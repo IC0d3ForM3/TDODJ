@@ -1,0 +1,285 @@
+<section class="game-page">
+	<header class="game-header">
+		<h2 class="game-title">{{ gameName() }}</h2>
+		@if (gameLastUpdated(); as updated) {
+			<p class="game-subtitle">Last updated: {{ updated }}</p>
+		}
+	</header>
+
+	@if (isLoadingGame()) {
+		<p class="status-message">Loading game...</p>
+	} @else if (gameLoadError(); as loadErrorText) {
+		<p class="status-message status-message-error">{{ loadErrorText }}</p>
+	} @else {
+		@if (gridPreviewContext(); as preview) {
+			<section class="game-layout" aria-label="Game play area">
+			<section class="visual-panel-stack">
+				<div class="canvas-panel">
+					<h3 class="panel-title">First Person</h3>
+					<app-dungeon-first-person
+						[preview]="preview"
+						[cheater]="previewCheaterForView()"
+						[squares]="previewSquaresForView()"
+						[filledSquares]="previewFilledSquaresForView()"
+						[tresherPlacements]="previewTresherPlacementsForView()"
+						[monsterPlacements]="previewLiveMonsterPlacementsForView()"
+						[keyList]="keyList"
+						[squareTexts]="previewSquareTextsForView()"
+						[monsterImagesBySquare]="previewMonsterImagesBySquareForView()"
+					></app-dungeon-first-person>
+				</div>
+
+				<div class="canvas-panel">
+					<h3 class="panel-title">10x10 Map</h3>
+					<div class="map-with-pad" aria-label="Map direction controls">
+						<div class="map-canvas-wrap">
+							<app-dungeon-preview-grid
+								[preview]="preview"
+								[cheater]="previewCheaterForView()"
+								[squares]="previewSquaresForView()"
+								[filledSquares]="previewFilledSquaresForView()"
+								[tresherPlacements]="previewTresherPlacementsForView()"
+								[monsterPlacements]="previewLiveMonsterPlacementsForView()"
+								[keyList]="keyList"
+								[startPoint]="previewStartPointForView()"
+								[squareTexts]="previewSquareTextsForView()"
+							></app-dungeon-preview-grid>
+						</div>
+
+						<div class="direction-pad" aria-label="Direction pad">
+							@for (button of directionPadButtons; track $index) {
+								<button
+									type="button"
+									class="direction-pad-button"
+									[class.direction-pad-button-center]="button.direction === 'center'"
+									[class.is-active]="isFacingDirectionActive(button.direction)"
+									[attr.aria-label]="button.ariaLabel"
+									(click)="setFacingDirectionFromPad(button.direction)"
+								>
+									{{ button.label }}
+								</button>
+							}
+						</div>
+					</div>
+				</div>
+
+				<p class="controls-help">
+					Use <strong>Arrow Keys</strong> or the pad to face a direction. Press <strong>Space</strong> or
+					the pad <strong>F</strong> button to move forward, or <strong>B</strong> to move backward.
+					Press <strong>A</strong> to attack an adjacent monster.
+				</p>
+			</section>
+
+			<section class="right-panel-stack">
+				<aside class="info-panel" aria-label="Nearby discoveries">
+					<h3 class="panel-title panel-title-light">What You See</h3>
+
+				<div class="info-tabs" role="tablist" aria-label="Info panel tabs">
+					<button
+						type="button"
+						class="info-tab-button"
+						[class.is-active]="activeInfoPanelTab() === 'nearby'"
+						[attr.aria-selected]="activeInfoPanelTab() === 'nearby'"
+						(click)="setActiveInfoPanelTab('nearby')"
+					>
+						Nearby
+					</button>
+					<button
+						type="button"
+						class="info-tab-button"
+						[class.is-active]="activeInfoPanelTab() === 'inventory'"
+						[attr.aria-selected]="activeInfoPanelTab() === 'inventory'"
+						(click)="setActiveInfoPanelTab('inventory')"
+					>
+						Inventory
+					</button>
+				</div>
+
+				@if (activeInfoPanelTab() === 'nearby') {
+					@if (nearbyDoorsForPreview().length > 0) {
+						<ul class="discovery-list">
+							@for (doorInfo of nearbyDoorsForPreview(); track doorInfo.door.id) {
+								<li class="discovery-item discovery-item-door">
+									<span class="discovery-kind">Door</span>
+									<p class="discovery-name">{{ doorInfo.door.name || 'Door' }} ({{ doorInfo.direction }})</p>
+									<p class="discovery-description">
+										@if (doorInfo.door.state === 'open') {
+											This door is open.
+										} @else if (doorInfo.door.isLocked) {
+											This door is locked.
+											@if (doorInfo.canUnlock) {
+												You have a key that fits.
+											}
+										} @else {
+											This door is closed.
+										}
+									</p>
+									<div class="door-actions">
+										@if (doorInfo.canOpen) {
+											<button type="button" class="action-button action-button-strong" (click)="openAdjacentDoor(doorInfo)">
+												Open Door
+											</button>
+										}
+										@if (doorInfo.canUnlock) {
+											<button type="button" class="action-button action-button-key" (click)="unlockAdjacentDoor(doorInfo)">
+												Use Key
+											</button>
+										}
+									</div>
+								</li>
+							}
+						</ul>
+					}
+
+					@if (nearbyItemsForPreview().length > 0) {
+						<ul class="discovery-list">
+							@for (item of nearbyItemsForPreview(); track item.kind + ':' + item.row + ':' + item.column + ':' + item.name) {
+								<li class="discovery-item">
+									<span class="discovery-kind">{{ item.kind }}</span>
+									<p class="discovery-name">{{ item.name }}</p>
+									<p class="discovery-description">{{ item.description }}</p>
+								</li>
+							}
+						</ul>
+					} @else {
+						<p class="discovery-empty">No key or tresher in your current or front square.</p>
+					}
+
+					@if (hasCurrentSquarePickupItems()) {
+						<div class="action-buttons">
+							<button type="button" class="action-button" (click)="lookForTrapsAtCurrentSquare()">
+								Look for Traps
+							</button>
+							<button type="button" class="action-button action-button-strong" (click)="takeAllFromCurrentSquare()">
+								Take All
+							</button>
+							@if (canTakeSomeFromCurrentSquare()) {
+								<button type="button" class="action-button" (click)="takeSomeFromCurrentSquare()">
+									Take Some
+								</button>
+							}
+						</div>
+					}
+				} @else {
+					<div class="inventory-summary">
+						<p class="inventory-summary-line">
+							Hands Equipped: {{ inventoryHandsUsedForPreview() }} / {{ maxEquippableHands }}
+						</p>
+						<p class="inventory-summary-line">
+							Armor Equipped: {{ equippedArmorSummaryForPreview() }}
+						</p>
+					</div>
+
+					@if (hasInventoryItemsForPreview()) {
+						@if (inventoryKeysForPreview().length > 0) {
+							<p class="inventory-section-title">Keys</p>
+							<ul class="discovery-list">
+								@for (key of inventoryKeysForPreview(); track key.id + ':' + $index) {
+									<li class="discovery-item">
+										<span class="discovery-kind">Key</span>
+										<p class="discovery-name">{{ key.name || 'Unnamed Key' }}</p>
+										<p class="discovery-description">{{ key.description || 'No description.' }}</p>
+									</li>
+								}
+							</ul>
+						}
+
+						@if (inventoryTreshersForPreview().length > 0) {
+							<p class="inventory-section-title">Tresher Items</p>
+							<ul class="discovery-list">
+								@for (tresher of inventoryTreshersForPreview(); track tresher.id + ':' + $index) {
+									<li class="discovery-item">
+										<span class="discovery-kind">{{ tresher.type }}</span>
+										<p class="discovery-name">{{ tresher.name || 'Unnamed Tresher' }}</p>
+										<p class="discovery-description">{{ tresher.description || 'No description.' }}</p>
+										<p class="inventory-meta">{{ getInventoryTresherMeta(tresher) }}</p>
+
+										@if (isTresherEquipable(tresher) || isHealingPotion(tresher)) {
+											<div class="inventory-item-actions">
+												@if (isTresherEquipable(tresher)) {
+													<button
+														type="button"
+														class="action-button"
+														[class.action-button-strong]="isInventoryTresherEquipped($index)"
+														(click)="toggleInventoryTresherEquipped($index)"
+													>
+														{{ isInventoryTresherEquipped($index) ? 'Unequip' : 'Equip' }}
+													</button>
+												}
+												@if (isHealingPotion(tresher)) {
+													<button
+														type="button"
+														class="action-button action-button-strong"
+														[disabled]="!canUseHealingPotion(tresher)"
+														(click)="useInventoryHealingPotion($index)"
+													>
+														Use Potion
+													</button>
+												}
+												@if (isInventoryTresherEquipped($index)) {
+													<span class="inventory-equipped-status">Equipped</span>
+												}
+											</div>
+										}
+									</li>
+								}
+							</ul>
+						}
+					} @else {
+						<p class="discovery-empty">Inventory is empty.</p>
+					}
+				}
+
+				@if (previewActionMessage(); as actionMessage) {
+					<p class="action-message">{{ actionMessage }}</p>
+				}
+			</aside>
+
+				<div class="combat-bar" aria-label="Combat status">
+					<div class="combat-stats">
+						<span class="stat-badge stat-hp">
+							HP: {{ playerHp() }} / {{ playerMaxHp() }}
+						</span>
+						<span class="stat-badge stat-ae">
+							AE: {{ playerAE() }} / {{ playerMaxAE }}
+						</span>
+						<span class="stat-badge stat-phase">
+							@if (turnPhase() === 'player') {
+								Your Turn
+							} @else if (turnPhase() === 'monsters') {
+								Monster Turn...
+							} @else {
+								Game Over
+							}
+						</span>
+					</div>
+					@if (turnPhase() === 'player') {
+						<div class="combat-actions">
+							<button type="button" class="action-button action-button-strong" (click)="tryPlayerAttack()">
+								Attack (A)
+							</button>
+							<button type="button" class="action-button" (click)="endPlayerTurnEarly()">
+								End Turn
+							</button>
+						</div>
+					}
+					@if (turnPhase() === 'gameover') {
+						<p class="combat-gameover">You have fallen. Your adventure ends here.</p>
+					}
+				</div>
+
+				@if (combatLog().length > 0) {
+					<div class="combat-log" aria-label="Combat log">
+						<h4 class="combat-log-title">Combat Log</h4>
+						<ul class="combat-log-list">
+							@for (entry of combatLog(); track $index) {
+								<li class="combat-log-entry">{{ entry.text }}</li>
+							}
+						</ul>
+					</div>
+				}
+			</section>
+			</section>
+		}
+	}
+</section>

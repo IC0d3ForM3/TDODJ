@@ -1,0 +1,1126 @@
+<section class="dashboard-wrap dashboard-tabs-wrap" aria-label="Dashboard tabs">
+	<nav class="dashboard-tabs-nav" aria-label="Dashboard sections">
+		@for (tab of dashboardTabs; track tab.id) {
+			<button
+				type="button"
+				class="dashboard-tab-button"
+				[class.dashboard-tab-button-active]="isDashboardTabActive(tab.id)"
+				(click)="setActiveDashboardTab(tab.id)"
+			>
+				{{ tab.label }}
+			</button>
+		}
+	</nav>
+</section>
+
+@if (activeDashboardTab() === 'published-games') {
+<section class="dashboard-wrap" aria-label="Available games">
+	<h3 class="dashboard-title">Available Games</h3>
+
+	@if (isLoadingPublishedGames()) {
+		<p class="dashboard-message">Loading available games...</p>
+	} @else if (publishedGamesError()) {
+		<p class="dashboard-message dashboard-message-error">{{ publishedGamesError() }}</p>
+	} @else if (publishedGames().length === 0) {
+		<p class="dashboard-message">No available games yet.</p>
+	} @else {
+		<ul class="dashboard-list">
+			@for (game of publishedGames(); track game.id) {
+				<li class="dashboard-list-item">
+					<button
+						type="button"
+						class="dashboard-game-button"
+						[class.dashboard-tab-button-active]="pendingStartGame()?.id === game.id"
+						[disabled]="isStartingGameId() === game.id"
+						(click)="selectGameForStart(game)"
+					>
+						<span class="dashboard-game-name">{{ game.name }}</span>
+						<small class="dashboard-game-meta">ID {{ game.id }} | {{ game.status }}</small>
+						@if (isStartingGameId() === game.id) {
+							<small class="dashboard-game-meta">Starting...</small>
+						}
+					</button>
+				</li>
+			}
+		</ul>
+
+		@if (pendingStartGame()) {
+			<div class="dashboard-pc-picker" style="margin-top: 0.8rem">
+				<h4 class="dashboard-subtitle">Select a PC for "{{ pendingStartGame()!.name }}"</h4>
+
+				@if (isLoadingUserPcs()) {
+					<p class="dashboard-message">Loading your PCs...</p>
+				} @else if (userPcs().length === 0) {
+					<p class="dashboard-message">You have no PCs. Create one in the PC tab first.</p>
+				} @else {
+					<ul class="dashboard-list">
+						@for (pc of userPcs(); track pc.id) {
+							<li class="dashboard-list-item">
+								<button
+									type="button"
+									class="dashboard-game-button"
+									[class.dashboard-tab-button-active]="selectedStartPcId() === pc.id"
+									(click)="selectedStartPcId.set(pc.id)"
+								>
+									<span class="dashboard-game-name">{{ pc.name }}</span>
+									<small class="dashboard-game-meta">{{ pc.species }} {{ pc.type }} | Lvl {{ pc.level }} | HP {{ pc.currentHP }}/{{ pc.maxHP }}</small>
+								</button>
+							</li>
+						}
+					</ul>
+
+					<div class="tresher-form-actions" style="margin-top: 0.6rem">
+						<button
+							type="button"
+							class="dashboard-action-button"
+							[disabled]="!selectedStartPcId() || isStartingGameId() !== null"
+							(click)="confirmStartGame()"
+						>
+							@if (isStartingGameId() !== null) {
+								Starting...
+							} @else {
+								Start Game
+							}
+						</button>
+						<button
+							type="button"
+							class="dashboard-action-button dashboard-action-button-muted"
+							(click)="cancelStartGame()"
+						>
+							Cancel
+						</button>
+					</div>
+				}
+			</div>
+		}
+
+		@if (startGameMessage()) {
+			<p class="dashboard-message" style="margin-top: 0.6rem">{{ startGameMessage() }}</p>
+		}
+	}
+</section>
+
+}
+
+@if (activeDashboardTab() === 'active-games') {
+<section class="dashboard-wrap" aria-label="Active games">
+	<h3 class="dashboard-title">Active Games</h3>
+
+	@if (!isLoggedIn()) {
+		<p class="dashboard-message">Log in to see your active games.</p>
+	} @else if (isLoadingActiveGames()) {
+		<p class="dashboard-message">Loading active games...</p>
+	} @else if (activeGamesError()) {
+		<p class="dashboard-message dashboard-message-error">{{ activeGamesError() }}</p>
+	} @else if (activeGames().length === 0) {
+		<p class="dashboard-message">No active games yet. Start a published game to see it here!</p>
+	} @else {
+		<ul class="dashboard-list">
+			@for (game of activeGames(); track game.id) {
+				<li class="dashboard-list-item">
+					<button
+						type="button"
+						class="dashboard-game-button"
+						(click)="resumeActiveGame(game)"
+					>
+						<span class="dashboard-game-name">{{ game.name }}</span>
+						<small class="dashboard-game-meta">Created {{ game.createdat | date:'short' }} · Last played {{ game.lastupdated | date:'short' }}</small>
+					</button>
+					<button
+						type="button"
+						class="dashboard-action-button dashboard-action-button-small dashboard-action-button-muted"
+						[disabled]="isDeletingGameId() === game.id"
+						(click)="deleteActiveGame(game)"
+					>
+						@if (isDeletingGameId() === game.id) {
+							Deleting...
+						} @else {
+							Delete
+						}
+					</button>
+				</li>
+			}
+		</ul>
+
+		@if (deleteGameMessage()) {
+			<p class="dashboard-message" style="margin-top: 0.6rem">{{ deleteGameMessage() }}</p>
+		}
+	}
+</section>
+}
+
+@if (activeDashboardTab() === 'friend') {
+<section class="dashboard-wrap dashboard-wrap-secondary" aria-label="Friends">
+	<h3 class="dashboard-title">Friends</h3>
+
+	@if (!isLoggedIn()) {
+		<p class="dashboard-message">Log in to add and view friends.</p>
+	} @else {
+		<form class="tresher-form" [formGroup]="userFriendForm" (ngSubmit)="saveFriend()">
+			<div class="tresher-form-grid">
+				<label class="tresher-field">
+					<span>Friend Email</span>
+					<input type="email" formControlName="email" placeholder="friend@example.com" />
+				</label>
+			</div>
+
+			<div class="tresher-form-actions">
+				<button type="submit" class="dashboard-action-button" [disabled]="isSavingUserFriend()">
+					@if (isSavingUserFriend()) {
+						Saving...
+					} @else {
+						Save Friend
+					}
+				</button>
+			</div>
+		</form>
+
+		@if (userFriendSaveMessage()) {
+			<p class="dashboard-message" style="margin-top: 0.6rem">{{ userFriendSaveMessage() }}</p>
+		}
+
+		<div class="tresher-list-wrap">
+			<h4 class="dashboard-subtitle">Active Friends</h4>
+
+			@if (isLoadingUserFriends()) {
+				<p class="dashboard-message">Loading your friends...</p>
+			} @else if (userFriendsError()) {
+				<p class="dashboard-message dashboard-message-error">{{ userFriendsError() }}</p>
+			} @else if (userFriends().length === 0) {
+				<p class="dashboard-message">No active friends yet.</p>
+			} @else {
+				<ul class="dashboard-list">
+					@for (item of userFriends(); track item.id) {
+						<li class="dashboard-list-item">
+							<div class="tresher-list-row">
+								<div>
+									<p class="dashboard-game-name">{{ item.friendEmail }}</p>
+									<small class="dashboard-game-meta">
+										ID {{ item.id }} | {{ item.isActiveFriend ? 'Active' : 'Inactive' }}
+									</small>
+								</div>
+							</div>
+						</li>
+					}
+				</ul>
+			}
+		</div>
+	}
+</section>
+}
+
+@if (activeDashboardTab() === 'monsters') {
+
+<section class="dashboard-wrap dashboard-wrap-secondary" aria-label="My monsters">
+	<div class="dashboard-section-header">
+		<h3 class="dashboard-title">My Monsters</h3>
+		<button type="button" class="dashboard-toggle-button" (click)="toggleMonsterSectionVisibility()">
+			{{ isMonsterSectionVisible() ? 'Hide' : 'Show' }}
+		</button>
+	</div>
+
+	@if (!isMonsterSectionVisible()) {
+		<p class="dashboard-message dashboard-subtle">Monster section is hidden.</p>
+	} @else if (!isLoggedIn()) {
+		<p class="dashboard-message">Log in to add or edit your monsters.</p>
+	} @else {
+		<form class="monster-form" [formGroup]="userMonsterForm" (ngSubmit)="saveMonster()">
+			<div class="tresher-form-grid">
+				<label class="tresher-field">
+					<span>Image</span>
+					<select formControlName="imageId">
+						<option [ngValue]="null">No Image</option>
+						@for (image of monsterImageOptions(); track image.id) {
+							<option [ngValue]="image.id">{{ image.name }} (ID {{ image.id }})</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Name</span>
+					<input type="text" formControlName="name" placeholder="Monster name" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Type</span>
+					<input type="text" formControlName="type" placeholder="Monster type" />
+				</label>
+
+				<label class="tresher-field tresher-field-wide">
+					<span>Description</span>
+					<input type="text" formControlName="description" placeholder="Description" />
+				</label>
+
+				<label class="tresher-field">
+					<span>HP</span>
+					<input type="number" formControlName="hp" min="0" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Movement Economy</span>
+					<input type="number" formControlName="movementEconomy" min="0" />
+				</label>
+
+				<label class="tresher-field">
+					<span>AC</span>
+					<input type="number" formControlName="ac" min="0" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Run At</span>
+					<input type="number" formControlName="runAt" min="0" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Number Of Attacks</span>
+					<input type="number" formControlName="numberOfAttacks" min="0" />
+				</label>
+			</div>
+
+			@if (isLoadingMonsterImageOptions()) {
+				<p class="dashboard-message dashboard-subtle">Loading image options...</p>
+			} @else if (monsterImageOptionsError()) {
+				<p class="dashboard-message dashboard-message-error">{{ monsterImageOptionsError() }}</p>
+			}
+
+			@if (selectedMonsterImageUrl()) {
+				<div class="monster-selected-image-wrap">
+					<img
+						class="dashboard-image-thumb monster-selected-image"
+						[src]="selectedMonsterImageUrl()"
+						[alt]="selectedMonsterImageName() || 'Selected monster image'"
+					/>
+					<p class="dashboard-message dashboard-subtle">Selected: {{ selectedMonsterImageName() }}</p>
+				</div>
+			}
+
+			<div class="monster-treshers-wrap">
+				<div class="monster-treshers-header">
+					<h4 class="dashboard-subtitle">Monster Treshers</h4>
+					<button
+						type="button"
+						class="dashboard-action-button dashboard-action-button-small dashboard-action-button-muted"
+						(click)="addMonsterTresher()"
+					>
+						Add Tresher
+					</button>
+				</div>
+
+				<div class="monster-treshers-list" formArrayName="tresherIds">
+					@for (tresherControl of monsterTresherControls(); track $index) {
+						<div class="monster-tresher-row">
+							<label class="tresher-field monster-tresher-select">
+								<span>Tresher</span>
+								<select [formControlName]="$index">
+									<option [ngValue]="null">No Tresher</option>
+									@for (tresher of monsterTresherOptions(); track tresher.id) {
+										<option [ngValue]="tresher.id">{{ tresher.name }} (ID {{ tresher.id }})</option>
+									}
+								</select>
+							</label>
+
+							<button
+								type="button"
+								class="dashboard-action-button dashboard-action-button-small dashboard-action-button-muted monster-tresher-remove"
+								(click)="removeMonsterTresher($index)"
+								[disabled]="monsterTresherControls().length === 1"
+							>
+								Remove
+							</button>
+						</div>
+					}
+				</div>
+
+				@if (isLoadingMonsterTresherOptions()) {
+					<p class="dashboard-message dashboard-subtle">Loading tresher options...</p>
+				} @else if (monsterTresherOptionsError()) {
+					<p class="dashboard-message dashboard-message-error">{{ monsterTresherOptionsError() }}</p>
+				}
+
+				<p class="dashboard-message dashboard-subtle">Selected treshers: {{ selectedMonsterTresherSummary() }}</p>
+			</div>
+
+			<div class="monster-attacks-wrap">
+				<div class="monster-attacks-header">
+					<h4 class="dashboard-subtitle">Attack Details</h4>
+					<button
+						type="button"
+						class="dashboard-action-button dashboard-action-button-small dashboard-action-button-muted"
+						(click)="addMonsterAttack()"
+					>
+						Add Attack
+					</button>
+				</div>
+
+				<div class="monster-attacks-list" formArrayName="attacks">
+					@for (attackForm of monsterAttackControls(); track $index) {
+						<div class="monster-attack-row" [formGroupName]="$index">
+							<label class="tresher-field monster-attack-description">
+								<span>Description</span>
+								<input type="text" formControlName="description" placeholder="Bite, Claw, Spell" />
+							</label>
+
+							<label class="tresher-field">
+								<span>Damage</span>
+								<input type="number" formControlName="damage" min="0" />
+							</label>
+
+							<label class="tresher-field">
+								<span>Plus To Hit</span>
+								<input type="number" formControlName="plusToHit" />
+							</label>
+
+							<button
+								type="button"
+								class="dashboard-action-button dashboard-action-button-small dashboard-action-button-muted monster-attack-remove"
+								(click)="removeMonsterAttack($index)"
+								[disabled]="monsterAttackControls().length === 1"
+							>
+								Remove
+							</button>
+						</div>
+					}
+				</div>
+			</div>
+
+			<label class="tresher-field-checkbox">
+				<input type="checkbox" formControlName="isPublic" [disabled]="!isAdminUser()" />
+				<span>Public</span>
+			</label>
+
+			@if (!isAdminUser()) {
+				<p class="dashboard-message dashboard-subtle">Only admins can mark a monster as public.</p>
+			}
+
+			<div class="tresher-form-actions">
+				<button type="submit" class="dashboard-action-button" [disabled]="isSavingUserMonster()">
+					@if (isSavingUserMonster()) {
+						Saving...
+					} @else if (editingUserMonsterId() !== null) {
+						Update Monster
+					} @else {
+						Add Monster
+					}
+				</button>
+
+				@if (editingUserMonsterId() !== null) {
+					<button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="cancelEditMonster()">
+						Cancel Edit
+					</button>
+				}
+
+				<button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="beginCreateMonster()">
+					New Blank
+				</button>
+			</div>
+		</form>
+
+		@if (userMonsterSaveMessage()) {
+			<p class="dashboard-message" style="margin-top: 0.6rem">{{ userMonsterSaveMessage() }}</p>
+		}
+
+		<div class="monster-list-wrap">
+			<h4 class="dashboard-subtitle">Your Monster Library</h4>
+
+			@if (isLoadingUserMonsters()) {
+				<p class="dashboard-message">Loading your monsters...</p>
+			} @else if (userMonstersError()) {
+				<p class="dashboard-message dashboard-message-error">{{ userMonstersError() }}</p>
+			} @else if (userMonsters().length === 0) {
+				<p class="dashboard-message">No monsters yet. Add your first one above.</p>
+			} @else {
+				<ul class="dashboard-list">
+					@for (item of userMonsters(); track item.id) {
+						<li class="dashboard-list-item">
+							<div class="tresher-list-row">
+								<div>
+									@if (monsterImageUrlForMonster(item)) {
+										<img
+											class="dashboard-image-thumb monster-inline-image"
+											[src]="monsterImageUrlForMonster(item)"
+											[alt]="item.name"
+										/>
+									}
+
+									<p class="dashboard-game-name">{{ item.name }}</p>
+									<small class="dashboard-game-meta">
+										ID {{ item.id }} | {{ item.type }} | {{ item.imageId === null ? 'No Image' : ('Image ' + item.imageId) }} | Treshers {{ monsterTresherSummaryForMonster(item) }} | {{ item.isPublic ? 'Public' : 'Private' }}
+									</small>
+									<p class="tresher-description">{{ item.description || 'No description.' }}</p>
+									<p class="tresher-description">
+										HP {{ item.hp }} | Move {{ item.movementEconomy }} | AC {{ item.ac }} | Run At {{ item.runAt }} | Attacks {{ item.numberOfAttacks }}
+									</p>
+
+									@if (item.attacks.length > 0) {
+										<ul class="monster-attack-summary-list">
+											@for (attack of item.attacks; track $index) {
+												<li>
+													{{ attack.description || 'Attack' }} | Damage {{ attack.damage }} | +To Hit {{ attack.plusToHit }}
+												</li>
+											}
+										</ul>
+									}
+								</div>
+
+								<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editMonster(item)">
+									Edit
+								</button>
+							</div>
+						</li>
+					}
+				</ul>
+			}
+		</div>
+	}
+</section>
+
+}
+
+@if (activeDashboardTab() === 'images') {
+
+<section class="dashboard-wrap dashboard-wrap-secondary" aria-label="My images">
+	<div class="dashboard-section-header">
+		<h3 class="dashboard-title">My Images</h3>
+		<button type="button" class="dashboard-toggle-button" (click)="toggleImageSectionVisibility()">
+			{{ isImageSectionVisible() ? 'Hide' : 'Show' }}
+		</button>
+	</div>
+
+	@if (!isImageSectionVisible()) {
+		<p class="dashboard-message dashboard-subtle">Image section is hidden.</p>
+	} @else if (!isLoggedIn()) {
+		<p class="dashboard-message">Log in to upload or edit your images.</p>
+	} @else {
+		<form class="image-form" [formGroup]="userImageForm" (ngSubmit)="saveImage()">
+			<div class="tresher-form-grid">
+				<label class="tresher-field">
+					<span>Name</span>
+					<input type="text" formControlName="name" placeholder="Image name" />
+				</label>
+
+				<label class="tresher-field tresher-field-wide">
+					<span>Path (auto set on upload)</span>
+					<input type="text" formControlName="path" placeholder="/images/my-file.png" />
+				</label>
+
+				<label class="tresher-field image-file-field">
+					<span>Upload File</span>
+					<input
+						type="file"
+						accept="image/*"
+						(change)="onImageFileSelected($event)"
+						[disabled]="editingUserImageId() !== null || isSavingUserImage()"
+					/>
+				</label>
+			</div>
+
+			@if (editingUserImageId() === null && selectedImageUploadName()) {
+				<p class="dashboard-message dashboard-subtle">Selected file: {{ selectedImageUploadName() }}</p>
+			}
+
+			@if (editingUserImageId() !== null) {
+				<p class="dashboard-message dashboard-subtle">
+					Editing metadata only. To replace the file, create a new image upload.
+				</p>
+			}
+
+			<div class="image-checkbox-row">
+				<label class="tresher-field-checkbox">
+					<input type="checkbox" formControlName="isActive" />
+					<span>Active</span>
+				</label>
+
+				<label class="tresher-field-checkbox">
+					<input type="checkbox" formControlName="isPublic" [disabled]="!isAdminUser()" />
+					<span>Public</span>
+				</label>
+			</div>
+
+			@if (!isAdminUser()) {
+				<p class="dashboard-message dashboard-subtle">Only admins can mark an image as public.</p>
+			}
+
+			<div class="tresher-form-actions">
+				<button type="submit" class="dashboard-action-button" [disabled]="isSavingUserImage()">
+					@if (isSavingUserImage()) {
+						Saving...
+					} @else if (editingUserImageId() !== null) {
+						Update Image
+					} @else {
+						Upload Image
+					}
+				</button>
+
+				@if (editingUserImageId() !== null) {
+					<button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="cancelEditImage()">
+						Cancel Edit
+					</button>
+				}
+
+				<button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="beginCreateImage()">
+					New Blank
+				</button>
+			</div>
+		</form>
+
+		@if (userImageSaveMessage()) {
+			<p class="dashboard-message" style="margin-top: 0.6rem">{{ userImageSaveMessage() }}</p>
+		}
+
+		<div class="image-list-wrap">
+			<h4 class="dashboard-subtitle">Your Image Library</h4>
+
+			@if (isLoadingUserImages()) {
+				<p class="dashboard-message">Loading your images...</p>
+			} @else if (userImagesError()) {
+				<p class="dashboard-message dashboard-message-error">{{ userImagesError() }}</p>
+			} @else if (userImages().length === 0) {
+				<p class="dashboard-message">No images yet. Upload your first one above.</p>
+			} @else {
+				<ul class="dashboard-list">
+					@for (item of userImages(); track item.id) {
+						<li class="dashboard-list-item">
+							<div class="image-list-row">
+								<div class="image-list-preview">
+									@if (resolveImageUrl(item.path)) {
+										<img class="dashboard-image-thumb" [src]="resolveImageUrl(item.path)" [alt]="item.name" />
+									} @else {
+										<div class="dashboard-image-thumb dashboard-image-thumb-empty">No Image</div>
+									}
+								</div>
+
+								<div class="image-list-details">
+									<p class="dashboard-game-name">{{ item.name }}</p>
+									<small class="dashboard-game-meta">
+										ID {{ item.id }} | {{ item.isPublic ? 'Public' : 'Private' }} | {{ item.isActive ? 'Active' : 'Inactive' }}
+									</small>
+									<p class="tresher-description image-path">{{ item.path }}</p>
+								</div>
+
+								<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editImage(item)">
+									Edit
+								</button>
+							</div>
+						</li>
+					}
+				</ul>
+			}
+		</div>
+	}
+</section>
+
+}
+
+@if (activeDashboardTab() === 'treshers') {
+
+<section class="dashboard-wrap dashboard-wrap-secondary" aria-label="My treshers">
+	<div class="dashboard-section-header">
+		<h3 class="dashboard-title">My Treshers</h3>
+		<button type="button" class="dashboard-toggle-button" (click)="toggleTresherSectionVisibility()">
+			{{ isTresherSectionVisible() ? 'Hide' : 'Show' }}
+		</button>
+	</div>
+
+	@if (!isTresherSectionVisible()) {
+		<p class="dashboard-message dashboard-subtle">Tresher section is hidden.</p>
+	} @else if (!isLoggedIn()) {
+		<p class="dashboard-message">Log in to add or edit your treshers.</p>
+	} @else {
+		<form class="tresher-form" [formGroup]="userTresherForm" (ngSubmit)="saveTresher()">
+			<div class="tresher-form-grid">
+				<label class="tresher-field">
+					<span>Type</span>
+					<select formControlName="type">
+						@for (type of tresherTypeOptions; track type) {
+							<option [value]="type">{{ type }}</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Name</span>
+					<input type="text" formControlName="name" placeholder="Tresher name" />
+				</label>
+
+				<label class="tresher-field tresher-field-wide">
+					<span>Description</span>
+					<input type="text" formControlName="description" placeholder="Description" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Worth</span>
+					<input type="number" formControlName="worth" min="0" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Trap ID</span>
+					<input type="number" formControlName="trapID" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Curse ID</span>
+					<input type="number" formControlName="curseID" />
+				</label>
+
+				@if (shouldTresherHaveHp()) {
+					<label class="tresher-field">
+						<span>HP</span>
+						<input type="number" formControlName="HP" />
+					</label>
+				}
+
+				@if (isWeaponTresherSelected()) {
+					<label class="tresher-field">
+						<span>Damage</span>
+						<input type="number" formControlName="damage" />
+					</label>
+
+					<label class="tresher-field">
+						<span>Hands</span>
+						<input type="number" formControlName="hands" min="1" />
+					</label>
+
+					<label class="tresher-field">
+						<span>Range</span>
+						<input type="number" formControlName="range" min="0" />
+					</label>
+
+					<label class="tresher-field">
+						<span>Ammo Type</span>
+						<input type="text" formControlName="ammoType" />
+					</label>
+				}
+
+				@if (isArmorTresherSelected()) {
+					<label class="tresher-field">
+						<span>Hands</span>
+						<input type="number" formControlName="hands" min="0" />
+					</label>
+
+					<label class="tresher-field">
+						<span>Speed Reduction</span>
+						<input type="number" formControlName="speedReduction" />
+					</label>
+
+					<label class="tresher-field">
+						<span>Armor Type</span>
+						<select formControlName="armorType">
+							@for (type of armorTypeOptions; track type) {
+								<option [value]="type">{{ type }}</option>
+							}
+						</select>
+					</label>
+				}
+
+				@if (isCoinsTresherSelected()) {
+					<label class="tresher-field">
+						<span>Coin Type</span>
+						<select formControlName="coinType">
+							@for (type of coinTypeOptions; track type) {
+								<option [value]="type">{{ type }}</option>
+							}
+						</select>
+					</label>
+				}
+
+				@if (isPotionTresherSelected()) {
+					<label class="tresher-field">
+						<span>Effect Number</span>
+						<input type="number" formControlName="effectNumber" />
+					</label>
+
+					<label class="tresher-field">
+						<span>Affects</span>
+						<select formControlName="effectTarget">
+							@for (target of potionEffectTargetOptions; track target) {
+								<option [value]="target">{{ target }}</option>
+							}
+						</select>
+					</label>
+
+					@if (userTresherForm.controls.effectTarget.value === 'AC' || userTresherForm.controls.effectTarget.value === 'AE') {
+						<label class="tresher-field">
+							<span>Duration (turns)</span>
+							<input type="number" formControlName="effectDuration" min="0" />
+						</label>
+					}
+				}
+			</div>
+
+			<label class="tresher-field-checkbox">
+				<input type="checkbox" formControlName="isPublic" [disabled]="!isAdminUser()" />
+				<span>Public</span>
+			</label>
+
+			@if (!isAdminUser()) {
+				<p class="dashboard-message dashboard-subtle">Only admins can mark a tresher as public.</p>
+			}
+
+			<div class="tresher-form-actions">
+				<button type="submit" class="dashboard-action-button" [disabled]="isSavingUserTresher()">
+					@if (isSavingUserTresher()) {
+						Saving...
+					} @else if (editingUserTresherId() !== null) {
+						Update Tresher
+					} @else {
+						Add Tresher
+					}
+				</button>
+
+				@if (editingUserTresherId() !== null) {
+					<button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="cancelEditTresher()">
+						Cancel Edit
+					</button>
+				}
+
+				<button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="beginCreateTresher()">
+					New Blank
+				</button>
+			</div>
+		</form>
+
+		@if (userTresherSaveMessage()) {
+			<p class="dashboard-message" style="margin-top: 0.6rem">{{ userTresherSaveMessage() }}</p>
+		}
+
+		<div class="tresher-list-wrap">
+			<h4 class="dashboard-subtitle">Your Tresher Library</h4>
+
+			@if (isLoadingUserTreshers()) {
+				<p class="dashboard-message">Loading your treshers...</p>
+			} @else if (userTreshersError()) {
+				<p class="dashboard-message dashboard-message-error">{{ userTreshersError() }}</p>
+			} @else if (userTreshers().length === 0) {
+				<p class="dashboard-message">No treshers yet. Add your first one above.</p>
+			} @else {
+				<ul class="dashboard-list">
+					@for (item of userTreshers(); track item.id) {
+						<li class="dashboard-list-item">
+							<div class="tresher-list-row">
+								<div>
+									<p class="dashboard-game-name">{{ item.name }}</p>
+									<small class="dashboard-game-meta">
+										ID {{ item.id }} | {{ item.type }} | {{ item.isPublic ? 'Public' : 'Private' }}
+									</small>
+									<p class="tresher-description">{{ item.description || 'No description.' }}</p>
+								</div>
+
+								<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editTresher(item)">
+									Edit
+								</button>
+							</div>
+						</li>
+					}
+				</ul>
+			}
+		</div>
+	}
+</section>
+
+}
+
+@if (activeDashboardTab() === 'pc') {
+<section class="dashboard-wrap dashboard-wrap-secondary" aria-label="PC">
+	<h3 class="dashboard-title">PC</h3>
+
+	@if (!isLoggedIn()) {
+		<p class="dashboard-message">Log in to add or edit your PCs.</p>
+	} @else {
+		<form class="monster-form" [formGroup]="userPcForm" (ngSubmit)="savePc()">
+			<div class="tresher-form-grid">
+				<label class="tresher-field">
+					<span>Name</span>
+					<input type="text" formControlName="name" placeholder="PC name" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Species</span>
+					<select formControlName="species" (change)="onPcSpeciesChanged()">
+						@for (species of pcSpeciesOptions; track species) {
+							<option [value]="species">{{ species }}</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Type</span>
+					<select formControlName="type">
+						@for (type of pcTypeOptions; track type) {
+							<option [value]="type">{{ type }}</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Image</span>
+					<select formControlName="imageId">
+						<option [ngValue]="null">No Image</option>
+						@for (image of monsterImageOptions(); track image.id) {
+							<option [ngValue]="image.id">{{ image.name }} (ID {{ image.id }})</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Max HP</span>
+					<input type="number" min="1" formControlName="maxHP" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Current HP</span>
+					<input type="number" min="0" formControlName="currentHP" />
+				</label>
+
+				<label class="tresher-field">
+					<span>AC</span>
+					<input type="number" min="0" formControlName="ac" />
+				</label>
+
+				<label class="tresher-field">
+					<span>ME</span>
+					<input type="number" min="0" formControlName="movementEconomy" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Poison Resist</span>
+					<input type="number" formControlName="poisonResest" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Magic Power (MP)</span>
+					<input type="number" formControlName="magicPower" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Level</span>
+					<input type="number" min="1" formControlName="level" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Strength</span>
+					<input type="number" formControlName="strength" />
+				</label>
+
+				<label class="tresher-field">
+					<span>Range Of View</span>
+					<input type="number" formControlName="rangeOfView" readonly />
+				</label>
+			</div>
+
+			@if (isLoadingMonsterImageOptions()) {
+				<p class="dashboard-message dashboard-subtle">Loading image options...</p>
+			} @else if (monsterImageOptionsError()) {
+				<p class="dashboard-message dashboard-message-error">{{ monsterImageOptionsError() }}</p>
+			}
+
+			@if (selectedPcImageUrl()) {
+				<div class="monster-selected-image-wrap">
+					<img
+						class="dashboard-image-thumb monster-selected-image"
+						[src]="selectedPcImageUrl()"
+						[alt]="selectedPcImageName() || 'Selected pc image'"
+					/>
+					<p class="dashboard-message dashboard-subtle">Selected: {{ selectedPcImageName() }}</p>
+				</div>
+			}
+
+			<div class="monster-treshers-wrap">
+				<div class="monster-treshers-header">
+					<h4 class="dashboard-subtitle">Treshers</h4>
+					<button
+						type="button"
+						class="dashboard-action-button dashboard-action-button-small dashboard-action-button-muted"
+						(click)="addPcTresher()"
+					>
+						Add Tresher
+					</button>
+				</div>
+
+				<div class="monster-treshers-list" formArrayName="tresherIds">
+					@for (tresherControl of pcTresherControls(); track $index) {
+						<div class="monster-tresher-row">
+							<label class="tresher-field monster-tresher-select">
+								<span>Tresher</span>
+								<select [formControlName]="$index">
+									<option [ngValue]="null">No Tresher</option>
+									@for (tresher of monsterTresherOptions(); track tresher.id) {
+										<option [ngValue]="tresher.id">{{ tresher.name }} (ID {{ tresher.id }})</option>
+									}
+								</select>
+							</label>
+
+							<button
+								type="button"
+								class="dashboard-action-button dashboard-action-button-small dashboard-action-button-muted monster-tresher-remove"
+								(click)="removePcTresher($index)"
+								[disabled]="pcTresherControls().length === 1"
+							>
+								Remove
+							</button>
+						</div>
+					}
+				</div>
+
+				@if (isLoadingMonsterTresherOptions()) {
+					<p class="dashboard-message dashboard-subtle">Loading tresher options...</p>
+				} @else if (monsterTresherOptionsError()) {
+					<p class="dashboard-message dashboard-message-error">{{ monsterTresherOptionsError() }}</p>
+				}
+
+				<p class="dashboard-message dashboard-subtle">Selected treshers: {{ selectedPcTresherSummary() }}</p>
+			</div>
+
+			<div class="tresher-form-grid">
+				<label class="tresher-field">
+					<span>Tresher (Primary)</span>
+					<select formControlName="primaryTresherId">
+						<option [ngValue]="null">None</option>
+						@for (tresher of availablePcLoadoutTreshers(); track tresher.id) {
+							<option [ngValue]="tresher.id">{{ tresher.name }} (ID {{ tresher.id }})</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Weapon</span>
+					<select formControlName="weaponTresherId">
+						<option [ngValue]="null">None</option>
+						@for (tresher of availablePcLoadoutTreshers(); track tresher.id) {
+							<option [ngValue]="tresher.id">{{ tresher.name }} (ID {{ tresher.id }})</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Equip Head Armor (1)</span>
+					<select formControlName="headArmorTresherId">
+						<option [ngValue]="null">None</option>
+						@for (tresher of availablePcLoadoutTreshers(); track tresher.id) {
+							<option [ngValue]="tresher.id">{{ tresher.name }} (ID {{ tresher.id }})</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Equip Body Armor (1)</span>
+					<select formControlName="bodyArmorTresherId">
+						<option [ngValue]="null">None</option>
+						@for (tresher of availablePcLoadoutTreshers(); track tresher.id) {
+							<option [ngValue]="tresher.id">{{ tresher.name }} (ID {{ tresher.id }})</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Equip Arm Armor 1 (2)</span>
+					<select formControlName="leftArmArmorTresherId">
+						<option [ngValue]="null">None</option>
+						@for (tresher of availablePcLoadoutTreshers(); track tresher.id) {
+							<option [ngValue]="tresher.id">{{ tresher.name }} (ID {{ tresher.id }})</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Equip Arm Armor 2 (2)</span>
+					<select formControlName="rightArmArmorTresherId">
+						<option [ngValue]="null">None</option>
+						@for (tresher of availablePcLoadoutTreshers(); track tresher.id) {
+							<option [ngValue]="tresher.id">{{ tresher.name }} (ID {{ tresher.id }})</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Equip Leg Armor 1 (2)</span>
+					<select formControlName="leftLegArmorTresherId">
+						<option [ngValue]="null">None</option>
+						@for (tresher of availablePcLoadoutTreshers(); track tresher.id) {
+							<option [ngValue]="tresher.id">{{ tresher.name }} (ID {{ tresher.id }})</option>
+						}
+					</select>
+				</label>
+
+				<label class="tresher-field">
+					<span>Equip Leg Armor 2 (2)</span>
+					<select formControlName="rightLegArmorTresherId">
+						<option [ngValue]="null">None</option>
+						@for (tresher of availablePcLoadoutTreshers(); track tresher.id) {
+							<option [ngValue]="tresher.id">{{ tresher.name }} (ID {{ tresher.id }})</option>
+						}
+					</select>
+				</label>
+			</div>
+
+			<div class="tresher-form-actions">
+				<button type="submit" class="dashboard-action-button" [disabled]="isSavingUserPc()">
+					@if (isSavingUserPc()) {
+						Saving...
+					} @else if (editingUserPcId() !== null) {
+						Update PC
+					} @else {
+						Add PC
+					}
+				</button>
+
+				@if (editingUserPcId() !== null) {
+					<button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="cancelEditPc()">
+						Cancel Edit
+					</button>
+				}
+
+				<button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="beginCreatePc()">
+					New Blank
+				</button>
+			</div>
+		</form>
+
+		@if (userPcSaveMessage()) {
+			<p class="dashboard-message" style="margin-top: 0.6rem">{{ userPcSaveMessage() }}</p>
+		}
+
+		<div class="monster-list-wrap">
+			<h4 class="dashboard-subtitle">Your PCs</h4>
+
+			@if (isLoadingUserPcs()) {
+				<p class="dashboard-message">Loading your PCs...</p>
+			} @else if (userPcsError()) {
+				<p class="dashboard-message dashboard-message-error">{{ userPcsError() }}</p>
+			} @else if (userPcs().length === 0) {
+				<p class="dashboard-message">No PCs yet. Add your first one above.</p>
+			} @else {
+				<ul class="dashboard-list">
+					@for (item of userPcs(); track item.id) {
+						<li class="dashboard-list-item">
+							<div class="tresher-list-row">
+								<div>
+									@if (pcImageUrlForPc(item)) {
+										<img
+											class="dashboard-image-thumb monster-inline-image"
+											[src]="pcImageUrlForPc(item)"
+											[alt]="item.name"
+										/>
+									}
+
+									<p class="dashboard-game-name">{{ item.name }}</p>
+									<small class="dashboard-game-meta">
+										ID {{ item.id }} | {{ item.species }} | {{ item.type }} | Lvl {{ item.level }}
+									</small>
+									<p class="tresher-description">
+										HP {{ item.currentHP }}/{{ item.maxHP }} | AC {{ item.ac }} | ME {{ item.movementEconomy }} | MP {{ item.magicPower }} | POV {{ item.rangeOfView }}
+									</p>
+									<p class="tresher-description">Treshers: {{ pcTresherSummaryForPc(item) }}</p>
+								</div>
+
+								<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editPc(item)">
+									Edit
+								</button>
+							</div>
+						</li>
+					}
+				</ul>
+			}
+		</div>
+	}
+</section>
+}

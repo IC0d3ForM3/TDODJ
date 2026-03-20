@@ -1,0 +1,607 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  ViewChild,
+  effect,
+  input,
+  untracked,
+} from '@angular/core';
+import { Door } from '../../interfaces/door';
+import { Key } from '../../interfaces/key';
+import { Square } from '../../interfaces/square';
+import { Wall } from '../../interfaces/wall';
+import {
+  AdjacentConnectionInfo,
+  Cheater,
+  DungonExit,
+  ExitTransitionType,
+  FacingDirection,
+  GridPreviewContext,
+  MonsterPlacement,
+  SquareSide,
+  SquareText,
+  StartPoint,
+  TresherPlacement,
+} from '../../interfaces/game';
+
+const DEFAULT_CHEATER: Cheater = {
+  name: 'Bob',
+  rangeOfSite: 5,
+  facingDir: 'right',
+  inventory: { keys: [], treshers: [] },
+};
+
+@Component({
+  selector: 'app-dungeon-preview-grid',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [],
+  templateUrl: './dungeon-preview-grid.html',
+})
+export class DungeonPreviewGridComponent {
+  private _canvasRef: ElementRef<HTMLCanvasElement> | null = null;
+
+  @ViewChild('canvas')
+  set canvasEl(value: ElementRef<HTMLCanvasElement> | undefined) {
+    this._canvasRef = value ?? null;
+    untracked(() => this.drawCanvas());
+  }
+
+  readonly preview = input.required<GridPreviewContext>();
+  readonly cheater = input.required<Cheater>();
+  readonly squares = input.required<Record<string, Square>>();
+  readonly filledSquares = input.required<Record<string, true>>();
+  readonly tresherPlacements = input<TresherPlacement[]>([]);
+  readonly monsterPlacements = input<MonsterPlacement[]>([]);
+  readonly keyList = input<Key[]>([]);
+  readonly exits = input<DungonExit[]>([]);
+  readonly startPoint = input<StartPoint | null>(null);
+  readonly squareTexts = input<SquareText[]>([]);
+
+  readonly cellSize = 18;
+  readonly dimension = 10;
+
+  get canvasWidth(): number {
+    return this.cellSize * this.dimension;
+  }
+
+  get canvasHeight(): number {
+    return this.cellSize * this.dimension;
+  }
+
+  constructor() {
+    effect(() => {
+      this.preview();
+      this.cheater();
+      this.squares();
+      this.filledSquares();
+      this.tresherPlacements();
+      this.monsterPlacements();
+      this.keyList();
+      this.exits();
+      this.startPoint();
+      this.squareTexts();
+      untracked(() => this.drawCanvas());
+    });
+  }
+
+  private drawCanvas(): void {
+    const canvas = this._canvasRef?.nativeElement;
+    const preview = this.preview();
+    if (!canvas) {
+      return;
+    }
+
+    const width = this.canvasWidth;
+    const height = this.canvasHeight;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return;
+    }
+
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = '#000000';
+    context.fillRect(0, 0, width, height);
+
+    const filledSquares = this.filledSquares();
+    const visibleSquareKeys = this.getVisibleSquareKeysForPreview(preview);
+
+    context.fillStyle = '#c7c7c7';
+    for (let previewRow = 0; previewRow < this.dimension; previewRow += 1) {
+      for (let previewColumn = 0; previewColumn < this.dimension; previewColumn += 1) {
+        const sourceRow = preview.startRow + previewRow;
+        const sourceColumn = preview.startColumn + previewColumn;
+        const sourceSquareKey = this.getSquareKey(sourceRow, sourceColumn);
+        if (!filledSquares[sourceSquareKey] || !visibleSquareKeys.has(sourceSquareKey)) {
+          continue;
+        }
+        context.fillRect(
+          previewColumn * this.cellSize,
+          previewRow * this.cellSize,
+          this.cellSize,
+          this.cellSize
+        );
+      }
+    }
+
+    context.strokeStyle = 'rgba(255, 255, 255, 0.88)';
+    context.lineWidth = 1;
+    context.beginPath();
+    for (let column = 0; column <= this.dimension; column += 1) {
+      const x = column * this.cellSize + 0.5;
+      context.moveTo(x, 0);
+      context.lineTo(x, height);
+    }
+    for (let row = 0; row <= this.dimension; row += 1) {
+      const y = row * this.cellSize + 0.5;
+      context.moveTo(0, y);
+      context.lineTo(width, y);
+    }
+    context.stroke();
+
+    const squares = Object.values(this.squares());
+    if (squares.length > 0) {
+      context.strokeStyle = '#ff2f2f';
+      context.lineWidth = 2;
+      context.beginPath();
+      for (const square of squares) {
+        const sourceSquareKey = this.getSquareKey(square.row, square.column);
+        if (!visibleSquareKeys.has(sourceSquareKey)) continue;
+        const previewRow = square.row - preview.startRow;
+        const previewColumn = square.column - preview.startColumn;
+        if (previewRow < 0 || previewColumn < 0 || previewRow >= this.dimension || previewColumn >= this.dimension) continue;
+        const left = previewColumn * this.cellSize;
+        const top = previewRow * this.cellSize;
+        const right = left + this.cellSize;
+        const bottom = top + this.cellSize;
+        if (this.isWallConnection(square.toTop)) { context.moveTo(left, top); context.lineTo(right, top); }
+        if (this.isWallConnection(square.toRight)) { context.moveTo(right, top); context.lineTo(right, bottom); }
+        if (this.isWallConnection(square.toBottom)) { context.moveTo(left, bottom); context.lineTo(right, bottom); }
+        if (this.isWallConnection(square.toLeft)) { context.moveTo(left, top); context.lineTo(left, bottom); }
+      }
+      context.stroke();
+
+      context.strokeStyle = '#20d646';
+      context.lineWidth = 2;
+      context.beginPath();
+      for (const square of squares) {
+        const sourceSquareKey = this.getSquareKey(square.row, square.column);
+        if (!visibleSquareKeys.has(sourceSquareKey)) continue;
+        const previewRow = square.row - preview.startRow;
+        const previewColumn = square.column - preview.startColumn;
+        if (previewRow < 0 || previewColumn < 0 || previewRow >= this.dimension || previewColumn >= this.dimension) continue;
+        const left = previewColumn * this.cellSize;
+        const top = previewRow * this.cellSize;
+        const right = left + this.cellSize;
+        const bottom = top + this.cellSize;
+        if (this.isDoorConnection(square.toTop)) { context.moveTo(left, top); context.lineTo(right, top); }
+        if (this.isDoorConnection(square.toRight)) { context.moveTo(right, top); context.lineTo(right, bottom); }
+        if (this.isDoorConnection(square.toBottom)) { context.moveTo(left, bottom); context.lineTo(right, bottom); }
+        if (this.isDoorConnection(square.toLeft)) { context.moveTo(left, top); context.lineTo(left, bottom); }
+      }
+      context.stroke();
+    }
+
+    context.fillStyle = '#2e84ff';
+    for (const key of this.keyList()) {
+      if (key.rownId === null || key.columnId === null) continue;
+      if (!visibleSquareKeys.has(this.getSquareKey(key.rownId, key.columnId))) continue;
+      const previewRow = key.rownId - preview.startRow;
+      const previewColumn = key.columnId - preview.startColumn;
+      if (previewRow < 0 || previewColumn < 0 || previewRow >= this.dimension || previewColumn >= this.dimension) continue;
+      const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+      const centerY = previewRow * this.cellSize + this.cellSize / 2;
+      context.beginPath();
+      context.arc(centerX, centerY, 3, 0, Math.PI * 2);
+      context.fill();
+      context.strokeStyle = '#dbe8ff';
+      context.lineWidth = 1;
+      context.stroke();
+    }
+
+    for (const placement of this.tresherPlacements()) {
+      const squareKey = this.getSquareKey(placement.row, placement.column);
+      if (!visibleSquareKeys.has(squareKey)) continue;
+      const previewRow = placement.row - preview.startRow;
+      const previewColumn = placement.column - preview.startColumn;
+      if (previewRow < 0 || previewColumn < 0 || previewRow >= this.dimension || previewColumn >= this.dimension) continue;
+      const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+      const centerY = previewRow * this.cellSize + this.cellSize / 2;
+      this.drawTresherCoinMarker(context, centerX, centerY, 3.5);
+    }
+
+    for (const placement of this.monsterPlacements()) {
+      const squareKey = this.getSquareKey(placement.row, placement.column);
+      if (!visibleSquareKeys.has(squareKey)) continue;
+      const previewRow = placement.row - preview.startRow;
+      const previewColumn = placement.column - preview.startColumn;
+      if (previewRow < 0 || previewColumn < 0 || previewRow >= this.dimension || previewColumn >= this.dimension) continue;
+      const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+      const centerY = previewRow * this.cellSize + this.cellSize / 2;
+      this.drawMonsterMarker(context, centerX, centerY, 3.5);
+    }
+
+    for (const exit of this.exits()) {
+      const exitSquareKey = this.getSquareKey(exit.row, exit.column);
+      if (!visibleSquareKeys.has(exitSquareKey)) continue;
+      const previewRow = exit.row - preview.startRow;
+      const previewColumn = exit.column - preview.startColumn;
+      if (previewRow < 0 || previewColumn < 0 || previewRow >= this.dimension || previewColumn >= this.dimension) continue;
+      const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+      const centerY = previewRow * this.cellSize + this.cellSize / 2;
+      this.drawExitMarker(context, centerX, centerY, this.cellSize * 0.48, exit.transitionType);
+    }
+
+    const startpoint = this.startPoint();
+    if (startpoint && visibleSquareKeys.has(this.getSquareKey(startpoint.row, startpoint.col))) {
+      const previewRow = startpoint.row - preview.startRow;
+      const previewColumn = startpoint.col - preview.startColumn;
+      if (previewRow >= 0 && previewColumn >= 0 && previewRow < this.dimension && previewColumn < this.dimension) {
+        const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+        const centerY = previewRow * this.cellSize + this.cellSize / 2;
+        context.fillStyle = '#ff3b30';
+        context.beginPath();
+        context.arc(centerX, centerY, 4, 0, Math.PI * 2);
+        context.fill();
+        context.strokeStyle = '#ffd6d3';
+        context.lineWidth = 1;
+        context.stroke();
+      }
+    }
+
+    for (const st of this.squareTexts()) {
+      if (!visibleSquareKeys.has(this.getSquareKey(st.row, st.column))) continue;
+      const previewRow = st.row - preview.startRow;
+      const previewColumn = st.column - preview.startColumn;
+      if (previewRow >= 0 && previewColumn >= 0 && previewRow < this.dimension && previewColumn < this.dimension) {
+        this.drawSquareTextWallGlow(
+          context,
+          previewColumn * this.cellSize,
+          previewRow * this.cellSize,
+          this.cellSize,
+          st.wallSide ?? null
+        );
+        const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+        const centerY = previewRow * this.cellSize + this.cellSize / 2;
+        context.fillStyle = st.wallSide ? '#d18cff' : '#e17055';
+        context.font = 'bold 9px sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText('T', centerX, centerY);
+      }
+    }
+
+    const cheater = this.cheater();
+    const centerPreviewRow = preview.centerRow - preview.startRow;
+    const centerPreviewColumn = preview.centerColumn - preview.startColumn;
+    if (
+      centerPreviewRow >= 0 &&
+      centerPreviewColumn >= 0 &&
+      centerPreviewRow < this.dimension &&
+      centerPreviewColumn < this.dimension
+    ) {
+      context.strokeStyle = '#f3d13d';
+      context.lineWidth = 2;
+      context.strokeRect(
+        centerPreviewColumn * this.cellSize + 1,
+        centerPreviewRow * this.cellSize + 1,
+        this.cellSize - 2,
+        this.cellSize - 2
+      );
+      this.drawFacingArrow(
+        context,
+        centerPreviewColumn * this.cellSize,
+        centerPreviewRow * this.cellSize,
+        this.cellSize,
+        cheater.facingDir
+      );
+    }
+  }
+
+  private getVisibleSquareKeysForPreview(preview: GridPreviewContext): Set<string> {
+    const visibleSquareKeys = new Set<string>();
+    const filledSquares = this.filledSquares();
+    const cheater = this.cheater();
+    const range =
+      typeof cheater.rangeOfSite === 'number' && Number.isFinite(cheater.rangeOfSite)
+        ? Math.max(0, cheater.rangeOfSite)
+        : DEFAULT_CHEATER.rangeOfSite;
+
+    const sourceSquareKey = this.getSquareKey(preview.centerRow, preview.centerColumn);
+    if (filledSquares[sourceSquareKey]) {
+      visibleSquareKeys.add(sourceSquareKey);
+    }
+
+    for (let previewRow = 0; previewRow < this.dimension; previewRow += 1) {
+      for (let previewColumn = 0; previewColumn < this.dimension; previewColumn += 1) {
+        const sourceRow = preview.startRow + previewRow;
+        const sourceColumn = preview.startColumn + previewColumn;
+        const squareKey = this.getSquareKey(sourceRow, sourceColumn);
+        if (!filledSquares[squareKey]) continue;
+        if (!this.isWithinSightRange(preview.centerRow, preview.centerColumn, sourceRow, sourceColumn, range)) continue;
+        if (!this.hasLineOfSight(preview.centerRow, preview.centerColumn, sourceRow, sourceColumn)) continue;
+        visibleSquareKeys.add(squareKey);
+      }
+    }
+    return visibleSquareKeys;
+  }
+
+  private isWithinSightRange(fromRow: number, fromColumn: number, toRow: number, toColumn: number, range: number): boolean {
+    return Math.hypot(toRow - fromRow, toColumn - fromColumn) <= range;
+  }
+
+  private hasLineOfSight(fromRow: number, fromColumn: number, toRow: number, toColumn: number): boolean {
+    if (fromRow === toRow && fromColumn === toColumn) return true;
+    const squares = this.squares();
+    if (!squares[this.getSquareKey(fromRow, fromColumn)]) return false;
+    if (!squares[this.getSquareKey(toRow, toColumn)]) return false;
+
+    const startX = fromColumn + 0.5;
+    const startY = fromRow + 0.5;
+    const endX = toColumn + 0.5;
+    const endY = toRow + 0.5;
+    const deltaX = endX - startX;
+    const deltaY = endY - startY;
+    const stepX = deltaX > 0 ? 1 : deltaX < 0 ? -1 : 0;
+    const stepY = deltaY > 0 ? 1 : deltaY < 0 ? -1 : 0;
+    const absoluteDeltaX = Math.abs(deltaX);
+    const absoluteDeltaY = Math.abs(deltaY);
+
+    let currentRow = fromRow;
+    let currentColumn = fromColumn;
+    let tMaxX = stepX === 0 ? Number.POSITIVE_INFINITY : (stepX > 0 ? currentColumn + 1 - startX : startX - currentColumn) / absoluteDeltaX;
+    let tMaxY = stepY === 0 ? Number.POSITIVE_INFINITY : (stepY > 0 ? currentRow + 1 - startY : startY - currentRow) / absoluteDeltaY;
+    const tDeltaX = stepX === 0 ? Number.POSITIVE_INFINITY : 1 / absoluteDeltaX;
+    const tDeltaY = stepY === 0 ? Number.POSITIVE_INFINITY : 1 / absoluteDeltaY;
+    const cornerPeekDistance = 1;
+    const epsilon = 0.0000001;
+    let guard = 0;
+    const maxSteps = 50 * 50 + 5;
+
+    while ((currentRow !== toRow || currentColumn !== toColumn) && guard < maxSteps) {
+      guard += 1;
+      if (tMaxX < tMaxY - epsilon) {
+        const nextColumn = currentColumn + stepX;
+        if (this.isSightBlockedBetweenAdjacentSquares(currentRow, currentColumn, currentRow, nextColumn)) return false;
+        currentColumn = nextColumn;
+        tMaxX += tDeltaX;
+        continue;
+      }
+      if (tMaxY < tMaxX - epsilon) {
+        const nextRow = currentRow + stepY;
+        if (this.isSightBlockedBetweenAdjacentSquares(currentRow, currentColumn, nextRow, currentColumn)) return false;
+        currentRow = nextRow;
+        tMaxY += tDeltaY;
+        continue;
+      }
+      const nextColumn = currentColumn + stepX;
+      const nextRow = currentRow + stepY;
+      const blockedToHorizontal = stepX !== 0 && this.isSightBlockedBetweenAdjacentSquares(currentRow, currentColumn, currentRow, nextColumn);
+      const blockedToVertical = stepY !== 0 && this.isSightBlockedBetweenAdjacentSquares(currentRow, currentColumn, nextRow, currentColumn);
+      if (blockedToHorizontal && blockedToVertical) return false;
+      if (blockedToHorizontal || blockedToVertical) {
+        const cornerDistanceFromSource = Math.max(Math.abs(currentRow - fromRow), Math.abs(currentColumn - fromColumn));
+        if (cornerDistanceFromSource > cornerPeekDistance) return false;
+      }
+      currentColumn = nextColumn;
+      currentRow = nextRow;
+      tMaxX += tDeltaX;
+      tMaxY += tDeltaY;
+    }
+
+    return currentRow === toRow && currentColumn === toColumn;
+  }
+
+  private isSightBlockedBetweenAdjacentSquares(
+    fromRow: number, fromColumn: number, toRow: number, toColumn: number
+  ): boolean {
+    const rowDelta = toRow - fromRow;
+    const columnDelta = toColumn - fromColumn;
+    if (Math.abs(rowDelta) + Math.abs(columnDelta) !== 1) return true;
+    const squares = this.squares();
+    const fromSquare = squares[this.getSquareKey(fromRow, fromColumn)];
+    const toSquare = squares[this.getSquareKey(toRow, toColumn)];
+    if (!fromSquare || !toSquare) return true;
+    let fromSide: SquareSide;
+    let toSide: SquareSide;
+    if (rowDelta === -1) { fromSide = 'toTop'; toSide = 'toBottom'; }
+    else if (rowDelta === 1) { fromSide = 'toBottom'; toSide = 'toTop'; }
+    else if (columnDelta === -1) { fromSide = 'toLeft'; toSide = 'toRight'; }
+    else { fromSide = 'toRight'; toSide = 'toLeft'; }
+    return this.isSightBlockingConnection(fromSquare[fromSide]) || this.isSightBlockingConnection(toSquare[toSide]);
+  }
+
+  private isSightBlockingConnection(connection: Door | Wall | null): boolean {
+    return this.isWallConnection(connection) || this.isDoorConnection(connection);
+  }
+
+  private drawFacingArrow(
+    context: CanvasRenderingContext2D,
+    left: number,
+    top: number,
+    size: number,
+    direction: FacingDirection
+  ): void {
+    const centerX = left + size / 2;
+    const centerY = top + size / 2;
+    const tipOffset = size * 0.34;
+    const baseOffset = size * 0.14;
+    const wingOffset = size * 0.2;
+    let tipX = centerX, tipY = centerY, wingAX = centerX, wingAY = centerY, wingBX = centerX, wingBY = centerY;
+
+    if (direction === 'up') {
+      tipY = centerY - tipOffset; wingAX = centerX - wingOffset; wingAY = centerY + baseOffset; wingBX = centerX + wingOffset; wingBY = centerY + baseOffset;
+    } else if (direction === 'right') {
+      tipX = centerX + tipOffset; wingAX = centerX - baseOffset; wingAY = centerY - wingOffset; wingBX = centerX - baseOffset; wingBY = centerY + wingOffset;
+    } else if (direction === 'down') {
+      tipY = centerY + tipOffset; wingAX = centerX - wingOffset; wingAY = centerY - baseOffset; wingBX = centerX + wingOffset; wingBY = centerY - baseOffset;
+    } else {
+      tipX = centerX - tipOffset; wingAX = centerX + baseOffset; wingAY = centerY - wingOffset; wingBX = centerX + baseOffset; wingBY = centerY + wingOffset;
+    }
+
+    context.fillStyle = '#30d158';
+    context.strokeStyle = '#1f8f3a';
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(tipX, tipY);
+    context.lineTo(wingAX, wingAY);
+    context.lineTo(wingBX, wingBY);
+    context.closePath();
+    context.fill();
+    context.stroke();
+  }
+
+  private drawSquareTextWallGlow(
+    context: CanvasRenderingContext2D,
+    left: number,
+    top: number,
+    size: number,
+    wallSide: SquareSide | null
+  ): void {
+    if (!wallSide) {
+      return;
+    }
+
+    const right = left + size;
+    const bottom = top + size;
+
+    context.save();
+    context.strokeStyle = 'rgba(205, 144, 255, 0.98)';
+    context.shadowColor = 'rgba(154, 78, 255, 0.95)';
+    context.shadowBlur = 10;
+    context.lineWidth = 3;
+    context.beginPath();
+
+    if (wallSide === 'toTop') {
+      context.moveTo(left + 2, top + 1.5);
+      context.lineTo(right - 2, top + 1.5);
+    } else if (wallSide === 'toRight') {
+      context.moveTo(right - 1.5, top + 2);
+      context.lineTo(right - 1.5, bottom - 2);
+    } else if (wallSide === 'toBottom') {
+      context.moveTo(left + 2, bottom - 1.5);
+      context.lineTo(right - 2, bottom - 1.5);
+    } else {
+      context.moveTo(left + 1.5, top + 2);
+      context.lineTo(left + 1.5, bottom - 2);
+    }
+
+    context.stroke();
+    context.restore();
+  }
+
+  private drawTresherCoinMarker(context: CanvasRenderingContext2D, centerX: number, centerY: number, radius: number): void {
+    const clampedRadius = Math.max(2, radius);
+    context.fillStyle = '#f5c332';
+    context.beginPath();
+    context.arc(centerX, centerY, clampedRadius, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = '#fff1b8';
+    context.lineWidth = 1;
+    context.stroke();
+    context.fillStyle = 'rgba(255, 248, 210, 0.45)';
+    context.beginPath();
+    context.arc(centerX - clampedRadius * 0.25, centerY - clampedRadius * 0.25, clampedRadius * 0.38, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  private drawMonsterMarker(context: CanvasRenderingContext2D, centerX: number, centerY: number, size: number): void {
+    const s = Math.max(2, size);
+    context.fillStyle = '#d63031';
+    context.beginPath();
+    context.moveTo(centerX, centerY - s);
+    context.lineTo(centerX + s, centerY);
+    context.lineTo(centerX, centerY + s);
+    context.lineTo(centerX - s, centerY);
+    context.closePath();
+    context.fill();
+    context.strokeStyle = '#ff7675';
+    context.lineWidth = 1;
+    context.stroke();
+  }
+
+  private drawExitMarker(
+    context: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    markerSize: number,
+    transitionType: ExitTransitionType
+  ): void {
+    const halfSize = Math.max(3, markerSize);
+    if (transitionType === 'open') {
+      context.fillStyle = '#45d483';
+      context.beginPath();
+      context.arc(centerX, centerY, halfSize * 0.36, 0, Math.PI * 2);
+      context.fill();
+      context.strokeStyle = '#e4fff0';
+      context.lineWidth = 1;
+      context.stroke();
+      return;
+    }
+    const left = centerX - halfSize;
+    const top = centerY - halfSize;
+    const sideLength = halfSize * 2;
+    context.fillStyle = transitionType === 'stairsUp' ? 'rgba(221, 76, 76, 0.38)' : 'rgba(189, 36, 36, 0.42)';
+    context.fillRect(left, top, sideLength, sideLength);
+    context.strokeStyle = transitionType === 'stairsUp' ? '#ffd7d7' : '#ffcdcd';
+    context.lineWidth = 1;
+    context.strokeRect(left + 0.5, top + 0.5, Math.max(0, sideLength - 1), Math.max(0, sideLength - 1));
+    context.strokeStyle = transitionType === 'stairsUp' ? '#ff8f8f' : '#ff6262';
+    context.lineWidth = 1.4;
+    context.beginPath();
+    const stepCount = 4;
+    for (let index = 0; index < stepCount; index += 1) {
+      const ratio = (index + 1) / (stepCount + 1);
+      const inset = ratio * (sideLength * 0.18);
+      const y = transitionType === 'stairsUp' ? top + sideLength - ratio * sideLength : top + ratio * sideLength;
+      context.moveTo(left + inset, y);
+      context.lineTo(left + sideLength - inset, y);
+    }
+    context.stroke();
+  }
+
+  private getMovementConnectionInfoBetweenAdjacentSquares(
+    fromRow: number, fromColumn: number, toRow: number, toColumn: number
+  ): AdjacentConnectionInfo {
+    const rowDelta = toRow - fromRow;
+    const columnDelta = toColumn - fromColumn;
+    if (Math.abs(rowDelta) + Math.abs(columnDelta) !== 1) return { type: 'void', door: null };
+    const squares = this.squares();
+    const fromSquare = squares[this.getSquareKey(fromRow, fromColumn)];
+    if (!fromSquare) return { type: 'void', door: null };
+    let fromSide: SquareSide;
+    let toSide: SquareSide;
+    if (rowDelta === -1) { fromSide = 'toTop'; toSide = 'toBottom'; }
+    else if (rowDelta === 1) { fromSide = 'toBottom'; toSide = 'toTop'; }
+    else if (columnDelta === -1) { fromSide = 'toLeft'; toSide = 'toRight'; }
+    else { fromSide = 'toRight'; toSide = 'toLeft'; }
+    const fromConnection = fromSquare[fromSide];
+    if (this.isWallConnection(fromConnection)) return { type: 'wall', door: null };
+    if (this.isDoorConnection(fromConnection)) return { type: fromConnection.state === 'closed' ? 'closedDoor' : 'openDoor', door: fromConnection };
+    const toSquare = squares[this.getSquareKey(toRow, toColumn)];
+    if (!toSquare) return { type: 'void', door: null };
+    const toConnection = toSquare[toSide];
+    if (this.isWallConnection(toConnection)) return { type: 'wall', door: null };
+    if (this.isDoorConnection(toConnection)) return { type: toConnection.state === 'closed' ? 'closedDoor' : 'openDoor', door: toConnection };
+    return { type: 'none', door: null };
+  }
+
+  private isWallConnection(connection: Door | Wall | null): connection is Wall {
+    return connection !== null && !('keyLock' in connection);
+  }
+
+  private isDoorConnection(connection: Door | Wall | null): connection is Door {
+    return connection !== null && 'keyLock' in connection;
+  }
+
+  private getSquareKey(row: number, column: number): string {
+    return `${row}:${column}`;
+  }
+}

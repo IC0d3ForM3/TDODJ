@@ -1,0 +1,58 @@
+.how-to-play-page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+  color: #edf2ff;
+}
+
+.how-to-play-hero {
+  background: linear-gradient(135deg, #1f2a44, #162034);
+  border: 1px solid rgba(160, 184, 220, 0.25);
+  border-radius: 12px;
+  padding: 1.2rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.how-to-play-hero h2 {
+  margin: 0 0 0.6rem;
+  color: #f8fbff;
+}
+
+.how-to-play-hero p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.how-to-play-section {
+  background: rgba(17, 25, 40, 0.7);
+  border: 1px solid rgba(160, 184, 220, 0.2);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.how-to-play-section h3 {
+  margin: 0 0 0.5rem;
+  color: #d2e3ff;
+}
+
+.how-to-play-section p {
+  margin: 0.2rem 0 0.55rem;
+  line-height: 1.55;
+}
+
+.how-to-play-section ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.how-to-play-section li {
+  margin-bottom: 0.35rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 700px) {
+  .how-to-play-page {
+    padding: 1.2rem 0.8rem 2rem;
+  }
+}

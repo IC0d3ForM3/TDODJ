@@ -1,0 +1,82 @@
+<div class="container mt-4">
+	<div class="d-flex justify-content-between align-items-center mb-3">
+		<h2 class="mb-0">All Users</h2>
+		<button
+			type="button"
+			class="btn btn-primary"
+			(click)="saveChanges()"
+			[disabled]="!hasPendingChanges() || isSaving()"
+		>
+			@if (isSaving()) {
+				Saving...
+			} @else {
+				Save
+			}
+		</button>
+	</div>
+
+	@if (saveSuccess()) {
+		<p class="text-success">{{ saveSuccess() }}</p>
+	}
+
+	@if (saveError()) {
+		<p class="text-danger">{{ saveError() }}</p>
+	}
+
+	@if (isLoading()) {
+		<p>Loading users...</p>
+	}
+
+	@if (error()) {
+		<p class="text-danger">{{ error() }}</p>
+	}
+
+	@if (!isLoading() && !error()) {
+		<table class="table table-bordered table-striped">
+			<thead>
+				<tr>
+					<th>ID</th>
+					<th>Username</th>
+					<th>Email</th>
+					<th>Active</th>
+					<th>Confirmed</th>
+					<th>Admin</th>
+					<th>Master Admin</th>
+					<th>Creator</th>
+				</tr>
+			</thead>
+			<tbody>
+				@for (user of users(); track user.id) {
+					<tr>
+						<td>{{ user.id }}</td>
+						<td>{{ user.username }}</td>
+						<td>{{ user.email }}</td>
+						<td>
+							<input
+								type="checkbox"
+								[checked]="user.isactive"
+								(change)="onCheckboxChange(user.id, 'isactive', $event)"
+							/>
+						</td>
+						<td>{{ user.isconfirmed }}</td>
+						<td>
+							<input
+								type="checkbox"
+								[checked]="user.isadmin"
+								(change)="onCheckboxChange(user.id, 'isadmin', $event)"
+							/>
+						</td>
+						<td>{{ user.ismasteradmin }}</td>
+						<td>
+							<input
+								type="checkbox"
+								[checked]="user.iscreator"
+								(change)="onCheckboxChange(user.id, 'iscreator', $event)"
+							/>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+</div>
