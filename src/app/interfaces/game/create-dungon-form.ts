@@ -7,4 +7,6 @@ export interface CreateDungonForm {
   minsplifetime: FormControl<number>;
   maxsplifetime: FormControl<number>;
   spreward: FormControl<number>;
+  ismaingame: FormControl<boolean>;
+  issample: FormControl<boolean>;
 }

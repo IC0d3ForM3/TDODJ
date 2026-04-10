@@ -1,12 +1,17 @@
 export interface MonsterAttack {
+  type: string;
   description: string;
-  damage: number;
   plusToHit: number;
+  damage: number;
+  weaponItemId: number | null;
+  spellId: number | null;
+  curseId: number | null;
 }
 
 export interface Monster {
   id: number;
   imageId: number | null;
+  soundId: number | null;
   tresherIds: number[];
   keyIds: number[];
   name: string;
@@ -19,4 +24,7 @@ export interface Monster {
   numberOfAttacks: number;
   attacks: MonsterAttack[];
   spReward: number;
+  magic: number;
+  magicResistance: number;
+  callsReinforcements: boolean;
 }

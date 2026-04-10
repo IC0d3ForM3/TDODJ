@@ -12,6 +12,7 @@ import {
   getDungonByIdForUser,
   getPublishedDungons,
   getDungonsByUserKey,
+  getDungonSpRewardById,
   insertDungon,
   NewDungon,
   PublishDungonOptions,
@@ -21,6 +22,11 @@ import {
   updateDungonMetadataForUser,
   updateGameDungenJson,
   deleteGameForUser,
+  approveDungon as approveDungonInRepo,
+  getSampleDungonFromDb,
+  getSampleDungonFullFromDb,
+  setSampleDungonInDb,
+  getAllPublishedDungonsForAdmin,
 } from '../repositories/dungonRepository';
 
 export const fetchPublishedDungons = async (userkey: string | null = null) => {
@@ -98,3 +104,29 @@ export const removeGameForUser = async (
 ): Promise<boolean> => {
   return await deleteGameForUser(id, userkey);
 };
+
+export const approvePendingDungon = async (
+  id: number,
+  adminKey: string
+): Promise<boolean> => {
+  return await approveDungonInRepo(id, adminKey);
+};
+
+export const fetchSampleDungon = async () => {
+  return await getSampleDungonFromDb();
+};
+
+export const fetchSampleDungonFull = async () => {
+  return await getSampleDungonFullFromDb();
+};
+
+export const setSampleGame = async (id: number) => {
+  return await setSampleDungonInDb(id);
+};
+
+export const fetchAllPublishedDungonsForAdmin = async () => {
+  return await getAllPublishedDungonsForAdmin();
+};
+
+export const fetchDungonSpReward = (dungonId: number): Promise<number> =>
+  getDungonSpRewardById(dungonId);

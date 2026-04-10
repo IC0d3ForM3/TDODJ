@@ -1,0 +1,85 @@
+<div class="pt-section" aria-label="My potions">
+	<div class="pt-section-header">
+		<h3 class="pt-title">My Potions</h3>
+		<button type="button" class="pt-toggle-btn" (click)="toggleSectionVisibility()">
+			{{ isPotionSectionVisible() ? 'Hide' : 'Show' }}
+		</button>
+	</div>
+
+	@if (!isPotionSectionVisible()) {
+		<p class="pt-message">Potion section is hidden.</p>
+	} @else if (!isLoggedIn()) {
+		<p class="pt-message">Log in to add or edit your potions.</p>
+	} @else {
+		<div class="pt-layout">
+
+			<!-- 1/3 LEFT: list -->
+			<aside class="pt-list-panel">
+				<h4 class="pt-panel-title">Your Potion Library</h4>
+				@if (isLoading()) {
+					<p class="pt-message">Loading your potions...</p>
+				} @else if (error()) {
+					<p class="pt-message pt-message-error">{{ error() }}</p>
+				} @else if (items().length === 0) {
+					<p class="pt-message">No potions yet.</p>
+				} @else {
+					<ul class="pt-list">
+						@for (item of items(); track item.id) {
+							<li class="pt-list-item">
+								<div class="pt-item-info">
+									<span class="pt-item-name">{{ item.name }}</span>
+									<small class="pt-item-meta">ID {{ item.id }} · {{ item.effectTo }}{{ item.effectTo2 ? '/' + item.effectTo2 : '' }} | Amt {{ item.effectAmount }}{{ item.effectAmount2 ? '/' + item.effectAmount2 : '' }} | Lasts {{ item.lastFor }} rnd | Val {{ item.value }}</small>
+									@if (item.description) { <small class="pt-item-desc">{{ item.description }}</small> }
+								</div>
+								<button type="button" class="pt-edit-btn" (click)="editPotion(item)">Edit</button>
+							</li>
+						}
+					</ul>
+				}
+			</aside>
+
+			<!-- 2/3 RIGHT: form -->
+			<form class="pt-form" [formGroup]="userPotionForm" (ngSubmit)="save()">
+				<div class="pt-form-grid">
+					<label class="pt-field pt-field-wide"><span>Name</span><input type="text" formControlName="name" placeholder="Potion name" /></label>
+					<label class="pt-field pt-field-wide"><span>Description</span><input type="text" formControlName="description" placeholder="Description" /></label>
+					<label class="pt-field"><span>Effect To 1</span>
+						<select formControlName="effectTo">@for (option of effectToOptions; track option) { <option [value]="option">{{ option }}</option> }</select>
+					</label>
+					<label class="pt-field"><span>Effect To 2 (optional)</span>
+						<select formControlName="effectTo2"><option [ngValue]="null">None</option>@for (option of effectToOptions; track option) { <option [value]="option">{{ option }}</option> }</select>
+					</label>
+					<label class="pt-field"><span>Last For (rounds)</span><input type="number" formControlName="lastFor" min="0" /></label>
+					<label class="pt-field"><span>Effect Amount 1</span><input type="number" formControlName="effectAmount" /></label>
+					<label class="pt-field"><span>Effect Amount 2</span><input type="number" formControlName="effectAmount2" /></label>
+					<label class="pt-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
+					<label class="pt-field pt-field-wide"><span>Image</span>
+						<div class="pt-upload-row">
+							<select formControlName="imageId"><option [ngValue]="null">No Image</option>@for (image of allImageOptions(); track image.id) { <option [ngValue]="image.id">{{ image.name }}</option> }</select>
+							<app-upload-popup mediaType="image" (mediaUploaded)="onImageUploaded($event)" />
+						</div>
+					</label>
+					@if (selectedImageUrl()) { <div class="pt-field pt-field-wide"><img class="pt-thumb" [src]="selectedImageUrl()" [alt]="selectedImageName() || 'Selected potion image'" /></div> }
+					<label class="pt-field pt-field-wide"><span>Sound</span>
+						<div class="pt-upload-row">
+							<select formControlName="soundId"><option [ngValue]="null">No Sound</option>@for (sound of allSoundOptions(); track sound.id) { <option [ngValue]="sound.id">{{ sound.name }}</option> }</select>
+							<app-upload-popup mediaType="sound" (mediaUploaded)="onSoundUploaded($event)" />
+						</div>
+					</label>
+					@if (isAdminUser()) {
+						<div class="pt-check-row"><input type="checkbox" formControlName="isPublic" id="potionIsPublic" /><label for="potionIsPublic">Public</label></div>
+					}
+				</div>
+				<div class="pt-actions">
+					<button type="submit" class="pt-btn-primary" [disabled]="isSavingUserPotion()">
+						@if (isSavingUserPotion()) { Saving... } @else if (editingUserPotionId() !== null) { Update Potion } @else { Add Potion }
+					</button>
+					@if (editingUserPotionId() !== null) { <button type="button" class="pt-btn-muted" (click)="cancelEdit()">Cancel Edit</button> }
+					<button type="button" class="pt-btn-muted" (click)="beginCreate()">New Blank</button>
+				</div>
+				@if (userPotionSaveMessage()) { <p class="pt-save-msg">{{ userPotionSaveMessage() }}</p> }
+			</form>
+
+		</div>
+	}
+</div>

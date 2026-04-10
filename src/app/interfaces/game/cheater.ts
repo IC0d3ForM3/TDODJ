@@ -9,7 +9,7 @@ export interface CheaterInventory {
 
 export interface Cheater {
   name: string;
-  rangeOfSite: number;
+  rangeOfSight: number;
   facingDir: FacingDirection;
   inventory: CheaterInventory;
 }

@@ -15,6 +15,15 @@ import { Account } from '../../services/account';
 import { DungeonFirstPersonComponent } from '../dungeon-first-person/dungeon-first-person';
 import { DungeonPreviewGridComponent } from '../dungeon-preview-grid/dungeon-preview-grid';
 import { CreatorLayout } from '../../services/creator-layout';
+import { Items } from '../items/items';
+import { Curses } from '../curses/curses';
+import { Potions } from '../potions/potions';
+import { Treshers } from '../treshers/treshers';
+import { Monsters } from '../monsters/monsters';
+import { UploadPopup, UploadedMediaItem } from '../upload-popup/upload-popup';
+import { ItemService } from '../../services/item';
+import { CurseService } from '../../services/curse';
+import { PotionService } from '../../services/potion';
 import { Door } from '../../interfaces/door';
 import { Square } from '../../interfaces/square';
 import { Wall } from '../../interfaces/wall';
@@ -22,10 +31,8 @@ import { Key } from '../../interfaces/key';
 import { API_BASE_URL } from '../../api-config';
 import {
   AdjacentConnectionInfo,
-  ArmorType,
   Cheater,
   CheaterInventory,
-  CoinType,
   CreateDungonForm,
   DungonExit,
   DoorPromptResult,
@@ -51,7 +58,6 @@ import {
   PendingExitPlacement,
   PendingStartPointPlacement,
   PendingTresherPlacement,
-  PotionEffectTarget,
   SideRule,
   SquareSide,
   SquareText,
@@ -59,7 +65,10 @@ import {
   StartPoint,
   Tresher,
   TresherPlacement,
-  TresherType,
+  Trap,
+  FloorTrapPlacement,
+  PortalPlacement,
+  PortalLook,
 } from '../../interfaces/game';
 
 const EMPTY_OPEN_BLOCK_SELECTIONS: Record<OpenBlockOptionKey, boolean> = {
@@ -75,7 +84,7 @@ const EMPTY_OPEN_BLOCK_SELECTIONS: Record<OpenBlockOptionKey, boolean> = {
 
 const DEFAULT_CHEATER: Cheater = {
   name: 'Bob',
-  rangeOfSite: 5,
+  rangeOfSight: 5,
   facingDir: 'right',
   inventory: {
     keys: [],
@@ -132,6 +141,24 @@ interface MonsterLibraryItem extends Monster {
   updatedAt: string;
 }
 
+interface LibImageItem { id: number; name: string; path: string; isPublic: boolean; isActive: boolean; createdAt: string; updatedAt: string; userguid: string; }
+interface LibSoundItem { id: number; name: string; path: string; isPublic: boolean; isActive: boolean; createdAt: string; updatedAt: string; userguid: string; }
+interface LibSpellItem { id: number; name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; imageId: number | null; soundId: number | null; isPublic: boolean; createdAt: string; updatedAt: string; }
+interface LibImageWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
+interface LibSoundWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
+interface LibSpellWritePayload { name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; imageId: number | null; soundId: number | null; isPublic: boolean; }
+
+type CreatorTabId = 'dungons' | 'treshers' | 'monsters' | 'images' | 'sounds' | 'spells' | 'potions' | 'items' | 'curses';
+
+interface GridPlacedItem {
+  key: string;
+  type: 'monster' | 'tresher' | 'door' | 'trap';
+  label: string;
+  row: number;
+  column: number;
+  refId: number;
+}
+
 type PublishVisibility = 'public' | 'friends' | 'private';
 
 interface CreatorFriendListItem {
@@ -145,14 +172,20 @@ interface CreatorFriendListItem {
 @Component({
   selector: 'app-creator',
   changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, DungeonFirstPersonComponent, DungeonPreviewGridComponent],
+  imports: [ReactiveFormsModule, DungeonFirstPersonComponent, DungeonPreviewGridComponent, Items, Curses, Potions, Treshers, Monsters, UploadPopup],
   templateUrl: './creator.html',
   styleUrl: './creator.css',
 })
 export class Creator implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly account = inject(Account);
+  private readonly doorImageCache = new Map<string, HTMLImageElement>();
+  private readonly stairsUpImageCache = new Map<string, HTMLImageElement>();
+  private readonly stairsUpSquareAssignment = new Map<string, 1 | 2 | 3>();
+  readonly account = inject(Account);
   readonly creatorLayout = inject(CreatorLayout);
+  private readonly itemService = inject(ItemService);
+  private readonly curseService = inject(CurseService);
+  private readonly potionService = inject(PotionService);
   private nextWallId = 0;
   private nextDoorId = 0;
   private nextKeyId = 0;
@@ -232,7 +265,21 @@ export class Creator implements OnInit {
   readonly pendingMonsterPlacement = signal<PendingMonsterPlacement | null>(null);
   readonly editingMonsterId = signal<number | null>(null);
   readonly editingMonsterKeyIds = signal<number[]>([]);
+  readonly editingMonsterImageId = signal<number | null>(null);
+  readonly editingMonsterSoundId = signal<number | null>(null);
+  readonly editingMonsterTresherIds = signal<number[]>([]);
+  readonly editingMonsterAttacks = signal<MonsterAttack[]>([]);
+  readonly monsterDialogImages = signal<{ id: number; name: string; path: string }[]>([]);
+  readonly monsterDialogSounds = signal<{ id: number; name: string; path: string }[]>([]);
+  readonly monsterDialogWeaponItems = signal<{ id: number; name: string }[]>([]);
+  readonly monsterDialogSpells = signal<{ id: number; name: string }[]>([]);
   readonly placeMonsterRoam = signal(false);
+  readonly placeMonsterDropTresherIds = signal<number[]>([]);
+  readonly placeMonsterDropKeyIds = signal<number[]>([]);
+  readonly placeMonsterIsDormant = signal(false);
+  readonly placeMonsterGuardRow = signal<number | null>(null);
+  readonly placeMonsterGuardCol = signal<number | null>(null);
+  readonly isSelectingGuardSquare = signal(false);
   readonly gridPreviewContext = signal<GridPreviewContext | null>(null);
   readonly cheaterByDungon = signal<Record<number, Cheater>>({});
   readonly startPointByDungon = signal<Record<number, StartPoint | null>>({});
@@ -246,6 +293,104 @@ export class Creator implements OnInit {
   readonly squareTextsByDungon = signal<Record<number, SquareText[]>>({});
   readonly filledSquaresByDungon = signal<Record<number, Record<string, true>>>({});
   readonly squaresByDungon = signal<Record<number, Record<string, Square>>>({});
+  readonly floorTrapPlacementsByDungon = signal<Record<number, FloorTrapPlacement[]>>({});
+  readonly isPlaceFloorTrapMode = signal(false);
+  readonly isFloorTrapDialogVisible = signal(false);
+  readonly pendingFloorTrapPlacement = signal<{ dungonId: number; row: number; column: number } | null>(null);
+  private nextFloorTrapId = 1;
+  readonly selectedPlacedItemKey = signal<string | null>(null);
+
+  readonly portalPlacementsByDungon = signal<Record<number, PortalPlacement[]>>({});
+  readonly isPortalDialogVisible = signal(false);
+  readonly editingPortalId = signal<number | null>(null);
+  readonly selectedPortalId = signal<number | null>(null);
+  readonly portalPickMode = signal<'start' | 'end' | null>(null);
+  readonly portalPickingId = signal<number | null>(null);
+  private nextPortalId = 1;
+
+  // ── Library tabs ──────────────────────────────────────────────────────────
+  readonly activeCreatorTab = signal<CreatorTabId>('dungons');
+  readonly creatorTabs: { id: CreatorTabId; label: string }[] = [
+    { id: 'dungons', label: 'Dungeons' },
+    { id: 'treshers', label: 'Treshers' },
+    { id: 'monsters', label: 'Monsters' },
+    { id: 'images', label: 'Images' },
+    { id: 'sounds', label: 'Sounds' },
+    { id: 'spells', label: 'Spells' },
+    { id: 'potions', label: 'Potions' },
+    { id: 'items', label: 'Items' },
+    { id: 'curses', label: 'Curses' },
+  ];
+
+  readonly libItems = this.itemService.items;
+  readonly libCurses = this.curseService.items;
+  readonly libPotions = this.potionService.items;
+  readonly libSpells = signal<{ id: number; name: string }[]>([]);
+
+  readonly libImageOptions = signal<{ id: number; name: string; path: string }[]>([]);
+  readonly libSoundOptions = signal<{ id: number; name: string; path: string }[]>([]);
+
+  readonly libUserImages = signal<LibImageItem[]>([]);
+  readonly isLoadingLibImages = signal(false);
+  readonly libImagesError = signal<string | null>(null);
+  readonly isSavingLibImage = signal(false);
+  readonly editingLibImageId = signal<number | null>(null);
+  readonly libImageSaveMessage = signal<string | null>(null);
+  readonly isLibImageSectionVisible = signal(true);
+  readonly selectedLibImageFile = signal<File | null>(null);
+
+  readonly libUserSounds = signal<LibSoundItem[]>([]);
+  readonly isLoadingLibSounds = signal(false);
+  readonly libSoundsError = signal<string | null>(null);
+  readonly isSavingLibSound = signal(false);
+  readonly editingLibSoundId = signal<number | null>(null);
+  readonly libSoundSaveMessage = signal<string | null>(null);
+  readonly isLibSoundSectionVisible = signal(true);
+  readonly selectedLibSoundFile = signal<File | null>(null);
+
+  readonly libUserSpells = signal<LibSpellItem[]>([]);
+  readonly isLoadingLibSpells = signal(false);
+  readonly libSpellsError = signal<string | null>(null);
+  readonly isSavingLibSpell = signal(false);
+  readonly editingLibSpellId = signal<number | null>(null);
+  readonly libSpellSaveMessage = signal<string | null>(null);
+  readonly isLibSpellSectionVisible = signal(true);
+
+  readonly libSpellEffectToOptions = [
+    'HP', 'Defense', 'Stamina', 'Mind', 'Sneak', 'Magic', 'Sight', 'Action Economy',
+  ] as const;
+
+  readonly libImageForm = new FormGroup({
+    path: new FormControl<string>('', { nonNullable: true }),
+    isPublic: new FormControl<boolean>(false, { nonNullable: true }),
+    isActive: new FormControl<boolean>(true, { nonNullable: true }),
+    name: new FormControl<string>('', { nonNullable: true }),
+  });
+
+  readonly libSoundForm = new FormGroup({
+    path: new FormControl<string>('', { nonNullable: true }),
+    isPublic: new FormControl<boolean>(false, { nonNullable: true }),
+    isActive: new FormControl<boolean>(true, { nonNullable: true }),
+    name: new FormControl<string>('', { nonNullable: true }),
+  });
+
+  readonly libSpellForm = new FormGroup({
+    name: new FormControl<string>('', { nonNullable: true }),
+    description: new FormControl<string>('', { nonNullable: true }),
+    range: new FormControl<number>(0, { nonNullable: true }),
+    effectOn: new FormControl<string>('HP', { nonNullable: true }),
+    effectOn2: new FormControl<string>('', { nonNullable: true }),
+    lastFor: new FormControl<number>(0, { nonNullable: true }),
+    effectAmount: new FormControl<number>(0, { nonNullable: true }),
+    effectAmount2: new FormControl<number>(0, { nonNullable: true }),
+    value: new FormControl<number>(0, { nonNullable: true }),
+    sp: new FormControl<number>(0, { nonNullable: true }),
+    successTestValue: new FormControl<number>(0, { nonNullable: true }),
+    magicCost: new FormControl<number>(1, { nonNullable: true }),
+    imageId: new FormControl<number | null>(null),
+    soundId: new FormControl<number | null>(null),
+    isPublic: new FormControl<boolean>(false, { nonNullable: true }),
+  });
   readonly openBlockOptions: OpenBlockOption[] = [
      { key: 'wallTop', label: 'Wall T' },
      { key: 'wallBottom', label: 'Wall B' },
@@ -260,7 +405,7 @@ export class Creator implements OnInit {
     ...EMPTY_OPEN_BLOCK_SELECTIONS,
   });
   readonly gridCellSize = 20;
-  readonly gridColumnCount = 50;
+  readonly gridColumnCount = 45;
   readonly gridRowCount = 50;
   readonly gridCanvasWidth = this.gridCellSize * this.gridColumnCount;
   readonly gridCanvasHeight = this.gridCellSize * this.gridRowCount;
@@ -291,6 +436,8 @@ export class Creator implements OnInit {
       nonNullable: true,
       validators: [Validators.min(0)],
     }),
+    ismaingame: new FormControl<boolean>(false, { nonNullable: true }),
+    issample: new FormControl<boolean>(false, { nonNullable: true }),
   });
 
   readonly isEditMetadataFormVisible = signal(false);
@@ -316,6 +463,8 @@ export class Creator implements OnInit {
       nonNullable: true,
       validators: [Validators.min(0)],
     }),
+    ismaingame: new FormControl<boolean>(false, { nonNullable: true }),
+    issample: new FormControl<boolean>(false, { nonNullable: true }),
   });
 
   readonly doorForm = new FormGroup({
@@ -325,11 +474,27 @@ export class Creator implements OnInit {
       validators: [Validators.required, Validators.min(1)],
     }),
     isLocked: new FormControl<boolean>(false, { nonNullable: true }),
+    toPick: new FormControl<number | null>(null, {
+      validators: [Validators.min(0)],
+    }),
+    isHidden: new FormControl<boolean>(false, { nonNullable: true }),
+    toFind: new FormControl<number>(3, {
+      nonNullable: true,
+      validators: [Validators.min(1), Validators.max(6)],
+    }),
     name: new FormControl<string>('', { nonNullable: true }),
     description: new FormControl<string>('', { nonNullable: true }),
     spReward: new FormControl<number | null>(null, {
       validators: [Validators.min(0)],
     }),
+    hasTrap: new FormControl<boolean>(false, { nonNullable: true }),
+    trapName: new FormControl<string>('', { nonNullable: true }),
+    trapDescription: new FormControl<string>('', { nonNullable: true }),
+    trapDamage: new FormControl<number>(0, { nonNullable: true }),
+    trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind'>('HP', { nonNullable: true }),
+    trapCurseId: new FormControl<number | null>(null),
+    trapToDetect: new FormControl<number>(10, { nonNullable: true }),
+    trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
   });
 
   readonly startPointForm = new FormGroup({
@@ -344,32 +509,41 @@ export class Creator implements OnInit {
   });
 
   readonly tresherForm = new FormGroup({
-    type: new FormControl<TresherType>('Weapon', { nonNullable: true }),
     name: new FormControl<string>('', { nonNullable: true }),
     description: new FormControl<string>('', { nonNullable: true }),
-    worth: new FormControl<number>(0, { nonNullable: true }),
-    trapID: new FormControl<number | null>(null),
-    curseID: new FormControl<number | null>(null),
-    HP: new FormControl<number | null>(10),
-    damage: new FormControl<number | null>(0),
-    hands: new FormControl<number | null>(1),
-    range: new FormControl<number | null>(0),
-    ammoType: new FormControl<string | null>(null),
-    speedReduction: new FormControl<number | null>(0),
-    armorType: new FormControl<ArmorType | null>('body'),
-    coinType: new FormControl<CoinType | null>('Gold'),
-    effectNumber: new FormControl<number | null>(0),
-    effectTarget: new FormControl<PotionEffectTarget | null>('Health'),
-    effectDuration: new FormControl<number | null>(1),
+    gold: new FormControl<number>(0, { nonNullable: true }),
+    silver: new FormControl<number>(0, { nonNullable: true }),
+    copper: new FormControl<number>(0, { nonNullable: true }),
+    zinc: new FormControl<number>(0, { nonNullable: true }),
+    item1Id: new FormControl<number | null>(null),
+    item2Id: new FormControl<number | null>(null),
+    item3Id: new FormControl<number | null>(null),
+    item4Id: new FormControl<number | null>(null),
+    spell1Id: new FormControl<number | null>(null),
+    spell2Id: new FormControl<number | null>(null),
+    spell3Id: new FormControl<number | null>(null),
+    spell4Id: new FormControl<number | null>(null),
+    curse1Id: new FormControl<number | null>(null),
+    curse2Id: new FormControl<number | null>(null),
     spReward: new FormControl<number>(0, {
       nonNullable: true,
       validators: [Validators.min(0)],
     }),
+    hasTrap: new FormControl<boolean>(false, { nonNullable: true }),
+    trapName: new FormControl<string>('', { nonNullable: true }),
+    trapDescription: new FormControl<string>('', { nonNullable: true }),
+    trapDamage: new FormControl<number>(0, { nonNullable: true }),
+    trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind'>('HP', { nonNullable: true }),
+    trapCurseId: new FormControl<number | null>(null),
+    trapToDetect: new FormControl<number>(10, { nonNullable: true }),
+    trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
   });
+
+  readonly monsterTypeOptions = ['Humanoid', 'Beast', 'Specter', 'Other'] as const;
 
   readonly monsterForm = new FormGroup({
     name: new FormControl<string>('', { nonNullable: true }),
-    type: new FormControl<string>('Unknown', { nonNullable: true }),
+    type: new FormControl<string>('Humanoid', { nonNullable: true }),
     description: new FormControl<string>('', { nonNullable: true }),
     hp: new FormControl<number>(1, { nonNullable: true }),
     movementEconomy: new FormControl<number>(0, { nonNullable: true }),
@@ -380,6 +554,22 @@ export class Creator implements OnInit {
       nonNullable: true,
       validators: [Validators.min(0)],
     }),
+  });
+
+  readonly floorTrapForm = new FormGroup({
+    trapName: new FormControl<string>('', { nonNullable: true }),
+    trapDescription: new FormControl<string>('', { nonNullable: true }),
+    trapDamage: new FormControl<number>(0, { nonNullable: true }),
+    trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind'>('HP', { nonNullable: true }),
+    trapCurseId: new FormControl<number | null>(null),
+    trapToDetect: new FormControl<number>(10, { nonNullable: true }),
+    trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
+  });
+
+  readonly portalForm = new FormGroup({
+    name: new FormControl<string>('', { nonNullable: true }),
+    description: new FormControl<string>('', { nonNullable: true }),
+    look: new FormControl<PortalLook>('starUp', { nonNullable: true }),
   });
 
   keyList: Key[] = [];
@@ -393,6 +583,20 @@ export class Creator implements OnInit {
     this.loadPublishFriends();
     this.loadTresherLibrary();
     this.loadMonsterLibrary();
+    this.loadDoorImages();
+    this.loadStairsUpImages();
+    this.loadLibImageOptions();
+    this.loadLibSoundOptions();
+    this.loadLibUserImages();
+    this.loadLibUserSounds();
+    this.loadLibUserSpells();
+    const userkey = this.account.getKey();
+    if (userkey) {
+      this.itemService.loadItems(userkey);
+      this.curseService.loadCurses(userkey);
+      this.potionService.loadPotions(userkey);
+      this.loadLibSpellOptions(userkey);
+    }
   }
 
   @HostListener('window:keydown', ['$event'])
@@ -464,6 +668,14 @@ export class Creator implements OnInit {
     this.isExitMode.set(false);
     this.isPlaceTresherMode.set(false);
     this.isPlaceMonsterMode.set(false);
+    this.isPlaceFloorTrapMode.set(false);
+    this.isFloorTrapDialogVisible.set(false);
+    this.pendingFloorTrapPlacement.set(null);
+    this.isPortalDialogVisible.set(false);
+    this.editingPortalId.set(null);
+    this.selectedPortalId.set(null);
+    this.portalPickMode.set(null);
+    this.portalPickingId.set(null);
     this.isStartPointDialogVisible.set(false);
     this.isExitDialogVisible.set(false);
     this.isTresherDialogVisible.set(false);
@@ -478,6 +690,12 @@ export class Creator implements OnInit {
     this.pendingMonsterPlacement.set(null);
     this.editingMonsterId.set(null);
     this.placeMonsterRoam.set(false);
+    this.placeMonsterDropTresherIds.set([]);
+    this.placeMonsterDropKeyIds.set([]);
+    this.placeMonsterIsDormant.set(false);
+    this.placeMonsterGuardRow.set(null);
+    this.placeMonsterGuardCol.set(null);
+    this.isSelectingGuardSquare.set(false);
     this.exitForm.reset({
       destinationType: 'outside',
       destinationDungonId: null,
@@ -500,27 +718,35 @@ export class Creator implements OnInit {
     });
     this.exitDialogError.set(null);
     this.tresherForm.reset({
-      type: 'Weapon',
       name: '',
       description: '',
-      worth: 0,
-      trapID: null,
-      curseID: null,
-      HP: 10,
-      damage: 0,
-      hands: 1,
-      range: 0,
-      ammoType: null,
-      speedReduction: 0,
-      armorType: 'body',
-      coinType: 'Gold',
-      effectNumber: 0,
-      effectTarget: 'Health',
-      effectDuration: 1,
+      gold: 0,
+      silver: 0,
+      copper: 0,
+      zinc: 0,
+      item1Id: null,
+      item2Id: null,
+      item3Id: null,
+      item4Id: null,
+      spell1Id: null,
+      spell2Id: null,
+      spell3Id: null,
+      spell4Id: null,
+      curse1Id: null,
+      curse2Id: null,
+      spReward: 0,
+      hasTrap: false,
+      trapName: '',
+      trapDescription: '',
+      trapDamage: 0,
+      trapDamageTo: 'HP',
+      trapCurseId: null,
+      trapToDetect: 10,
+      trapToDisarm: 10,
     });
     this.monsterForm.reset({
       name: '',
-      type: 'Unknown',
+      type: 'Humanoid',
       description: '',
       hp: 1,
       movementEconomy: 0,
@@ -532,6 +758,11 @@ export class Creator implements OnInit {
       name: '',
       description: '',
       intro: '',
+      minsplifetime: 0,
+      maxsplifetime: 1000000,
+      spreward: 0,
+      ismaingame: false,
+      issample: false,
     });
   }
 
@@ -542,6 +773,24 @@ export class Creator implements OnInit {
   setMoveMode(event: Event): void {
     const target = event.target as HTMLInputElement | null;
     this.isMoveMode.set(Boolean(target?.checked));
+  }
+
+  toggleMoveMode(): void {
+    const next = !this.isMoveMode();
+    this.isMoveMode.set(next);
+    if (next) {
+      this.openBlockSelections.set({ ...EMPTY_OPEN_BLOCK_SELECTIONS });
+    }
+  }
+
+  selectOpenBlockOption(key: OpenBlockOptionKey): void {
+    const alreadySelected = this.openBlockSelections()[key];
+    const newSelections = { ...EMPTY_OPEN_BLOCK_SELECTIONS };
+    if (!alreadySelected) {
+      newSelections[key] = true;
+      this.isMoveMode.set(false);
+    }
+    this.openBlockSelections.set(newSelections);
   }
 
   setOpenBlockSelection(optionKey: OpenBlockOptionKey, event: Event): void {
@@ -578,12 +827,32 @@ export class Creator implements OnInit {
     const state = this.doorForm.controls.state.value;
     const hp = Math.max(1, Math.floor(this.doorForm.controls.hp.value));
     const isLocked = state === 'closed' ? this.doorForm.controls.isLocked.value : false;
+    const toPick = isLocked ? (this.doorForm.controls.toPick.value ?? null) : null;
+    const hasTrap = this.doorForm.controls.hasTrap.value;
+    const trap: Trap | null = hasTrap
+      ? {
+          name: this.doorForm.controls.trapName.value.trim(),
+          description: this.doorForm.controls.trapDescription.value.trim(),
+          damage: Math.max(0, this.doorForm.controls.trapDamage.value),
+          damageTo: this.doorForm.controls.trapDamageTo.value,
+          curseId: this.doorForm.controls.trapCurseId.value ?? null,
+          toDetect: Math.max(0, this.doorForm.controls.trapToDetect.value),
+          toDisarm: Math.max(0, this.doorForm.controls.trapToDisarm.value),
+        }
+      : null;
     const settings: DoorPromptResult = {
       state,
       hp,
       isLocked,
+      isHidden: this.doorForm.controls.isHidden.value,
+      toFind: this.doorForm.controls.isHidden.value
+        ? Math.min(6, Math.max(1, Math.floor(this.doorForm.controls.toFind.value)))
+        : 0,
       name: this.doorForm.controls.name.value.trim(),
       description: this.doorForm.controls.description.value.trim(),
+      toPick,
+      trap,
+      spReward: this.doorForm.controls.spReward.value ?? null,
     };
 
     const dungonId = pending.dungonId;
@@ -620,6 +889,7 @@ export class Creator implements OnInit {
     }
 
     this.closeDoorPlacementDialog();
+    this.openBlockSelections.set({ ...EMPTY_OPEN_BLOCK_SELECTIONS });
     this.markDungonJsonChanged();
     this.drawGridCanvas();
   }
@@ -640,6 +910,7 @@ export class Creator implements OnInit {
     this.isPlaceTresherMode.set(false);
     this.isPlaceMonsterMode.set(false);
     this.isAddTextMode.set(false);
+    this.isPlaceFloorTrapMode.set(false);
   }
 
   closeKaysDialog(): void {
@@ -669,9 +940,370 @@ export class Creator implements OnInit {
       this.startPlaceMonsterMode();
     } else if (action === 'addCellWallText') {
       this.startAddTextMode();
+    } else if (action === 'placeFloorTrap') {
+      this.startPlaceFloorTrapMode();
+    } else if (action === 'placePortal') {
+      this.openPortalDialog(null);
     }
 
     target.value = '';
+  }
+
+  startPlaceFloorTrapMode(): void {
+    this.isPlaceFloorTrapMode.set(true);
+    this.isPlaceTresherMode.set(false);
+    this.isPlaceMonsterMode.set(false);
+    this.isStartPointMode.set(false);
+    this.isExitMode.set(false);
+    this.isAddTextMode.set(false);
+    this.isFloorTrapDialogVisible.set(false);
+    this.pendingFloorTrapPlacement.set(null);
+    this.portalPickMode.set(null);
+    this.portalPickingId.set(null);
+  }
+
+  stopPlaceFloorTrapMode(): void {
+    this.isPlaceFloorTrapMode.set(false);
+    this.isFloorTrapDialogVisible.set(false);
+    this.pendingFloorTrapPlacement.set(null);
+  }
+
+  openFloorTrapDialog(dungonId: number, row: number, column: number): void {
+    this.pendingFloorTrapPlacement.set({ dungonId, row, column });
+    this.floorTrapForm.reset({
+      trapName: '',
+      trapDescription: '',
+      trapDamage: 0,
+      trapDamageTo: 'HP',
+      trapCurseId: null,
+      trapToDetect: 10,
+      trapToDisarm: 10,
+    });
+    this.isFloorTrapDialogVisible.set(true);
+  }
+
+  saveFloorTrap(): void {
+    const pending = this.pendingFloorTrapPlacement();
+    if (!pending) return;
+
+    const controls = this.floorTrapForm.controls;
+    const trap: Trap = {
+      name: controls.trapName.value.trim(),
+      description: controls.trapDescription.value.trim(),
+      damage: Math.max(0, controls.trapDamage.value),
+      damageTo: controls.trapDamageTo.value,
+      curseId: controls.trapCurseId.value ?? null,
+      toDetect: Math.max(0, controls.trapToDetect.value),
+      toDisarm: Math.max(0, controls.trapToDisarm.value),
+    };
+
+    const placement: FloorTrapPlacement = {
+      id: this.nextFloorTrapId,
+      row: pending.row,
+      column: pending.column,
+      trap,
+      isTriggered: false,
+      isDisarmed: false,
+    };
+    this.nextFloorTrapId += 1;
+
+    this.floorTrapPlacementsByDungon.update((all) => ({
+      ...all,
+      [pending.dungonId]: [...(all[pending.dungonId] ?? []), placement],
+    }));
+
+    this.markDungonJsonChanged();
+    this.isFloorTrapDialogVisible.set(false);
+    this.pendingFloorTrapPlacement.set(null);
+  }
+
+  cancelFloorTrap(): void {
+    this.isFloorTrapDialogVisible.set(false);
+    this.pendingFloorTrapPlacement.set(null);
+  }
+
+  removeFloorTrap(dungonId: number, trapId: number): void {
+    this.floorTrapPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: (all[dungonId] ?? []).filter((p) => p.id !== trapId),
+    }));
+    this.markDungonJsonChanged();
+  }
+
+  // ── Portals ───────────────────────────────────────────────────────────────
+
+  currentDungonPortals(): PortalPlacement[] {
+    const dungonId = this.selectedDungonId();
+    return dungonId !== null ? (this.portalPlacementsByDungon()[dungonId] ?? []) : [];
+  }
+
+  selectedPortal(): PortalPlacement | null {
+    const id = this.selectedPortalId();
+    if (id === null) return null;
+    return this.currentDungonPortals().find((p) => p.id === id) ?? null;
+  }
+
+  onPortalSelectChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.selectedPortalId.set(value ? Number(value) : null);
+  }
+
+  portalLookLabel(look: PortalLook): string {
+    if (look === 'starDown') return 'Star (Down)';
+    if (look === 'magicDoor') return 'Magic Door';
+    return 'Star (Up)';
+  }
+
+  openPortalDialog(portalId: number | null): void {
+    this.editingPortalId.set(portalId);
+    if (portalId !== null) {
+      const dungonId = this.selectedDungonId();
+      const portal =
+        dungonId !== null
+          ? (this.portalPlacementsByDungon()[dungonId] ?? []).find((p) => p.id === portalId) ?? null
+          : null;
+      if (portal) {
+        this.portalForm.reset({
+          name: portal.name,
+          description: portal.description,
+          look: portal.look,
+        });
+      } else {
+        this.portalForm.reset({ name: '', description: '', look: 'starUp' });
+      }
+    } else {
+      this.portalForm.reset({ name: '', description: '', look: 'starUp' });
+    }
+    this.isPortalDialogVisible.set(true);
+  }
+
+  savePortal(): void {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) return;
+
+    const controls = this.portalForm.controls;
+    const name = controls.name.value.trim() || 'Unnamed Portal';
+    const description = controls.description.value.trim();
+    const look = controls.look.value;
+    const editingId = this.editingPortalId();
+
+    if (editingId !== null) {
+      this.portalPlacementsByDungon.update((all) => ({
+        ...all,
+        [dungonId]: (all[dungonId] ?? []).map((p) =>
+          p.id === editingId ? { ...p, name, description, look } : p
+        ),
+      }));
+      this.isPortalDialogVisible.set(false);
+      this.editingPortalId.set(null);
+      this.markDungonJsonChanged();
+      this.drawGridCanvas();
+    } else {
+      const newPortal: PortalPlacement = {
+        id: this.nextPortalId,
+        name,
+        description,
+        look,
+        startRow: null,
+        startColumn: null,
+        endRow: null,
+        endColumn: null,
+      };
+      this.nextPortalId += 1;
+      this.portalPlacementsByDungon.update((all) => ({
+        ...all,
+        [dungonId]: [...(all[dungonId] ?? []), newPortal],
+      }));
+      this.isPortalDialogVisible.set(false);
+      this.editingPortalId.set(null);
+      this.selectedPortalId.set(newPortal.id);
+      this.markDungonJsonChanged();
+      // Auto-enter placement mode for start point
+      this.startPickPortalPoint(newPortal.id, 'start');
+    }
+  }
+
+  cancelPortalDialog(): void {
+    this.isPortalDialogVisible.set(false);
+    this.editingPortalId.set(null);
+  }
+
+  startPickPortalPoint(portalId: number, step: 'start' | 'end'): void {
+    this.portalPickMode.set(step);
+    this.portalPickingId.set(portalId);
+    this.isPlaceFloorTrapMode.set(false);
+    this.isPlaceTresherMode.set(false);
+    this.isPlaceMonsterMode.set(false);
+    this.isStartPointMode.set(false);
+    this.isExitMode.set(false);
+    this.isAddTextMode.set(false);
+  }
+
+  stopPickPortalPoint(): void {
+    this.portalPickMode.set(null);
+    this.portalPickingId.set(null);
+  }
+
+  setPortalPoint(dungonId: number, portalId: number, step: 'start' | 'end', row: number, column: number): void {
+    this.portalPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: (all[dungonId] ?? []).map((p) =>
+        p.id === portalId
+          ? step === 'start'
+            ? { ...p, startRow: row, startColumn: column }
+            : { ...p, endRow: row, endColumn: column }
+          : p
+      ),
+    }));
+    if (step === 'start') {
+      this.portalPickMode.set('end');
+    } else {
+      this.portalPickMode.set(null);
+      this.portalPickingId.set(null);
+    }
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+  }
+
+  removePortal(dungonId: number, portalId: number): void {
+    this.portalPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: (all[dungonId] ?? []).filter((p) => p.id !== portalId),
+    }));
+    if (this.selectedPortalId() === portalId) {
+      this.selectedPortalId.set(null);
+    }
+    if (this.portalPickingId() === portalId) {
+      this.stopPickPortalPoint();
+    }
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+  }
+
+  // ── Placement Inspector ───────────────────────────────────────────────────
+
+  placedItemsForCurrentDungon(): GridPlacedItem[] {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) return [];
+    const items: GridPlacedItem[] = [];
+
+    // Monsters
+    const monsters = this.monsterListByDungon()[dungonId] ?? [];
+    for (const p of this.monsterPlacementsByDungon()[dungonId] ?? []) {
+      const name = monsters.find((m) => m.id === p.monsterId)?.name ?? `Monster #${p.monsterId}`;
+      items.push({
+        key: `monster-${p.monsterId}-${p.row}-${p.column}`,
+        type: 'monster',
+        label: `Monster: ${name} (r${p.row},c${p.column})`,
+        row: p.row,
+        column: p.column,
+        refId: p.monsterId,
+      });
+    }
+
+    // Treshers
+    const treshers = this.tresherListByDungon()[dungonId] ?? [];
+    for (const p of this.tresherPlacementsByDungon()[dungonId] ?? []) {
+      const name = treshers.find((t) => t.id === p.tresherId)?.name ?? `Tresher #${p.tresherId}`;
+      items.push({
+        key: `tresher-${p.tresherId}-${p.row}-${p.column}`,
+        type: 'tresher',
+        label: `Tresher: ${name} (r${p.row},c${p.column})`,
+        row: p.row,
+        column: p.column,
+        refId: p.tresherId,
+      });
+    }
+
+    // Doors (deduplicated by door id)
+    const seenDoorIds = new Set<number>();
+    for (const square of Object.values(this.squaresByDungon()[dungonId] ?? {})) {
+      const sides = [square.toTop, square.toRight, square.toBottom, square.toLeft];
+      for (const conn of sides) {
+        if (!conn || !this.isDoorConnection(conn) || seenDoorIds.has(conn.id)) continue;
+        seenDoorIds.add(conn.id);
+        items.push({
+          key: `door-${conn.id}-${square.row}-${square.column}`,
+          type: 'door',
+          label: `Door: ${conn.name} (r${square.row},c${square.column})`,
+          row: square.row,
+          column: square.column,
+          refId: conn.id,
+        });
+      }
+    }
+
+    // Traps
+    for (const p of this.floorTrapPlacementsByDungon()[dungonId] ?? []) {
+      items.push({
+        key: `trap-${p.id}-${p.row}-${p.column}`,
+        type: 'trap',
+        label: `Trap: ${p.trap.name || 'Unnamed'} (r${p.row},c${p.column})`,
+        row: p.row,
+        column: p.column,
+        refId: p.id,
+      });
+    }
+
+    return items;
+  }
+
+  selectedPlacedItem(): GridPlacedItem | null {
+    const key = this.selectedPlacedItemKey();
+    if (!key) return null;
+    return this.placedItemsForCurrentDungon().find((item) => item.key === key) ?? null;
+  }
+
+  onPlacedItemSelect(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.selectedPlacedItemKey.set(value || null);
+    this.drawGridCanvas();
+  }
+
+  moveSelectedPlacement(): void {
+    const item = this.selectedPlacedItem();
+    const dungonId = this.selectedDungonId();
+    if (!item || dungonId === null) return;
+    this.selectedPlacedItemKey.set(null);
+
+    if (item.type === 'monster') {
+      this.removeMonsterPlacementsAtSquare(dungonId, item.row, item.column);
+      this.markDungonJsonChanged();
+      this.drawGridCanvas();
+      this.startPlaceMonsterMode();
+    } else if (item.type === 'tresher') {
+      this.removeTresherPlacementsAtSquare(dungonId, item.row, item.column);
+      this.markDungonJsonChanged();
+      this.drawGridCanvas();
+      this.startPlaceTresherMode();
+    } else if (item.type === 'trap') {
+      this.removeFloorTrap(dungonId, item.refId);
+      this.drawGridCanvas();
+      this.startPlaceFloorTrapMode();
+    }
+  }
+
+  editSelectedPlacement(): void {
+    const item = this.selectedPlacedItem();
+    if (!item) return;
+
+    if (item.type === 'monster') {
+      this.openMonsterDialog();
+      this.editSelectedMonster(item.refId);
+    } else if (item.type === 'tresher') {
+      this.openTresherDialog();
+    }
+  }
+
+  clearSelectedPlacement(): void {
+    this.selectedPlacedItemKey.set(null);
+    this.drawGridCanvas();
+  }
+
+  floorTrapsForPreview(): FloorTrapPlacement[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) return [];
+    return this.floorTrapPlacementsByDungon()[preview.dungonId] ?? [];
   }
 
   onPublishVisibilityChange(event: Event): void {
@@ -735,6 +1367,10 @@ export class Creator implements OnInit {
       return false;
     }
 
+    if (selectedDungon.status === 'pending') {
+      return false;
+    }
+
     if (selectedDungon.status !== 'published') {
       return true;
     }
@@ -742,10 +1378,14 @@ export class Creator implements OnInit {
     return this.savedPublishUpdatesByDungon()[selectedDungon.id] === true;
   }
 
-  publishButtonText(): 'Publish' | 'Published' | 'Publish Update' {
+  publishButtonText(): 'Publish' | 'Published' | 'Publish Update' | 'Pending Approval' {
     const selectedDungon = this.selectedDungon();
     if (!selectedDungon) {
       return 'Publish';
+    }
+
+    if (selectedDungon.status === 'pending') {
+      return 'Pending Approval';
     }
 
     if (selectedDungon.status !== 'published') {
@@ -753,6 +1393,46 @@ export class Creator implements OnInit {
     }
 
     return this.canOpenPublishDialog() ? 'Publish Update' : 'Published';
+  }
+
+  approveDungon(): void {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) {
+      return;
+    }
+
+    const userKey = this.account.getKey();
+    if (!userKey) {
+      return;
+    }
+
+    this.http
+      .put<{ result: number; error?: string }>(
+        `${API_BASE_URL}/dungons/${dungonId}/approve`,
+        { userkey: userKey }
+      )
+      .subscribe({
+        next: (response) => {
+          if (response.result !== 1) {
+            return;
+          }
+
+          const currentSelected = this.selectedDungon();
+          if (currentSelected && currentSelected.id === dungonId) {
+            this.selectedDungon.set({
+              ...currentSelected,
+              status: 'published',
+              ispublic: true,
+            });
+          }
+
+          this.dungons.update((items) =>
+            items.map((item) =>
+              item.id === dungonId ? { ...item, status: 'published' } : item
+            )
+          );
+        },
+      });
   }
 
   selectKeyForPlacement(keyId: number): void {
@@ -1056,6 +1736,7 @@ export class Creator implements OnInit {
     this.selectedKeyIdForPlacement.set(null);
     this.beginCreateMonster();
     this.loadMonsterLibrary();
+    this.loadMonsterDialogOptions();
   }
 
   closeMonsterDialog(): void {
@@ -1197,6 +1878,52 @@ export class Creator implements OnInit {
     this.placeMonsterRoam.set(Boolean(target?.checked));
   }
 
+  onPlaceMonsterIsDormantChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.placeMonsterIsDormant.set(Boolean(target?.checked));
+    if (!target?.checked) {
+      this.placeMonsterGuardRow.set(null);
+      this.placeMonsterGuardCol.set(null);
+      this.isSelectingGuardSquare.set(false);
+    }
+  }
+
+  startSelectingGuardSquare(): void {
+    this.isSelectingGuardSquare.set(true);
+    this.isPlaceMonsterDialogVisible.set(false);
+  }
+
+  clearMonsterGuardSquare(): void {
+    this.placeMonsterGuardRow.set(null);
+    this.placeMonsterGuardCol.set(null);
+  }
+
+  isMonsterDropTresherSelected(id: number): boolean {
+    return this.placeMonsterDropTresherIds().includes(id);
+  }
+
+  toggleMonsterDropTresher(id: number): void {
+    const current = this.placeMonsterDropTresherIds();
+    if (current.includes(id)) {
+      this.placeMonsterDropTresherIds.set(current.filter((v) => v !== id));
+    } else {
+      this.placeMonsterDropTresherIds.set([...current, id]);
+    }
+  }
+
+  isMonsterDropKeySelected(id: number): boolean {
+    return this.placeMonsterDropKeyIds().includes(id);
+  }
+
+  toggleMonsterDropKey(id: number): void {
+    const current = this.placeMonsterDropKeyIds();
+    if (current.includes(id)) {
+      this.placeMonsterDropKeyIds.set(current.filter((v) => v !== id));
+    } else {
+      this.placeMonsterDropKeyIds.set([...current, id]);
+    }
+  }
+
   closePlaceTresherDialog(): void {
     this.isPlaceTresherDialogVisible.set(false);
     this.pendingTresherPlacement.set(null);
@@ -1206,6 +1933,12 @@ export class Creator implements OnInit {
     this.isPlaceMonsterDialogVisible.set(false);
     this.pendingMonsterPlacement.set(null);
     this.placeMonsterRoam.set(false);
+    this.placeMonsterDropTresherIds.set([]);
+    this.placeMonsterDropKeyIds.set([]);
+    this.placeMonsterIsDormant.set(false);
+    this.placeMonsterGuardRow.set(null);
+    this.placeMonsterGuardCol.set(null);
+    this.isSelectingGuardSquare.set(false);
   }
 
   placeSelectedTresherAtPendingPlacement(tresherId: number): void {
@@ -1351,6 +2084,11 @@ export class Creator implements OnInit {
             row: pending.row,
             column: pending.column,
             roam: this.placeMonsterRoam(),
+            tresherIds: this.placeMonsterDropTresherIds().length > 0 ? [...this.placeMonsterDropTresherIds()] : undefined,
+            keyIds: this.placeMonsterDropKeyIds().length > 0 ? [...this.placeMonsterDropKeyIds()] : undefined,
+            isDormant: this.placeMonsterIsDormant() || undefined,
+            guardRow: this.placeMonsterIsDormant() && this.placeMonsterGuardRow() !== null ? this.placeMonsterGuardRow() : undefined,
+            guardColumn: this.placeMonsterIsDormant() && this.placeMonsterGuardCol() !== null ? this.placeMonsterGuardCol() : undefined,
           },
         ],
       };
@@ -1381,23 +2119,30 @@ export class Creator implements OnInit {
 
     const nextLocalTresher: Tresher = {
       id: this.nextTresherId,
-      type: libraryTresher.type,
+      type: libraryTresher.type ?? 'OtherTresher',
       name: libraryTresher.name,
       description: libraryTresher.description,
-      worth: libraryTresher.worth,
-      curseID: libraryTresher.curseID,
-      trapID: libraryTresher.trapID,
-      HP: libraryTresher.HP,
-      damage: libraryTresher.damage,
-      hands: libraryTresher.hands,
-      range: libraryTresher.range,
-      ammoType: libraryTresher.ammoType,
-      speedReduction: libraryTresher.speedReduction,
-      armorType: libraryTresher.armorType,
-      coinType: libraryTresher.coinType,
-      effectNumber: libraryTresher.effectNumber,
-      effectTarget: libraryTresher.effectTarget,
-      effectDuration: libraryTresher.effectDuration,
+      gold: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryTresher.gold), 0)),
+      silver: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryTresher.silver), 0)),
+      copper: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryTresher.copper), 0)),
+      zinc: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryTresher.zinc), 0)),
+      item1Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.item1Id)),
+      item2Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.item2Id)),
+      item3Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.item3Id)),
+      item4Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.item4Id)),
+      spell1Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.spell1Id)),
+      spell2Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.spell2Id)),
+      spell3Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.spell3Id)),
+      spell4Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.spell4Id)),
+      curse1Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.curse1Id)),
+      curse2Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.curse2Id)),
+      potion1Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.potion1Id)),
+      potion2Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.potion2Id)),
+      potion3Id: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.potion3Id)),
+      imageId: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.imageId)),
+      soundId: this.normalizeNullableNumber(this.toFiniteNumber(libraryTresher.soundId)),
+      spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryTresher.spReward), 0)),
+      trap: null,
     };
 
     this.nextTresherId += 1;
@@ -1426,6 +2171,7 @@ export class Creator implements OnInit {
     const nextLocalMonster: Monster = {
       id: this.nextMonsterId,
       imageId: this.normalizeNullableNumber(this.toFiniteNumber(libraryMonster.imageId)),
+      soundId: this.normalizeNullableNumber(this.toFiniteNumber(libraryMonster.soundId)),
       tresherIds: this.normalizeIdList(libraryMonster.tresherIds),
       keyIds: this.normalizeIdList(libraryMonster.keyIds),
       name: libraryMonster.name,
@@ -1446,8 +2192,11 @@ export class Creator implements OnInit {
         )
       ),
       attacks,
+      magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.magic), 0)),
+      magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.magicResistance), 0)),
+      spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.spReward), 0)),
+      callsReinforcements: libraryMonster.callsReinforcements === true,
     };
-
     this.nextMonsterId += 1;
     this.monsterListByDungon.update((allMonsters) => ({
       ...allMonsters,
@@ -1460,20 +2209,22 @@ export class Creator implements OnInit {
 
   private isSameTresherDefinition(left: Tresher, right: Tresher): boolean {
     return (
-      left.type === right.type &&
       left.name === right.name &&
       left.description === right.description &&
-      left.worth === right.worth &&
-      left.curseID === right.curseID &&
-      left.trapID === right.trapID &&
-      left.HP === right.HP &&
-      left.damage === right.damage &&
-      left.hands === right.hands &&
-      left.range === right.range &&
-      left.ammoType === right.ammoType &&
-      left.speedReduction === right.speedReduction &&
-      left.armorType === right.armorType &&
-      left.coinType === right.coinType
+      left.gold === right.gold &&
+      left.silver === right.silver &&
+      left.copper === right.copper &&
+      left.zinc === right.zinc &&
+      left.item1Id === right.item1Id &&
+      left.item2Id === right.item2Id &&
+      left.item3Id === right.item3Id &&
+      left.item4Id === right.item4Id &&
+      left.spell1Id === right.spell1Id &&
+      left.spell2Id === right.spell2Id &&
+      left.spell3Id === right.spell3Id &&
+      left.spell4Id === right.spell4Id &&
+      left.curse1Id === right.curse1Id &&
+      left.curse2Id === right.curse2Id
     );
   }
 
@@ -1545,34 +2296,16 @@ export class Creator implements OnInit {
 
     const controls = this.monsterForm.controls;
     const editingId = this.editingMonsterId();
-    const existing = editingId === null
-      ? null
-      : (this.monsterListByDungon()[dungonId] ?? []).find((monster) => monster.id === editingId) ?? null;
-
-    const desiredAttackCount = Math.max(
-      0,
-      this.normalizeNumber(this.toFiniteNumber(controls.numberOfAttacks.value), 1)
-    );
-    let attacks = this.normalizeMonsterAttacks(existing?.attacks ?? []);
-    while (attacks.length < desiredAttackCount) {
-      attacks.push({
-        description: '',
-        damage: 0,
-        plusToHit: 0,
-      });
-    }
-
-    if (attacks.length > desiredAttackCount) {
-      attacks = attacks.slice(0, desiredAttackCount);
-    }
+    const editingAttacks = this.editingMonsterAttacks();
 
     const nextMonster: Monster = {
       id: editingId ?? this.nextMonsterId,
-      imageId: existing?.imageId ?? null,
-      tresherIds: existing?.tresherIds ? this.normalizeIdList(existing.tresherIds) : [],
+      imageId: this.editingMonsterImageId(),
+      soundId: this.editingMonsterSoundId(),
+      tresherIds: this.normalizeIdList(this.editingMonsterTresherIds()),
       keyIds: this.normalizeIdList(this.editingMonsterKeyIds()),
       name: controls.name.value.trim() || 'Unnamed Monster',
-      type: controls.type.value.trim() || 'Unknown',
+      type: controls.type.value.trim() || 'Humanoid',
       description: controls.description.value.trim(),
       hp: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.hp.value), 1)),
       movementEconomy: Math.max(
@@ -1581,8 +2314,12 @@ export class Creator implements OnInit {
       ),
       ac: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.ac.value), 10)),
       runAt: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.runAt.value), 0)),
-      numberOfAttacks: desiredAttackCount,
-      attacks,
+      numberOfAttacks: editingAttacks.length,
+      attacks: editingAttacks,
+      magic: 0,
+      magicResistance: 0,
+      spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.spReward?.value), 0)),
+      callsReinforcements: false,
     };
 
     if (editingId !== null) {
@@ -1610,10 +2347,14 @@ export class Creator implements OnInit {
     }
 
     this.editingMonsterKeyIds.set([]);
+    this.editingMonsterImageId.set(null);
+    this.editingMonsterSoundId.set(null);
+    this.editingMonsterTresherIds.set([]);
+    this.editingMonsterAttacks.set([]);
 
     this.monsterForm.reset({
       name: '',
-      type: 'Unknown',
+      type: 'Humanoid',
       description: '',
       hp: 1,
       movementEconomy: 0,
@@ -1638,6 +2379,10 @@ export class Creator implements OnInit {
 
     this.editingMonsterId.set(selectedMonster.id);
     this.editingMonsterKeyIds.set(this.normalizeIdList(selectedMonster.keyIds));
+    this.editingMonsterImageId.set(this.normalizeNullableNumber(this.toFiniteNumber(selectedMonster.imageId)));
+    this.editingMonsterSoundId.set(this.normalizeNullableNumber(this.toFiniteNumber(selectedMonster.soundId)));
+    this.editingMonsterTresherIds.set(this.normalizeIdList(selectedMonster.tresherIds));
+    this.editingMonsterAttacks.set(this.normalizeMonsterAttacks(selectedMonster.attacks));
     this.monsterForm.reset({
       name: selectedMonster.name,
       type: selectedMonster.type,
@@ -1667,67 +2412,215 @@ export class Creator implements OnInit {
     return this.editingMonsterKeyIds().includes(keyId);
   }
 
+  isKeyPlaced(keyId: number): boolean {
+    const key = this.keyList.find((k) => k.id === keyId);
+    if (key !== undefined && key.rownId !== null && key.columnId !== null) {
+      return true;
+    }
+    const dungonId = this.selectedDungonId();
+    if (dungonId !== null) {
+      const monsterPlacements = this.monsterPlacementsByDungon()[dungonId] ?? [];
+      if (monsterPlacements.some((p) => p.keyIds?.includes(keyId))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  getDoorKeyLocation(doorRefId: number): { row: number; column: number } | null {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) return null;
+
+    const key = this.keyList.find((k) => k.doorId === doorRefId);
+    if (!key) return null;
+
+    // Key is placed directly on the grid
+    if (key.rownId !== null && key.columnId !== null) {
+      return { row: key.rownId, column: key.columnId };
+    }
+
+    // Key is held by a monster — find which placement
+    const monsters = this.monsterListByDungon()[dungonId] ?? [];
+    const holderMonster = monsters.find((m) => m.keyIds.includes(key.id));
+    if (holderMonster) {
+      const placement = (this.monsterPlacementsByDungon()[dungonId] ?? []).find(
+        (p) => p.monsterId === holderMonster.id
+      );
+      if (placement) return { row: placement.row, column: placement.column };
+    }
+
+    // Key is inside a tresher — find which tresher placement
+    const treshers = this.tresherListByDungon()[dungonId] ?? [];
+    const holderTresher = treshers.find((t) => (t as any).keyIds?.includes(key.id));
+    if (holderTresher) {
+      const placement = (this.tresherPlacementsByDungon()[dungonId] ?? []).find(
+        (p) => p.tresherId === holderTresher.id
+      );
+      if (placement) return { row: placement.row, column: placement.column };
+    }
+
+    return null;
+  }
+
+  setMonsterDialogImageId(value: string): void {
+    this.editingMonsterImageId.set(value ? (parseInt(value, 10) || null) : null);
+  }
+
+  setMonsterDialogSoundId(value: string): void {
+    this.editingMonsterSoundId.set(value ? (parseInt(value, 10) || null) : null);
+  }
+
+  toggleMonsterTresher(tresherId: number): void {
+    const current = this.editingMonsterTresherIds();
+    if (current.includes(tresherId)) {
+      this.editingMonsterTresherIds.set(current.filter((id) => id !== tresherId));
+    } else {
+      this.editingMonsterTresherIds.set([...current, tresherId]);
+    }
+  }
+
+  isMonsterTresherSelected(tresherId: number): boolean {
+    return this.editingMonsterTresherIds().includes(tresherId);
+  }
+
+  addMonsterAttack(): void {
+    this.editingMonsterAttacks.update((attacks) => [
+      ...attacks,
+      { type: 'Bite', description: '', damage: 0, plusToHit: 0, weaponItemId: null, spellId: null, curseId: null },
+    ]);
+  }
+
+  removeMonsterAttack(idx: number): void {
+    this.editingMonsterAttacks.update((attacks) => attacks.filter((_, i) => i !== idx));
+  }
+
+  setMonsterAttackType(idx: number, type: string): void {
+    this.editingMonsterAttacks.update((attacks) =>
+      attacks.map((a, i) => i === idx ? { ...a, type, weaponItemId: null, spellId: null } : a)
+    );
+  }
+
+  setMonsterAttackDamage(idx: number, value: string): void {
+    const damage = Math.max(0, parseInt(value, 10) || 0);
+    this.editingMonsterAttacks.update((attacks) =>
+      attacks.map((a, i) => i === idx ? { ...a, damage } : a)
+    );
+  }
+
+  setMonsterAttackHit(idx: number, value: string): void {
+    const plusToHit = parseInt(value, 10) || 0;
+    this.editingMonsterAttacks.update((attacks) =>
+      attacks.map((a, i) => i === idx ? { ...a, plusToHit } : a)
+    );
+  }
+
+  setMonsterAttackWeaponId(idx: number, value: string): void {
+    const weaponItemId = value ? (parseInt(value, 10) || null) : null;
+    this.editingMonsterAttacks.update((attacks) =>
+      attacks.map((a, i) => i === idx ? { ...a, weaponItemId } : a)
+    );
+  }
+
+  setMonsterAttackSpellId(idx: number, value: string): void {
+    const spellId = value ? (parseInt(value, 10) || null) : null;
+    this.editingMonsterAttacks.update((attacks) =>
+      attacks.map((a, i) => i === idx ? { ...a, spellId } : a)
+    );
+  }
+
+  private loadMonsterDialogOptions(): void {
+    const userKey = this.account.getKey();
+    if (!userKey) return;
+
+    this.http
+      .get<{ id: number; name: string; path: string }[]>(`${API_BASE_URL}/images`, {
+        params: { userkey: userKey, scope: 'library' },
+      })
+      .subscribe({
+        next: (items) => this.monsterDialogImages.set(items),
+        error: () => this.monsterDialogImages.set([]),
+      });
+
+    this.http
+      .get<{ id: number; name: string; path: string }[]>(`${API_BASE_URL}/sounds`, {
+        params: { userkey: userKey, scope: 'library' },
+      })
+      .subscribe({
+        next: (items) => this.monsterDialogSounds.set(items),
+        error: () => this.monsterDialogSounds.set([]),
+      });
+
+    this.http
+      .get<{ id: number; name: string; type: string }[]>(`${API_BASE_URL}/items`, {
+        params: { userkey: userKey },
+      })
+      .subscribe({
+        next: (items) =>
+          this.monsterDialogWeaponItems.set(
+            items.filter((i) => i.type === 'weapon').map((i) => ({ id: i.id, name: i.name }))
+          ),
+        error: () => this.monsterDialogWeaponItems.set([]),
+      });
+
+    this.http
+      .get<{ id: number; name: string }[]>(`${API_BASE_URL}/spells`, {
+        params: { userkey: userKey },
+      })
+      .subscribe({
+        next: (items) => this.monsterDialogSpells.set(items),
+        error: () => this.monsterDialogSpells.set([]),
+      });
+  }
+
   saveTresher(): void {
     const dungonId = this.selectedDungonId();
     if (dungonId === null) {
       return;
     }
 
-    const type = this.tresherForm.controls.type.value;
-    const worth = Math.max(0, this.normalizeNumber(this.tresherForm.controls.worth.value, 0));
-    const trapID = this.normalizeNullableNumber(this.tresherForm.controls.trapID.value);
-    const curseID = this.normalizeNullableNumber(this.tresherForm.controls.curseID.value);
-    const name = this.tresherForm.controls.name.value.trim() || 'Unnamed Tresher';
-    const description = this.tresherForm.controls.description.value.trim();
+    const controls = this.tresherForm.controls;
+    const name = controls.name.value.trim() || 'Unnamed Tresher';
+    const description = controls.description.value.trim();
+
+    const hasTrap = controls.hasTrap.value;
+    const tresherTrap: Trap | null = hasTrap
+      ? {
+          name: controls.trapName.value.trim(),
+          description: controls.trapDescription.value.trim(),
+          damage: Math.max(0, controls.trapDamage.value),
+          damageTo: controls.trapDamageTo.value,
+          curseId: controls.trapCurseId.value ?? null,
+          toDetect: Math.max(0, controls.trapToDetect.value),
+          toDisarm: Math.max(0, controls.trapToDisarm.value),
+        }
+      : null;
 
     const nextTresher: Tresher = {
       id: this.nextTresherId,
-      type,
       name,
       description,
-      worth,
-      trapID,
-      curseID,
-      HP: null,
-      damage: null,
-      hands: null,
-      range: null,
-      ammoType: null,
-      speedReduction: null,
-      armorType: null,
-      coinType: null,
-      effectNumber: null,
-      effectTarget: null,
-      effectDuration: null,
+      gold: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.gold.value), 0)),
+      silver: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.silver.value), 0)),
+      copper: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.copper.value), 0)),
+      zinc: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.zinc.value), 0)),
+      item1Id: this.normalizeNullableNumber(this.toFiniteNumber(controls.item1Id.value)),
+      item2Id: this.normalizeNullableNumber(this.toFiniteNumber(controls.item2Id.value)),
+      item3Id: this.normalizeNullableNumber(this.toFiniteNumber(controls.item3Id.value)),
+      item4Id: this.normalizeNullableNumber(this.toFiniteNumber(controls.item4Id.value)),
+      spell1Id: this.normalizeNullableNumber(this.toFiniteNumber(controls.spell1Id.value)),
+      spell2Id: this.normalizeNullableNumber(this.toFiniteNumber(controls.spell2Id.value)),
+      spell3Id: this.normalizeNullableNumber(this.toFiniteNumber(controls.spell3Id.value)),
+      spell4Id: this.normalizeNullableNumber(this.toFiniteNumber(controls.spell4Id.value)),
+      curse1Id: this.normalizeNullableNumber(this.toFiniteNumber(controls.curse1Id.value)),
+      curse2Id: this.normalizeNullableNumber(this.toFiniteNumber(controls.curse2Id.value)),
+      potion1Id: null,
+      potion2Id: null,
+      potion3Id: null,
+      imageId: null,
+      soundId: null,
+      spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.spReward.value), 0)),
+      trap: tresherTrap,
     };
-
-    if (type === 'Weapon') {
-      nextTresher.HP = this.normalizeNumber(this.tresherForm.controls.HP.value, 10);
-      nextTresher.damage = this.normalizeNumber(this.tresherForm.controls.damage.value, 0);
-      nextTresher.hands = Math.max(1, this.normalizeNumber(this.tresherForm.controls.hands.value, 1));
-      nextTresher.range = Math.max(0, this.normalizeNumber(this.tresherForm.controls.range.value, 0));
-      const ammoTypeRaw = this.tresherForm.controls.ammoType.value;
-      nextTresher.ammoType = ammoTypeRaw && ammoTypeRaw.trim() ? ammoTypeRaw.trim() : null;
-    } else if (type === 'Armor') {
-      nextTresher.HP = this.normalizeNumber(this.tresherForm.controls.HP.value, 10);
-      nextTresher.hands = Math.max(0, this.normalizeNumber(this.tresherForm.controls.hands.value, 0));
-      nextTresher.speedReduction = this.normalizeNumber(
-        this.tresherForm.controls.speedReduction.value,
-        0
-      );
-      nextTresher.armorType = this.normalizeArmorType(this.tresherForm.controls.armorType.value);
-    } else if (type === 'Coins') {
-      nextTresher.coinType = this.normalizeCoinType(this.tresherForm.controls.coinType.value);
-    } else if (type === 'Potion') {
-      nextTresher.effectNumber = this.normalizeNumber(this.tresherForm.controls.effectNumber.value, 0);
-      nextTresher.effectTarget = this.tresherForm.controls.effectTarget.value;
-      const target = nextTresher.effectTarget;
-      if (target === 'AC' || target === 'AE') {
-        nextTresher.effectDuration = Math.max(1, this.normalizeNumber(this.tresherForm.controls.effectDuration.value, 1));
-      }
-    } else {
-      nextTresher.HP = this.normalizeNumber(this.tresherForm.controls.HP.value, 10);
-    }
 
     this.nextTresherId += 1;
 
@@ -1740,49 +2633,32 @@ export class Creator implements OnInit {
     this.closeTresherDialog();
 
     this.tresherForm.reset({
-      type,
       name: '',
       description: '',
-      worth: 0,
-      trapID: null,
-      curseID: null,
-      HP: 10,
-      damage: 0,
-      hands: 1,
-      range: 0,
-      ammoType: null,
-      speedReduction: 0,
-      armorType: 'body',
-      coinType: 'Gold',
-      effectNumber: 0,
-      effectTarget: 'Health',
-      effectDuration: 1,
+      gold: 0,
+      silver: 0,
+      copper: 0,
+      zinc: 0,
+      item1Id: null,
+      item2Id: null,
+      item3Id: null,
+      item4Id: null,
+      spell1Id: null,
+      spell2Id: null,
+      spell3Id: null,
+      spell4Id: null,
+      curse1Id: null,
+      curse2Id: null,
+      spReward: 0,
+      hasTrap: false,
+      trapName: '',
+      trapDescription: '',
+      trapDamage: 0,
+      trapDamageTo: 'HP',
+      trapCurseId: null,
+      trapToDetect: 10,
+      trapToDisarm: 10,
     });
-  }
-
-  selectedTresherType(): TresherType {
-    return this.tresherForm.controls.type.value;
-  }
-
-  isWeaponTresherSelected(): boolean {
-    return this.selectedTresherType() === 'Weapon';
-  }
-
-  isArmorTresherSelected(): boolean {
-    return this.selectedTresherType() === 'Armor';
-  }
-
-  isCoinsTresherSelected(): boolean {
-    return this.selectedTresherType() === 'Coins';
-  }
-
-  isPotionTresherSelected(): boolean {
-    return this.selectedTresherType() === 'Potion';
-  }
-
-  shouldTresherHaveHp(): boolean {
-    const type = this.selectedTresherType();
-    return type === 'Weapon' || type === 'Armor' || type === 'OtherTresher';
   }
 
   selectedDungonTreshers(): Tresher[] {
@@ -1992,7 +2868,7 @@ export class Creator implements OnInit {
     }
 
     const trappedTreshers = treshers.filter(
-      (tresher) => tresher.trapID !== null || tresher.curseID !== null
+      (tresher) => tresher.curse1Id !== null || tresher.curse2Id !== null
     ).length;
 
     if (trappedTreshers === 0) {
@@ -2509,10 +3385,42 @@ export class Creator implements OnInit {
       return;
     }
 
+    if (this.isSelectingGuardSquare()) {
+      if (isFilledSquare) {
+        this.placeMonsterGuardRow.set(row);
+        this.placeMonsterGuardCol.set(column);
+        this.isSelectingGuardSquare.set(false);
+        this.isPlaceMonsterDialogVisible.set(true);
+      }
+
+      return;
+    }
+
     if (this.isAddTextMode()) {
       if (isFilledSquare) {
         this.openTextDialog(dungonId, row, column);
         this.isAddTextMode.set(false);
+      }
+
+      return;
+    }
+
+    if (this.isPlaceFloorTrapMode()) {
+      if (isFilledSquare) {
+        this.openFloorTrapDialog(dungonId, row, column);
+        this.isPlaceFloorTrapMode.set(false);
+      }
+
+      return;
+    }
+
+    if (this.portalPickMode() !== null) {
+      if (isFilledSquare) {
+        const portalId = this.portalPickingId();
+        const step = this.portalPickMode();
+        if (portalId !== null && step !== null) {
+          this.setPortalPoint(dungonId, portalId, step, row, column);
+        }
       }
 
       return;
@@ -2608,6 +3516,7 @@ export class Creator implements OnInit {
       ),
     }));
 
+    this.openBlockSelections.set({ ...EMPTY_OPEN_BLOCK_SELECTIONS });
     this.markDungonJsonChanged();
     this.drawGridCanvas();
   }
@@ -2657,6 +3566,12 @@ export class Creator implements OnInit {
     this.pendingMonsterPlacement.set(null);
     this.editingMonsterId.set(null);
     this.placeMonsterRoam.set(false);
+    this.placeMonsterDropTresherIds.set([]);
+    this.placeMonsterDropKeyIds.set([]);
+    this.placeMonsterIsDormant.set(false);
+    this.placeMonsterGuardRow.set(null);
+    this.placeMonsterGuardCol.set(null);
+    this.isSelectingGuardSquare.set(false);
     this.gridPreviewContext.set(null);
     this.selectedDungonId.set(dungonId);
     this.selectedDungon.set(null);
@@ -2722,6 +3637,10 @@ export class Creator implements OnInit {
     this.isSaving.set(true);
     this.saveError.set(null);
 
+    const spreward = this.createDungonForm.controls.spreward.value;
+    const ismaingame = this.account.isAdmin() ? this.createDungonForm.controls.ismaingame.value : false;
+    const issample = this.account.isAdmin() ? this.createDungonForm.controls.issample.value : false;
+
     this.http
       .post<{ result: number; dungon?: { name: string; id: number } }>(`${API_BASE_URL}/dungons`, {
         userkey: userKey,
@@ -2730,6 +3649,9 @@ export class Creator implements OnInit {
         intro,
         minsplifetime,
         maxsplifetime,
+        spreward,
+        ismaingame,
+        issample,
       })
       .pipe(finalize(() => this.isSaving.set(false)))
       .subscribe({
@@ -3119,8 +4041,17 @@ export class Creator implements OnInit {
       state: 'closed',
       hp: 10,
       isLocked: false,
+      toPick: null,
       name: '',
       description: '',
+      hasTrap: false,
+      trapName: '',
+      trapDescription: '',
+      trapDamage: 0,
+      trapDamageTo: 'HP',
+      trapCurseId: null,
+      trapToDetect: 10,
+      trapToDisarm: 10,
     });
     this.isDoorDialogVisible.set(true);
   }
@@ -3213,6 +4144,12 @@ export class Creator implements OnInit {
     });
 
     this.placeMonsterRoam.set(false);
+    this.placeMonsterDropTresherIds.set([]);
+    this.placeMonsterDropKeyIds.set([]);
+    this.placeMonsterIsDormant.set(false);
+    this.placeMonsterGuardRow.set(null);
+    this.placeMonsterGuardCol.set(null);
+    this.isSelectingGuardSquare.set(false);
     this.isKaysDialogVisible.set(false);
     this.isTresherDialogVisible.set(false);
     this.isMonsterDialogVisible.set(false);
@@ -3297,6 +4234,8 @@ export class Creator implements OnInit {
     const tresherPlacements = this.tresherPlacementsByDungon()[dungonId] ?? [];
     const monsterPlacements = this.monsterPlacementsByDungon()[dungonId] ?? [];
     const exits = this.exitsByDungon()[dungonId] ?? [];
+    const floorTrapPlacements = this.floorTrapPlacementsByDungon()[dungonId] ?? [];
+    const portalPlacements = this.portalPlacementsByDungon()[dungonId] ?? [];
 
     return {
       filledSquares: this.filledSquaresByDungon()[dungonId] ?? {},
@@ -3316,6 +4255,8 @@ export class Creator implements OnInit {
       monsterPlacementList: monsterPlacements,
       monsters: this.monsterListByDungon()[dungonId] ?? [],
       squareTexts: this.squareTextsByDungon()[dungonId] ?? [],
+      floorTrapPlacements,
+      portalPlacements,
     };
   }
 
@@ -3372,6 +4313,16 @@ export class Creator implements OnInit {
       [dungonId]: parsed.squareTexts ?? [],
     }));
 
+    this.floorTrapPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.floorTrapPlacements ?? [],
+    }));
+
+    this.portalPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.portalPlacements ?? [],
+    }));
+
     this.keyList = parsed.keyList;
     this.syncIdsFromLoadedData(
       parsed.squares,
@@ -3379,7 +4330,8 @@ export class Creator implements OnInit {
       parsed.tresherList,
       parsed.monsterList ?? [],
       parsed.exits ?? [],
-      parsed.squareTexts ?? []
+      parsed.squareTexts ?? [],
+      parsed.portalPlacements ?? []
     );
     this.drawGridCanvas();
   }
@@ -3473,10 +4425,10 @@ export class Creator implements OnInit {
         typeof sourceCheater.name === 'string' && sourceCheater.name.trim()
           ? sourceCheater.name
           : DEFAULT_CHEATER.name,
-      rangeOfSite:
-        typeof sourceCheater.rangeOfSite === 'number' && Number.isFinite(sourceCheater.rangeOfSite)
-          ? sourceCheater.rangeOfSite
-          : DEFAULT_CHEATER.rangeOfSite,
+      rangeOfSight:
+        typeof sourceCheater.rangeOfSight === 'number' && Number.isFinite(sourceCheater.rangeOfSight)
+          ? sourceCheater.rangeOfSight
+          : DEFAULT_CHEATER.rangeOfSight,
       facingDir: this.normalizeFacingDirection(sourceCheater.facingDir),
       inventory,
     };
@@ -3605,7 +4557,84 @@ export class Creator implements OnInit {
       monsterPlacements,
       exits,
       squareTexts,
+      floorTrapPlacements: this.parseFloorTrapPlacements((source as Record<string, unknown>)['floorTrapPlacements']),
+      portalPlacements: this.parsePortalPlacements((source as Record<string, unknown>)['portalPlacements']),
     };
+  }
+
+  private parseFloorTrapPlacements(raw: unknown): FloorTrapPlacement[] {
+    if (!Array.isArray(raw)) return [];
+    let maxId = 0;
+    const result: FloorTrapPlacement[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const src = item as Partial<Record<string, unknown>>;
+      const id = typeof src['id'] === 'number' ? Math.floor(src['id']) : 0;
+      const row = typeof src['row'] === 'number' ? Math.floor(src['row']) : null;
+      const column = typeof src['column'] === 'number' ? Math.floor(src['column']) : null;
+      if (row === null || column === null) continue;
+      const trap = this.parseTrapObject(src['trap']);
+      if (!trap) continue;
+      result.push({
+        id,
+        row,
+        column,
+        trap,
+        isTriggered: Boolean(src['isTriggered']),
+        isDisarmed: Boolean(src['isDisarmed']),
+      });
+      if (id > maxId) maxId = id;
+    }
+    if (maxId >= this.nextFloorTrapId) {
+      this.nextFloorTrapId = maxId + 1;
+    }
+    return result;
+  }
+
+  private parseTrapObject(raw: unknown): Trap | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const src = raw as Partial<Record<string, unknown>>;
+    const damageTo = src['damageTo'] === 'Stamina' ? 'Stamina' : src['damageTo'] === 'Mind' ? 'Mind' : 'HP';
+    return {
+      name: typeof src['name'] === 'string' ? src['name'] : '',
+      description: typeof src['description'] === 'string' ? src['description'] : '',
+      damage: typeof src['damage'] === 'number' ? Math.max(0, src['damage']) : 0,
+      damageTo: damageTo as 'HP' | 'Stamina' | 'Mind',
+      curseId: typeof src['curseId'] === 'number' ? src['curseId'] : null,
+      toDetect: typeof src['toDetect'] === 'number' ? Math.max(0, src['toDetect']) : 10,
+      toDisarm: typeof src['toDisarm'] === 'number' ? Math.max(0, src['toDisarm']) : 10,
+    };
+  }
+
+  private parsePortalPlacements(raw: unknown): PortalPlacement[] {
+    if (!Array.isArray(raw)) return [];
+    let maxId = 0;
+    const result: PortalPlacement[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const src = item as Partial<Record<string, unknown>>;
+      const id = typeof src['id'] === 'number' ? Math.floor(src['id']) : 0;
+      const look: PortalLook =
+        src['look'] === 'starDown' ? 'starDown' :
+        src['look'] === 'magicDoor' ? 'magicDoor' : 'starUp';
+      const toNullableInt = (v: unknown): number | null =>
+        typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : null;
+      result.push({
+        id,
+        name: typeof src['name'] === 'string' ? src['name'] : '',
+        description: typeof src['description'] === 'string' ? src['description'] : '',
+        look,
+        startRow: toNullableInt(src['startRow']),
+        startColumn: toNullableInt(src['startColumn']),
+        endRow: toNullableInt(src['endRow']),
+        endColumn: toNullableInt(src['endColumn']),
+      });
+      if (id > maxId) maxId = id;
+    }
+    if (maxId >= this.nextPortalId) {
+      this.nextPortalId = maxId + 1;
+    }
+    return result;
   }
 
   private parseTresherItem(item: unknown): Tresher | null {
@@ -3613,69 +4642,39 @@ export class Creator implements OnInit {
       return null;
     }
 
-    const source = item as Partial<Tresher> & {
-      trapId?: unknown;
-      curseId?: unknown;
-      hp?: unknown;
-    };
-    const parsedId = this.toFiniteNumber(source.id);
+    const source = item as Partial<Record<string, unknown>>;
+    const parsedId = this.toFiniteNumber(source['id']);
     if (parsedId === null) {
       return null;
     }
 
-    // Support legacy payload keys while writing the canonical trapID/curseID/HP fields.
-    const trapSourceValue = source.trapID !== undefined ? source.trapID : source.trapId;
-    const curseSourceValue = source.curseID !== undefined ? source.curseID : source.curseId;
-    const hpSourceValue = source.HP !== undefined ? source.HP : source.hp;
-
-    const type = this.normalizeTresherType(source.type);
-    const tresher: Tresher = {
+    return {
       id: Math.max(0, Math.floor(parsedId)),
-      type,
-      name: typeof source.name === 'string' && source.name.trim() ? source.name : 'Unnamed Tresher',
-      description: typeof source.description === 'string' ? source.description : '',
-      worth: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.worth), 0)),
-      trapID: this.normalizeNullableNumber(this.toFiniteNumber(trapSourceValue)),
-      curseID: this.normalizeNullableNumber(this.toFiniteNumber(curseSourceValue)),
-      HP: null,
-      damage: null,
-      hands: null,
-      range: null,
-      ammoType: null,
-      speedReduction: null,
-      armorType: null,
-      coinType: null,
-      effectNumber: null,
-      effectTarget: null,
-      effectDuration: null,
+      type: typeof source['type'] === 'string' && (source['type'] as string).trim() ? (source['type'] as string).trim() : 'OtherTresher',
+      name: typeof source['name'] === 'string' && (source['name'] as string).trim() ? source['name'] as string : 'Unnamed Tresher',
+      description: typeof source['description'] === 'string' ? source['description'] as string : '',
+      gold: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['gold']), 0)),
+      silver: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['silver']), 0)),
+      copper: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['copper']), 0)),
+      zinc: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['zinc']), 0)),
+      item1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item1Id'])),
+      item2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item2Id'])),
+      item3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item3Id'])),
+      item4Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item4Id'])),
+      spell1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell1Id'])),
+      spell2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell2Id'])),
+      spell3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell3Id'])),
+      spell4Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell4Id'])),
+      curse1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['curse1Id'])),
+      curse2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['curse2Id'])),
+      potion1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion1Id'])),
+      potion2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion2Id'])),
+      potion3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion3Id'])),
+      imageId: this.normalizeNullableNumber(this.toFiniteNumber(source['imageId'])),
+      soundId: this.normalizeNullableNumber(this.toFiniteNumber(source['soundId'])),
+      spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['spReward']), 0)),
+      trap: this.parseTrapObject(source['trap']),
     };
-
-    if (type === 'Weapon') {
-      tresher.HP = this.normalizeNumber(this.toFiniteNumber(hpSourceValue), 10);
-      tresher.damage = Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.damage), 0));
-      tresher.hands = Math.max(1, this.normalizeNumber(this.toFiniteNumber(source.hands), 1));
-      tresher.range = Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.range), 0));
-      tresher.ammoType =
-        typeof source.ammoType === 'string' && source.ammoType.trim() ? source.ammoType : null;
-    } else if (type === 'Armor') {
-      tresher.HP = this.normalizeNumber(this.toFiniteNumber(hpSourceValue), 10);
-      tresher.hands = Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.hands), 0));
-      tresher.speedReduction = this.normalizeNumber(this.toFiniteNumber(source.speedReduction), 0);
-      tresher.armorType = this.normalizeArmorType(source.armorType);
-    } else if (type === 'Coins') {
-      tresher.coinType = this.normalizeCoinType(source.coinType);
-    } else if (type === 'Potion') {
-      tresher.effectNumber = this.normalizeNumber(this.toFiniteNumber(source.effectNumber), 0);
-      const rawTarget = typeof source.effectTarget === 'string' ? source.effectTarget : '';
-      tresher.effectTarget = (rawTarget === 'Health' || rawTarget === 'AC' || rawTarget === 'AE') ? rawTarget : 'Health';
-      if (tresher.effectTarget === 'AC' || tresher.effectTarget === 'AE') {
-        tresher.effectDuration = Math.max(1, this.normalizeNumber(this.toFiniteNumber(source.effectDuration), 1));
-      }
-    } else {
-      tresher.HP = this.normalizeNumber(this.toFiniteNumber(hpSourceValue), 10);
-    }
-
-    return tresher;
   }
 
   private parseTresherPlacementItem(item: unknown): TresherPlacement | null {
@@ -3758,12 +4757,13 @@ export class Creator implements OnInit {
     return {
       id: Math.max(0, Math.floor(parsedId)),
       imageId: this.normalizeNullableNumber(this.toFiniteNumber(source.imageId ?? source.imageid)),
+      soundId: this.normalizeNullableNumber(this.toFiniteNumber(source.soundId)),
       tresherIds: this.normalizeIdList(
         source.tresherIds ?? source.tresherids ?? source.trusherIds ?? source.trusherids
       ),
       keyIds: this.normalizeIdList(source.keyIds ?? source.keyids),
       name: typeof source.name === 'string' && source.name.trim() ? source.name : 'Unnamed Monster',
-      type: typeof source.type === 'string' && source.type.trim() ? source.type : 'Unknown',
+      type: typeof source.type === 'string' && source.type.trim() ? source.type : 'Humanoid',
       description: typeof source.description === 'string' ? source.description : '',
       hp: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.hp), 1)),
       movementEconomy: Math.max(
@@ -3774,6 +4774,10 @@ export class Creator implements OnInit {
       runAt: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.runAt ?? source.runat), 0)),
       numberOfAttacks,
       attacks,
+      magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magic), 0)),
+      magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magicResistance), 0)),
+      spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.spReward), 0)),
+      callsReinforcements: (source as Record<string, unknown>)['callsReinforcements'] === true,
     };
   }
 
@@ -3787,7 +4791,9 @@ export class Creator implements OnInit {
       plushToHit?: unknown;
     };
 
+    const attackType = source.type;
     return {
+      type: attackType === 'Bite' || attackType === 'Claw' || attackType === 'Spell' || attackType === 'Weapon' ? attackType : 'Bite',
       description:
         typeof source.description === 'string'
           ? source.description
@@ -3796,6 +4802,9 @@ export class Creator implements OnInit {
             : '',
       damage: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.damage), 0)),
       plusToHit: this.normalizeNumber(this.toFiniteNumber(source.plusToHit ?? source.plushToHit), 0),
+      weaponItemId: this.normalizeNullableNumber(this.toFiniteNumber(source.weaponItemId)),
+      spellId: this.normalizeNullableNumber(this.toFiniteNumber(source.spellId)),
+      curseId: this.normalizeNullableNumber(this.toFiniteNumber(source.curseId)),
     };
   }
 
@@ -3844,6 +4853,9 @@ export class Creator implements OnInit {
       row: Math.floor(row),
       column: Math.floor(column),
       roam: this.normalizeBoolean(roamRaw),
+      isDormant: source.isDormant === true || undefined,
+      guardRow: typeof (source as Record<string, unknown>)['guardRow'] === 'number' ? Math.floor((source as Record<string, unknown>)['guardRow'] as number) : undefined,
+      guardColumn: typeof (source as Record<string, unknown>)['guardColumn'] === 'number' ? Math.floor((source as Record<string, unknown>)['guardColumn'] as number) : undefined,
     };
   }
 
@@ -3987,28 +4999,6 @@ export class Creator implements OnInit {
     };
   }
 
-  private normalizeTresherType(value: unknown): TresherType {
-    return value === 'Weapon' || value === 'Armor' || value === 'Coins' || value === 'Potion' || value === 'OtherTresher'
-      ? value
-      : 'OtherTresher';
-  }
-
-  private normalizeArmorType(value: unknown): ArmorType | null {
-    return value === 'head' ||
-      value === 'hand' ||
-      value === 'body' ||
-      value === 'arms' ||
-      value === 'legs'
-      ? value
-      : null;
-  }
-
-  private normalizeCoinType(value: unknown): CoinType | null {
-    return value === 'Gold' || value === 'Silver' || value === 'Copper' || value === 'Tin'
-      ? value
-      : null;
-  }
-
   private toFiniteNumber(value: unknown): number | null {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
   }
@@ -4045,7 +5035,8 @@ export class Creator implements OnInit {
     tresherList: Tresher[],
     monsterList: Monster[],
     exits: DungonExit[],
-    squareTexts: SquareText[]
+    squareTexts: SquareText[],
+    portalPlacements: PortalPlacement[] = []
   ): void {
     let maxWallId = -1;
     let maxDoorId = -1;
@@ -4070,6 +5061,7 @@ export class Creator implements OnInit {
     const maxExitId = exits.reduce((maxValue, item) => Math.max(maxValue, item.id), -1);
     const maxMonsterId = monsterList.reduce((maxValue, monster) => Math.max(maxValue, monster.id), -1);
     const maxSquareTextId = squareTexts.reduce((maxValue, st) => Math.max(maxValue, st.id), -1);
+    const maxPortalId = portalPlacements.reduce((maxValue, p) => Math.max(maxValue, p.id), -1);
     this.nextWallId = maxWallId + 1;
     this.nextDoorId = maxDoorId + 1;
     this.nextKeyId = maxKeyId + 1;
@@ -4077,6 +5069,9 @@ export class Creator implements OnInit {
     this.nextExitId = maxExitId + 1;
     this.nextMonsterId = maxMonsterId + 1;
     this.nextSquareTextId = maxSquareTextId + 1;
+    if (maxPortalId >= this.nextPortalId) {
+      this.nextPortalId = maxPortalId + 1;
+    }
   }
 
   private drawGridCanvas(): void {
@@ -4357,6 +5352,110 @@ export class Creator implements OnInit {
         context.textAlign = 'center';
         context.textBaseline = 'middle';
         context.fillText('T', centerX, centerY);
+      }
+    }
+
+    // Draw "!" markers for floor traps
+    if (dungonId !== null) {
+      const ftFilledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
+      for (const ft of this.floorTrapPlacementsByDungon()[dungonId] ?? []) {
+        if (
+          ft.row < 0 ||
+          ft.column < 0 ||
+          ft.row >= this.gridRowCount ||
+          ft.column >= this.gridColumnCount
+        ) {
+          continue;
+        }
+
+        const ftKey = this.getSquareKey(ft.row, ft.column);
+        if (!ftFilledSquares[ftKey]) {
+          continue;
+        }
+
+        const centerX = ft.column * this.gridCellSize + this.gridCellSize / 2;
+        const centerY = ft.row * this.gridCellSize + this.gridCellSize / 2;
+        context.fillStyle = '#ff9f0a';
+        context.font = 'bold 11px sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText('!', centerX, centerY);
+      }
+    }
+
+    // Draw portal markers
+    if (dungonId !== null) {
+      const ptFilledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
+      const portalColors = ['#cc44ff', '#44ddff', '#ff44cc', '#88ff44', '#ffaa00'];
+      const portals = this.portalPlacementsByDungon()[dungonId] ?? [];
+      for (let pi = 0; pi < portals.length; pi++) {
+        const portal = portals[pi];
+        const color = portalColors[pi % portalColors.length] ?? '#cc44ff';
+        const symbol = portal.look === 'starDown' ? '▼' : portal.look === 'magicDoor' ? '⊡' : '▲';
+
+        const drawPortalMarker = (row: number | null, col: number | null, label: string): void => {
+          if (row === null || col === null) return;
+          if (row < 0 || col < 0 || row >= this.gridRowCount || col >= this.gridColumnCount) return;
+          const key = this.getSquareKey(row, col);
+          if (!ptFilledSquares[key]) return;
+          const cx = col * this.gridCellSize + this.gridCellSize / 2;
+          const cy = row * this.gridCellSize + this.gridCellSize / 2;
+          context.fillStyle = color;
+          context.font = 'bold 10px sans-serif';
+          context.textAlign = 'center';
+          context.textBaseline = 'middle';
+          context.fillText(symbol + label, cx, cy);
+        };
+
+        drawPortalMarker(portal.startRow, portal.startColumn, 'S');
+        drawPortalMarker(portal.endRow, portal.endColumn, 'E');
+
+        // Draw a connecting line between start and end if both exist
+        if (
+          portal.startRow !== null && portal.startColumn !== null &&
+          portal.endRow !== null && portal.endColumn !== null
+        ) {
+          const sx = portal.startColumn * this.gridCellSize + this.gridCellSize / 2;
+          const sy = portal.startRow * this.gridCellSize + this.gridCellSize / 2;
+          const ex = portal.endColumn * this.gridCellSize + this.gridCellSize / 2;
+          const ey = portal.endRow * this.gridCellSize + this.gridCellSize / 2;
+          context.strokeStyle = color;
+          context.lineWidth = 1;
+          context.setLineDash([3, 3]);
+          context.beginPath();
+          context.moveTo(sx, sy);
+          context.lineTo(ex, ey);
+          context.stroke();
+          context.setLineDash([]);
+        }
+      }
+    }
+
+    // Highlight selected placement item
+    const selectedItem = this.selectedPlacedItem();
+    if (selectedItem) {
+      const hx = selectedItem.column * this.gridCellSize;
+      const hy = selectedItem.row * this.gridCellSize;
+      context.strokeStyle = '#00e5ff';
+      context.lineWidth = 3;
+      context.strokeRect(hx + 1.5, hy + 1.5, this.gridCellSize - 3, this.gridCellSize - 3);
+
+      // If a door is selected, also highlight where its key is
+      if (selectedItem.type === 'door') {
+        const keyLoc = this.getDoorKeyLocation(selectedItem.refId);
+        if (keyLoc) {
+          const kx = keyLoc.column * this.gridCellSize;
+          const ky = keyLoc.row * this.gridCellSize;
+          context.strokeStyle = '#ffd700';
+          context.lineWidth = 3;
+          context.strokeRect(kx + 1.5, ky + 1.5, this.gridCellSize - 3, this.gridCellSize - 3);
+          // Draw a small key icon marker
+          context.fillStyle = '#ffd700';
+          context.font = 'bold 11px sans-serif';
+          context.textAlign = 'center';
+          context.textBaseline = 'middle';
+          context.fillText('🔑', kx + this.gridCellSize / 2, ky + this.gridCellSize / 2);
+        }
       }
     }
   }
@@ -5008,7 +6107,8 @@ export class Creator implements OnInit {
           context,
           nearFrame,
           farFrame,
-          step.exitTransitionType
+          step.exitTransitionType,
+          squareKey
         );
       }
 
@@ -5134,7 +6234,7 @@ export class Creator implements OnInit {
 
     const maxDepth = Math.max(
       1,
-      Math.min(this.firstPersonMaxDepth, Math.floor(Math.max(1, cheater.rangeOfSite + 1)))
+      Math.min(this.firstPersonMaxDepth, Math.floor(Math.max(1, cheater.rangeOfSight + 1)))
     );
     let endBlock: FirstPersonBlock = this.toFirstPersonBlock('none', null);
 
@@ -5512,7 +6612,8 @@ export class Creator implements OnInit {
     context: CanvasRenderingContext2D,
     nearFrame: { left: number; right: number; top: number; bottom: number },
     farFrame: { left: number; right: number; top: number; bottom: number },
-    transitionType: ExitTransitionType
+    transitionType: ExitTransitionType,
+    squareKey = ''
   ): void {
     const nearWidth = nearFrame.right - nearFrame.left;
     const farWidth = farFrame.right - farFrame.left;
@@ -5540,6 +6641,26 @@ export class Creator implements OnInit {
       context.lineWidth = 1;
       context.stroke();
       return;
+    }
+
+    if (transitionType === 'stairsUp') {
+      if (squareKey && !this.stairsUpSquareAssignment.has(squareKey)) {
+        this.stairsUpSquareAssignment.set(squareKey, (Math.floor(Math.random() * 3) + 1) as 1 | 2 | 3);
+      }
+      const assignedIdx = squareKey ? (this.stairsUpSquareAssignment.get(squareKey) ?? 1) : 1;
+      const stairImg = this.stairsUpImageCache.get(`stup${assignedIdx}`) ?? null;
+      if (stairImg) {
+        const midLeft = nearFrame.left * 0.65 + farFrame.left * 0.35;
+        const midRight = nearFrame.right * 0.65 + farFrame.right * 0.35;
+        const midTop = nearFrame.top * 0.65 + farFrame.top * 0.35;
+        const midBottom = nearFrame.bottom * 0.65 + farFrame.bottom * 0.35;
+        const drawW = Math.max(8, (midRight - midLeft) * 0.9);
+        const drawH = Math.max(8, (midBottom - midTop) * 0.92);
+        const drawX = (midLeft + midRight) / 2 - drawW / 2;
+        const drawY = midBottom - drawH;
+        context.drawImage(stairImg, drawX, drawY, drawW, drawH);
+        return;
+      }
     }
 
     // Build a full-tile stair plane that starts at the front edge and reaches the back edge.
@@ -6298,6 +7419,31 @@ export class Creator implements OnInit {
     };
   }
 
+  private loadDoorImages(): void {
+    for (const key of ['open', 'closed'] as const) {
+      if (this.doorImageCache.has(key)) continue;
+      const img = new Image();
+      img.onload = () => {
+        this.doorImageCache.set(key, img);
+        this.drawFirstPersonViewCanvas();
+      };
+      img.src = key === 'open' ? '/images/dooropen.jpg' : '/images/doorclosed.jpg';
+    }
+  }
+
+  private loadStairsUpImages(): void {
+    for (let i = 1; i <= 3; i++) {
+      const key = `stup${i}`;
+      if (this.stairsUpImageCache.has(key)) continue;
+      const img = new Image();
+      img.onload = () => {
+        this.stairsUpImageCache.set(key, img);
+        this.drawFirstPersonViewCanvas();
+      };
+      img.src = `/images/${key}.jpg`;
+    }
+  }
+
   private drawFirstPersonDoorFace(
     context: CanvasRenderingContext2D,
     frame: { left: number; right: number; top: number; bottom: number },
@@ -6316,59 +7462,63 @@ export class Creator implements OnInit {
     const doorRight = frame.right - insetX;
     const doorTop = frame.top + insetY;
     const doorBottom = frame.bottom - insetY;
+    const doorW = doorRight - doorLeft;
+    const doorH = doorBottom - doorTop;
+
+    const cacheKey = block.type === 'openDoor' ? 'open' : 'closed';
+    const img = this.doorImageCache.get(cacheKey) ?? null;
 
     context.save();
     context.globalAlpha = isPortal ? 0.84 : 1;
 
-    context.fillStyle = '#b33030';
-    context.fillRect(doorLeft, doorTop, doorRight - doorLeft, doorBottom - doorTop);
-
-    context.strokeStyle = '#f0b0b0';
-    context.lineWidth = Math.max(1, Math.min(2, (doorRight - doorLeft) * 0.04));
-    context.strokeRect(doorLeft, doorTop, doorRight - doorLeft, doorBottom - doorTop);
-
-    if (block.type === 'openDoor') {
-      const openingWidth = Math.max(3, (doorRight - doorLeft) * 0.35);
-      const openingLeft = doorRight - openingWidth - Math.max(2, (doorRight - doorLeft) * 0.06);
-      context.fillStyle = '#0c0f14';
-      context.fillRect(openingLeft, doorTop + 2, openingWidth, Math.max(2, doorBottom - doorTop - 4));
-
-      context.strokeStyle = '#ff8080';
-      context.lineWidth = 1;
-      context.beginPath();
-      context.moveTo(doorLeft + 2, doorTop + 3);
-      context.lineTo(openingLeft, doorTop + Math.max(3, (doorBottom - doorTop) * 0.32));
-      context.stroke();
+    if (img) {
+      context.drawImage(img, doorLeft, doorTop, doorW, doorH);
     } else {
-      const centerX = (doorLeft + doorRight) / 2;
-      context.strokeStyle = '#f5c1c1';
-      context.lineWidth = 1;
-      context.beginPath();
-      context.moveTo(centerX, doorTop + 1);
-      context.lineTo(centerX, doorBottom - 1);
-      context.stroke();
-
-      const handleX = doorRight - Math.max(3, (doorRight - doorLeft) * 0.18);
-      const handleY = doorTop + (doorBottom - doorTop) * 0.52;
-      context.fillStyle = '#f7dddd';
-      context.beginPath();
-      context.arc(handleX, handleY, Math.max(1.2, (doorRight - doorLeft) * 0.025), 0, Math.PI * 2);
-      context.fill();
-
-      if (block.hasKeyhole) {
-        const keyholeX = doorRight - Math.max(4, (doorRight - doorLeft) * 0.28);
-        const keyholeY = doorTop + (doorBottom - doorTop) * 0.64;
-        const keyholeRadius = Math.max(1.2, (doorRight - doorLeft) * 0.03);
-        context.fillStyle = '#1f1111';
+      context.fillStyle = '#b33030';
+      context.fillRect(doorLeft, doorTop, doorW, doorH);
+      context.strokeStyle = '#f0b0b0';
+      context.lineWidth = Math.max(1, Math.min(2, doorW * 0.04));
+      context.strokeRect(doorLeft, doorTop, doorW, doorH);
+      if (block.type === 'openDoor') {
+        const openingWidth = Math.max(3, doorW * 0.35);
+        const openingLeft = doorRight - openingWidth - Math.max(2, doorW * 0.06);
+        context.fillStyle = '#0c0f14';
+        context.fillRect(openingLeft, doorTop + 2, openingWidth, Math.max(2, doorH - 4));
+        context.strokeStyle = '#ff8080';
+        context.lineWidth = 1;
         context.beginPath();
-        context.arc(keyholeX, keyholeY, keyholeRadius, 0, Math.PI * 2);
+        context.moveTo(doorLeft + 2, doorTop + 3);
+        context.lineTo(openingLeft, doorTop + Math.max(3, doorH * 0.32));
+        context.stroke();
+      } else {
+        const centerX = (doorLeft + doorRight) / 2;
+        context.strokeStyle = '#f5c1c1';
+        context.lineWidth = 1;
+        context.beginPath();
+        context.moveTo(centerX, doorTop + 1);
+        context.lineTo(centerX, doorBottom - 1);
+        context.stroke();
+        const handleX = doorRight - Math.max(3, doorW * 0.18);
+        const handleY = doorTop + doorH * 0.52;
+        context.fillStyle = '#f7dddd';
+        context.beginPath();
+        context.arc(handleX, handleY, Math.max(1.2, doorW * 0.025), 0, Math.PI * 2);
         context.fill();
-        context.fillRect(
-          keyholeX - keyholeRadius * 0.45,
-          keyholeY,
-          keyholeRadius * 0.9,
-          Math.max(2, keyholeRadius * 2.2)
-        );
+        if (block.hasKeyhole) {
+          const keyholeX = doorRight - Math.max(4, doorW * 0.28);
+          const keyholeY = doorTop + doorH * 0.64;
+          const keyholeRadius = Math.max(1.2, doorW * 0.03);
+          context.fillStyle = '#1f1111';
+          context.beginPath();
+          context.arc(keyholeX, keyholeY, keyholeRadius, 0, Math.PI * 2);
+          context.fill();
+          context.fillRect(
+            keyholeX - keyholeRadius * 0.45,
+            keyholeY,
+            keyholeRadius * 0.9,
+            Math.max(2, keyholeRadius * 2.2)
+          );
+        }
       }
     }
 
@@ -6469,9 +7619,9 @@ export class Creator implements OnInit {
     const filledSquares = this.filledSquaresByDungon()[preview.dungonId] ?? {};
     const cheater = this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER;
     const range =
-      typeof cheater.rangeOfSite === 'number' && Number.isFinite(cheater.rangeOfSite)
-        ? Math.max(0, cheater.rangeOfSite)
-        : DEFAULT_CHEATER.rangeOfSite;
+      typeof cheater.rangeOfSight === 'number' && Number.isFinite(cheater.rangeOfSight)
+        ? Math.max(0, cheater.rangeOfSight)
+        : DEFAULT_CHEATER.rangeOfSight;
 
     const sourceSquareKey = this.getSquareKey(preview.centerRow, preview.centerColumn);
     if (filledSquares[sourceSquareKey]) {
@@ -7348,10 +8498,15 @@ export class Creator implements OnInit {
       description: settings.description,
       keyLock,
       isLocked: settings.isLocked,
-      isTrapped: false,
+      isTrapped: settings.trap !== null,
+      toPick: settings.toPick ?? null,
+      trap: settings.trap ?? null,
       HP: settings.hp,
       state: settings.state,
-      isHidden: false,
+      isHidden: settings.isHidden,
+      toFind: settings.toFind,
+      isFound: false,
+      spReward: settings.spReward ?? null,
     };
   }
 
@@ -7385,5 +8540,280 @@ export class Creator implements OnInit {
 
     this.nextWallId += 1;
     return wall;
+  }
+
+  // ── Library tab helpers ───────────────────────────────────────────────────
+
+  setCreatorTab(id: CreatorTabId): void { this.activeCreatorTab.set(id); }
+  isCreatorTabActive(id: CreatorTabId): boolean { return this.activeCreatorTab() === id; }
+
+  isAdminUser(): boolean { return this.account.isAdmin(); }
+
+  private loadLibImageOptions(): void {
+    const userkey = this.account.getKey();
+    if (!userkey) return;
+    this.http
+      .get<{ id: number; name: string; path: string }[]>(`${API_BASE_URL}/images`, { params: { userkey, scope: 'library' } })
+      .subscribe({ next: (items) => this.libImageOptions.set(items), error: () => this.libImageOptions.set([]) });
+  }
+
+  private loadLibSoundOptions(): void {
+    const userkey = this.account.getKey();
+    if (!userkey) return;
+    this.http
+      .get<{ id: number; name: string; path: string }[]>(`${API_BASE_URL}/sounds`, { params: { userkey, scope: 'library' } })
+      .subscribe({ next: (items) => this.libSoundOptions.set(items), error: () => this.libSoundOptions.set([]) });
+  }
+
+  private loadLibSpellOptions(userkey: string): void {
+    this.http
+      .get<{ id: number; name: string }[]>(`${API_BASE_URL}/spells`, { params: { userkey } })
+      .subscribe({ next: (items) => this.libSpells.set(items), error: () => this.libSpells.set([]) });
+  }
+
+  private loadLibUserImages(): void {
+    const userkey = this.account.getKey();
+    if (!userkey) { this.libImagesError.set('Log in to manage your images.'); return; }
+    this.isLoadingLibImages.set(true);
+    this.libImagesError.set(null);
+    this.http
+      .get<LibImageItem[]>(`${API_BASE_URL}/images`, { params: { userkey } })
+      .pipe(finalize(() => this.isLoadingLibImages.set(false)))
+      .subscribe({
+        next: (items) => { this.libUserImages.set(items); this.loadLibImageOptions(); },
+        error: () => { this.libUserImages.set([]); this.libImagesError.set('Failed to load your images.'); },
+      });
+  }
+
+  private loadLibUserSounds(): void {
+    const userkey = this.account.getKey();
+    if (!userkey) { this.libSoundsError.set('Log in to manage your sounds.'); return; }
+    this.isLoadingLibSounds.set(true);
+    this.libSoundsError.set(null);
+    this.http
+      .get<LibSoundItem[]>(`${API_BASE_URL}/sounds`, { params: { userkey } })
+      .pipe(finalize(() => this.isLoadingLibSounds.set(false)))
+      .subscribe({
+        next: (items) => { this.libUserSounds.set(items); this.loadLibSoundOptions(); },
+        error: () => { this.libUserSounds.set([]); this.libSoundsError.set('Failed to load your sounds.'); },
+      });
+  }
+
+  private loadLibUserSpells(): void {
+    const userkey = this.account.getKey();
+    if (!userkey) { this.libSpellsError.set('Log in to manage your spells.'); return; }
+    this.isLoadingLibSpells.set(true);
+    this.libSpellsError.set(null);
+    this.http
+      .get<LibSpellItem[]>(`${API_BASE_URL}/spells`, { params: { userkey } })
+      .pipe(finalize(() => this.isLoadingLibSpells.set(false)))
+      .subscribe({
+        next: (items) => { this.libUserSpells.set(items); },
+        error: () => { this.libUserSpells.set([]); this.libSpellsError.set('Failed to load your spells.'); },
+      });
+  }
+
+  toggleLibImageSection(): void { this.isLibImageSectionVisible.update((v) => !v); }
+  toggleLibSoundSection(): void { this.isLibSoundSectionVisible.update((v) => !v); }
+  toggleLibSpellSection(): void { this.isLibSpellSectionVisible.update((v) => !v); }
+
+  libImageUploadName(): string | null { return this.selectedLibImageFile()?.name ?? null; }
+  libSoundUploadName(): string | null { return this.selectedLibSoundFile()?.name ?? null; }
+
+  onLibImageFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0] ?? null;
+    this.selectedLibImageFile.set(file);
+    if (file && this.editingLibImageId() === null && !this.libImageForm.controls.name.value.trim()) {
+      this.libImageForm.controls.name.setValue(this.libFileBaseName(file.name));
+    }
+  }
+
+  onLibSoundFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0] ?? null;
+    this.selectedLibSoundFile.set(file);
+    if (file && this.editingLibSoundId() === null && !this.libSoundForm.controls.name.value.trim()) {
+      this.libSoundForm.controls.name.setValue(this.libFileBaseName(file.name));
+    }
+  }
+
+  editLibImage(item: LibImageItem): void {
+    this.editingLibImageId.set(item.id);
+    this.selectedLibImageFile.set(null);
+    this.libImageSaveMessage.set(null);
+    this.libImageForm.reset({ path: item.path, isPublic: item.isPublic, isActive: item.isActive, name: item.name });
+  }
+  cancelEditLibImage(): void { this.editingLibImageId.set(null); this.selectedLibImageFile.set(null); this.libImageSaveMessage.set(null); this.libImageForm.reset({ path: '', isPublic: false, isActive: true, name: '' }); }
+
+  editLibSound(item: LibSoundItem): void {
+    this.editingLibSoundId.set(item.id);
+    this.selectedLibSoundFile.set(null);
+    this.libSoundSaveMessage.set(null);
+    this.libSoundForm.reset({ path: item.path, isPublic: item.isPublic, isActive: item.isActive, name: item.name });
+  }
+  cancelEditLibSound(): void { this.editingLibSoundId.set(null); this.selectedLibSoundFile.set(null); this.libSoundSaveMessage.set(null); this.libSoundForm.reset({ path: '', isPublic: false, isActive: true, name: '' }); }
+
+  editLibSpell(item: LibSpellItem): void {
+    this.editingLibSpellId.set(item.id);
+    this.libSpellSaveMessage.set(null);
+    this.libSpellForm.reset({
+      name: item.name || '', description: item.description || '', range: item.range ?? 0,
+      effectOn: item.effectOn || 'HP', effectOn2: item.effectOn2 || '',
+      lastFor: item.lastFor ?? 0, effectAmount: item.effectAmount ?? 0, effectAmount2: item.effectAmount2 ?? 0,
+      value: item.value ?? 0, sp: item.sp ?? 0, successTestValue: item.successTestValue ?? 0,
+      magicCost: item.magicCost ?? 1, imageId: item.imageId ?? null, soundId: item.soundId ?? null, isPublic: item.isPublic,
+    });
+  }
+  cancelEditLibSpell(): void { this.editingLibSpellId.set(null); this.libSpellSaveMessage.set(null); this.resetLibSpellForm(); }
+
+  onLibSpellImageUploaded(item: UploadedMediaItem): void {
+    this.libImageOptions.update((opts) => [...opts, item]);
+    this.libSpellForm.controls.imageId.setValue(item.id);
+  }
+
+  onLibSpellSoundUploaded(item: UploadedMediaItem): void {
+    this.libSoundOptions.update((opts) => [...opts, item]);
+    this.libSpellForm.controls.soundId.setValue(item.id);
+  }
+
+  libSelectedSpellImageUrl(): string {
+    const id = this.libSpellForm.controls.imageId.value;
+    const img = id !== null ? this.libImageOptions().find((i) => i.id === id) : null;
+    return img ? this.libResolveImageUrl(img.path) : '';
+  }
+
+  libResolveImageUrl(path: string): string {
+    const t = (path || '').trim();
+    if (!t) return '';
+    if (/^https?:\/\//i.test(t)) return t;
+    return t.startsWith('/') ? `${API_BASE_URL}${t}` : `${API_BASE_URL}/${t}`;
+  }
+
+  libResolveSoundUrl(path: string): string {
+    const t = (path || '').trim();
+    if (!t) return '';
+    if (/^https?:\/\//i.test(t)) return t;
+    return t.startsWith('/') ? `${API_BASE_URL}${t}` : `${API_BASE_URL}/${t}`;
+  }
+
+  saveLibImage(): void {
+    if (this.isSavingLibImage()) return;
+    const userkey = this.account.getKey();
+    if (!userkey) { this.libImageSaveMessage.set('Please log in to save images.'); return; }
+    const v = this.libImageForm.getRawValue();
+    const payload: LibImageWritePayload = { path: (v.path || '').trim(), isPublic: this.isAdminUser() && v.isPublic, isActive: v.isActive, name: (v.name || '').trim() || 'Unnamed Image' };
+    const editingId = this.editingLibImageId();
+    const request$ = editingId
+      ? this.http.put<{ result: number; error?: string }>(`${API_BASE_URL}/images/${editingId}`, { userkey, image: payload })
+      : (() => {
+          const file = this.selectedLibImageFile();
+          if (!file) { this.libImageSaveMessage.set('Select an image file to upload.'); return null; }
+          const fd = new FormData();
+          fd.append('userkey', userkey);
+          fd.append('name', payload.name);
+          fd.append('isPublic', payload.isPublic ? 'true' : 'false');
+          fd.append('isActive', payload.isActive ? 'true' : 'false');
+          fd.append('image', file);
+          return this.http.post<{ result: number; error?: string }>(`${API_BASE_URL}/images`, fd);
+        })();
+    if (!request$) return;
+    this.isSavingLibImage.set(true);
+    this.libImageSaveMessage.set(null);
+    request$.pipe(finalize(() => this.isSavingLibImage.set(false))).subscribe({
+      next: (r) => {
+        if (r.result !== 1) { this.libImageSaveMessage.set(r.error || 'Failed to save image.'); return; }
+        this.loadLibUserImages();
+        this.libImageSaveMessage.set(editingId ? 'Image updated.' : 'Image uploaded.');
+        this.cancelEditLibImage();
+      },
+      error: () => this.libImageSaveMessage.set('Failed to save image.'),
+    });
+  }
+
+  saveLibSound(): void {
+    if (this.isSavingLibSound()) return;
+    const userkey = this.account.getKey();
+    if (!userkey) { this.libSoundSaveMessage.set('Please log in to save sounds.'); return; }
+    const v = this.libSoundForm.getRawValue();
+    const payload: LibSoundWritePayload = { path: (v.path || '').trim(), isPublic: this.isAdminUser() && v.isPublic, isActive: v.isActive, name: (v.name || '').trim() || 'Unnamed Sound' };
+    const editingId = this.editingLibSoundId();
+    const request$ = editingId
+      ? this.http.put<{ result: number; error?: string }>(`${API_BASE_URL}/sounds/${editingId}`, { userkey, sound: payload })
+      : (() => {
+          const file = this.selectedLibSoundFile();
+          if (!file) { this.libSoundSaveMessage.set('Select a sound file to upload.'); return null; }
+          const fd = new FormData();
+          fd.append('userkey', userkey);
+          fd.append('name', payload.name);
+          fd.append('isPublic', payload.isPublic ? 'true' : 'false');
+          fd.append('isActive', payload.isActive ? 'true' : 'false');
+          fd.append('sound', file);
+          return this.http.post<{ result: number; error?: string }>(`${API_BASE_URL}/sounds`, fd);
+        })();
+    if (!request$) return;
+    this.isSavingLibSound.set(true);
+    this.libSoundSaveMessage.set(null);
+    request$.pipe(finalize(() => this.isSavingLibSound.set(false))).subscribe({
+      next: (r) => {
+        if (r.result !== 1) { this.libSoundSaveMessage.set(r.error || 'Failed to save sound.'); return; }
+        this.loadLibUserSounds();
+        this.libSoundSaveMessage.set(editingId ? 'Sound updated.' : 'Sound uploaded.');
+        this.cancelEditLibSound();
+      },
+      error: () => this.libSoundSaveMessage.set('Failed to save sound.'),
+    });
+  }
+
+  saveLibSpell(): void {
+    if (this.isSavingLibSpell()) return;
+    const userkey = this.account.getKey();
+    if (!userkey) { this.libSpellSaveMessage.set('Please log in to save spells.'); return; }
+    const c = this.libSpellForm.controls;
+    const payload: LibSpellWritePayload = {
+      name: (c.name.value || '').trim() || 'Unnamed Spell',
+      description: (c.description.value || '').trim(),
+      range: Math.max(0, c.range.value ?? 0),
+      effectOn: (c.effectOn.value || 'HP').trim(),
+      effectOn2: (c.effectOn2.value || '').trim(),
+      lastFor: Math.max(0, c.lastFor.value ?? 0),
+      effectAmount: c.effectAmount.value ?? 0,
+      effectAmount2: c.effectAmount2.value ?? 0,
+      value: Math.max(0, c.value.value ?? 0),
+      sp: Math.max(0, c.sp.value ?? 0),
+      successTestValue: Math.max(0, c.successTestValue.value ?? 0),
+      magicCost: Math.max(1, c.magicCost.value ?? 1),
+      imageId: c.imageId.value ?? null,
+      soundId: c.soundId.value ?? null,
+      isPublic: this.isAdminUser() ? c.isPublic.value : false,
+    };
+    const editingId = this.editingLibSpellId();
+    const request$ = editingId
+      ? this.http.put<{ result: number; error?: string }>(`${API_BASE_URL}/spells/${editingId}`, { userkey, spell: payload })
+      : this.http.post<{ result: number; error?: string }>(`${API_BASE_URL}/spells`, { userkey, spell: payload });
+    this.isSavingLibSpell.set(true);
+    this.libSpellSaveMessage.set(null);
+    request$.pipe(finalize(() => this.isSavingLibSpell.set(false))).subscribe({
+      next: (r) => {
+        if (r.result !== 1) { this.libSpellSaveMessage.set(r.error || 'Failed to save spell.'); return; }
+        this.loadLibUserSpells();
+        const key = this.account.getKey();
+        if (key) this.loadLibSpellOptions(key);
+        this.libSpellSaveMessage.set(editingId ? 'Spell updated.' : 'Spell created.');
+        this.cancelEditLibSpell();
+      },
+      error: () => this.libSpellSaveMessage.set('Failed to save spell.'),
+    });
+  }
+
+  private resetLibSpellForm(): void {
+    this.libSpellForm.reset({ name: '', description: '', range: 0, effectOn: 'HP', effectOn2: '',
+      lastFor: 0, effectAmount: 0, effectAmount2: 0, value: 0, sp: 0, successTestValue: 0, magicCost: 1, imageId: null, soundId: null, isPublic: false });
+  }
+
+  private libFileBaseName(fileName: string): string {
+    const t = (fileName || '').trim();
+    const i = t.lastIndexOf('.');
+    return (i > 0 ? t.slice(0, i).trim() : t) || 'Uploaded File';
   }
 }

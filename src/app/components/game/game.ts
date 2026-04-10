@@ -21,10 +21,11 @@ import { Key } from '../../interfaces/key';
 import { API_BASE_URL } from '../../api-config';
 import {
   AdjacentConnectionInfo,
-  ArmorType,
   Cheater,
   CheaterInventory,
-  CoinType,
+  DungonExit,
+  ExitDestinationType,
+  ExitTransitionType,
   FacingDirection,
   FirstPersonBlock,
   FirstPersonStep,
@@ -42,7 +43,8 @@ import {
   StartPoint,
   Tresher,
   TresherPlacement,
-  TresherType,
+  Trap,
+  FloorTrapPlacement,
 } from '../../interfaces/game';
 
 interface GameSessionPayload {
@@ -52,8 +54,19 @@ interface GameSessionPayload {
   dungenJson: unknown;
   lastupdated: string;
   pcTreshers?: unknown[];
+  pcTresherItems?: unknown[];
+  pcTresherPotions?: unknown[];
+  pcTresherSpells?: unknown[];
   pcCurrentHP?: number | null;
   pcMaxHP?: number | null;
+  pcSp?: number | null;
+  pcMind?: number | null;
+  pcStamina?: number | null;
+  pcStrength?: number | null;
+  pcMagicPower?: number | null;
+  currentPcId?: number | null;
+  dungonSpReward?: number;
+  monsterImages?: { id: number; path: string }[];
 }
 
 interface ImageRecordPayload {
@@ -77,10 +90,36 @@ interface GameMonsterInstance {
   isDead: boolean;
   remainingAE: number;
   attacksUsedThisTurn: number;
+  dropTresherIds: number[];
+  dropKeyIds: number[];
+  activeEffects: ActiveEffect[];
+  isDormant: boolean;
+  guardRow: number | null;
+  guardColumn: number | null;
+  hasCalledReinforcements: boolean;
 }
 
 interface CombatLogEntry {
   text: string;
+}
+
+interface PcTresherSpellData {
+  id: number;
+  name: string;
+  description: string;
+  range: number;
+  effectOn: string;
+  effectAmount: number;
+  successTestValue: number;
+  sp: number;
+  lastFor: number;
+}
+
+interface ActiveEffect {
+  effectOn: string;
+  effectAmount: number;
+  remainingAE: number;
+  sourceName: string;
 }
 
 interface NearbyDoorInfo {
@@ -92,6 +131,7 @@ interface NearbyDoorInfo {
   direction: string;
   canOpen: boolean;
   canUnlock: boolean;
+  canPick: boolean;
   matchingKeyIndex: number | null;
 }
 
@@ -137,6 +177,7 @@ export class Game implements OnInit {
   readonly visualFacingByDungon = signal<Record<number, DisplayFacingDirection>>({});
   readonly activeInfoPanelTab = signal<InfoPanelTab>('nearby');
   readonly equippedTresherIndexesByDungon = signal<Record<number, number[]>>({});
+  readonly equippedItemIdsByDungon = signal<Record<number, number[]>>({});
 
   readonly gridPreviewContext = signal<GridPreviewContext | null>(null);
   readonly cheaterByDungon = signal<Record<number, Cheater>>({});
@@ -150,17 +191,43 @@ export class Game implements OnInit {
   readonly squareTextsByDungon = signal<Record<number, SquareText[]>>({});
 
   private readonly monsterImageCache = new Map<number, HTMLImageElement>();
+  private readonly monsterImageCacheVersion = signal(0);
+  private readonly doorImageCache = new Map<string, HTMLImageElement>();
 
   readonly turnPhase = signal<TurnPhase>('player');
   readonly playerAE = signal(0);
   readonly playerMaxAE = 5;
+  readonly playerDefendStacks = signal(0);
   readonly playerHp = signal(20);
   readonly playerMaxHp = signal(20);
   readonly playerBaseAC = 10;
   readonly monsterInstances = signal<GameMonsterInstance[]>([]);
   readonly combatLog = signal<CombatLogEntry[]>([]);
   readonly currentGameId = signal<number | null>(null);
+  readonly isSampleMode = signal(false);
   readonly pcInventoryInitializedByDungon = signal<Record<number, boolean>>({});
+  readonly pcTresherItemsById = signal<Map<number, { id: number; name: string; description: string; type: string; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null }>>(new Map());
+  readonly pcTresherPotionsById = signal<Map<number, { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>>(new Map());
+  readonly exitsByDungon = signal<Record<number, DungonExit[]>>({});
+  readonly playerSp = signal<number>(0);
+  readonly playerMind = signal<number>(0);
+  readonly playerStamina = signal<number>(0);
+  readonly playerStrength = signal<number>(0);
+  readonly playerMagicPower = signal<number>(0);
+  readonly pcTresherSpellsById = signal<Map<number, PcTresherSpellData>>(new Map());
+  readonly selectedSpellId = signal<number | null>(null);
+  readonly selectedCombatTarget = signal<{ row: number; column: number } | null>(null);
+  private readonly comboTracker = signal<{ placementIndex: number; count: number } | null>(null);
+  readonly playerActiveEffects = signal<ActiveEffect[]>([]);
+  readonly floorTrapPlacementsByDungon = signal<Record<number, FloorTrapPlacement[]>>({});
+  readonly foundTrap = signal<{ trap: Trap; source: 'door' | 'tresher' | 'floor'; doorInfo?: NearbyDoorInfo; tresherIndex?: number; floorTrapId?: number; adjacentRow?: number; adjacentColumn?: number } | null>(null);
+  readonly bloodSplatter = signal<{ x: number; y: number; r: number }[]>([]);
+  readonly playerHitFlash = signal(false);
+  readonly currentPcId_ = signal<number | null>(null);
+  readonly dungonSpReward = signal<number>(0);
+  readonly dungonWon = signal<boolean>(false);
+  readonly winStairsImageIndex = signal<1 | 2 | 3 | null>(null);
+  readonly pendingExitTransitionType = signal<ExitTransitionType | null>(null);
 
   readonly gridCellSize = 20;
   readonly gridColumnCount = 50;
@@ -198,6 +265,7 @@ export class Game implements OnInit {
 
   ngOnInit(): void {
     this.loadGame();
+    this.loadDoorImages();
   }
 
   @HostListener('window:keydown', ['$event'])
@@ -212,6 +280,12 @@ export class Game implements OnInit {
 
     if (event.key.toLowerCase() === 'a') {
       this.tryPlayerAttack();
+      event.preventDefault();
+      return;
+    }
+
+    if (event.key.toLowerCase() === 'd') {
+      this.tryPlayerDefend();
       event.preventDefault();
       return;
     }
@@ -352,12 +426,23 @@ export class Game implements OnInit {
     return this.squareTextsByDungon()[preview.dungonId] ?? [];
   }
 
+  previewExitsForView(): DungonExit[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return [];
+    }
+
+    return this.exitsByDungon()[preview.dungonId] ?? [];
+  }
+
   previewMonsterImagesBySquareForView(): Map<string, HTMLImageElement | null> {
     const preview = this.gridPreviewContext();
     if (!preview) {
       return new Map<string, HTMLImageElement | null>();
     }
 
+    // Read version signal so Angular re-evaluates this when images finish loading.
+    this.monsterImageCacheVersion();
     const monstersById = this.getMonstersByIdForDungon(preview.dungonId);
     const imageBySquare = new Map<string, HTMLImageElement | null>();
     for (const instance of this.monsterInstances().filter((monster) => !monster.isDead)) {
@@ -392,11 +477,103 @@ export class Game implements OnInit {
   }
 
   isTresherEquipable(tresher: Tresher): boolean {
-    return this.getHandsRequiredForEquip(tresher) > 0 || tresher.armorType !== null;
+    const type = tresher.type ?? 'OtherTresher';
+    return type === 'Weapon' || type === 'Armor';
+  }
+
+  hasWeaponEquipped(): boolean {
+    const preview = this.gridPreviewContext();
+    if (!preview) return false;
+    const equippedItemIds = this.equippedItemIdsByDungon()[preview.dungonId] ?? [];
+    const itemsMap = this.pcTresherItemsById();
+    return equippedItemIds.some((id) => itemsMap.get(id)?.type === 'weapon');
+  }
+
+  canAttackUnarmed(): boolean {
+    if (this.turnPhase() !== 'player' || this.playerAE() < 1) return false;
+    const preview = this.gridPreviewContext();
+    if (!preview) return false;
+    return this.findAdjacentLiveMonster(preview.centerRow, preview.centerColumn, 1, preview.dungonId) !== null;
+  }
+
+  /** Returns the current attack range for map highlighting (0 = no combat). */
+  combatRangeForMap(): number {
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0) return 0;
+    if (!this.monsterInstances().some(m => !m.isDead)) return 0;
+    const preview = this.gridPreviewContext();
+    if (!preview) return 0;
+    // If a spell is primed, use spell range
+    const spellId = this.selectedSpellId();
+    if (spellId !== null) {
+      const spell = this.pcTresherSpellsById().get(spellId);
+      if (spell) return Math.max(1, spell.range);
+    }
+    // Weapon range
+    const equippedItemIds = this.equippedItemIdsByDungon()[preview.dungonId] ?? [];
+    const itemsMap = this.pcTresherItemsById();
+    let bestRange = 1; // unarmed baseline
+    for (const itemId of equippedItemIds) {
+      const item = itemsMap.get(itemId);
+      if (item?.type === 'weapon' && item.range > bestRange) bestRange = item.range;
+    }
+    return bestRange;
+  }
+
+  /** Called when the player clicks a cell on the 10x10 mini-map. */
+  onMapCellClicked(cell: { row: number; column: number }): void {
+    const preview = this.gridPreviewContext();
+    if (!preview || this.turnPhase() !== 'player' || this.playerHp() <= 0) return;
+    const range = this.combatRangeForMap();
+    if (range === 0) return;
+    const dr = Math.abs(cell.row - preview.centerRow);
+    const dc = Math.abs(cell.column - preview.centerColumn);
+    if (dr > range || dc > range || (dr === 0 && dc === 0)) return;
+    const monster = this.monsterInstances().find(
+      m => !m.isDead && m.row === cell.row && m.column === cell.column
+    );
+    if (!monster) return;
+    if (!this.hasLineOfSight(preview.dungonId, preview.centerRow, preview.centerColumn, cell.row, cell.column)) return;
+    this.selectedCombatTarget.set({ row: cell.row, column: cell.column });
+    const name = this.getMonstersByIdForDungon(preview.dungonId).get(monster.monsterId)?.name ?? 'monster';
+    this.previewActionMessage.set(`Target: ${name}.`);
+  }
+
+  canPickAny(): boolean {
+    return this.nearbyDoorsForPreview().some((d) => d.canPick) || !!this.foundTrap();
+  }
+
+  canOpenAnyDoor(): boolean {
+    return this.nearbyDoorsForPreview().some((d) => d.canOpen);
+  }
+
+  canUnlockAnyDoor(): boolean {
+    return this.nearbyDoorsForPreview().some((d) => d.canUnlock);
+  }
+
+  turnFacingLeft(): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const current = (this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER).facingDir;
+    this.applyCardinalFacingDirection(this.turnFacing(current, 'left'));
+  }
+
+  turnFacingRight(): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const current = (this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER).facingDir;
+    this.applyCardinalFacingDirection(this.turnFacing(current, 'right'));
+  }
+
+  moveForward(): void {
+    this.tryMoveCheaterForward();
+  }
+
+  moveBackward(): void {
+    this.tryMoveCheaterBackward();
   }
 
   isHealingPotion(tresher: Tresher): boolean {
-    return this.getHealingPotionAmount(tresher) > 0;
+    return (tresher.type ?? 'OtherTresher') === 'Potion' || this.getHealingPotionAmount(tresher) > 0;
   }
 
   canUseHealingPotion(tresher: Tresher): boolean {
@@ -442,6 +619,7 @@ export class Game implements OnInit {
         dungonId,
         equippedIndexes.filter((equippedIndex) => equippedIndex !== index)
       );
+      this.addCombatLog(`${tresherName} unequipped.`);
       this.previewActionMessage.set(`${tresherName} unequipped.`);
       return;
     }
@@ -451,33 +629,8 @@ export class Game implements OnInit {
       return;
     }
 
-    const equippedTreshers = equippedIndexes
-      .map((equippedIndex) => inventory.treshers[equippedIndex])
-      .filter((item): item is Tresher => item !== undefined);
-
-    if (
-      selectedTresher.armorType !== null &&
-      equippedTreshers.some((item) => item.armorType === selectedTresher.armorType)
-    ) {
-      this.previewActionMessage.set(
-        `Only one ${selectedTresher.armorType} armor item can be equipped at a time.`
-      );
-      return;
-    }
-
-    const selectedHands = this.getHandsRequiredForEquip(selectedTresher);
-    const usedHands = equippedTreshers.reduce(
-      (sum, item) => sum + this.getHandsRequiredForEquip(item),
-      0
-    );
-    if (usedHands + selectedHands > this.maxEquippableHands) {
-      this.previewActionMessage.set(
-        `Cannot equip ${tresherName}. Hands used would be ${usedHands + selectedHands} of ${this.maxEquippableHands}.`
-      );
-      return;
-    }
-
     this.setEquippedTresherIndexesForDungon(dungonId, [...equippedIndexes, index]);
+    this.addCombatLog(`${tresherName} equipped.`);
     this.previewActionMessage.set(`${tresherName} equipped.`);
   }
 
@@ -497,6 +650,11 @@ export class Game implements OnInit {
 
     if (this.turnPhase() !== 'player' || this.playerHp() <= 0) {
       this.previewActionMessage.set('Potions can only be used during your turn.');
+      return;
+    }
+
+    if (this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to use a potion.');
       return;
     }
 
@@ -522,6 +680,10 @@ export class Game implements OnInit {
     this.removeInventoryTresherAtIndex(dungonId, index);
     this.previewActionMessage.set(`${potionName} restored ${restoredHp} HP.`);
     this.addCombatLog(`You drink ${potionName} and recover ${restoredHp} HP.`);
+    this.consumePlayerAE(1, dungonId);
+    if (this.playerAE() <= 0) {
+      this.startMonsterTurns();
+    }
     this.saveGameState();
   }
 
@@ -536,7 +698,7 @@ export class Game implements OnInit {
       inventoryContext.inventory.treshers.length
     );
 
-    return equippedIndexes.reduce((sum, equippedIndex) => {
+    const tresherHands = equippedIndexes.reduce((sum, equippedIndex) => {
       const equippedItem = inventoryContext.inventory.treshers[equippedIndex];
       if (!equippedItem) {
         return sum;
@@ -544,6 +706,12 @@ export class Game implements OnInit {
 
       return sum + this.getHandsRequiredForEquip(equippedItem);
     }, 0);
+
+    // Each equipped item (weapon, armor, or other) occupies 1 hand slot
+    const equippedItemIds = this.equippedItemIdsByDungon()[inventoryContext.dungonId] ?? [];
+    const itemHands = equippedItemIds.length;
+
+    return tresherHands + itemHands;
   }
 
   equippedArmorSummaryForPreview(): string {
@@ -557,38 +725,256 @@ export class Game implements OnInit {
       inventoryContext.inventory.treshers.length
     );
 
-    const armorTypes = equippedIndexes
-      .map((equippedIndex) => inventoryContext.inventory.treshers[equippedIndex]?.armorType)
-      .filter((armorType): armorType is ArmorType => armorType !== null && armorType !== undefined);
+    const armorNames = equippedIndexes
+      .map((index) => inventoryContext.inventory.treshers[index])
+      .filter((t) => t && (t.type ?? 'OtherTresher') === 'Armor')
+      .map((t) => t!.name.trim() || 'Armor');
 
-    if (armorTypes.length === 0) {
-      return 'None';
-    }
-
-    return armorTypes.join(', ');
+    return armorNames.length > 0 ? armorNames.join(', ') : 'None';
   }
 
   getInventoryTresherMeta(tresher: Tresher): string {
     const parts: string[] = [];
-    const handCount = this.getHandsRequiredForEquip(tresher);
-    if (handCount > 0) {
-      parts.push(`Hands: ${handCount}`);
-    }
-
-    if (tresher.armorType !== null) {
-      parts.push(`Armor Slot: ${tresher.armorType}`);
-    }
-
-    const healingAmount = this.getHealingPotionAmount(tresher);
-    if (healingAmount > 0) {
-      parts.push(`Heals ${healingAmount} HP`);
-    }
-
-    if (parts.length === 0) {
-      return 'Not equipable';
-    }
-
+    if (tresher.gold > 0) parts.push(`Gold: ${tresher.gold}`);
+    if (tresher.silver > 0) parts.push(`Silver: ${tresher.silver}`);
+    if (tresher.copper > 0) parts.push(`Copper: ${tresher.copper}`);
+    if (tresher.zinc > 0) parts.push(`Zinc: ${tresher.zinc}`);
     return parts.join(' | ');
+  }
+
+  getTresherInnerItems(tresher: Tresher): Array<{ id: number; name: string; description: string; type: string; effectValue: number | null; armorSlot: string | null; damage: number; range: number }> {
+    const itemsMap = this.pcTresherItemsById();
+    const result: Array<{ id: number; name: string; description: string; type: string; effectValue: number | null; armorSlot: string | null; damage: number; range: number }> = [];
+    for (const itemId of [tresher.item1Id, tresher.item2Id, tresher.item3Id, tresher.item4Id]) {
+      if (itemId != null) {
+        const item = itemsMap.get(itemId);
+        if (item) {
+          result.push(item);
+        }
+      }
+    }
+    return result;
+  }
+
+  getTresherInnerPotions(tresher: Tresher): Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }> {
+    const potionsMap = this.pcTresherPotionsById();
+    const result: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }> = [];
+    for (const potionId of [tresher.potion1Id, tresher.potion2Id, tresher.potion3Id]) {
+      if (potionId != null) {
+        const potion = potionsMap.get(potionId);
+        if (potion) {
+          result.push(potion);
+        }
+      }
+    }
+    return result;
+  }
+
+  isInnerPotionDrinkable(potion: { effectTo: string }): boolean {
+    return potion.effectTo === 'HP';
+  }
+
+  canDrinkInnerPotion(): boolean {
+    return this.turnPhase() === 'player' && this.playerHp() > 0;
+  }
+
+  getTresherInnerSpells(tresher: Tresher): PcTresherSpellData[] {
+    const spellsMap = this.pcTresherSpellsById();
+    const result: PcTresherSpellData[] = [];
+    for (const spellId of [tresher.spell1Id, tresher.spell2Id, tresher.spell3Id, tresher.spell4Id]) {
+      if (spellId != null) {
+        const spell = spellsMap.get(spellId);
+        if (spell) {
+          result.push(spell);
+        }
+      }
+    }
+    return result;
+  }
+
+  getPlayerMagicResistance(): number {
+    return Math.floor(this.playerMind() / 2);
+  }
+
+  canCastSpell(spell: PcTresherSpellData): boolean {
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0) return false;
+    if (this.playerAE() < Math.max(1, spell.sp)) return false;
+    const preview = this.gridPreviewContext();
+    if (!preview) return false;
+    return this.findAdjacentLiveMonster(preview.centerRow, preview.centerColumn, spell.range, preview.dungonId) !== null;
+  }
+
+  castSpell(spellId: number): void {
+    if (this.turnPhase() !== 'player') return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+
+    const spell = this.pcTresherSpellsById().get(spellId);
+    if (!spell) return;
+
+    const mpCost = Math.max(1, spell.sp);
+    if (this.playerAE() < mpCost) {
+      this.addCombatLog(`Not enough AE to cast ${spell.name}. Need ${mpCost} AE.`);
+      return;
+    }
+
+    const target = this.getTargetMonster(preview.dungonId, preview.centerRow, preview.centerColumn, spell.range);
+    if (!target) {
+      this.addCombatLog(`No target in range (${spell.range}) for ${spell.name}.`);
+      return;
+    }
+
+    const template = this.getMonstersByIdForDungon(preview.dungonId).get(target.monsterId);
+    const monsterName = template?.name ?? 'monster';
+    const magicResistance = template?.magicResistance ?? 0;
+
+    this.selectedSpellId.set(null);
+
+    const roll = this.rollD12(this.playerMind());
+    const dc = spell.successTestValue + magicResistance;
+    this.addCombatLog(`Cast ${spell.name} — rolled ${roll} (1d12+${this.playerMind()}) vs DC ${dc} (TN ${spell.successTestValue} + MR ${magicResistance}).`);
+
+    if (roll >= dc) {
+      if (spell.lastFor > 0) {
+        target.activeEffects.push({
+          effectOn: spell.effectOn,
+          effectAmount: Math.max(1, spell.effectAmount),
+          remainingAE: spell.lastFor,
+          sourceName: spell.name,
+        });
+        this.addCombatLog(`${spell.name} afflicts ${monsterName} for ${spell.lastFor} AE! (${spell.effectOn} -${spell.effectAmount}/AE)`);
+      } else {
+        if (spell.effectOn === 'HP') {
+          const damage = Math.max(1, spell.effectAmount);
+          target.currentHp -= damage;
+          this.triggerBloodSplatter();
+          this.addCombatLog(`${spell.name} hits ${monsterName} for ${damage} damage!`);
+        } else {
+          this.addCombatLog(`${spell.name} successfully affects ${monsterName}! (${spell.effectOn} −${spell.effectAmount})`);
+        }
+
+        if (target.currentHp <= 0) {
+          target.isDead = true;
+          target.currentHp = 0;
+          this.addCombatLog(`${monsterName} is dead!`);
+          this.selectedCombatTarget.set(null); // clear target after kill
+          this.dropMonsterLoot(preview.dungonId, target, template ?? null);
+          const spGain = template?.spReward ?? 0;
+          if (spGain > 0) {
+            this.playerSp.update((s) => s + spGain);
+            this.addCombatLog(`+${spGain} SP!`);
+            this.awardSpToPC(spGain);
+          }
+        }
+      }
+      this.monsterInstances.update((arr) => [...arr]);
+    } else {
+      this.addCombatLog(`${spell.name} fizzles — ${monsterName} resists!`);
+    }
+
+    // consumePlayerAE ticks all active effects (including any just applied) once per AE point
+    this.consumePlayerAE(mpCost, preview.dungonId);
+    this.drawPreviewGridCanvas();
+
+    if (this.playerAE() <= 0) {
+      this.startMonsterTurns();
+    }
+  }
+
+  drinkTresherInnerPotion(tresherIndex: number, potionId: number): void {
+    const inventoryContext = this.getInventoryContextForPreview();
+    if (!inventoryContext) return;
+
+    const { dungonId, inventory } = inventoryContext;
+    if (tresherIndex < 0 || tresherIndex >= inventory.treshers.length) return;
+
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0) {
+      this.previewActionMessage.set('Potions can only be used during your turn.');
+      return;
+    }
+
+    const potion = this.pcTresherPotionsById().get(potionId);
+    if (!potion) return;
+
+    if (potion.effectTo !== 'HP') {
+      this.previewActionMessage.set(`${potion.name} does not affect health.`);
+      return;
+    }
+
+    this.removeInnerPotionSlotFromInventoryTresher(dungonId, tresherIndex, potionId);
+
+    if (potion.lastFor > 1) {
+      // Lasting regeneration: ticks once per AE spent by anyone
+      this.playerActiveEffects.update((effects) => [
+        ...effects,
+        { effectOn: 'HP', effectAmount: potion.effectAmount, remainingAE: potion.lastFor, sourceName: potion.name },
+      ]);
+      this.addCombatLog(`You drink ${potion.name}. Regenerating +${potion.effectAmount} HP for ${potion.lastFor} AE.`);
+      this.previewActionMessage.set(`${potion.name}: +${potion.effectAmount} HP for ${potion.lastFor} AE.`);
+    } else {
+      const variance = Math.floor(Math.random() * 3) + 1;
+      const sign = Math.random() < 0.5 ? 1 : -1;
+      const delta = potion.effectAmount + sign * variance;
+
+      const currentHp = this.playerHp();
+      const maxHp = this.playerMaxHp();
+      const newHp = Math.max(0, Math.min(currentHp + delta, maxHp));
+      const change = newHp - currentHp;
+
+      this.playerHp.set(newHp);
+
+      const changeText = change >= 0 ? `restored ${change} HP` : `lost ${Math.abs(change)} HP`;
+      this.previewActionMessage.set(`${potion.name}: ${changeText}.`);
+      this.addCombatLog(`You drink ${potion.name} and ${changeText}.`);
+    }
+    this.saveGameState();
+  }
+
+  isItemEquipable(type: string): boolean {
+    return type === 'weapon' || type === 'armor' || type === 'ring' || type === 'necklace';
+  }
+
+  isItemEquippedById(itemId: number): boolean {
+    const inventoryContext = this.getInventoryContextForPreview();
+    if (!inventoryContext) {
+      return false;
+    }
+    return (this.equippedItemIdsByDungon()[inventoryContext.dungonId] ?? []).includes(itemId);
+  }
+
+  toggleItemEquipped(itemId: number): void {
+    const inventoryContext = this.getInventoryContextForPreview();
+    if (!inventoryContext) {
+      return;
+    }
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0) {
+      this.previewActionMessage.set('You can only equip items during your turn.');
+      return;
+    }
+    if (this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to equip or unequip.');
+      return;
+    }
+    const { dungonId } = inventoryContext;
+    const item = this.pcTresherItemsById().get(itemId);
+    if (!item) {
+      return;
+    }
+    const itemName = item.name || 'Item';
+    const equippedIds = this.equippedItemIdsByDungon()[dungonId] ?? [];
+    if (equippedIds.includes(itemId)) {
+      this.equippedItemIdsByDungon.update((all) => ({ ...all, [dungonId]: equippedIds.filter((id) => id !== itemId) }));
+      this.addCombatLog(`${itemName} unequipped.`);
+      this.previewActionMessage.set(`${itemName} unequipped.`);
+    } else {
+      this.equippedItemIdsByDungon.update((all) => ({ ...all, [dungonId]: [...equippedIds, itemId] }));
+      this.addCombatLog(`${itemName} equipped.`);
+      this.previewActionMessage.set(`${itemName} equipped.`);
+    }
+    this.consumePlayerAE(1, dungonId);
+    if (this.playerAE() <= 0) {
+      this.startMonsterTurns();
+    }
   }
 
   nearbyItemsForPreview(): NearbyDiscoveryItem[] {
@@ -675,15 +1061,44 @@ export class Game implements OnInit {
       });
     }
 
+    const facingWallSides = this.getFacingWallSides(displayDirection);
+
     for (const st of this.squareTextsByDungon()[preview.dungonId] ?? []) {
-      if (st.row === currentRow && st.column === currentColumn) {
-        items.push({
-          kind: 'Text',
-          name: 'Message',
-          description: st.text,
-          row: st.row,
-          column: st.column,
-        });
+      const isCurrentSquare = st.row === currentRow && st.column === currentColumn;
+      const isTargetSquare = hasValidTargetSquare && st.row === targetRow && st.column === targetColumn;
+
+      if (isCurrentSquare) {
+        if (!st.wallSide) {
+          // Floor text — show when standing on this square
+          items.push({
+            kind: 'Text',
+            name: 'Message',
+            description: st.text,
+            row: st.row,
+            column: st.column,
+          });
+        } else if (facingWallSides.includes(st.wallSide)) {
+          // Wall note — show when facing this wall
+          items.push({
+            kind: 'Text',
+            name: 'Wall Note',
+            description: st.text,
+            row: st.row,
+            column: st.column,
+          });
+        }
+      } else if (isTargetSquare && st.wallSide) {
+        // Wall note on the adjacent facing square pointing back toward us
+        const oppositeWall = this.oppositeWallSide(st.wallSide);
+        if (facingWallSides.includes(oppositeWall)) {
+          items.push({
+            kind: 'Text',
+            name: 'Wall Note',
+            description: st.text,
+            row: st.row,
+            column: st.column,
+          });
+        }
       }
     }
 
@@ -746,6 +1161,9 @@ export class Game implements OnInit {
       if (!this.isDoorConnection(connection)) {
         continue;
       }
+      if (connection.isHidden && !connection.isFound) {
+        continue;
+      }
       if (seenDoorIds.has(connection.id)) {
         continue;
       }
@@ -755,6 +1173,7 @@ export class Game implements OnInit {
       const canOpen = !connection.isLocked && connection.state === 'closed';
       let canUnlock = false;
       let matchingKeyIndex: number | null = null;
+      let canPick = false;
 
       if (connection.isLocked && connection.state === 'closed' && connection.keyLock) {
         const keyIdx = inventoryKeys.findIndex(
@@ -766,6 +1185,10 @@ export class Game implements OnInit {
         }
       }
 
+      if (connection.isLocked && connection.state === 'closed' && !canUnlock && (connection.toPick ?? 0) > 0) {
+        canPick = true;
+      }
+
       doors.push({
         door: connection,
         squareKey,
@@ -775,6 +1198,7 @@ export class Game implements OnInit {
         direction: check.label,
         canOpen,
         canUnlock,
+        canPick,
         matchingKeyIndex,
       });
     }
@@ -868,6 +1292,31 @@ export class Game implements OnInit {
     });
   }
 
+  private setDoorFound(
+    dungonId: number,
+    squareKey: string,
+    side: SquareSide,
+    neighborSquareKey: string,
+    neighborSide: SquareSide
+  ): void {
+    this.squaresByDungon.update((allSquares) => {
+      const squares = { ...(allSquares[dungonId] ?? {}) };
+      const sq = squares[squareKey];
+      if (sq) {
+        const connection = sq[side];
+        if (this.isDoorConnection(connection)) {
+          const updatedDoor = { ...connection, isFound: true };
+          squares[squareKey] = this.withSquareSide(sq, side, updatedDoor);
+          const neighborSq = squares[neighborSquareKey];
+          if (neighborSq) {
+            squares[neighborSquareKey] = this.withSquareSide(neighborSq, neighborSide, updatedDoor);
+          }
+        }
+      }
+      return { ...allSquares, [dungonId]: squares };
+    });
+  }
+
   hasCurrentSquarePickupItems(): boolean {
     return this.currentSquareItemsForPreview().length > 0;
   }
@@ -881,30 +1330,181 @@ export class Game implements OnInit {
     return this.getTresherPlacementsAtSquare(current.dungonId, current.row, current.column).length > 1;
   }
 
-  lookForTrapsAtCurrentSquare(): void {
+  pickLockDoor(doorInfo: NearbyDoorInfo): void {
+    if (!doorInfo.canPick) return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const dc = doorInfo.door.toPick ?? 10;
+    const roll = this.randomInt(1, 12) + this.playerMind();
+    const doorName = doorInfo.door.name || 'door';
+    if (roll >= dc) {
+      this.setDoorLocked(preview.dungonId, doorInfo, false);
+      this.previewActionMessage.set(`You pick the lock on the ${doorName} (rolled ${roll} vs DC ${dc}). Door unlocked!`);
+      this.addCombatLog(`Pick lock: rolled ${roll} vs DC ${dc}. Success.`);
+    } else {
+      this.previewActionMessage.set(`Failed to pick the lock on the ${doorName} (rolled ${roll} vs DC ${dc}).`);
+      this.addCombatLog(`Pick lock: rolled ${roll} vs DC ${dc}. Failed.`);
+      if (doorInfo.door.trap) {
+        this.triggerTrap(doorInfo.door.trap);
+      }
+    }
+    this.saveGameState();
+    this.drawPreviewGridCanvas();
+    this.drawFirstPersonViewCanvas();
+  }
+
+  searchForTraps(): void {
     const current = this.getCurrentPreviewSquareContext();
-    if (!current) {
-      return;
+    if (!current) return;
+    const mindRoll = this.randomInt(1, 12) + this.playerMind();
+
+    // Check floor traps at current square
+    const floorTraps = (this.floorTrapPlacementsByDungon()[current.dungonId] ?? [])
+      .filter(p => p.row === current.row && p.column === current.column && !p.isTriggered && !p.isDisarmed);
+    for (const fp of floorTraps) {
+      if (mindRoll >= fp.trap.toDetect) {
+        this.foundTrap.set({ trap: fp.trap, source: 'floor', floorTrapId: fp.id });
+        this.previewActionMessage.set(`You find a floor trap: ${fp.trap.name || 'Unknown Trap'} (rolled ${mindRoll} vs DC ${fp.trap.toDetect}).`);
+        return;
+      }
     }
 
+    // Check floor traps in adjacent squares (one cell away through open/door connections)
+    const filledSquares = this.filledSquaresByDungon()[current.dungonId] ?? {};
+    const adjacentChecks: Array<{ dr: number; dc: number; label: string }> = [
+      { dr: -1, dc: 0, label: 'North' },
+      { dr: 0, dc: 1, label: 'East' },
+      { dr: 1, dc: 0, label: 'South' },
+      { dr: 0, dc: -1, label: 'West' },
+    ];
+    for (const adj of adjacentChecks) {
+      const adjRow = current.row + adj.dr;
+      const adjCol = current.column + adj.dc;
+      const adjKey = this.getSquareKey(adjRow, adjCol);
+      if (!filledSquares[adjKey]) continue;
+      // Only search through traversable connections — not solid walls or hidden undiscovered doors
+      const blockType = this.getMovementBlockTypeBetweenAdjacentSquares(
+        current.dungonId, current.row, current.column, adjRow, adjCol
+      );
+      if (blockType === 'wall') continue;
+      const adjFloorTraps = (this.floorTrapPlacementsByDungon()[current.dungonId] ?? [])
+        .filter(p => p.row === adjRow && p.column === adjCol && !p.isTriggered && !p.isDisarmed);
+      for (const fp of adjFloorTraps) {
+        if (mindRoll >= fp.trap.toDetect) {
+          this.foundTrap.set({ trap: fp.trap, source: 'floor', floorTrapId: fp.id, adjacentRow: adjRow, adjacentColumn: adjCol });
+          this.previewActionMessage.set(`You find a floor trap to the ${adj.label}: ${fp.trap.name || 'Unknown Trap'} (rolled ${mindRoll} vs DC ${fp.trap.toDetect}).`);
+          return;
+        }
+      }
+    }
+
+    // Check tresher traps at current square
     const treshers = this.getTreshersAtSquare(current.dungonId, current.row, current.column);
-    if (treshers.length === 0) {
-      this.previewActionMessage.set('No treshers here to inspect for traps.');
-      return;
+    for (let i = 0; i < treshers.length; i++) {
+      const t = treshers[i];
+      if (t.trap && mindRoll >= t.trap.toDetect) {
+        this.foundTrap.set({ trap: t.trap, source: 'tresher', tresherIndex: i });
+        this.previewActionMessage.set(`You find a trap on ${t.name || 'tresher'}: ${t.trap.name || 'Trap'} (rolled ${mindRoll} vs DC ${t.trap.toDetect}).`);
+        return;
+      }
     }
 
-    const trappedTreshers = treshers.filter(
-      (tresher) => tresher.trapID !== null || tresher.curseID !== null
-    ).length;
-
-    if (trappedTreshers === 0) {
-      this.previewActionMessage.set('No trap signs found on current treshers.');
-      return;
+    // Check adjacent door traps
+    for (const doorInfo of this.nearbyDoorsForPreview()) {
+      if (doorInfo.door.trap && mindRoll >= doorInfo.door.trap.toDetect) {
+        this.foundTrap.set({ trap: doorInfo.door.trap, source: 'door', doorInfo });
+        this.previewActionMessage.set(`You find a trap on the ${doorInfo.door.name || 'door'} (rolled ${mindRoll} vs DC ${doorInfo.door.trap.toDetect}).`);
+        return;
+      }
     }
 
-    this.previewActionMessage.set(
-      `Possible trap signs on ${trappedTreshers} tresher${trappedTreshers === 1 ? '' : 's'}.`
-    );
+    // Check for hidden doors
+    const squares = this.squaresByDungon()[current.dungonId] ?? {};
+    const currentSquare = squares[this.getSquareKey(current.row, current.column)];
+    if (currentSquare) {
+      const hiddenDoorChecks: Array<{ side: SquareSide; neighborSide: SquareSide; dr: number; dc: number; label: string }> = [
+        { side: 'toTop', neighborSide: 'toBottom', dr: -1, dc: 0, label: 'North' },
+        { side: 'toRight', neighborSide: 'toLeft', dr: 0, dc: 1, label: 'East' },
+        { side: 'toBottom', neighborSide: 'toTop', dr: 1, dc: 0, label: 'South' },
+        { side: 'toLeft', neighborSide: 'toRight', dr: 0, dc: -1, label: 'West' },
+      ];
+      for (const cs of hiddenDoorChecks) {
+        const connection = currentSquare[cs.side];
+        if (this.isDoorConnection(connection) && connection.isHidden && !connection.isFound) {
+          if (mindRoll >= connection.toFind) {
+            this.setDoorFound(
+              current.dungonId,
+              this.getSquareKey(current.row, current.column),
+              cs.side,
+              this.getSquareKey(current.row + cs.dr, current.column + cs.dc),
+              cs.neighborSide
+            );
+            const doorName = connection.name || 'hidden door';
+            this.previewActionMessage.set(`You find a ${doorName} to the ${cs.label}! (rolled ${mindRoll} vs DC ${connection.toFind})`);
+            this.saveGameState();
+            this.drawPreviewGridCanvas();
+            this.drawFirstPersonViewCanvas();
+            return;
+          }
+        }
+      }
+    }
+
+    this.foundTrap.set(null);
+    this.previewActionMessage.set(`No traps found (rolled ${mindRoll}).`);
+  }
+
+  tryDisarmTrap(): void {
+    const found = this.foundTrap();
+    if (!found) return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const dc = found.trap.toDisarm;
+    const roll = this.randomInt(1, 12) + this.playerMind();
+    if (roll >= dc) {
+      this.previewActionMessage.set(`Trap disarmed! (rolled ${roll} vs DC ${dc})`);
+      this.addCombatLog(`Disarm trap: rolled ${roll} vs DC ${dc}. Success.`);
+      if (found.source === 'floor' && found.floorTrapId != null) {
+        this.floorTrapPlacementsByDungon.update(all => ({
+          ...all,
+          [preview.dungonId]: (all[preview.dungonId] ?? []).map(p =>
+            p.id === found.floorTrapId ? { ...p, isDisarmed: true } : p
+          )
+        }));
+      }
+      this.foundTrap.set(null);
+      this.saveGameState();
+    } else {
+      this.previewActionMessage.set(`Failed to disarm trap! (rolled ${roll} vs DC ${dc})`);
+      this.addCombatLog(`Disarm trap: rolled ${roll} vs DC ${dc}. Failed - trap triggers!`);
+      this.triggerTrap(found.trap);
+      this.foundTrap.set(null);
+      this.saveGameState();
+    }
+  }
+
+  private triggerTrap(trap: Trap): void {
+    this.previewActionMessage.set(`Trap triggered! ${trap.name || 'A trap'} goes off!`);
+    if (trap.damage <= 0) {
+      this.addCombatLog(`Trap triggered! ${trap.name || 'Trap'}`);
+      return;
+    }
+    if (trap.damageTo === 'HP') {
+      const newHp = Math.max(0, this.playerHp() - trap.damage);
+      this.playerHp.set(newHp);
+      this.addCombatLog(`Trap triggered! ${trap.name || 'Trap'} deals ${trap.damage} damage to HP.`);
+      if (newHp <= 0) {
+        this.turnPhase.set('gameover');
+      }
+    } else if (trap.damageTo === 'Stamina') {
+      this.addCombatLog(`Trap triggered! ${trap.name || 'Trap'} deals ${trap.damage} damage to Stamina.`);
+    } else if (trap.damageTo === 'Mind') {
+      this.addCombatLog(`Trap triggered! ${trap.name || 'Trap'} deals ${trap.damage} damage to Mind.`);
+    }
+  }
+
+  lookForTrapsAtCurrentSquare(): void {
+    this.searchForTraps();
   }
 
   takeAllFromCurrentSquare(): void {
@@ -942,6 +1542,7 @@ export class Game implements OnInit {
 
     if (tresherPlacements.length > 0) {
       this.removeTresherPlacementsAtSquare(current.dungonId, current.row, current.column);
+      this.activateTresherGuards(current.dungonId, current.row, current.column);
     }
 
     const totalItemCount = keysAtSquare.length + tresherPlacements.length;
@@ -987,6 +1588,7 @@ export class Game implements OnInit {
       current.column,
       placementToTake.tresherId
     );
+    this.activateTresherGuards(current.dungonId, current.row, current.column);
 
     const remainingCount = tresherPlacements.length - 1;
     this.previewActionMessage.set(
@@ -997,8 +1599,110 @@ export class Game implements OnInit {
 
   private loadGame(): void {
     const gameId = Number.parseInt(this.route.snapshot.paramMap.get('gameId') ?? '', 10);
-    if (!Number.isInteger(gameId) || gameId <= 0) {
-      this.gameLoadError.set('Invalid game id.');
+    const isSample = !Number.isInteger(gameId) || gameId <= 0;
+
+    if (isSample) {
+      // Sample play mode — no auth required
+      const pcIdRaw = this.route.snapshot.queryParamMap.get('pcId') ?? '';
+      const pcId = Number.parseInt(pcIdRaw, 10);
+      if (!Number.isInteger(pcId) || pcId <= 0) {
+        this.gameLoadError.set('Invalid sample game parameters.');
+        return;
+      }
+
+      this.isSampleMode.set(true);
+      this.isLoadingGame.set(true);
+      this.gameLoadError.set(null);
+
+      this.http
+        .get<GameSessionPayload>(`${API_BASE_URL}/games/sample-session`, {
+          params: { pcId: String(pcId) },
+        })
+        .pipe(finalize(() => this.isLoadingGame.set(false)))
+        .subscribe({
+          next: (game) => {
+            const playerMaxHp = this.resolvePlayerMaxHp(game.pcMaxHP);
+            this.playerMaxHp.set(playerMaxHp);
+            this.playerStartingHp = this.resolvePlayerCurrentHp(game.pcCurrentHP, playerMaxHp);
+            this.currentGameId.set(null);
+            this.gameName.set(game.name || 'Sample Game');
+            this.gameLastUpdated.set(null);
+            this.playerSp.set(0);
+            this.playerMind.set(typeof game.pcMind === 'number' ? Math.max(0, Math.floor(game.pcMind)) : 0);
+            this.playerStamina.set(typeof game.pcStamina === 'number' ? Math.max(0, Math.floor(game.pcStamina)) : 0);
+            this.playerStrength.set(typeof game.pcStrength === 'number' ? Math.max(0, Math.floor(game.pcStrength)) : 0);
+            this.playerMagicPower.set(typeof game.pcMagicPower === 'number' ? Math.max(0, Math.floor(game.pcMagicPower)) : 0);
+            this.currentPcId_.set(null);
+            this.dungonSpReward.set(0);
+            this.loadDungonJsonState(game.dungonid, game.dungenJson);
+            // Force-reset so PC treshers always seed fresh in sample mode (dungeon JSON may have flag set to true)
+            this.setPcInventoryInitialized(game.dungonid, false);
+            this.seedPcTreshersIntoInventory(game.dungonid, game.pcTreshers);
+            if (Array.isArray(game.pcTresherItems)) {
+              const itemMap = new Map<number, { id: number; name: string; description: string; type: string; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null }>();
+              for (const raw of game.pcTresherItems) {
+                const it = raw as { id: number; name: string; description: string; type: string; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null };
+                if (typeof it.id === 'number') {
+                  itemMap.set(it.id, { ...it, damage: typeof it.damage === 'number' ? it.damage : 6, range: typeof it.range === 'number' ? Math.max(1, it.range) : 1 });
+                }
+              }
+              this.pcTresherItemsById.set(itemMap);
+            }
+            if (Array.isArray(game.pcTresherPotions)) {
+              const potionMap = new Map<number, { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>();
+              for (const raw of game.pcTresherPotions) {
+                const p = raw as { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number };
+                if (typeof p.id === 'number') {
+                  potionMap.set(p.id, p);
+                }
+              }
+              this.pcTresherPotionsById.set(potionMap);
+            }
+            if (Array.isArray(game.pcTresherSpells)) {
+              const spellMap = new Map<number, PcTresherSpellData>();
+              for (const raw of game.pcTresherSpells) {
+                const s = raw as PcTresherSpellData;
+                if (typeof s.id === 'number') {
+                  spellMap.set(s.id, {
+                    id: s.id,
+                    name: typeof s.name === 'string' && s.name ? s.name : 'Unnamed Spell',
+                    description: typeof s.description === 'string' ? s.description : '',
+                    range: typeof s.range === 'number' ? Math.max(1, s.range) : 1,
+                    effectOn: typeof s.effectOn === 'string' ? s.effectOn : 'HP',
+                    effectAmount: typeof s.effectAmount === 'number' ? s.effectAmount : 0,
+                    successTestValue: typeof s.successTestValue === 'number' ? s.successTestValue : 10,
+                    sp: typeof s.sp === 'number' ? Math.max(1, s.sp) : 1,
+                    lastFor: typeof s.lastFor === 'number' ? Math.max(0, s.lastFor) : 0,
+                  });
+                }
+              }
+              this.pcTresherSpellsById.set(spellMap);
+            }
+            this.setInitialPreviewContext(game.dungonid);
+            // Pre-populate monster image cache from paths returned by the server
+            if (Array.isArray(game.monsterImages)) {
+              for (const mi of game.monsterImages) {
+                if (typeof mi.id !== 'number' || !mi.path) continue;
+                if (this.monsterImageCache.has(mi.id)) continue;
+                const url = this.resolveImageUrl(mi.path);
+                if (!url) continue;
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                  this.monsterImageCache.set(mi.id, img);
+                  this.monsterImageCacheVersion.update((v) => v + 1);
+                  this.drawFirstPersonViewCanvas();
+                };
+                img.src = url;
+              }
+            }
+            this.loadMonsterImages(game.dungonid);
+            this.initializeCombatState(game.dungonid);
+          },
+          error: () => {
+            this.gameLoadError.set('Failed to load sample game.');
+          },
+        });
       return;
     }
 
@@ -1028,8 +1732,55 @@ export class Game implements OnInit {
           this.currentGameId.set(gameId);
           this.gameName.set(game.name || 'Game');
           this.gameLastUpdated.set(game.lastupdated ?? null);
+          this.playerSp.set(typeof game.pcSp === 'number' ? Math.max(0, Math.floor(game.pcSp)) : 0);
+          this.playerMind.set(typeof game.pcMind === 'number' ? Math.max(0, Math.floor(game.pcMind)) : 0);
+          this.playerStamina.set(typeof game.pcStamina === 'number' ? Math.max(0, Math.floor(game.pcStamina)) : 0);
+          this.playerStrength.set(typeof game.pcStrength === 'number' ? Math.max(0, Math.floor(game.pcStrength)) : 0);
+          this.playerMagicPower.set(typeof game.pcMagicPower === 'number' ? Math.max(0, Math.floor(game.pcMagicPower)) : 0);
+          this.currentPcId_.set(typeof game.currentPcId === 'number' ? game.currentPcId : null);
+          this.dungonSpReward.set(typeof game.dungonSpReward === 'number' ? Math.max(0, Math.floor(game.dungonSpReward)) : 0);
           this.loadDungonJsonState(game.dungonid, game.dungenJson);
           this.seedPcTreshersIntoInventory(game.dungonid, game.pcTreshers);
+          if (Array.isArray(game.pcTresherItems)) {
+            const itemMap = new Map<number, { id: number; name: string; description: string; type: string; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null }>();
+            for (const raw of game.pcTresherItems) {
+              const it = raw as { id: number; name: string; description: string; type: string; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null };
+              if (typeof it.id === 'number') {
+                itemMap.set(it.id, { ...it, damage: typeof it.damage === 'number' ? it.damage : 6, range: typeof it.range === 'number' ? Math.max(1, it.range) : 1 });
+              }
+            }
+            this.pcTresherItemsById.set(itemMap);
+          }
+          if (Array.isArray(game.pcTresherPotions)) {
+            const potionMap = new Map<number, { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>();
+            for (const raw of game.pcTresherPotions) {
+              const p = raw as { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number };
+              if (typeof p.id === 'number') {
+                potionMap.set(p.id, p);
+              }
+            }
+            this.pcTresherPotionsById.set(potionMap);
+          }
+          if (Array.isArray(game.pcTresherSpells)) {
+            const spellMap = new Map<number, PcTresherSpellData>();
+            for (const raw of game.pcTresherSpells) {
+              const s = raw as PcTresherSpellData;
+              if (typeof s.id === 'number') {
+                spellMap.set(s.id, {
+                  id: s.id,
+                  name: typeof s.name === 'string' && s.name ? s.name : 'Unnamed Spell',
+                  description: typeof s.description === 'string' ? s.description : '',
+                  range: typeof s.range === 'number' ? Math.max(1, s.range) : 1,
+                  effectOn: typeof s.effectOn === 'string' ? s.effectOn : 'HP',
+                  effectAmount: typeof s.effectAmount === 'number' ? s.effectAmount : 0,
+                  successTestValue: typeof s.successTestValue === 'number' ? s.successTestValue : 10,
+                  sp: typeof s.sp === 'number' ? Math.max(1, s.sp) : 1,
+                  lastFor: typeof s.lastFor === 'number' ? Math.max(0, s.lastFor) : 0,
+                });
+              }
+            }
+            this.pcTresherSpellsById.set(spellMap);
+          }
           this.setInitialPreviewContext(game.dungonid);
           this.loadMonsterImages(game.dungonid);
           this.initializeCombatState(game.dungonid);
@@ -1054,7 +1805,34 @@ export class Game implements OnInit {
     }
 
     const userKey = this.account.getKey();
+
     if (!userKey) {
+      // Sample mode: fetch only public images by ID
+      this.http
+        .get<{ id: number; path: string }[]>(`${API_BASE_URL}/images/by-ids`, {
+          params: { ids: Array.from(imageIds).join(',') },
+        })
+        .subscribe({
+          next: (images) => {
+            for (const image of images) {
+              if (!imageIds.has(image.id) || !image.path) {
+                continue;
+              }
+              const url = this.resolveImageUrl(image.path);
+              if (!url) {
+                continue;
+              }
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.onload = () => {
+                this.monsterImageCache.set(image.id, img);
+                this.monsterImageCacheVersion.update((v) => v + 1);
+                this.drawFirstPersonViewCanvas();
+              };
+              img.src = url;
+            }
+          },
+        });
       return;
     }
 
@@ -1078,6 +1856,7 @@ export class Game implements OnInit {
             img.crossOrigin = 'anonymous';
             img.onload = () => {
               this.monsterImageCache.set(image.id, img);
+              this.monsterImageCacheVersion.update((v) => v + 1);
               this.drawFirstPersonViewCanvas();
             };
             img.src = url;
@@ -1256,11 +2035,7 @@ export class Game implements OnInit {
   }
 
   private getHandsRequiredForEquip(tresher: Tresher): number {
-    if (typeof tresher.hands !== 'number' || !Number.isFinite(tresher.hands)) {
-      return 0;
-    }
-
-    return Math.max(0, Math.floor(tresher.hands));
+    return (tresher.type ?? 'OtherTresher') === 'Weapon' ? 1 : 0;
   }
 
   private getCurrentPreviewSquareContext():
@@ -1371,6 +2146,35 @@ export class Game implements OnInit {
     }));
 
     this.setPcInventoryInitialized(dungonId, true);
+  }
+
+  private removeInnerPotionSlotFromInventoryTresher(dungonId: number, tresherIndex: number, potionId: number): void {
+    const existingCheater = this.cheaterByDungon()[dungonId] ?? { ...DEFAULT_CHEATER };
+    const existingInventory = this.normalizeCheaterInventory(existingCheater.inventory);
+    if (tresherIndex < 0 || tresherIndex >= existingInventory.treshers.length) return;
+
+    const tresher = existingInventory.treshers[tresherIndex];
+    const updatedTresher: Tresher = {
+      ...tresher,
+      potion1Id: tresher.potion1Id === potionId ? null : tresher.potion1Id,
+      potion2Id: tresher.potion2Id === potionId ? null : tresher.potion2Id,
+      potion3Id: tresher.potion3Id === potionId ? null : tresher.potion3Id,
+    };
+
+    const updatedTreshers = existingInventory.treshers.map((t, i) =>
+      i === tresherIndex ? updatedTresher : t
+    );
+
+    this.cheaterByDungon.update((allCheaters) => ({
+      ...allCheaters,
+      [dungonId]: {
+        ...existingCheater,
+        inventory: {
+          keys: existingInventory.keys,
+          treshers: updatedTreshers,
+        },
+      },
+    }));
   }
 
   private removeInventoryTresherAtIndex(dungonId: number, index: number): void {
@@ -1596,22 +2400,22 @@ export class Game implements OnInit {
         const right = left + this.previewGridCellSize;
         const bottom = top + this.previewGridCellSize;
 
-        if (this.isDoorConnection(square.toTop)) {
+        if (this.isDoorConnection(square.toTop) && (!square.toTop.isHidden || square.toTop.isFound)) {
           context.moveTo(left, top);
           context.lineTo(right, top);
         }
 
-        if (this.isDoorConnection(square.toRight)) {
+        if (this.isDoorConnection(square.toRight) && (!square.toRight.isHidden || square.toRight.isFound)) {
           context.moveTo(right, top);
           context.lineTo(right, bottom);
         }
 
-        if (this.isDoorConnection(square.toBottom)) {
+        if (this.isDoorConnection(square.toBottom) && (!square.toBottom.isHidden || square.toBottom.isFound)) {
           context.moveTo(left, bottom);
           context.lineTo(right, bottom);
         }
 
-        if (this.isDoorConnection(square.toLeft)) {
+        if (this.isDoorConnection(square.toLeft) && (!square.toLeft.isHidden || square.toLeft.isFound)) {
           context.moveTo(left, top);
           context.lineTo(left, bottom);
         }
@@ -2176,7 +2980,7 @@ export class Game implements OnInit {
 
     const maxDepth = Math.max(
       1,
-      Math.min(this.firstPersonMaxDepth, Math.floor(Math.max(1, cheater.rangeOfSite + 1)))
+      Math.min(this.firstPersonMaxDepth, Math.floor(Math.max(1, cheater.rangeOfSight + 1)))
     );
     let endBlock: FirstPersonBlock = this.toFirstPersonBlock('none', null);
 
@@ -2286,7 +3090,7 @@ export class Game implements OnInit {
       this.drawBrickPatternInPolygon(context, points, textureSeed + 131, wallDepth);
     }
 
-    if (block.type === 'openDoor' || block.type === 'closedDoor') {
+    if (block.type === 'closedDoor') {
       this.drawFirstPersonSideDoorMarker(context, nearFrame, farFrame, side, block.type);
     }
   }
@@ -2970,6 +3774,18 @@ export class Game implements OnInit {
     };
   }
 
+  private loadDoorImages(): void {
+    for (const key of ['open', 'closed'] as const) {
+      if (this.doorImageCache.has(key)) continue;
+      const img = new Image();
+      img.onload = () => {
+        this.doorImageCache.set(key, img);
+        this.drawFirstPersonViewCanvas();
+      };
+      img.src = key === 'open' ? '/images/dooropen.jpg' : '/images/doorclosed.jpg';
+    }
+  }
+
   private drawFirstPersonDoorFace(
     context: CanvasRenderingContext2D,
     frame: { left: number; right: number; top: number; bottom: number },
@@ -2977,6 +3793,9 @@ export class Game implements OnInit {
     isPortal: boolean
   ): void {
     if (block.type !== 'openDoor' && block.type !== 'closedDoor') {
+      return;
+    }
+    if (block.type === 'openDoor') {
       return;
     }
 
@@ -2988,30 +3807,31 @@ export class Game implements OnInit {
     const doorRight = frame.right - insetX;
     const doorTop = frame.top + insetY;
     const doorBottom = frame.bottom - insetY;
+    const doorW = doorRight - doorLeft;
+    const doorH = doorBottom - doorTop;
+
+    const img = this.doorImageCache.get('closed') ?? null;
 
     context.save();
     context.globalAlpha = isPortal ? 0.84 : 1;
 
-    context.fillStyle = '#b33030';
-    context.fillRect(doorLeft, doorTop, doorRight - doorLeft, doorBottom - doorTop);
-
-    context.strokeStyle = '#f0b0b0';
-    context.lineWidth = Math.max(1, Math.min(2, (doorRight - doorLeft) * 0.04));
-    context.strokeRect(doorLeft, doorTop, doorRight - doorLeft, doorBottom - doorTop);
-
-    if (block.type === 'openDoor') {
-      const openingWidth = Math.max(3, (doorRight - doorLeft) * 0.35);
-      const openingLeft = doorRight - openingWidth - Math.max(2, (doorRight - doorLeft) * 0.06);
-      context.fillStyle = '#0c0f14';
-      context.fillRect(openingLeft, doorTop + 2, openingWidth, Math.max(2, doorBottom - doorTop - 4));
-    } else if (block.hasKeyhole) {
-      const keyholeX = doorRight - Math.max(4, (doorRight - doorLeft) * 0.28);
-      const keyholeY = doorTop + (doorBottom - doorTop) * 0.64;
-      const keyholeRadius = Math.max(1.2, (doorRight - doorLeft) * 0.03);
-      context.fillStyle = '#1f1111';
-      context.beginPath();
-      context.arc(keyholeX, keyholeY, keyholeRadius, 0, Math.PI * 2);
-      context.fill();
+    if (img) {
+      context.drawImage(img, doorLeft, doorTop, doorW, doorH);
+    } else {
+      context.fillStyle = '#b33030';
+      context.fillRect(doorLeft, doorTop, doorW, doorH);
+      context.strokeStyle = '#f0b0b0';
+      context.lineWidth = Math.max(1, Math.min(2, doorW * 0.04));
+      context.strokeRect(doorLeft, doorTop, doorW, doorH);
+      if (block.hasKeyhole) {
+        const keyholeX = doorRight - Math.max(4, doorW * 0.28);
+        const keyholeY = doorTop + doorH * 0.64;
+        const keyholeRadius = Math.max(1.2, doorW * 0.03);
+        context.fillStyle = '#1f1111';
+        context.beginPath();
+        context.arc(keyholeX, keyholeY, keyholeRadius, 0, Math.PI * 2);
+        context.fill();
+      }
     }
 
     context.restore();
@@ -3042,6 +3862,9 @@ export class Game implements OnInit {
     }
 
     if (this.isDoorConnection(connection)) {
+      if (connection.isHidden && !connection.isFound) {
+        return this.toFirstPersonBlock('wall', null);
+      }
       return this.toFirstPersonBlock(
         connection.state === 'closed' ? 'closedDoor' : 'openDoor',
         connection
@@ -3111,9 +3934,9 @@ export class Game implements OnInit {
     const filledSquares = this.filledSquaresByDungon()[preview.dungonId] ?? {};
     const cheater = this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER;
     const range =
-      typeof cheater.rangeOfSite === 'number' && Number.isFinite(cheater.rangeOfSite)
-        ? Math.max(0, cheater.rangeOfSite)
-        : DEFAULT_CHEATER.rangeOfSite;
+      typeof cheater.rangeOfSight === 'number' && Number.isFinite(cheater.rangeOfSight)
+        ? Math.max(0, cheater.rangeOfSight)
+        : DEFAULT_CHEATER.rangeOfSight;
 
     const sourceSquareKey = this.getSquareKey(preview.centerRow, preview.centerColumn);
     if (filledSquares[sourceSquareKey]) {
@@ -3346,7 +4169,12 @@ export class Game implements OnInit {
   }
 
   private isSightBlockingConnection(connection: Door | Wall | null): boolean {
-    return this.isWallConnection(connection) || this.isDoorConnection(connection);
+    if (this.isWallConnection(connection)) return true;
+    if (this.isDoorConnection(connection)) {
+      if (connection.isHidden && !connection.isFound) return true;
+      return (connection as Door).state !== 'open';
+    }
+    return false;
   }
 
   private isSpaceKey(key: string): boolean {
@@ -3466,7 +4294,7 @@ export class Game implements OnInit {
     }
 
     if (this.turnPhase() === 'player') {
-      this.playerAE.update((ae) => ae - moveCost);
+      this.consumePlayerAE(moveCost, preview.dungonId);
     }
 
     const halfDimension = Math.floor(this.previewGridDimension / 2);
@@ -3477,6 +4305,18 @@ export class Game implements OnInit {
       startRow: nextRow - halfDimension,
       startColumn: nextColumn - halfDimension,
     });
+
+    this.playStepSound(0.22);
+
+    // Check if player stepped onto an exit
+    const exits = this.exitsByDungon()[preview.dungonId] ?? [];
+    const landedExit = exits.find((e) => e.row === nextRow && e.column === nextColumn);
+    if (landedExit && landedExit.destinationType === 'outside' && !this.dungonWon() && !this.pendingExitTransitionType()) {
+      this.pendingExitTransitionType.set(landedExit.transitionType ?? 'open');
+    }
+
+    // Check if player stepped onto a floor trap
+    this.checkFloorTrapsAtCurrentSquare(preview.dungonId, nextRow, nextColumn);
 
     this.drawPreviewGridCanvas();
 
@@ -3579,6 +4419,48 @@ export class Game implements OnInit {
     return { rowOffset: 0, columnOffset: -1 };
   }
 
+  private getFacingWallSides(direction: DisplayFacingDirection): SquareSide[] {
+    switch (direction) {
+      case 'up': return ['toTop'];
+      case 'down': return ['toBottom'];
+      case 'left': return ['toLeft'];
+      case 'right': return ['toRight'];
+      case 'upRight': return ['toTop', 'toRight'];
+      case 'upLeft': return ['toTop', 'toLeft'];
+      case 'downRight': return ['toBottom', 'toRight'];
+      case 'downLeft': return ['toBottom', 'toLeft'];
+      default: return [];
+    }
+  }
+
+  private oppositeWallSide(side: SquareSide): SquareSide {
+    const map: Record<SquareSide, SquareSide> = {
+      toTop: 'toBottom',
+      toBottom: 'toTop',
+      toLeft: 'toRight',
+      toRight: 'toLeft',
+    };
+    return map[side];
+  }
+
+  private checkFloorTrapsAtCurrentSquare(dungonId: number, row: number, column: number): void {
+    const traps = this.floorTrapPlacementsByDungon()[dungonId] ?? [];
+    const activeTrap = traps.find(
+      (p) => p.row === row && p.column === column && !p.isTriggered && !p.isDisarmed
+    );
+    if (!activeTrap) return;
+
+    this.floorTrapPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: (all[dungonId] ?? []).map((p) =>
+        p.id === activeTrap.id ? { ...p, isTriggered: true } : p
+      ),
+    }));
+
+    this.triggerTrap(activeTrap.trap);
+    this.saveGameState();
+  }
+
   private getMovementDeltaForDisplayFacingDirection(
     direction: DisplayFacingDirection
   ): { rowOffset: number; columnOffset: number } {
@@ -3678,6 +4560,9 @@ export class Game implements OnInit {
     }
 
     if (this.isDoorConnection(fromConnection)) {
+      if (fromConnection.isHidden && !fromConnection.isFound) {
+        return { type: 'wall', door: null };
+      }
       return {
         type: fromConnection.state === 'closed' ? 'closedDoor' : 'openDoor',
         door: fromConnection,
@@ -3696,6 +4581,9 @@ export class Game implements OnInit {
     }
 
     if (this.isDoorConnection(toConnection)) {
+      if (toConnection.isHidden && !toConnection.isFound) {
+        return { type: 'wall', door: null };
+      }
       return {
         type: toConnection.state === 'closed' ? 'closedDoor' : 'openDoor',
         door: toConnection,
@@ -3953,7 +4841,17 @@ export class Game implements OnInit {
       [dungonId]: parsed.squareTexts ?? [],
     }));
 
+    this.exitsByDungon.update((allExits) => ({
+      ...allExits,
+      [dungonId]: parsed.exits,
+    }));
+
     this.setPcInventoryInitialized(dungonId, parsed.pcInventoryInitialized);
+
+    this.floorTrapPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.floorTrapPlacements,
+    }));
 
     this.keyList = parsed.keyList;
 
@@ -3998,6 +4896,8 @@ export class Game implements OnInit {
     monsterList: Monster[];
     monsterPlacements: MonsterPlacement[];
     squareTexts: SquareText[];
+    exits: DungonExit[];
+    floorTrapPlacements: FloorTrapPlacement[];
     pcInventoryInitialized: boolean;
     savedPlayerHp: number | null;
     savedPlayerAE: number | null;
@@ -4017,6 +4917,8 @@ export class Game implements OnInit {
         monsterList: [],
         monsterPlacements: [],
         squareTexts: [],
+        exits: [],
+        floorTrapPlacements: [],
         pcInventoryInitialized: false,
         savedPlayerHp: null,
         savedPlayerAE: null,
@@ -4050,6 +4952,9 @@ export class Game implements OnInit {
       turnPhase?: unknown;
       playerRow?: unknown;
       playerColumn?: unknown;
+      exits?: unknown[];
+      exitList?: unknown[];
+      floorTrapPlacements?: unknown[];
     };
 
     const filledSquaresSource =
@@ -4113,10 +5018,10 @@ export class Game implements OnInit {
         typeof sourceCheater.name === 'string' && sourceCheater.name.trim()
           ? sourceCheater.name
           : DEFAULT_CHEATER.name,
-      rangeOfSite:
-        typeof sourceCheater.rangeOfSite === 'number' && Number.isFinite(sourceCheater.rangeOfSite)
-          ? sourceCheater.rangeOfSite
-          : DEFAULT_CHEATER.rangeOfSite,
+      rangeOfSight:
+        typeof sourceCheater.rangeOfSight === 'number' && Number.isFinite(sourceCheater.rangeOfSight)
+          ? sourceCheater.rangeOfSight
+          : DEFAULT_CHEATER.rangeOfSight,
       facingDir: this.normalizeFacingDirection(sourceCheater.facingDir),
       inventory,
     };
@@ -4241,6 +5146,17 @@ export class Game implements OnInit {
           .filter((st) => st.text.trim().length > 0)
       : [];
 
+    const sourceExits = Array.isArray(source.exits)
+      ? source.exits
+      : Array.isArray(source.exitList)
+        ? source.exitList
+        : [];
+    const exits: DungonExit[] = sourceExits
+      .map((item) => this.parseExitItem(item))
+      .filter((item): item is DungonExit => item !== null);
+
+    const floorTrapPlacements = this.parseFloorTrapPlacements(source.floorTrapPlacements);
+
     return {
       filledSquares,
       squares,
@@ -4252,6 +5168,8 @@ export class Game implements OnInit {
       monsterList,
       monsterPlacements,
       squareTexts,
+      exits,
+      floorTrapPlacements,
       pcInventoryInitialized,
       savedPlayerHp: savedPlayerHpRaw,
       savedPlayerAE: savedPlayerAERaw,
@@ -4266,68 +5184,78 @@ export class Game implements OnInit {
       return null;
     }
 
-    const source = item as Partial<Tresher> & {
-      trapId?: unknown;
-      curseId?: unknown;
-      hp?: unknown;
-    };
-    const parsedId = this.toFiniteNumber(source.id);
+    const source = item as Partial<Record<string, unknown>>;
+    const parsedId = this.toFiniteNumber(source['id']);
     if (parsedId === null) {
       return null;
     }
 
-    const trapSourceValue = source.trapID !== undefined ? source.trapID : source.trapId;
-    const curseSourceValue = source.curseID !== undefined ? source.curseID : source.curseId;
-    const hpSourceValue = source.HP !== undefined ? source.HP : source.hp;
-
-    const type = this.normalizeTresherType(source.type);
-    const tresher: Tresher = {
+    return {
       id: Math.max(0, Math.floor(parsedId)),
-      type,
-      name: typeof source.name === 'string' && source.name.trim() ? source.name : 'Unnamed Tresher',
-      description: typeof source.description === 'string' ? source.description : '',
-      worth: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.worth), 0)),
-      trapID: this.normalizeNullableNumber(this.toFiniteNumber(trapSourceValue)),
-      curseID: this.normalizeNullableNumber(this.toFiniteNumber(curseSourceValue)),
-      HP: null,
-      damage: null,
-      hands: null,
-      range: null,
-      ammoType: null,
-      speedReduction: null,
-      armorType: null,
-      coinType: null,
-      effectNumber: null,
-      effectTarget: null,
-      effectDuration: null,
+      type: typeof source['type'] === 'string' && (source['type'] as string).trim() ? (source['type'] as string).trim() : 'OtherTresher',
+      name: typeof source['name'] === 'string' && (source['name'] as string).trim() ? source['name'] as string : 'Unnamed Tresher',
+      description: typeof source['description'] === 'string' ? source['description'] as string : '',
+      gold: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['gold']), 0)),
+      silver: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['silver']), 0)),
+      copper: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['copper']), 0)),
+      zinc: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['zinc']), 0)),
+      item1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item1Id'])),
+      item2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item2Id'])),
+      item3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item3Id'])),
+      item4Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item4Id'])),
+      spell1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell1Id'])),
+      spell2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell2Id'])),
+      spell3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell3Id'])),
+      spell4Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell4Id'])),
+      curse1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['curse1Id'])),
+      curse2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['curse2Id'])),
+      potion1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion1Id'])),
+      potion2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion2Id'])),
+      potion3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion3Id'])),
+      imageId: this.normalizeNullableNumber(this.toFiniteNumber(source['imageId'])),
+      soundId: this.normalizeNullableNumber(this.toFiniteNumber(source['soundId'])),
+      spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['spReward']), 0)),
+      trap: this.parseTrapObject(source['trap']),
     };
+  }
 
-    if (type === 'Weapon') {
-      tresher.HP = this.normalizeNumber(this.toFiniteNumber(hpSourceValue), 10);
-      tresher.damage = Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.damage), 0));
-      tresher.hands = Math.max(1, this.normalizeNumber(this.toFiniteNumber(source.hands), 1));
-      tresher.range = Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.range), 0));
-      tresher.ammoType =
-        typeof source.ammoType === 'string' && source.ammoType.trim() ? source.ammoType : null;
-    } else if (type === 'Armor') {
-      tresher.HP = this.normalizeNumber(this.toFiniteNumber(hpSourceValue), 10);
-      tresher.hands = Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.hands), 0));
-      tresher.speedReduction = this.normalizeNumber(this.toFiniteNumber(source.speedReduction), 0);
-      tresher.armorType = this.normalizeArmorType(source.armorType);
-    } else if (type === 'Coins') {
-      tresher.coinType = this.normalizeCoinType(source.coinType);
-    } else if (type === 'Potion') {
-      tresher.effectNumber = this.normalizeNumber(this.toFiniteNumber(source.effectNumber), 0);
-      const rawTarget = typeof source.effectTarget === 'string' ? source.effectTarget : '';
-      tresher.effectTarget = (rawTarget === 'Health' || rawTarget === 'AC' || rawTarget === 'AE') ? rawTarget : 'Health';
-      if (tresher.effectTarget === 'AC' || tresher.effectTarget === 'AE') {
-        tresher.effectDuration = Math.max(1, this.normalizeNumber(this.toFiniteNumber(source.effectDuration), 1));
-      }
-    } else {
-      tresher.HP = this.normalizeNumber(this.toFiniteNumber(hpSourceValue), 10);
+  private parseTrapObject(raw: unknown): Trap | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const src = raw as Partial<Record<string, unknown>>;
+    const damageTo = src['damageTo'] === 'Stamina' ? 'Stamina' : src['damageTo'] === 'Mind' ? 'Mind' : 'HP';
+    return {
+      name: typeof src['name'] === 'string' ? src['name'] : '',
+      description: typeof src['description'] === 'string' ? src['description'] : '',
+      damage: typeof src['damage'] === 'number' ? Math.max(0, src['damage']) : 0,
+      damageTo: damageTo as 'HP' | 'Stamina' | 'Mind',
+      curseId: typeof src['curseId'] === 'number' ? src['curseId'] : null,
+      toDetect: typeof src['toDetect'] === 'number' ? Math.max(0, src['toDetect']) : 10,
+      toDisarm: typeof src['toDisarm'] === 'number' ? Math.max(0, src['toDisarm']) : 10,
+    };
+  }
+
+  private parseFloorTrapPlacements(raw: unknown[] | undefined): FloorTrapPlacement[] {
+    if (!Array.isArray(raw)) return [];
+    const result: FloorTrapPlacement[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const src = item as Partial<Record<string, unknown>>;
+      const trap = this.parseTrapObject(src['trap']);
+      if (!trap) continue;
+      const id = typeof src['id'] === 'number' ? src['id'] : 0;
+      const row = typeof src['row'] === 'number' ? src['row'] : -1;
+      const column = typeof src['column'] === 'number' ? src['column'] : -1;
+      if (row < 0 || column < 0) continue;
+      result.push({
+        id,
+        row,
+        column,
+        trap,
+        isTriggered: src['isTriggered'] === true,
+        isDisarmed: src['isDisarmed'] === true,
+      });
     }
-
-    return tresher;
+    return result;
   }
 
   private parseTresherPlacementItem(item: unknown): TresherPlacement | null {
@@ -4424,6 +5352,11 @@ export class Game implements OnInit {
         )
       ),
       attacks: this.normalizeMonsterAttacks(source.attacks),
+      spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.spReward), 0)),
+      soundId: typeof source.soundId === 'number' ? source.soundId : null,
+      magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magic), 0)),
+      magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magicResistance), 0)),
+      callsReinforcements: (source as Record<string, unknown>)['callsReinforcements'] === true,
     };
   }
 
@@ -4440,6 +5373,8 @@ export class Game implements OnInit {
       col?: unknown;
       isRoaming?: unknown;
       rome?: unknown;
+      tresherIds?: unknown;
+      keyIds?: unknown;
     };
 
     const monsterIdRaw =
@@ -4483,6 +5418,30 @@ export class Game implements OnInit {
     if (savedHp !== null) {
       result.currentHp = savedHp;
     }
+    if (Array.isArray(source.tresherIds)) {
+      result.tresherIds = source.tresherIds
+        .map((v) => this.toFiniteNumber(v))
+        .filter((v): v is number => v !== null)
+        .map((v) => Math.max(0, Math.floor(v)));
+    }
+    if (Array.isArray(source.keyIds)) {
+      result.keyIds = source.keyIds
+        .map((v) => this.toFiniteNumber(v))
+        .filter((v): v is number => v !== null)
+        .map((v) => Math.max(0, Math.floor(v)));
+    }
+
+    if (source.isDormant === true) {
+      result.isDormant = true;
+    }
+    const guardRow = this.toFiniteNumber((source as Record<string, unknown>)['guardRow']);
+    if (guardRow !== null) {
+      result.guardRow = Math.floor(guardRow);
+    }
+    const guardColRaw = this.toFiniteNumber((source as Record<string, unknown>)['guardColumn']);
+    if (guardColRaw !== null) {
+      result.guardColumn = Math.floor(guardColRaw);
+    }
 
     return result;
   }
@@ -4500,12 +5459,16 @@ export class Game implements OnInit {
 
         const source = item as Partial<MonsterAttack> & { plus_to_hit?: unknown };
         return {
+          type: typeof source.type === 'string' ? source.type : 'Weapon',
           description: typeof source.description === 'string' ? source.description : '',
           damage: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.damage), 0)),
           plusToHit: Math.max(
             0,
             this.normalizeNumber(this.toFiniteNumber(source.plusToHit ?? source.plus_to_hit), 0)
           ),
+          weaponItemId: typeof source.weaponItemId === 'number' ? source.weaponItemId : null,
+          spellId: typeof source.spellId === 'number' ? source.spellId : null,
+          curseId: typeof source.curseId === 'number' ? source.curseId : null,
         };
       })
       .filter((item): item is MonsterAttack => item !== null);
@@ -4597,15 +5560,7 @@ export class Game implements OnInit {
   }
 
   private getHealingPotionAmount(tresher: Tresher): number {
-    if (tresher.type !== 'Potion' || tresher.effectTarget !== 'Health') {
-      return 0;
-    }
-
-    if (typeof tresher.effectNumber !== 'number' || !Number.isFinite(tresher.effectNumber)) {
-      return 0;
-    }
-
-    return Math.max(0, Math.floor(tresher.effectNumber));
+    return (tresher.type ?? 'OtherTresher') === 'Potion' ? 6 : 0;
   }
 
   private resolvePlayerMaxHp(value: unknown): number {
@@ -4633,28 +5588,6 @@ export class Game implements OnInit {
     }));
   }
 
-  private normalizeTresherType(value: unknown): TresherType {
-    return value === 'Weapon' || value === 'Armor' || value === 'Coins' || value === 'Potion' || value === 'OtherTresher'
-      ? value
-      : 'OtherTresher';
-  }
-
-  private normalizeArmorType(value: unknown): ArmorType | null {
-    return value === 'head' ||
-      value === 'hand' ||
-      value === 'body' ||
-      value === 'arms' ||
-      value === 'legs'
-      ? value
-      : null;
-  }
-
-  private normalizeCoinType(value: unknown): CoinType | null {
-    return value === 'Gold' || value === 'Silver' || value === 'Copper' || value === 'Tin'
-      ? value
-      : null;
-  }
-
   private toFiniteNumber(value: unknown): number | null {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
   }
@@ -4669,6 +5602,94 @@ export class Game implements OnInit {
     }
 
     return Math.floor(value);
+  }
+
+  private parseExitItem(item: unknown): DungonExit | null {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+
+    const source = item as Partial<DungonExit> & {
+      col?: unknown;
+      destinationDungonID?: unknown;
+      exitType?: unknown;
+    };
+
+    const parsedId = this.toFiniteNumber(source.id);
+    const row = this.toFiniteNumber(source.row);
+    const column = this.toFiniteNumber(source.column ?? source.col);
+    if (parsedId === null || row === null || column === null) {
+      return null;
+    }
+
+    const destinationType: ExitDestinationType =
+      source.destinationType === 'dungon' ? 'dungon' : 'outside';
+    const destinationRaw =
+      source.destinationDungonId !== undefined
+        ? source.destinationDungonId
+        : (source as unknown as Record<string, unknown>)['destinationDungonID'];
+    const parsedDestination = this.normalizeNullableNumber(this.toFiniteNumber(destinationRaw));
+    const transitionSource = source.transitionType ?? source.exitType;
+    const transitionType: ExitTransitionType =
+      transitionSource === 'stairsUp' || transitionSource === 'stairsDown' || transitionSource === 'open'
+        ? transitionSource
+        : 'open';
+
+    return {
+      id: Math.max(0, Math.floor(parsedId)),
+      row: Math.floor(row),
+      column: Math.floor(column),
+      destinationType,
+      destinationDungonId: destinationType === 'dungon' ? parsedDestination : null,
+      transitionType,
+    };
+  }
+
+  confirmExit(): void {
+    const transitionType = this.pendingExitTransitionType();
+    if (transitionType === null) return;
+    this.pendingExitTransitionType.set(null);
+    this.triggerDungonWin(transitionType);
+  }
+
+  cancelExit(): void {
+    this.pendingExitTransitionType.set(null);
+  }
+
+  private triggerDungonWin(transitionType?: ExitTransitionType): void {
+    this.dungonWon.set(true);
+    if (transitionType === 'stairsUp' && this.winStairsImageIndex() === null) {
+      const idx = (Math.floor(Math.random() * 3) + 1) as 1 | 2 | 3;
+      this.winStairsImageIndex.set(idx);
+    }
+    const spReward = this.dungonSpReward();
+    if (spReward > 0) {
+      this.playerSp.update((s) => s + spReward);
+      this.awardSpToPC(spReward);
+    }
+  }
+
+  private awardSpToPC(amount: number): void {
+    if (amount <= 0) {
+      return;
+    }
+
+    const pcId = this.currentPcId_();
+    if (!pcId) {
+      return;
+    }
+
+    const userKey = this.account.getKey();
+    if (!userKey) {
+      return;
+    }
+
+    this.http
+      .patch<{ result: number; sp: number }>(
+        `${API_BASE_URL}/pcs/${pcId}/award-sp`,
+        { userkey: userKey, amount }
+      )
+      .subscribe();
   }
 
   // ── Combat System ──────────────────────────────────────────────
@@ -4692,6 +5713,13 @@ export class Game implements OnInit {
         isDead: hasSavedCombat && placement.isDead === true,
         remainingAE: 0,
         attacksUsedThisTurn: 0,
+        dropTresherIds: Array.isArray(placement.tresherIds) ? placement.tresherIds : [],
+        dropKeyIds: Array.isArray(placement.keyIds) ? placement.keyIds : [],
+        activeEffects: [],
+        isDormant: placement.isDormant === true,
+        guardRow: typeof placement.guardRow === 'number' ? placement.guardRow : null,
+        guardColumn: typeof placement.guardColumn === 'number' ? placement.guardColumn : null,
+        hasCalledReinforcements: false,
       };
     });
     this.monsterInstances.set(instances);
@@ -4712,12 +5740,17 @@ export class Game implements OnInit {
     }
 
     this.combatLog.set([]);
+    this.playerActiveEffects.set([]);
     this.addCombatLog('Your turn. AE: ' + this.playerAE());
     this.savedCombatState = { playerHp: null, playerAE: null, turnPhase: null, playerRow: null, playerColumn: null };
   }
 
   private addCombatLog(text: string): void {
     this.combatLog.update((log) => [...log.slice(-49), { text }]);
+  }
+
+  playerACForView(): number {
+    return this.getPlayerAC() + this.playerStamina();
   }
 
   private getPlayerAC(): number {
@@ -4730,11 +5763,22 @@ export class Game implements OnInit {
     const inventory = cheater.inventory?.treshers ?? [];
     let armorCount = 0;
     for (const idx of equippedIndexes) {
-      if (inventory[idx]?.armorType) {
+      if ((inventory[idx] as unknown as Record<string, unknown>)?.['armorType']) {
         armorCount += 1;
       }
     }
-    return this.playerBaseAC + armorCount;
+    const equippedItemIds = this.equippedItemIdsByDungon()[preview.dungonId] ?? [];
+    const itemsMap = this.pcTresherItemsById();
+    let armorItemBonus = 0;
+    for (const itemId of equippedItemIds) {
+      const item = itemsMap.get(itemId);
+      if (item?.effectValue != null) {
+        if (item.type === 'armor' || ((item.type === 'ring' || item.type === 'necklace') && item.effectOn === 'AC')) {
+          armorItemBonus += item.effectValue;
+        }
+      }
+    }
+    return this.playerBaseAC + armorCount + armorItemBonus;
   }
 
   endPlayerTurnEarly(): void {
@@ -4744,6 +5788,37 @@ export class Game implements OnInit {
     this.playerAE.set(0);
     this.addCombatLog('You end your turn early.');
     this.startMonsterTurns();
+  }
+
+  canPlayerDefend(): boolean {
+    return this.turnPhase() === 'player' && this.playerAE() >= 1;
+  }
+
+  tryPlayerDefend(): void {
+    if (!this.canPlayerDefend()) return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    this.consumePlayerAE(1, preview.dungonId);
+    this.playerDefendStacks.update((s) => s + 1);
+    this.addCombatLog(`You defend! +2 AC for the next attack against you. (${this.playerDefendStacks()} stack${this.playerDefendStacks() !== 1 ? 's' : ''} active)`);
+    if (this.playerAE() <= 0) {
+      this.startMonsterTurns();
+    }
+  }
+
+  canPlayerAttack(): boolean {
+    if (this.turnPhase() !== 'player' || this.playerAE() < 1) return false;
+    const preview = this.gridPreviewContext();
+    if (!preview) return false;
+    const equippedItemIds = this.equippedItemIdsByDungon()[preview.dungonId] ?? [];
+    const itemsMap = this.pcTresherItemsById();
+    let bestRange = 0;
+    for (const itemId of equippedItemIds) {
+      const item = itemsMap.get(itemId);
+      if (item?.type === 'weapon' && item.range > bestRange) bestRange = item.range;
+    }
+    if (bestRange === 0) return false;
+    return this.findAdjacentLiveMonster(preview.centerRow, preview.centerColumn, bestRange, preview.dungonId) !== null;
   }
 
   tryPlayerAttack(): void {
@@ -4759,33 +5834,52 @@ export class Game implements OnInit {
       return;
     }
 
-    const adjacentMonster = this.findAdjacentLiveMonster(preview.centerRow, preview.centerColumn);
-    if (!adjacentMonster) {
-      this.addCombatLog('No monster adjacent to attack.');
-      return;
-    }
-
-    this.playerAE.update((ae) => ae - 1);
-    const template = this.getMonstersByIdForDungon(preview.dungonId).get(adjacentMonster.monsterId);
-    const monsterAC = template?.ac ?? 10;
-
-    const equippedIndexes = this.equippedTresherIndexesByDungon()[preview.dungonId] ?? [];
-    const cheater = this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER;
-    const inventory = cheater.inventory?.treshers ?? [];
-    let weaponDamage = 1;
+    const equippedItemIds = this.equippedItemIdsByDungon()[preview.dungonId] ?? [];
+    const itemsMap = this.pcTresherItemsById();
+    let bestRange = 0;
     let weaponToHit = 0;
-    for (const idx of equippedIndexes) {
-      const tresher = inventory[idx];
-      if (tresher && tresher.damage !== null && tresher.damage > 0) {
-        weaponDamage = Math.max(weaponDamage, tresher.damage);
-        weaponToHit += (tresher.range ?? 0);
+    let weaponDamageDivisor = 6;
+    for (const itemId of equippedItemIds) {
+      const item = itemsMap.get(itemId);
+      if (item?.type === 'weapon') {
+        if (item.range > bestRange) bestRange = item.range;
+        if ((item.effectValue ?? 0) > weaponToHit) {
+          weaponToHit = item.effectValue ?? 0;
+          weaponDamageDivisor = item.damage > 0 ? item.damage : 6;
+        }
       }
     }
 
-    const hitRoll = this.rollCombat(weaponToHit);
+    if (bestRange === 0) {
+      this.addCombatLog('No weapon equipped.');
+      return;
+    }
+
+    const adjacentMonster = this.getTargetMonster(preview.dungonId, preview.centerRow, preview.centerColumn, bestRange);
+    if (!adjacentMonster) {
+      this.addCombatLog('No monster in weapon range.');
+      return;
+    }
+
+    this.consumePlayerAE(1, preview.dungonId);
+    const template = this.getMonstersByIdForDungon(preview.dungonId).get(adjacentMonster.monsterId);
+    const monsterAC = template?.ac ?? 10;
+
+    const prevCombo = this.comboTracker();
+    const isSameTarget = prevCombo?.placementIndex === adjacentMonster.placementIndex;
+    const comboCount = isSameTarget ? prevCombo!.count : 0;
+    const comboBonus = Math.min(comboCount, 4);
+    this.comboTracker.set({ placementIndex: adjacentMonster.placementIndex, count: comboCount + 1 });
+    if (comboBonus > 0) {
+      this.addCombatLog(`Combo ×${comboCount + 1}! +${comboBonus} to hit!`);
+    }
+
+    const hitRoll = this.rollD12(weaponToHit + this.playerStamina() + comboBonus);
     if (hitRoll >= monsterAC) {
-      const damage = weaponDamage <= 1 ? 1 : this.randomInt(1, weaponDamage);
+      const dieFaces = Math.max(1, Math.ceil(12 / Math.max(1, weaponDamageDivisor)));
+      const damage = Math.max(1, this.randomInt(1, dieFaces) + this.playerStrength());
       adjacentMonster.currentHp -= damage;
+      this.triggerBloodSplatter();
       this.addCombatLog(
         `You hit ${template?.name ?? 'monster'} for ${damage} dmg! (rolled ${hitRoll} vs AC ${monsterAC})`
       );
@@ -4793,7 +5887,15 @@ export class Game implements OnInit {
         adjacentMonster.isDead = true;
         adjacentMonster.currentHp = 0;
         this.addCombatLog(`${template?.name ?? 'Monster'} is dead!`);
+        this.selectedCombatTarget.set(null); // clear target after kill
+        this.comboTracker.set(null);
         this.dropMonsterLoot(preview.dungonId, adjacentMonster, template ?? null);
+        const spGain = template?.spReward ?? 0;
+        if (spGain > 0) {
+          this.playerSp.update((s) => s + spGain);
+          this.addCombatLog(`+${spGain} SP!`);
+          this.awardSpToPC(spGain);
+        }
       }
       this.monsterInstances.update((arr) => [...arr]);
     } else {
@@ -4809,16 +5911,118 @@ export class Game implements OnInit {
     }
   }
 
-  private rollCombat(plusToHit: number): number {
-    let total = this.randomInt(1, 12);
-    for (let i = 0; i < Math.abs(plusToHit); i++) {
-      total += this.randomInt(1, 6);
+  private tickActiveEffectsOnce(dungonId: number): void {
+    // Tick player active effects
+    const pEffects = this.playerActiveEffects();
+    if (pEffects.length > 0) {
+      const pRemaining: ActiveEffect[] = [];
+      for (const eff of pEffects) {
+        if (eff.effectOn === 'HP') {
+          const newHp = Math.min(this.playerMaxHp(), Math.max(0, this.playerHp() + eff.effectAmount));
+          this.playerHp.set(newHp);
+          const sign = eff.effectAmount >= 0 ? '+' : '';
+          this.addCombatLog(`${eff.sourceName}: ${sign}${eff.effectAmount} HP (${eff.remainingAE - 1} AE left).`);
+          if (newHp <= 0) {
+            this.turnPhase.set('gameover');
+          }
+        } else {
+          this.addCombatLog(`${eff.sourceName}: ${eff.effectOn} ${eff.effectAmount} (${eff.remainingAE - 1} AE left).`);
+        }
+        if (eff.remainingAE - 1 > 0) {
+          pRemaining.push({ ...eff, remainingAE: eff.remainingAE - 1 });
+        } else {
+          this.addCombatLog(`${eff.sourceName} wears off.`);
+        }
+      }
+      this.playerActiveEffects.set(pRemaining);
     }
-    return total;
+
+    // Tick monster active effects
+    const instances = this.monsterInstances();
+    const monstersById = this.getMonstersByIdForDungon(dungonId);
+    let anyMonsterChanged = false;
+    for (const instance of instances) {
+      if (instance.isDead || instance.activeEffects.length === 0) continue;
+      anyMonsterChanged = true;
+      const template = monstersById.get(instance.monsterId);
+      const mRemaining: ActiveEffect[] = [];
+      let monsterDied = false;
+      for (const eff of instance.activeEffects) {
+        if (eff.effectOn === 'HP') {
+          instance.currentHp -= eff.effectAmount;
+          this.triggerBloodSplatter();
+          this.addCombatLog(`${eff.sourceName}: -${eff.effectAmount} HP on ${template?.name ?? 'monster'} (${eff.remainingAE - 1} AE left).`);
+          if (instance.currentHp <= 0) {
+            instance.isDead = true;
+            instance.currentHp = 0;
+            monsterDied = true;
+            this.addCombatLog(`${template?.name ?? 'Monster'} is dead!`);
+            this.dropMonsterLoot(dungonId, instance, template ?? null);
+            const spGain = template?.spReward ?? 0;
+            if (spGain > 0) {
+              this.playerSp.update((s) => s + spGain);
+              this.addCombatLog(`+${spGain} SP!`);
+              this.awardSpToPC(spGain);
+            }
+            break;
+          }
+        } else {
+          this.addCombatLog(`${eff.sourceName}: ${eff.effectOn} -${eff.effectAmount} on ${template?.name ?? 'monster'} (${eff.remainingAE - 1} AE left).`);
+        }
+        if (eff.remainingAE - 1 > 0) {
+          mRemaining.push({ ...eff, remainingAE: eff.remainingAE - 1 });
+        } else {
+          this.addCombatLog(`${eff.sourceName} on ${template?.name ?? 'monster'} wears off.`);
+        }
+      }
+      instance.activeEffects = monsterDied ? [] : mRemaining;
+    }
+    if (anyMonsterChanged) {
+      this.monsterInstances.update((arr) => [...arr]);
+    }
+  }
+
+  private consumePlayerAE(amount: number, dungonId: number): void {
+    for (let i = 0; i < amount; i++) {
+      this.playerAE.update((ae) => Math.max(0, ae - 1));
+      this.tickActiveEffectsOnce(dungonId);
+      if (this.turnPhase() === 'gameover') return;
+    }
+  }
+
+  private consumeMonsterAE(monster: GameMonsterInstance, amount: number, dungonId: number): void {
+    for (let i = 0; i < amount; i++) {
+      monster.remainingAE = Math.max(0, monster.remainingAE - 1);
+      this.tickActiveEffectsOnce(dungonId);
+      if (this.turnPhase() === 'gameover') return;
+    }
+  }
+
+  private rollD12(bonus: number = 0): number {
+    return this.randomInt(1, 12) + bonus;
   }
 
   private randomInt(min: number, max: number): number {
     return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  private triggerBloodSplatter(): void {
+    const drops: { x: number; y: number; r: number }[] = [];
+    const count = 6 + Math.floor(Math.random() * 7);
+    for (let i = 0; i < count; i++) {
+      drops.push({
+        x: 10 + Math.floor(Math.random() * 310),
+        y: 5 + Math.floor(Math.random() * 200),
+        r: 2 + Math.floor(Math.random() * 9),
+      });
+    }
+    this.bloodSplatter.set(drops);
+    setTimeout(() => this.bloodSplatter.set([]), 2000);
+  }
+
+  private triggerPlayerHitFlash(): void {
+    this.playerHitFlash.set(true);
+    setTimeout(() => this.playerHitFlash.set(false), 1500);
   }
 
   private dropMonsterLoot(
@@ -4832,7 +6036,7 @@ export class Game implements OnInit {
 
     const droppedNames: string[] = [];
 
-    const tresherIds = template.tresherIds ?? [];
+    const tresherIds = [...monster.dropTresherIds, ...(template.tresherIds ?? [])];
     if (tresherIds.length > 0) {
       const newPlacements: TresherPlacement[] = tresherIds.map((tresherId) => ({
         tresherId,
@@ -4851,7 +6055,7 @@ export class Game implements OnInit {
       }
     }
 
-    const keyIds = template.keyIds ?? [];
+    const keyIds = [...monster.dropKeyIds, ...(template.keyIds ?? [])];
     if (keyIds.length > 0) {
       const keyIdSet = new Set(keyIds);
       this.keyList = this.keyList.map((key) =>
@@ -4870,7 +6074,7 @@ export class Game implements OnInit {
     }
   }
 
-  private findAdjacentLiveMonster(row: number, col: number): GameMonsterInstance | null {
+  private findAdjacentLiveMonster(row: number, col: number, maxRange = 1, dungonId?: number): GameMonsterInstance | null {
     const instances = this.monsterInstances();
     for (const monster of instances) {
       if (monster.isDead) {
@@ -4878,11 +6082,108 @@ export class Game implements OnInit {
       }
       const dr = Math.abs(monster.row - row);
       const dc = Math.abs(monster.column - col);
-      if (dr <= 1 && dc <= 1 && (dr + dc) > 0) {
+      if (dr <= maxRange && dc <= maxRange && (dr + dc) > 0) {
+        if (dungonId != null && !this.hasLineOfSight(dungonId, row, col, monster.row, monster.column)) {
+          continue;
+        }
         return monster;
       }
     }
     return null;
+  }
+
+  /**
+   * Returns a 0-7 priority index for auto-targeting based on the player's
+   * facing direction (0 = front = highest priority, 7 = back = lowest).
+   */
+  private getTargetDirectionPriority(
+    facing: FacingDirection,
+    playerRow: number, playerCol: number,
+    monsterRow: number, monsterCol: number
+  ): number {
+    const dr = monsterRow - playerRow;
+    const dc = monsterCol - playerCol;
+    // Angle from north (CW positive); atan2(east, north)
+    const monsterAngle = Math.atan2(dc, -dr);
+    const facingAngle: Record<FacingDirection, number> = {
+      up: 0,
+      right: Math.PI / 2,
+      down: Math.PI,
+      left: -Math.PI / 2,
+    };
+    let rel = monsterAngle - facingAngle[facing];
+    if (rel > Math.PI) rel -= 2 * Math.PI;
+    if (rel < -Math.PI) rel += 2 * Math.PI;
+    const abs = Math.abs(rel);
+    const sign = rel >= 0 ? 1 : -1;
+    if (abs <= Math.PI / 8)         return 0; // front
+    if (abs <= 3 * Math.PI / 8)     return sign >= 0 ? 1 : 2; // front-right / front-left
+    if (abs <= 5 * Math.PI / 8)     return sign >= 0 ? 3 : 4; // right / left
+    if (abs <= 7 * Math.PI / 8)     return sign >= 0 ? 6 : 5; // back-right / back-left
+    return 7; // back
+  }
+
+  /**
+   * Finds the highest-priority monster in Chebyshev range with line-of-sight,
+   * ordered front → front-right → front-left → right → left → back-left → back-right → back,
+   * then by distance (closer first) within the same angular region.
+   */
+  private findPriorityTarget(
+    dungonId: number,
+    playerRow: number,
+    playerCol: number,
+    range: number
+  ): GameMonsterInstance | null {
+    const facing = (this.cheaterByDungon()[dungonId] ?? DEFAULT_CHEATER).facingDir;
+    const inRange = this.monsterInstances().filter(m => {
+      if (m.isDead) return false;
+      const dr = Math.abs(m.row - playerRow);
+      const dc = Math.abs(m.column - playerCol);
+      return dr <= range && dc <= range && (dr + dc) > 0 &&
+        this.hasLineOfSight(dungonId, playerRow, playerCol, m.row, m.column);
+    });
+    if (inRange.length === 0) return null;
+    inRange.sort((a, b) => {
+      const ap = this.getTargetDirectionPriority(facing, playerRow, playerCol, a.row, a.column);
+      const bp = this.getTargetDirectionPriority(facing, playerRow, playerCol, b.row, b.column);
+      if (ap !== bp) return ap - bp;
+      const ad = Math.max(Math.abs(a.row - playerRow), Math.abs(a.column - playerCol));
+      const bd = Math.max(Math.abs(b.row - playerRow), Math.abs(b.column - playerCol));
+      return ad - bd;
+    });
+    return inRange[0];
+  }
+
+  /**
+   * Returns the monster to attack/cast at:
+   * 1. Uses selectedCombatTarget if there's a live monster there within range.
+   * 2. Falls back to findPriorityTarget and updates selectedCombatTarget.
+   */
+  private getTargetMonster(
+    dungonId: number,
+    playerRow: number,
+    playerCol: number,
+    range: number
+  ): GameMonsterInstance | null {
+    const sel = this.selectedCombatTarget();
+    if (sel) {
+      const dr = Math.abs(sel.row - playerRow);
+      const dc = Math.abs(sel.column - playerCol);
+      if (dr <= range && dc <= range) {
+        const m = this.monsterInstances().find(
+          x => !x.isDead && x.row === sel.row && x.column === sel.column
+        );
+        if (m && this.hasLineOfSight(dungonId, playerRow, playerCol, m.row, m.column)) {
+          return m;
+        }
+      }
+    }
+    // Auto-select by direction priority
+    const auto = this.findPriorityTarget(dungonId, playerRow, playerCol, range);
+    if (auto) {
+      this.selectedCombatTarget.set({ row: auto.row, column: auto.column });
+    }
+    return auto;
   }
 
   private isAdjacentTo(r1: number, c1: number, r2: number, c2: number): boolean {
@@ -4891,9 +6192,45 @@ export class Game implements OnInit {
     return dr <= 1 && dc <= 1 && (dr + dc) > 0;
   }
 
+  private playStepSound(volume = 0.2): void {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(110, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(volume, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+      osc.onended = () => ctx.close();
+    } catch { /* audio not supported */ }
+  }
+
+  private activateTresherGuards(dungonId: number, row: number, column: number): void {
+    const monstersById = this.getMonstersByIdForDungon(dungonId);
+    const instances = this.monsterInstances();
+    let anyActivated = false;
+    for (const m of instances) {
+      if (!m.isDead && m.isDormant && m.guardRow === row && m.guardColumn === column) {
+        m.isDormant = false;
+        anyActivated = true;
+        const template = monstersById.get(m.monsterId);
+        this.addCombatLog(`${template?.name ?? 'Monster'} was guarding that treasure!`);
+      }
+    }
+    if (anyActivated) {
+      this.monsterInstances.update((arr) => [...arr]);
+    }
+  }
+
   private startMonsterTurns(): void {
     this.turnPhase.set('monsters');
     this.addCombatLog('--- Monster turns ---');
+    this.comboTracker.set(null);
 
     const preview = this.gridPreviewContext();
     if (!preview) {
@@ -4904,7 +6241,7 @@ export class Game implements OnInit {
     const monstersById = this.getMonstersByIdForDungon(preview.dungonId);
     const instances = this.monsterInstances();
     for (const monster of instances) {
-      if (monster.isDead) {
+      if (monster.isDead || monster.isDormant) {
         monster.remainingAE = 0;
         monster.attacksUsedThisTurn = 0;
         continue;
@@ -4920,7 +6257,7 @@ export class Game implements OnInit {
 
   private processMonsterRound(dungonId: number): void {
     const instances = this.monsterInstances();
-    const anyHasAE = instances.some((m) => !m.isDead && m.remainingAE > 0);
+    const anyHasAE = instances.some((m) => !m.isDead && !m.isDormant && m.remainingAE > 0);
     if (!anyHasAE) {
       this.endMonsterTurns();
       return;
@@ -4936,8 +6273,21 @@ export class Game implements OnInit {
     const playerRow = preview.centerRow;
     const playerCol = preview.centerColumn;
 
+    // Activate dormant guard monsters if player is on their guarded square
+    for (const m of instances) {
+      if (!m.isDead && m.isDormant && m.guardRow !== null && m.guardColumn !== null) {
+        if (playerRow === m.guardRow && playerCol === m.guardColumn) {
+          m.isDormant = false;
+          const t = monstersById.get(m.monsterId);
+          this.addCombatLog(`${t?.name ?? 'Monster'} guards this spot and attacks!`);
+          const tpl = monstersById.get(m.monsterId);
+          m.remainingAE = (tpl?.movementEconomy ?? 0) + (tpl?.numberOfAttacks ?? 0);
+        }
+      }
+    }
+
     for (const monster of instances) {
-      if (monster.isDead || monster.remainingAE <= 0) {
+      if (monster.isDead || monster.isDormant || monster.remainingAE <= 0) {
         continue;
       }
 
@@ -4948,14 +6298,31 @@ export class Game implements OnInit {
       }
 
       const maxAttacks = template.numberOfAttacks;
-      const isAdjacent = this.isAdjacentTo(monster.row, monster.column, playerRow, playerCol);
+      const isAdjacent = this.isAdjacentTo(monster.row, monster.column, playerRow, playerCol)
+        && this.hasLineOfSight(dungonId, monster.row, monster.column, playerRow, playerCol);
+      const canDetectPlayer = isAdjacent || this.isMonsterWithinRangeOfPlayer(monster, playerRow, playerCol, 5, dungonId);
       const shouldFlee = monster.currentHp <= template.runAt && template.runAt > 0;
+
+      // Call for reinforcements before acting (first time only, costs full turn)
+      if (template.callsReinforcements && !monster.hasCalledReinforcements && canDetectPlayer) {
+        monster.hasCalledReinforcements = true;
+        monster.remainingAE = 0;
+        this.addCombatLog(`${template.name} calls for reinforcements!`);
+        for (const other of instances) {
+          if (other !== monster && !other.isDead && other.isDormant) {
+            other.isDormant = false;
+            const otherTpl = monstersById.get(other.monsterId);
+            other.remainingAE = (otherTpl?.movementEconomy ?? 0) + (otherTpl?.numberOfAttacks ?? 0);
+          }
+        }
+        continue;
+      }
 
       if (shouldFlee) {
         this.monsterTryFlee(monster, dungonId, playerRow, playerCol);
       } else if (isAdjacent && monster.attacksUsedThisTurn < maxAttacks) {
         this.monsterAttackPlayer(monster, template, dungonId);
-      } else if (!isAdjacent && this.isMonsterWithinRangeOfPlayer(monster, playerRow, playerCol, 5, dungonId)) {
+      } else if (!isAdjacent && canDetectPlayer) {
         this.monsterMoveToward(monster, dungonId, playerRow, playerCol);
       } else if (monster.roam) {
         this.monsterMoveRandom(monster, dungonId);
@@ -4978,21 +6345,27 @@ export class Game implements OnInit {
   private monsterAttackPlayer(
     monster: GameMonsterInstance,
     template: Monster,
-    _dungonId: number
+    dungonId: number
   ): void {
-    monster.remainingAE -= 1;
+    this.consumeMonsterAE(monster, 1, dungonId);
+    if (monster.isDead) return;
     monster.attacksUsedThisTurn += 1;
 
     const attack = template.attacks[monster.attacksUsedThisTurn - 1] ?? template.attacks[0];
     const plusToHit = attack?.plusToHit ?? 0;
     const maxDamage = attack?.damage ?? 1;
 
-    const hitRoll = this.rollCombat(plusToHit);
-    const playerAC = this.getPlayerAC();
+    const hitRoll = this.rollD12(plusToHit);
+    let playerAC = this.getPlayerAC() + this.playerStamina();
+    if (this.playerDefendStacks() > 0) {
+      playerAC += 2;
+      this.playerDefendStacks.update((s) => s - 1);
+    }
 
     if (hitRoll >= playerAC) {
       const damage = maxDamage <= 1 ? 1 : this.randomInt(1, maxDamage);
       this.playerHp.update((hp) => Math.max(0, hp - damage));
+      this.triggerPlayerHitFlash();
       this.addCombatLog(
         `${template.name} hits you for ${damage} dmg! (rolled ${hitRoll} vs AC ${playerAC})`
       );
@@ -5034,9 +6407,12 @@ export class Game implements OnInit {
 
     if (bestDir) {
       const isDiag = bestDir.rowOffset !== 0 && bestDir.columnOffset !== 0;
-      monster.remainingAE -= isDiag ? 2 : 1;
-      monster.row += bestDir.rowOffset;
-      monster.column += bestDir.columnOffset;
+      this.consumeMonsterAE(monster, isDiag ? 2 : 1, dungonId);
+      if (!monster.isDead) {
+        monster.row += bestDir.rowOffset;
+        monster.column += bestDir.columnOffset;
+        this.playStepSound(0.1);
+      }
     } else {
       monster.remainingAE = 0;
     }
@@ -5068,9 +6444,12 @@ export class Game implements OnInit {
 
     if (bestDir) {
       const isDiag = bestDir.rowOffset !== 0 && bestDir.columnOffset !== 0;
-      monster.remainingAE -= isDiag ? 2 : 1;
-      monster.row += bestDir.rowOffset;
-      monster.column += bestDir.columnOffset;
+      this.consumeMonsterAE(monster, isDiag ? 2 : 1, dungonId);
+      if (!monster.isDead) {
+        monster.row += bestDir.rowOffset;
+        monster.column += bestDir.columnOffset;
+        this.playStepSound(0.12);
+      }
     } else {
       monster.remainingAE = 0;
     }
@@ -5086,9 +6465,12 @@ export class Game implements OnInit {
         if (isDiag && monster.remainingAE < 2) {
           continue;
         }
-        monster.remainingAE -= isDiag ? 2 : 1;
-        monster.row = nr;
-        monster.column = nc;
+        this.consumeMonsterAE(monster, isDiag ? 2 : 1, dungonId);
+        if (!monster.isDead) {
+          monster.row = nr;
+          monster.column = nc;
+          this.playStepSound(0.12);
+        }
         return;
       }
     }
@@ -5217,6 +6599,7 @@ export class Game implements OnInit {
     this.drawPreviewGridCanvas();
 
     if (this.turnPhase() !== 'gameover') {
+      this.playerDefendStacks.set(0);
       this.playerAE.set(this.playerMaxAE);
       this.turnPhase.set('player');
       this.addCombatLog('Your turn. AE: ' + this.playerMaxAE);
@@ -5282,6 +6665,8 @@ export class Game implements OnInit {
       roam: inst.roam,
       isDead: inst.isDead,
       currentHp: inst.currentHp,
+      ...(inst.dropTresherIds.length > 0 ? { tresherIds: inst.dropTresherIds } : {}),
+      ...(inst.dropKeyIds.length > 0 ? { keyIds: inst.dropKeyIds } : {}),
     }));
 
     return {
@@ -5296,6 +6681,7 @@ export class Game implements OnInit {
       monsterList,
       monsterPlacements,
       squareTexts: this.squareTextsByDungon()[dungonId] ?? [],
+      floorTrapPlacements: this.floorTrapPlacementsByDungon()[dungonId] ?? [],
       playerHp: this.playerHp(),
       playerAE: this.playerAE(),
       turnPhase: this.turnPhase(),
@@ -5307,7 +6693,7 @@ export class Game implements OnInit {
 
 const DEFAULT_CHEATER: Cheater = {
   name: 'Bob',
-  rangeOfSite: 5,
+  rangeOfSight: 5,
   facingDir: 'right',
   inventory: {
     keys: [],

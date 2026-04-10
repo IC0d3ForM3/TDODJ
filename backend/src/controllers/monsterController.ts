@@ -18,6 +18,7 @@ interface MonsterWriteRequestBody {
 interface MonsterWriteInput {
   imageId?: unknown;
   imageid?: unknown;
+  soundId?: unknown;
   tresherIds?: unknown;
   tresherids?: unknown;
   trusherIds?: unknown;
@@ -39,14 +40,22 @@ interface MonsterWriteInput {
   attacks?: unknown;
   isPublic?: unknown;
   ispublic?: unknown;
+  spReward?: unknown;
+  magic?: unknown;
+  magicResistance?: unknown;
+  callsReinforcements?: unknown;
 }
 
 interface MonsterAttackWriteInput {
+  type?: unknown;
   description?: unknown;
   discription?: unknown;
   damage?: unknown;
   plusToHit?: unknown;
   plushToHit?: unknown;
+  weaponItemId?: unknown;
+  spellId?: unknown;
+  curseId?: unknown;
 }
 
 export const getMonsters = async (req: Request, res: Response) => {
@@ -206,6 +215,7 @@ const normalizeMonsterPayload = (value: unknown): UpsertMonsterPayload | null =>
 
   return {
     imageId: normalizeNullableNumber(input.imageId ?? input.imageid),
+    soundId: normalizeNullableNumber(input.soundId),
     tresherIds: normalizeIdList(
       input.tresherIds ?? input.tresherids ?? input.trusherIds ?? input.trusherids
     ),
@@ -223,6 +233,10 @@ const normalizeMonsterPayload = (value: unknown): UpsertMonsterPayload | null =>
     numberOfAttacks,
     attacks,
     isPublic: normalizeBoolean(input.isPublic ?? input.ispublic),
+    spReward: Math.max(0, normalizeNumber(input.spReward, 0)),
+    magic: Math.max(0, normalizeNumber(input.magic, 0)),
+    magicResistance: Math.max(0, normalizeNumber(input.magicResistance, 0)),
+    callsReinforcements: normalizeBoolean(input.callsReinforcements),
   };
 };
 
@@ -239,9 +253,13 @@ const normalizeMonsterAttacks = (value: unknown): MonsterAttackRecord[] => {
 
       const source = item as MonsterAttackWriteInput;
       return {
+        type: normalizeText(source.type, 'Weapon'),
         description: normalizeText(source.description ?? source.discription, ''),
         damage: Math.max(0, normalizeNumber(source.damage, 0)),
         plusToHit: normalizeNumber(source.plusToHit ?? source.plushToHit, 0),
+        weaponItemId: normalizeNullableNumber(source.weaponItemId),
+        spellId: normalizeNullableNumber(source.spellId),
+        curseId: normalizeNullableNumber(source.curseId),
       };
     })
     .filter((item): item is MonsterAttackRecord => item !== null);

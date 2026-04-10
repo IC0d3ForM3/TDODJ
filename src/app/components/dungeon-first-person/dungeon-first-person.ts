@@ -58,6 +58,9 @@ export class DungeonFirstPersonComponent {
   readonly canvasWidth = 330;
   readonly canvasHeight = 220;
   private readonly maxDepth = 8;
+  private readonly doorImageCache = new Map<string, HTMLImageElement>();
+  private readonly stairsUpImageCache = new Map<string, HTMLImageElement>();
+  private readonly stairsUpSquareAssignment = new Map<string, 1 | 2 | 3>();
 
   constructor() {
     effect(() => {
@@ -75,6 +78,8 @@ export class DungeonFirstPersonComponent {
       this.monsterImagesBySquare();
       untracked(() => this.drawCanvas());
     });
+    this.loadDoorImages();
+    this.loadStairsUpImages();
   }
 
   private drawCanvas(): void {
@@ -409,7 +414,7 @@ export class DungeonFirstPersonComponent {
       }
 
       if (step.exitTransitionType) {
-        this.drawFirstPersonFloorExit(context, nearFrame, farFrame, step.exitTransitionType);
+        this.drawFirstPersonFloorExit(context, nearFrame, farFrame, step.exitTransitionType, squareKey);
       }
 
       if (showMonsters && step.visibleMonsterSlots.length > 0) {
@@ -585,7 +590,7 @@ export class DungeonFirstPersonComponent {
 
     const maxDepth = Math.max(
       1,
-      Math.min(this.maxDepth, Math.floor(Math.max(1, cheater.rangeOfSite + 1)))
+      Math.min(this.maxDepth, Math.floor(Math.max(1, cheater.rangeOfSight + 1)))
     );
     let endBlock: FirstPersonBlock = this.toFirstPersonBlock('none', null);
 
@@ -695,7 +700,7 @@ export class DungeonFirstPersonComponent {
       this.drawWallGlowPolygon(context, points);
     }
 
-    if (block.type === 'openDoor' || block.type === 'closedDoor') {
+    if (block.type === 'closedDoor') {
       this.drawFirstPersonSideDoorMarker(context, nearFrame, farFrame, side, block.type);
     }
   }
@@ -802,7 +807,7 @@ export class DungeonFirstPersonComponent {
       context.stroke();
     }
 
-    if (block.type === 'openDoor' || block.type === 'closedDoor') {
+    if (block.type === 'closedDoor') {
       const doorFrame =
         side === 'left'
           ? {
@@ -970,7 +975,8 @@ export class DungeonFirstPersonComponent {
     context: CanvasRenderingContext2D,
     nearFrame: { left: number; right: number; top: number; bottom: number },
     farFrame: { left: number; right: number; top: number; bottom: number },
-    transitionType: ExitTransitionType
+    transitionType: ExitTransitionType,
+    squareKey = ''
   ): void {
     const nearWidth = nearFrame.right - nearFrame.left;
     const farWidth = farFrame.right - farFrame.left;
@@ -996,6 +1002,26 @@ export class DungeonFirstPersonComponent {
       context.lineWidth = 1;
       context.stroke();
       return;
+    }
+
+    if (transitionType === 'stairsUp') {
+      if (squareKey && !this.stairsUpSquareAssignment.has(squareKey)) {
+        this.stairsUpSquareAssignment.set(squareKey, (Math.floor(Math.random() * 3) + 1) as 1 | 2 | 3);
+      }
+      const assignedIdx = squareKey ? (this.stairsUpSquareAssignment.get(squareKey) ?? 1) : 1;
+      const stairImg = this.stairsUpImageCache.get(`stup${assignedIdx}`) ?? null;
+      if (stairImg) {
+        const midLeft = nearFrame.left * 0.65 + farFrame.left * 0.35;
+        const midRight = nearFrame.right * 0.65 + farFrame.right * 0.35;
+        const midTop = nearFrame.top * 0.65 + farFrame.top * 0.35;
+        const midBottom = nearFrame.bottom * 0.65 + farFrame.bottom * 0.35;
+        const drawW = Math.max(8, (midRight - midLeft) * 0.9);
+        const drawH = Math.max(8, (midBottom - midTop) * 0.92);
+        const drawX = (midLeft + midRight) / 2 - drawW / 2;
+        const drawY = midBottom - drawH;
+        context.drawImage(stairImg, drawX, drawY, drawW, drawH);
+        return;
+      }
     }
 
     const slopeFrontY = transitionType === 'stairsUp' ? frontY : frontY - depthSize * 0.1;
@@ -1105,6 +1131,31 @@ export class DungeonFirstPersonComponent {
     context.fill();
   }
 
+  private loadDoorImages(): void {
+    for (const key of ['open', 'closed'] as const) {
+      if (this.doorImageCache.has(key)) continue;
+      const img = new Image();
+      img.onload = () => {
+        this.doorImageCache.set(key, img);
+        this.drawCanvas();
+      };
+      img.src = key === 'open' ? '/images/dooropen.jpg' : '/images/doorclosed.jpg';
+    }
+  }
+
+  private loadStairsUpImages(): void {
+    for (let i = 1; i <= 3; i++) {
+      const key = `stup${i}`;
+      if (this.stairsUpImageCache.has(key)) continue;
+      const img = new Image();
+      img.onload = () => {
+        this.stairsUpImageCache.set(key, img);
+        this.drawCanvas();
+      };
+      img.src = `/images/${key}.jpg`;
+    }
+  }
+
   private drawFirstPersonDoorFace(
     context: CanvasRenderingContext2D,
     frame: { left: number; right: number; top: number; bottom: number },
@@ -1115,6 +1166,9 @@ export class DungeonFirstPersonComponent {
     if (block.type !== 'openDoor' && block.type !== 'closedDoor') {
       return;
     }
+    if (block.type === 'openDoor') {
+      return;
+    }
     const frameWidth = frame.right - frame.left;
     const frameHeight = frame.bottom - frame.top;
     const insetX = Math.max(2, frameWidth * 0.1);
@@ -1123,57 +1177,52 @@ export class DungeonFirstPersonComponent {
     const doorRight = frame.right - insetX;
     const doorTop = frame.top + insetY;
     const doorBottom = frame.bottom - insetY;
+    const doorW = doorRight - doorLeft;
+    const doorH = doorBottom - doorTop;
+
+    const img = this.doorImageCache.get('closed') ?? null;
 
     context.save();
     context.globalAlpha = isPortal ? 0.84 : 1;
-    context.fillStyle = '#b33030';
-    context.fillRect(doorLeft, doorTop, doorRight - doorLeft, doorBottom - doorTop);
-    context.strokeStyle = '#f0b0b0';
-    context.lineWidth = Math.max(1, Math.min(2, (doorRight - doorLeft) * 0.04));
-    context.strokeRect(doorLeft, doorTop, doorRight - doorLeft, doorBottom - doorTop);
 
-    if (block.type === 'openDoor') {
-      const openingWidth = Math.max(3, (doorRight - doorLeft) * 0.35);
-      const openingLeft = doorRight - openingWidth - Math.max(2, (doorRight - doorLeft) * 0.06);
-      context.fillStyle = '#0c0f14';
-      context.fillRect(openingLeft, doorTop + 2, openingWidth, Math.max(2, doorBottom - doorTop - 4));
-      context.strokeStyle = '#ff8080';
-      context.lineWidth = 1;
-      context.beginPath();
-      context.moveTo(doorLeft + 2, doorTop + 3);
-      context.lineTo(openingLeft, doorTop + Math.max(3, (doorBottom - doorTop) * 0.32));
-      context.stroke();
+    if (img) {
+      context.drawImage(img, doorLeft, doorTop, doorW, doorH);
     } else {
-      const centerX = (doorLeft + doorRight) / 2;
-      context.strokeStyle = '#f5c1c1';
-      context.lineWidth = 1;
-      context.beginPath();
-      context.moveTo(centerX, doorTop + 1);
-      context.lineTo(centerX, doorBottom - 1);
-      context.stroke();
-
-      const handleX = doorRight - Math.max(3, (doorRight - doorLeft) * 0.18);
-      const handleY = doorTop + (doorBottom - doorTop) * 0.52;
-      context.fillStyle = '#f7dddd';
-      context.beginPath();
-      context.arc(handleX, handleY, Math.max(1.2, (doorRight - doorLeft) * 0.025), 0, Math.PI * 2);
-      context.fill();
-
-      if (block.hasKeyhole) {
-        const keyholeX = doorRight - Math.max(4, (doorRight - doorLeft) * 0.28);
-        const keyholeY = doorTop + (doorBottom - doorTop) * 0.64;
-        const keyholeRadius = Math.max(1.2, (doorRight - doorLeft) * 0.03);
-        context.fillStyle = '#1f1111';
+      context.fillStyle = '#b33030';
+      context.fillRect(doorLeft, doorTop, doorW, doorH);
+      context.strokeStyle = '#f0b0b0';
+      context.lineWidth = Math.max(1, Math.min(2, doorW * 0.04));
+      context.strokeRect(doorLeft, doorTop, doorW, doorH);
+      {
+        const centerX = (doorLeft + doorRight) / 2;
+        context.strokeStyle = '#f5c1c1';
+        context.lineWidth = 1;
         context.beginPath();
-        context.arc(keyholeX, keyholeY, keyholeRadius, 0, Math.PI * 2);
+        context.moveTo(centerX, doorTop + 1);
+        context.lineTo(centerX, doorBottom - 1);
+        context.stroke();
+        const handleX = doorRight - Math.max(3, doorW * 0.18);
+        const handleY = doorTop + doorH * 0.52;
+        context.fillStyle = '#f7dddd';
+        context.beginPath();
+        context.arc(handleX, handleY, Math.max(1.2, doorW * 0.025), 0, Math.PI * 2);
         context.fill();
-        context.fillRect(keyholeX - keyholeRadius * 0.45, keyholeY, keyholeRadius * 0.9, Math.max(2, keyholeRadius * 2.2));
+        if (block.hasKeyhole) {
+          const keyholeX = doorRight - Math.max(4, doorW * 0.28);
+          const keyholeY = doorTop + doorH * 0.64;
+          const keyholeRadius = Math.max(1.2, doorW * 0.03);
+          context.fillStyle = '#1f1111';
+          context.beginPath();
+          context.arc(keyholeX, keyholeY, keyholeRadius, 0, Math.PI * 2);
+          context.fill();
+          context.fillRect(keyholeX - keyholeRadius * 0.45, keyholeY, keyholeRadius * 0.9, Math.max(2, keyholeRadius * 2.2));
+        }
       }
     }
     context.restore();
 
     if (highlight) {
-      this.drawWallGlowRect(context, doorLeft, doorTop, doorRight - doorLeft, doorBottom - doorTop);
+      this.drawWallGlowRect(context, doorLeft, doorTop, doorW, doorH);
     }
   }
 

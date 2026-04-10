@@ -23,6 +23,19 @@
 	font-size: 0.9rem;
 }
 
+.game-sample-banner {
+	margin: 0.25rem 0 0;
+	padding: 0.25rem 0.7rem;
+	display: inline-block;
+	background: rgba(255, 200, 50, 0.15);
+	border: 1px solid rgba(255, 180, 30, 0.45);
+	border-radius: 5px;
+	color: #b07800;
+	font-size: 0.82rem;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+
 .status-message {
 	margin: 0;
 	padding: 0.65rem 0.75rem;
@@ -40,7 +53,7 @@
 
 .game-layout {
 	display: grid;
-	grid-template-columns: minmax(320px, 560px) minmax(260px, 1fr);
+	grid-template-columns: minmax(280px, 400px) minmax(260px, 1fr);
 	gap: 0.9rem;
 }
 
@@ -101,6 +114,161 @@
 	border-radius: 6px;
 	background-color: #000;
 	image-rendering: pixelated;
+	min-height: 260px;
+}
+
+/* FPV canvas + right icon bar */
+.fpv-with-controls {
+	display: flex;
+	gap: 0.5rem;
+	align-items: stretch;
+}
+
+.fpv-canvas-wrap {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.fpv-icon-bar {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	justify-content: flex-start;
+	padding: 0.25rem 0;
+}
+
+.fpv-icon-btn {
+	width: 2.6rem;
+	height: 2.6rem;
+	border: 1px solid #4a586b;
+	border-radius: 8px;
+	background-color: #18212e;
+	color: #8faac8;
+	font-size: 1.3rem;
+	line-height: 1;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background-color 0.12s, border-color 0.12s;
+}
+
+.fpv-icon-btn:hover {
+	background-color: #1f2b3d;
+	color: #c8ddf0;
+}
+
+.fpv-icon-btn-eye {
+	color: #4da8f0;
+	border-color: #2a5a88;
+}
+
+.pick-icon {
+	font-size: 1rem;
+	letter-spacing: -0.15em;
+	font-family: monospace;
+}
+
+.fpv-icon-btn-active {
+	border-color: #3faf5f !important;
+	background-color: #1f4e2a !important;
+	color: #7de8a0 !important;
+	box-shadow: inset 0 0 0 1px rgba(91, 205, 126, 0.45);
+}
+
+/* Move buttons row below FPV */
+.fpv-move-row {
+	display: flex;
+	gap: 0.4rem;
+	margin-top: 0.5rem;
+	justify-content: center;
+}
+
+.fpv-move-btn {
+	width: 3rem;
+	height: 3rem;
+	border: 1px solid #4a586b;
+	border-radius: 8px;
+	background-color: #18212e;
+	color: #f4f8ff;
+	font-size: 1.35rem;
+	line-height: 1;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.fpv-move-btn:hover {
+	background-color: #1f2b3d;
+}
+
+.fpv-move-btn-forward,
+.fpv-move-btn-back {
+	border-color: #4a7bc0;
+	background-color: #23487b;
+}
+
+.fpv-move-btn-forward:hover,
+.fpv-move-btn-back:hover {
+	background-color: #2a5490;
+}
+
+.fpv-move-btn-turn {
+	border-color: #7b6b3f;
+	background-color: #3d3012;
+	font-size: 1.5rem;
+}
+
+.fpv-move-btn-turn:hover {
+	background-color: #4e3c18;
+}
+
+.fpv-viewport {
+	position: relative;
+	line-height: 0;
+}
+
+.fpv-blood-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	pointer-events: none;
+	animation: blood-fade 2s forwards;
+}
+
+.blood-drop {
+	position: absolute;
+	border-radius: 50%;
+	background: radial-gradient(circle at 40% 35%, #cc0000, #5a0000);
+	box-shadow: 0 0 4px #800;
+}
+
+.fpv-hit-flash {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	pointer-events: none;
+	background: rgba(200, 0, 0, 0.45);
+	animation: hit-flash 1.5s forwards;
+}
+
+@keyframes blood-fade {
+	0% { opacity: 1; }
+	60% { opacity: 0.85; }
+	100% { opacity: 0; }
+}
+
+@keyframes hit-flash {
+	0% { opacity: 1; }
+	25% { opacity: 0.95; }
+	100% { opacity: 0; }
 }
 
 .map-with-pad {
@@ -112,6 +280,13 @@
 .map-canvas-wrap {
 	flex: 1;
 	min-width: 170px;
+}
+
+.fpv-map-inline {
+	margin-top: 0.5rem;
+	flex: none;
+	display: flex;
+	justify-content: center;
 }
 
 .direction-pad {
@@ -165,6 +340,20 @@
 	border-radius: 8px;
 	background: radial-gradient(circle at top, #3a3f4a 0%, #242831 66%, #171a20 100%);
 	color: #e8ecf3;
+	max-height: 380px;
+	overflow-y: auto;
+}
+
+.info-panel-split {
+	display: flex;
+	gap: 1rem;
+	max-height: none;
+	overflow-y: visible;
+}
+
+.info-col {
+	flex: 1;
+	min-width: 0;
 	max-height: 380px;
 	overflow-y: auto;
 }
@@ -257,6 +446,13 @@
 	color: #91e8a7;
 }
 
+.tresher-item-stat {
+	display: block;
+	font-size: 0.78rem;
+	color: #a0c4e8;
+	margin-top: 0.1rem;
+}
+
 .action-buttons {
 	display: flex;
 	flex-wrap: wrap;
@@ -325,6 +521,17 @@
 	align-items: center;
 }
 
+.combat-stats-secondary {
+	margin-top: 0.25rem;
+}
+
+.stat-secondary {
+	background-color: #1e2430;
+	border: 1px solid #3a4455;
+	color: #b0bdd4;
+	font-weight: 500;
+}
+
 .stat-badge {
 	display: inline-block;
 	padding: 0.2rem 0.55rem;
@@ -345,10 +552,29 @@
 	color: #a0d0f5;
 }
 
+.stat-sp {
+	background-color: #1a2b15;
+	border: 1px solid #3a6a2a;
+	color: #a0e080;
+}
+
 .stat-phase {
 	background-color: #2a2a15;
 	border: 1px solid #6a6a2a;
 	color: #e5e5a0;
+}
+
+.stat-effect {
+	background-color: #2b1500;
+	border: 1px solid #b06000;
+	color: #ffb347;
+}
+
+.active-effects-bar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	margin-top: 0.35rem;
 }
 
 .combat-actions {
@@ -416,4 +642,73 @@
 
 .action-button-key:hover {
 	background-color: #4a4a1f;
+}
+
+/* ── Win Overlay ────────────────────────── */
+
+.exit-confirm-overlay {
+	text-align: center;
+	padding: 1.2rem 1.5rem;
+	border-radius: 8px;
+	background-color: #132030;
+	border: 2px solid #4a80b0;
+	margin-bottom: 0.75rem;
+}
+
+.exit-confirm-title {
+	margin: 0 0 0.3rem;
+	font-size: 1.2rem;
+	font-weight: 700;
+	color: #80c8ff;
+}
+
+.exit-confirm-sp {
+	margin: 0 0 0.3rem;
+	font-size: 1rem;
+	color: #a0e080;
+	font-weight: 600;
+}
+
+.exit-confirm-prompt {
+	margin: 0 0 0.8rem;
+	font-size: 0.95rem;
+	color: #c0d8f0;
+}
+
+.exit-confirm-actions {
+	display: flex;
+	gap: 0.6rem;
+	justify-content: center;
+}
+
+.win-overlay {
+	text-align: center;
+	padding: 1.2rem 1.5rem;
+	border-radius: 8px;
+	background-color: #1a2b15;
+	border: 2px solid #4a9a30;
+	margin-bottom: 0.75rem;
+}
+
+.win-title {
+	margin: 0 0 0.4rem;
+	font-size: 1.5rem;
+	font-weight: 700;
+	color: #80e040;
+}
+
+.win-stairs-image {
+	display: block;
+	width: 100%;
+	max-height: 220px;
+	object-fit: cover;
+	border-radius: 4px;
+	margin-bottom: 0.5rem;
+}
+
+.win-sp {
+	margin: 0;
+	font-size: 1.1rem;
+	color: #a0e080;
+	font-weight: 600;
 }

@@ -2,6 +2,11 @@ import { Request, Response } from 'express';
 import * as dungonService from '../services/dungonService';
 import * as pcService from '../services/pcService';
 import * as tresherService from '../services/tresherService';
+import * as itemService from '../services/itemService';
+import * as potionService from '../services/potionService';
+import * as spellService from '../services/spellService';
+import * as imageService from '../services/imageService';
+import { getUserByKey } from '../repositories/userRepository';
 
 type PublishVisibility = 'public' | 'friends' | 'private';
 
@@ -71,12 +76,13 @@ export const getDungonById = async (req: Request, res: Response) => {
 };
 
 export const createDungon = async (req: Request, res: Response) => {
-  const { userkey, name, description, intro, ismaingame } = req.body as Partial<{
+  const { userkey, name, description, intro, ismaingame, issample } = req.body as Partial<{
     userkey: string;
     name: string;
     description: string;
     intro: string;
     ismaingame?: boolean;
+    issample?: boolean;
   }>;
 
   if (
@@ -91,27 +97,41 @@ export const createDungon = async (req: Request, res: Response) => {
     });
   }
 
-  // Only allow admins to create MainGame
-  if (ismaingame === true) {
-    // TODO: Replace with real admin check
-    const isAdmin = req.headers['x-admin'] === 'true';
-    if (!isAdmin) {
-      return res.status(403).json({ result: -1, error: 'Only admins can create MainGame' });
-    }
-    // Check if a MainGame already exists
-    const existingMainGame = await dungonService.fetchMainGame();
-    if (existingMainGame) {
-      return res.status(409).json({ result: -1, error: 'MainGame already exists' });
-    }
-  }
-
   const trimmedUserKey = userkey.trim();
-  const trimmedName = name.trim();
 
   if (!UUID_REGEX.test(trimmedUserKey)) {
     return res.status(400).json({ result: -1, error: 'Invalid userkey format' });
   }
 
+  // Look up the caller to verify permissions
+  const user = await getUserByKey(trimmedUserKey);
+  if (!user) {
+    return res.status(403).json({ result: -1, error: 'User not found or inactive' });
+  }
+
+  const isAdmin = user.isadmin || user.ismasteradmin;
+  const isCreator = user.iscreator;
+
+  if (!isAdmin && !isCreator) {
+    return res.status(403).json({ result: -1, error: 'Only creators and admins can create dungons' });
+  }
+
+  if (ismaingame === true && !isAdmin) {
+    return res.status(403).json({ result: -1, error: 'Only admins can create a Main Game dungon' });
+  }
+
+  if (issample === true && !isAdmin) {
+    return res.status(403).json({ result: -1, error: 'Only admins can mark a dungon as a sample' });
+  }
+
+  if (ismaingame === true) {
+    const existingMainGame = await dungonService.fetchMainGame();
+    if (existingMainGame) {
+      return res.status(409).json({ result: -1, error: 'A Main Game dungon already exists' });
+    }
+  }
+
+  const trimmedName = name.trim();
   if (!trimmedName) {
     return res.status(400).json({ result: -1, error: 'Name is required' });
   }
@@ -122,7 +142,8 @@ export const createDungon = async (req: Request, res: Response) => {
       name: trimmedName,
       description: description.trim(),
       intro: intro.trim(),
-      ismaingame: !!ismaingame,
+      ismaingame: isAdmin ? !!ismaingame : false,
+      issample: isAdmin ? !!issample : false,
     });
 
     return res.status(201).json({ result: 1, dungon });
@@ -257,6 +278,15 @@ export const publishDungon = async (req: Request, res: Response) => {
     return res.status(400).json({ result: -1, error: 'Select at least one friend for friend visibility.' });
   }
 
+  // Determine if the user is an admin (admins publish public directly; creators go to pending)
+  let isAdminUser = false;
+  try {
+    const user = await getUserByKey(userkey.trim());
+    isAdminUser = !!(user?.isadmin || user?.ismasteradmin);
+  } catch {
+    // Non-fatal — default to non-admin
+  }
+
   try {
     const wasPublished = await dungonService.publishDungonForUserKey(
       id,
@@ -264,6 +294,7 @@ export const publishDungon = async (req: Request, res: Response) => {
       {
         visibility: normalizedVisibility,
         friendUserKeys: normalizedFriendUserKeys,
+        isAdminUser,
       }
     );
 
@@ -271,7 +302,9 @@ export const publishDungon = async (req: Request, res: Response) => {
       return res.status(404).json({ result: -1, error: 'Dungon not found' });
     }
 
-    return res.json({ result: 1, status: 'published', visibility: normalizedVisibility });
+    // Non-admin requesting public → status becomes 'pending'
+    const resultStatus = (normalizedVisibility === 'public' && !isAdminUser) ? 'pending' : 'published';
+    return res.json({ result: 1, status: resultStatus, visibility: normalizedVisibility });
   } catch (error) {
     if (error instanceof Error && error.message === 'INVALID_FRIEND_SELECTION') {
       return res.status(400).json({ result: -1, error: 'One or more selected friends are not active friends.' });
@@ -365,41 +398,129 @@ export const getGameById = async (req: Request, res: Response) => {
     }
 
     let pcTreshers: object[] = [];
+    let pcTresherItems: object[] = [];
+    let pcTresherPotions: object[] = [];
+    let pcTresherSpells: object[] = [];
     let pcCurrentHP: number | null = null;
     let pcMaxHP: number | null = null;
+    let pcSp: number | null = null;
+    let pcMind: number = 0;
+    let pcStamina: number = 0;
+    let pcStrength: number = 0;
+    let pcMagicPower: number = 0;
+    const currentPcId: number | null = game.pcid ?? null;
     if (game.pcid !== null && game.pcid > 0) {
       const pc = await pcService.fetchPcByIdForUser(game.pcid, userkey.trim());
       if (pc) {
         pcCurrentHP = pc.currentHP;
         pcMaxHP = pc.maxHP;
+        pcSp = pc.sp;
+        pcMind = pc.mind;
+        pcStamina = pc.stamina ?? 0;
+        pcStrength = pc.strength ?? 0;
+        pcMagicPower = pc.magicPower ?? 0;
 
-        if (Array.isArray(pc.tresherIds) && pc.tresherIds.length > 0) {
-          const treshers = await tresherService.fetchTreshersByIds(pc.tresherIds);
+        const allPcTresherIds = Array.from(new Set([
+          ...(Array.isArray(pc.tresherIds) ? pc.tresherIds : []),
+          pc.weaponTresherId,
+          pc.primaryTresherId,
+          pc.headArmorTresherId,
+          pc.bodyArmorTresherId,
+          pc.leftArmArmorTresherId,
+          pc.rightArmArmorTresherId,
+          pc.leftLegArmorTresherId,
+          pc.rightLegArmorTresherId,
+        ].filter((id): id is number => typeof id === 'number' && id > 0)));
+
+        if (allPcTresherIds.length > 0) {
+          const treshers = await tresherService.fetchTreshersByIds(allPcTresherIds);
           pcTreshers = treshers.map((t) => ({
             id: t.id,
             type: t.type,
             name: t.name,
             description: t.description,
-            worth: t.worth,
-            curseID: t.curseID,
-            trapID: t.trapID,
-            HP: t.HP,
-            damage: t.damage,
-            hands: t.hands,
-            range: t.range,
-            ammoType: t.ammoType,
-            speedReduction: t.speedReduction,
-            armorType: t.armorType,
-            coinType: t.coinType,
-            effectNumber: t.effectNumber,
-            effectTarget: t.effectTarget,
-            effectDuration: t.effectDuration,
+            gold: t.gold,
+            silver: t.silver,
+            copper: t.copper,
+            zinc: t.zinc,
+            item1Id: t.item1Id,
+            item2Id: t.item2Id,
+            item3Id: t.item3Id,
+            item4Id: t.item4Id,
+            spell1Id: t.spell1Id,
+            spell2Id: t.spell2Id,
+            spell3Id: t.spell3Id,
+            spell4Id: t.spell4Id,
+            curse1Id: t.curse1Id,
+            curse2Id: t.curse2Id,
+            potion1Id: t.potion1Id,
+            potion2Id: t.potion2Id,
+            potion3Id: t.potion3Id,
+            imageId: t.imageId,
+            soundId: t.soundId,
+            spReward: t.spReward,
           }));
+
+          const allItemIds = Array.from(new Set(
+            treshers.flatMap((t) => [t.item1Id, t.item2Id, t.item3Id, t.item4Id]
+              .filter((id): id is number => typeof id === 'number' && id > 0))
+          ));
+          if (allItemIds.length > 0) {
+            const items = await itemService.fetchItemsByIds(allItemIds);
+            pcTresherItems = items.map((it) => ({
+              id: it.id,
+              name: it.name,
+              description: it.description,
+              type: it.type,
+              effectValue: it.effectValue,
+              damage: it.damage ?? 0,
+              range: Math.max(1, parseInt(String(it.range), 10) || 1),
+              armorSlot: it.armorSlot ?? null,
+              effectOn: it.effectOn ?? null,
+            }));
+          }
+
+          const allPotionIds = Array.from(new Set(
+            treshers.flatMap((t) => [t.potion1Id, t.potion2Id, t.potion3Id]
+              .filter((id): id is number => typeof id === 'number' && id > 0))
+          ));
+          if (allPotionIds.length > 0) {
+            const potions = await potionService.fetchPotionsByIds(allPotionIds);
+            pcTresherPotions = potions.map((p) => ({
+              id: p.id,
+              name: p.name,
+              description: p.description,
+              effectTo: p.effectTo,
+              effectAmount: p.effectAmount,
+              lastFor: p.lastFor,
+            }));
+          }
+
+          const allSpellIds = Array.from(new Set(
+            treshers.flatMap((t) => [t.spell1Id, t.spell2Id, t.spell3Id, t.spell4Id]
+              .filter((id): id is number => typeof id === 'number' && id > 0))
+          ));
+          if (allSpellIds.length > 0) {
+            const spells = await spellService.fetchSpellsByIdsForGame(allSpellIds);
+            pcTresherSpells = spells.map((s) => ({
+              id: s.id,
+              name: s.name,
+              description: s.description,
+              range: s.range,
+              effectOn: s.effectOn,
+              effectAmount: s.effectAmount,
+              successTestValue: s.successTestValue,
+              sp: s.sp,
+              lastFor: s.lastFor,
+            }));
+          }
         }
       }
     }
 
-    return res.json({ ...game, pcTreshers, pcCurrentHP, pcMaxHP });
+    const dungonSpReward = await dungonService.fetchDungonSpReward(game.dungonid);
+
+    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcStrength, pcMagicPower, currentPcId, dungonSpReward });
   } catch (error) {
     console.error('Error fetching game by id:', error);
     return res.status(500).json({ error: 'Failed to fetch game' });
@@ -458,5 +579,279 @@ export const deleteGame = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error deleting game:', error);
     return res.status(500).json({ result: -1, error: 'Failed to delete game' });
+  }
+};
+
+export const approveDungon = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const { userkey } = req.body as Partial<{ userkey: string }>;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid dungon id is required' });
+  }
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+
+  const trimmedKey = userkey.trim();
+  const user = await getUserByKey(trimmedKey);
+  if (!user || (!user.isadmin && !user.ismasteradmin)) {
+    return res.status(403).json({ result: -1, error: 'Only admins can approve dungons' });
+  }
+
+  try {
+    const wasApproved = await dungonService.approvePendingDungon(id, trimmedKey);
+    if (!wasApproved) {
+      return res.status(404).json({ result: -1, error: 'Pending dungon not found' });
+    }
+
+    return res.json({ result: 1, status: 'published' });
+  } catch (error) {
+    console.error('Error approving dungon:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to approve dungon' });
+  }
+};
+
+export const getSampleDungon = async (req: Request, res: Response) => {
+  try {
+    const dungon = await dungonService.fetchSampleDungon();
+    if (!dungon) {
+      return res.status(404).json({ error: 'No sample dungon configured' });
+    }
+    return res.json(dungon);
+  } catch (error) {
+    console.error('Error fetching sample dungon:', error);
+    return res.status(500).json({ error: 'Failed to fetch sample dungon' });
+  }
+};
+
+export const setSampleDungon = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const { userkey } = req.body as Partial<{ userkey: string }>;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid dungon id is required' });
+  }
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+
+  const trimmedKey = userkey.trim();
+  const user = await getUserByKey(trimmedKey);
+  if (!user || (!user.isadmin && !user.ismasteradmin)) {
+    return res.status(403).json({ result: -1, error: 'Only admins can set the sample dungon' });
+  }
+
+  try {
+    const wasSet = await dungonService.setSampleGame(id);
+    if (!wasSet) {
+      return res.status(404).json({ result: -1, error: 'Published dungon not found' });
+    }
+    return res.json({ result: 1 });
+  } catch (error) {
+    console.error('Error setting sample dungon:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to set sample dungon' });
+  }
+};
+
+export const getAdminPublishedDungons = async (req: Request, res: Response) => {
+  const userkey = req.query['userkey'];
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ error: 'Valid userkey query parameter is required' });
+  }
+
+  const trimmedKey = userkey.trim();
+  const user = await getUserByKey(trimmedKey);
+  if (!user || (!user.isadmin && !user.ismasteradmin)) {
+    return res.status(403).json({ error: 'Only admins can access this endpoint' });
+  }
+
+  try {
+    const dungons = await dungonService.fetchAllPublishedDungonsForAdmin();
+    return res.json(dungons);
+  } catch (error) {
+    console.error('Error fetching published dungons for admin:', error);
+    return res.status(500).json({ error: 'Failed to fetch published dungons' });
+  }
+};
+
+export const getSampleGameSession = async (req: Request, res: Response) => {
+  const pcIdRaw = req.query['pcId'];
+  const pcId = typeof pcIdRaw === 'string' ? Number.parseInt(pcIdRaw, 10) : NaN;
+
+  if (!Number.isInteger(pcId) || pcId <= 0) {
+    return res.status(400).json({ error: 'Valid pcId query parameter is required' });
+  }
+
+  try {
+    const [dungon, pc] = await Promise.all([
+      dungonService.fetchSampleDungonFull(),
+      pcService.fetchSamplePcById(pcId),
+    ]);
+
+    if (!dungon) {
+      return res.status(404).json({ error: 'No sample dungon configured' });
+    }
+
+    if (!pc) {
+      return res.status(404).json({ error: 'Sample PC not found' });
+    }
+
+    let pcTreshers: object[] = [];
+    let pcTresherItems: object[] = [];
+    let pcTresherPotions: object[] = [];
+    let pcTresherSpells: object[] = [];
+
+    const allPcTresherIds = Array.from(new Set([
+      ...(Array.isArray(pc.tresherIds) ? pc.tresherIds : []),
+      pc.weaponTresherId,
+      pc.primaryTresherId,
+      pc.headArmorTresherId,
+      pc.bodyArmorTresherId,
+      pc.leftArmArmorTresherId,
+      pc.rightArmArmorTresherId,
+      pc.leftLegArmorTresherId,
+      pc.rightLegArmorTresherId,
+    ].filter((id): id is number => typeof id === 'number' && id > 0)));
+
+    if (allPcTresherIds.length > 0) {
+      const treshers = await tresherService.fetchTreshersByIds(allPcTresherIds);
+      pcTreshers = treshers.map((t) => ({
+        id: t.id,
+        type: t.type,
+        name: t.name,
+        description: t.description,
+        gold: t.gold,
+        silver: t.silver,
+        copper: t.copper,
+        zinc: t.zinc,
+        item1Id: t.item1Id,
+        item2Id: t.item2Id,
+        item3Id: t.item3Id,
+        item4Id: t.item4Id,
+        spell1Id: t.spell1Id,
+        spell2Id: t.spell2Id,
+        spell3Id: t.spell3Id,
+        spell4Id: t.spell4Id,
+        curse1Id: t.curse1Id,
+        curse2Id: t.curse2Id,
+        potion1Id: t.potion1Id,
+        potion2Id: t.potion2Id,
+        potion3Id: t.potion3Id,
+        imageId: t.imageId,
+        soundId: t.soundId,
+        spReward: t.spReward,
+      }));
+
+      const allItemIds = Array.from(new Set(
+        treshers.flatMap((t) => [t.item1Id, t.item2Id, t.item3Id, t.item4Id]
+          .filter((id): id is number => typeof id === 'number' && id > 0))
+      ));
+      if (allItemIds.length > 0) {
+        const items = await itemService.fetchItemsByIds(allItemIds);
+        pcTresherItems = items.map((it) => ({
+          id: it.id,
+          name: it.name,
+          description: it.description,
+          type: it.type,
+          effectValue: it.effectValue,
+          damage: it.damage ?? 0,
+          range: Math.max(1, parseInt(String(it.range), 10) || 1),
+          armorSlot: it.armorSlot ?? null,
+          effectOn: it.effectOn ?? null,
+        }));
+      }
+
+      const allPotionIds = Array.from(new Set(
+        treshers.flatMap((t) => [t.potion1Id, t.potion2Id, t.potion3Id]
+          .filter((id): id is number => typeof id === 'number' && id > 0))
+      ));
+      if (allPotionIds.length > 0) {
+        const potions = await potionService.fetchPotionsByIds(allPotionIds);
+        pcTresherPotions = potions.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          effectTo: p.effectTo,
+          effectAmount: p.effectAmount,
+          lastFor: p.lastFor,
+        }));
+      }
+
+      const allSpellIds = Array.from(new Set(
+        treshers.flatMap((t) => [t.spell1Id, t.spell2Id, t.spell3Id, t.spell4Id]
+          .filter((id): id is number => typeof id === 'number' && id > 0))
+      ));
+      if (allSpellIds.length > 0) {
+        const spells = await spellService.fetchSpellsByIdsForGame(allSpellIds);
+        pcTresherSpells = spells.map((s) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          range: s.range,
+          effectOn: s.effectOn,
+          effectAmount: s.effectAmount,
+          successTestValue: s.successTestValue,
+          sp: s.sp,
+          lastFor: s.lastFor,
+        }));
+      }
+    }
+
+    // Extract monster image IDs from dungeon JSON and fetch their paths
+    let monsterImages: { id: number; path: string }[] = [];
+    try {
+      const dungonJsonObj = typeof dungon.dungenJson === 'string'
+        ? JSON.parse(dungon.dungenJson)
+        : dungon.dungenJson;
+      const monsterList = Array.isArray(dungonJsonObj?.monsterList)
+        ? dungonJsonObj.monsterList
+        : Array.isArray(dungonJsonObj?.monsters)
+          ? dungonJsonObj.monsters
+          : [];
+      const monsterImageIds: number[] = Array.from(new Set(
+        monsterList
+          .map((m: unknown) => (m as Record<string, unknown>)?.imageId)
+          .filter((id: unknown): id is number => typeof id === 'number' && id > 0)
+      ));
+      if (monsterImageIds.length > 0) {
+        const images = await imageService.fetchImagesByIds(monsterImageIds);
+        monsterImages = images
+          .filter((img) => typeof img.path === 'string' && img.path.trim())
+          .map((img) => ({ id: img.id, path: img.path }));
+      }
+    } catch {
+      // non-fatal — just proceed without images
+    }
+
+    return res.json({
+      id: 0,
+      dungonid: dungon.id,
+      name: dungon.name,
+      description: dungon.description,
+      intro: dungon.intro,
+      dungenJson: dungon.dungenJson,
+      lastupdated: new Date().toISOString(),
+      pcTreshers,
+      pcTresherItems,
+      pcTresherPotions,
+      pcTresherSpells,
+      pcCurrentHP: pc.maxHP,
+      pcMaxHP: pc.maxHP,
+      pcSp: 0,
+      pcMind: pc.mind,
+      pcStamina: pc.stamina,
+      pcStrength: pc.strength,
+      pcMagicPower: pc.magicPower,
+      currentPcId: null,
+      dungonSpReward: dungon.spreward,
+      monsterImages,
+    });
+  } catch (error) {
+    console.error('Error building sample game session:', error);
+    return res.status(500).json({ error: 'Failed to build sample game session' });
   }
 };

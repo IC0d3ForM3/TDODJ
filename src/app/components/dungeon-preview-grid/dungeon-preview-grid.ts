@@ -5,6 +5,7 @@ import {
   ViewChild,
   effect,
   input,
+  output,
   untracked,
 } from '@angular/core';
 import { Door } from '../../interfaces/door';
@@ -27,7 +28,7 @@ import {
 
 const DEFAULT_CHEATER: Cheater = {
   name: 'Bob',
-  rangeOfSite: 5,
+  rangeOfSight: 5,
   facingDir: 'right',
   inventory: { keys: [], treshers: [] },
 };
@@ -57,6 +58,15 @@ export class DungeonPreviewGridComponent {
   readonly exits = input<DungonExit[]>([]);
   readonly startPoint = input<StartPoint | null>(null);
   readonly squareTexts = input<SquareText[]>([]);
+  /** Chebyshev range for combat targeting overlay (0 = no overlay). */
+  readonly combatRange = input<number>(0);
+  /** Row of the currently selected combat target (null = none). */
+  readonly selectedTargetRow = input<number | null>(null);
+  /** Column of the currently selected combat target (null = none). */
+  readonly selectedTargetColumn = input<number | null>(null);
+
+  /** Emitted when the player clicks a cell on the map. */
+  readonly cellClicked = output<{ row: number; column: number }>();
 
   readonly cellSize = 18;
   readonly dimension = 10;
@@ -81,6 +91,9 @@ export class DungeonPreviewGridComponent {
       this.exits();
       this.startPoint();
       this.squareTexts();
+      this.combatRange();
+      this.selectedTargetRow();
+      this.selectedTargetColumn();
       untracked(() => this.drawCanvas());
     });
   }
@@ -181,10 +194,10 @@ export class DungeonPreviewGridComponent {
         const top = previewRow * this.cellSize;
         const right = left + this.cellSize;
         const bottom = top + this.cellSize;
-        if (this.isDoorConnection(square.toTop)) { context.moveTo(left, top); context.lineTo(right, top); }
-        if (this.isDoorConnection(square.toRight)) { context.moveTo(right, top); context.lineTo(right, bottom); }
-        if (this.isDoorConnection(square.toBottom)) { context.moveTo(left, bottom); context.lineTo(right, bottom); }
-        if (this.isDoorConnection(square.toLeft)) { context.moveTo(left, top); context.lineTo(left, bottom); }
+        if (this.isDoorConnection(square.toTop) && square.toTop.state !== 'open') { context.moveTo(left, top); context.lineTo(right, top); }
+        if (this.isDoorConnection(square.toRight) && square.toRight.state !== 'open') { context.moveTo(right, top); context.lineTo(right, bottom); }
+        if (this.isDoorConnection(square.toBottom) && square.toBottom.state !== 'open') { context.moveTo(left, bottom); context.lineTo(right, bottom); }
+        if (this.isDoorConnection(square.toLeft) && square.toLeft.state !== 'open') { context.moveTo(left, top); context.lineTo(left, bottom); }
       }
       context.stroke();
     }
@@ -215,6 +228,28 @@ export class DungeonPreviewGridComponent {
       const centerX = previewColumn * this.cellSize + this.cellSize / 2;
       const centerY = previewRow * this.cellSize + this.cellSize / 2;
       this.drawTresherCoinMarker(context, centerX, centerY, 3.5);
+    }
+
+    if (this.combatRange() > 0) {
+      const range = this.combatRange();
+      const pRow = preview.centerRow;
+      const pCol = preview.centerColumn;
+      context.save();
+      context.globalAlpha = 0.15;
+      context.fillStyle = '#ffff00';
+      for (let pr = 0; pr < this.dimension; pr++) {
+        for (let pc = 0; pc < this.dimension; pc++) {
+          const sr = preview.startRow + pr;
+          const sc = preview.startColumn + pc;
+          if (!visibleSquareKeys.has(this.getSquareKey(sr, sc))) continue;
+          if (sr === pRow && sc === pCol) continue;
+          const dr = Math.abs(sr - pRow);
+          const dc = Math.abs(sc - pCol);
+          if (dr <= range && dc <= range)
+            context.fillRect(pc * this.cellSize, pr * this.cellSize, this.cellSize, this.cellSize);
+        }
+      }
+      context.restore();
     }
 
     for (const placement of this.monsterPlacements()) {
@@ -303,6 +338,39 @@ export class DungeonPreviewGridComponent {
         cheater.facingDir
       );
     }
+
+    const selRow = this.selectedTargetRow();
+    const selCol = this.selectedTargetColumn();
+    if (selRow !== null && selCol !== null) {
+      const pr = selRow - preview.startRow;
+      const pc = selCol - preview.startColumn;
+      if (pr >= 0 && pc >= 0 && pr < this.dimension && pc < this.dimension &&
+          visibleSquareKeys.has(this.getSquareKey(selRow, selCol))) {
+        context.strokeStyle = '#ff9500';
+        context.lineWidth = 2.5;
+        context.setLineDash([3, 2]);
+        context.strokeRect(pc * this.cellSize + 1.5, pr * this.cellSize + 1.5, this.cellSize - 3, this.cellSize - 3);
+        context.setLineDash([]);
+      }
+    }
+  }
+
+  handleCanvasClick(event: MouseEvent): void {
+    const canvas = this._canvasRef?.nativeElement;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const scaleX = this.canvasWidth / rect.width;
+    const scaleY = this.canvasHeight / rect.height;
+    const cellX = Math.floor(x * scaleX / this.cellSize);
+    const cellY = Math.floor(y * scaleY / this.cellSize);
+    const preview = this.preview();
+    const row = preview.startRow + cellY;
+    const col = preview.startColumn + cellX;
+    if (cellX >= 0 && cellX < this.dimension && cellY >= 0 && cellY < this.dimension) {
+      this.cellClicked.emit({ row, column: col });
+    }
   }
 
   private getVisibleSquareKeysForPreview(preview: GridPreviewContext): Set<string> {
@@ -310,9 +378,9 @@ export class DungeonPreviewGridComponent {
     const filledSquares = this.filledSquares();
     const cheater = this.cheater();
     const range =
-      typeof cheater.rangeOfSite === 'number' && Number.isFinite(cheater.rangeOfSite)
-        ? Math.max(0, cheater.rangeOfSite)
-        : DEFAULT_CHEATER.rangeOfSite;
+      typeof cheater.rangeOfSight === 'number' && Number.isFinite(cheater.rangeOfSight)
+        ? Math.max(0, cheater.rangeOfSight)
+        : DEFAULT_CHEATER.rangeOfSight;
 
     const sourceSquareKey = this.getSquareKey(preview.centerRow, preview.centerColumn);
     if (filledSquares[sourceSquareKey]) {
@@ -419,7 +487,9 @@ export class DungeonPreviewGridComponent {
   }
 
   private isSightBlockingConnection(connection: Door | Wall | null): boolean {
-    return this.isWallConnection(connection) || this.isDoorConnection(connection);
+    if (this.isWallConnection(connection)) return true;
+    if (this.isDoorConnection(connection)) return connection.state !== 'open';
+    return false;
   }
 
   private drawFacingArrow(

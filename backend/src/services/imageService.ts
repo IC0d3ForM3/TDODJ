@@ -4,6 +4,8 @@ import {
   UpdateImagePayload,
   getImageLibraryByUserGuid,
   getImagesByUserGuid,
+  getImagesByIds,
+  getPublicImagesByIds,
   insertImageForUser,
   isImageAccessibleByIdForUser,
   isAdminUserByGuid,
@@ -42,4 +44,12 @@ export const saveImageForUser = async (
   payload: UpdateImagePayload
 ): Promise<ImageRecord | null> => {
   return await updateImageForUser(id, userguid, payload);
+};
+
+export const fetchPublicImagesByIds = async (ids: number[]): Promise<ImageRecord[]> => {
+  return await getPublicImagesByIds(ids);
+};
+
+export const fetchImagesByIds = async (ids: number[]): Promise<ImageRecord[]> => {
+  return await getImagesByIds(ids);
 };

@@ -2,66 +2,312 @@
   <header class="how-to-play-hero">
     <h2>How to Play</h2>
     <p>
-      A new dungon is planned each week (and sometimes more). Start from the first story dungon,
-      reach the End point, and then move to the next level when it becomes available.
+      Explore dungeons from a first-person view, fight monsters, collect loot, and find the exit.
+      Each run uses your Player Character (PC) — your stats, species, and class all shape how the
+      adventure plays out.
     </p>
   </header>
 
-  <section class="how-to-play-section">
-    <h3>Weekly Story Dungons</h3>
-    <p>
-      The story path begins with the starting dungon. You must complete that dungon by making it
-      to the End point before progressing to the next level release.
-    </p>
-    <p>
-      If a new level is not out yet, keep improving your PC and play community dungons in the
-      meantime.
-    </p>
-  </section>
-
-  <section class="how-to-play-section">
-    <h3>Community Games and Publishing</h3>
-    <p>
-      You can play community-created games, publish your own dungons for friends, or open them to
-      the public.
-    </p>
-    <ul>
-      <li>Play published community adventures.</li>
-      <li>Create private games for selected friends.</li>
-      <li>Share games publicly so anyone can try them.</li>
-    </ul>
-  </section>
-
+  <!-- ── Creating a PC ──────────────────────────────────────────── -->
   <section class="how-to-play-section">
     <h3>Creating a PC</h3>
     <p>
-      Build your Player Character (PC) in the Dashboard. Choose stats, gear, and a playstyle that
-      matches how you want to clear dungons.
+      Head to the <strong>Dashboard → PC tab</strong> and click <strong>Create New PC</strong>.
+      Pick a name, a species, and a class. Stats are rolled automatically using a d12 — you can
+      reroll by changing your species or type.
     </p>
-    <p>
-      Your PC setup matters for combat, survival, and how fast you can push through harder levels.
-    </p>
-  </section>
 
-  <section class="how-to-play-section">
-    <h3>What a PC Can Do in a Dungon</h3>
+    <p class="htp-subsection-title">Species</p>
+    <table class="htp-table">
+      <thead>
+        <tr><th>Species</th><th>Range of View</th><th>Action Economy</th><th>Strength</th><th>Flavour</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Human</td><td>5</td><td>5</td><td>d12÷2 + 1</td><td>Balanced, moderate magic</td></tr>
+        <tr><td>Elph</td><td>7</td><td>5</td><td>d12÷2</td><td>Far sight, nimble, magic-leaning</td></tr>
+        <tr><td>DwarPh</td><td>7</td><td>4</td><td>d12÷2 + 4</td><td>Tough, powerful, low magic</td></tr>
+        <tr><td>Shorties</td><td>5</td><td>4</td><td>d12÷4 + 2</td><td>Balanced, decent magic</td></tr>
+      </tbody>
+    </table>
+
+    <p class="htp-subsection-title">Class</p>
+    <table class="htp-table">
+      <thead>
+        <tr><th>Class</th><th>Max HP</th><th>AC Bonus</th><th>Magic Power</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Figher</td><td>d12 + 4</td><td>+4</td><td>0</td><td>Front-line brawler</td></tr>
+        <tr><td>Thieph</td><td>d12 + 2</td><td>+2</td><td>2</td><td>Stealth, picking locks</td></tr>
+        <tr><td>Mage</td><td>d12÷2 + 2</td><td>+2</td><td>8 +</td><td>Spell power, fragile</td></tr>
+        <tr><td>Healer</td><td>d12÷2 + 2</td><td>+2</td><td>6 +</td><td>Support, recovery</td></tr>
+      </tbody>
+    </table>
+
+    <p class="htp-subsection-title">PC Stats at a Glance</p>
     <ul>
-      <li>Explore using first-person movement and line of sight.</li>
-      <li>Fight monsters and manage turn-based actions.</li>
-      <li>Collect keys, treshers, and useful gear.</li>
-      <li>Use inventory items like potions to survive.</li>
-      <li>Reach the End point to finish the run.</li>
+      <li><strong>HP</strong> — Health points. Reach 0 and the run is over.</li>
+      <li><strong>AC</strong> — Armor Class. Higher AC means monsters hit you less often.</li>
+      <li><strong>AE</strong> — Action Economy. How many actions you have each turn (5 for Human/Elph, 4 for DwarPh/Shorties).</li>
+      <li><strong>Strength</strong> — Adds to weapon damage.</li>
+      <li><strong>Stamina</strong> — Adds to your attack roll and to your effective AC when defending.</li>
+      <li><strong>Mind</strong> — Used for trap detection, lock picking, finding hidden doors, and casting spells. Also determines your Magic Resistance (Mind ÷ 2, rounded down).</li>
+      <li><strong>Magic Power (MP)</strong> — How many magic points you have available to fuel spells. Each magic point costs 1 AE to spend.</li>
+      <li><strong>Range of View</strong> — How far you can see in the first-person view.</li>
     </ul>
   </section>
 
+  <!-- ── Starting a Game ────────────────────────────────────────── -->
   <section class="how-to-play-section">
-    <h3>Becoming a Creator</h3>
+    <h3>Starting a Game</h3>
     <p>
-      Want to build your own adventures? Use the Create tools to design layouts, place monsters,
-      keys, treshers, and story text.
+      Go to the <strong>Dashboard → Available Games</strong> tab. Pick a dungeon, select the PC
+      you want to play, and hit Start. The game saves automatically as you play, so you can pick
+      it back up any time from <strong>Active Games</strong>.
     </p>
     <p>
-      Then publish your dungon for friends or for the full community when it is ready.
+      New story dungeons drop regularly. Complete each one to unlock the next level.
+    </p>
+  </section>
+
+  <!-- ── Active Game Controls ───────────────────────────────────── -->
+  <section class="how-to-play-section">
+    <h3>Moving Around</h3>
+    <p>
+      The game shows a <strong>first-person view</strong> on the left and a <strong>10 × 10 mini-map</strong> to the right.
+      The map shows your position and everything within your range of view.
+    </p>
+    <p class="htp-subsection-title">Keyboard shortcuts</p>
+    <ul>
+      <li><strong>Arrow Keys</strong> — turn to face that direction.</li>
+      <li><strong>Space</strong> or <strong>F</strong> — move forward one square.</li>
+      <li><strong>B</strong> — move backward one square.</li>
+      <li><strong>A</strong> — attack an adjacent monster.</li>
+    </ul>
+    <p>
+      You can also use the on-screen direction pad beneath the mini-map. Tap the outer buttons to
+      face a direction (including diagonals) and <strong>F</strong> in the centre to step forward.
+      Moving diagonally costs <strong>2 AE</strong> instead of 1.
+    </p>
+  </section>
+
+  <!-- ── Action Bar ─────────────────────────────────────────────── -->
+  <section class="how-to-play-section">
+    <h3>Action Bar Icons</h3>
+    <p>
+      A vertical icon bar sits to the right of the first-person view. These are quick-action
+      buttons for the most common things you do in a dungeon.
+    </p>
+    <ul class="htp-icon-list">
+      <li>
+        <span class="htp-icon">👁</span>
+        <span><strong>Search for Traps</strong> — Roll Mind + d12. Finds floor traps, tresher traps, door traps, and hidden doors nearby. Lights up when a trap has been found so you can disarm it.</span>
+      </li>
+      <li>
+        <span class="htp-icon">⚔</span>
+        <span><strong>Attack</strong> — Attack the nearest monster in weapon range (costs 1 AE). Shows as <strong>✊</strong> when no weapon is equipped (unarmed punch). Lights up gold when a valid target is adjacent.</span>
+      </li>
+      <li>
+        <span class="htp-icon">💰</span>
+        <span><strong>Take All</strong> — Pick up every tresher and key on your current square in one tap. Lights up gold when there is loot to grab.</span>
+      </li>
+      <li>
+        <span class="htp-icon">🚪</span>
+        <span><strong>Open Door</strong> — Open an unlocked closed door adjacent to you. Lights up gold when a door can be opened.</span>
+      </li>
+      <li>
+        <span class="htp-icon">🔑</span>
+        <span><strong>Use Key</strong> — Unlock a locked door if you are carrying the correct key. Lights up gold when a matching key is in your inventory.</span>
+      </li>
+      <li>
+        <span class="htp-icon htp-icon-pick">⌐¬</span>
+        <span><strong>Pick Lock / Disarm Trap</strong> — Attempt to pick a locked door (Mind + d12 vs DC) or disarm a found trap. Lights up gold when either action is available.</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- ── Turns and Combat ───────────────────────────────────────── -->
+  <section class="how-to-play-section">
+    <h3>Turns and Combat</h3>
+    <p>
+      The game is <strong>turn-based</strong>. The status bar at the bottom shows whether it is
+      <em>Your Turn</em> or <em>Monster Turn</em>.
+    </p>
+    <p class="htp-subsection-title">Your Turn</p>
+    <ul>
+      <li>You start each turn with your full AE (5 or 4 depending on species).</li>
+      <li>Every action — moving, attacking, drinking a potion — costs <strong>1 AE</strong> (diagonal moves cost 2).</li>
+      <li>When your AE hits 0 it is automatically the monsters' turn. You can also click <strong>End Turn</strong> early.</li>
+    </ul>
+    <p class="htp-subsection-title">Attacking</p>
+    <ul>
+      <li>
+        <strong>Hit roll:</strong> d12 + weapon bonus + Stamina vs monster AC.
+        Roll equal to or above AC to hit.
+      </li>
+      <li>
+        <strong>Damage:</strong> d(12 ÷ weapon tier) + Strength. Better weapons roll bigger dice.
+      </li>
+      <li>
+        You can equip up to <strong>2 hands</strong> worth of weapons from your inventory.
+        Weapons have a range stat — longer range lets you hit from further away.
+      </li>
+    </ul>
+    <p class="htp-subsection-title">Defending</p>
+    <ul>
+      <li>
+        <strong>Monster hit roll:</strong> d12 + monster bonus vs your AC + Stamina.
+      </li>
+      <li>
+        Your base AC is 10. Equipping armor treshers and armor items raises it.
+      </li>
+      <li>When HP reaches 0 it's game over — <em>"You have fallen. Your adventure ends here."</em></li>
+    </ul>
+    <p class="htp-subsection-title">Monster behaviour</p>
+    <ul>
+      <li>Monsters move toward you when you are within 5 squares and they have line of sight.</li>
+      <li>Some monsters <strong>flee</strong> when they drop below a certain HP threshold.</li>
+      <li>Monsters that have the roam flag will wander even when you are far away.</li>
+      <li>Killing a monster can drop treshers and keys — and earns you <strong>SP</strong>.</li>
+    </ul>
+  </section>
+
+  <!-- ── The Nearby Panel ───────────────────────────────────────── -->
+  <section class="how-to-play-section">
+    <h3>The Info Panel</h3>
+    <p>
+      The right-hand panel has two tabs: <strong>Nearby</strong> and <strong>Inventory</strong>.
+    </p>
+    <p class="htp-subsection-title">Nearby</p>
+    <ul>
+      <li>Lists every <strong>door</strong> adjacent to you with its state (open, closed, locked) and action buttons — Open Door, Use Key, Pick Lock.</li>
+      <li>Shows <strong>treshers</strong> and <strong>keys</strong> on your current or front square.</li>
+      <li>Has a <strong>Search for Traps</strong> button. If a trap is found a <strong>Disarm Trap</strong> button appears.</li>
+      <li>Shows a <strong>Take All</strong> button (and <strong>Take Some</strong> if there are multiple treshers).</li>
+    </ul>
+    <p class="htp-subsection-title">Inventory</p>
+    <ul>
+      <li>Lists all keys and tresher items you are carrying.</li>
+      <li>Weapons and armor have <strong>Equip / Unequip</strong> buttons. You have 2 hand slots.</li>
+      <li>Healing potions show a <strong>Drink</strong> button (costs 1 AE, cannot be used on monster turns).</li>
+      <li>Spells show a <strong>Cast (N AE)</strong> button that lights up when a valid target is in range.</li>
+    </ul>
+  </section>
+
+  <!-- ── Doors ──────────────────────────────────────────────────── -->
+  <section class="how-to-play-section">
+    <h3>Doors</h3>
+    <ul>
+      <li><strong>Open</strong> — Walk straight through.</li>
+      <li><strong>Closed</strong> — Use the 🚪 button or click Open Door in the Nearby panel.</li>
+      <li><strong>Locked</strong> — Find the matching key (🔑) or pick the lock (⌐¬) with a Mind + d12 roll vs the DC.</li>
+      <li><strong>Trapped</strong> — Search (👁) to detect the trap, then disarm it before it triggers on you or costs you HP.</li>
+      <li><strong>Hidden</strong> — Looks exactly like a solid wall until you Search and roll Mind + d12 ≥ the Find DC (1–6). Once found it appears as a normal door you can open.</li>
+    </ul>
+  </section>
+
+  <!-- ── Treshers and Loot ──────────────────────────────────────── -->
+  <section class="how-to-play-section">
+    <h3>Treshers and Loot</h3>
+    <p>
+      Treshers are containers found on the dungeon floor or dropped by monsters. They can hold:
+    </p>
+    <ul>
+      <li>Coin (gold, silver, copper, zinc)</li>
+      <li>Weapons and armor — equip them from your Inventory tab</li>
+      <li>Potions — drink healing potions to recover HP (costs 1 AE)</li>
+      <li>Spells — cast them from your Inventory tab (see Magic below)</li>
+      <li>Other items</li>
+    </ul>
+    <p>
+      Some treshers are trapped. Always search before grabbing a pile of loot in a suspicious spot.
+    </p>
+  </section>
+
+  <!-- ── Magic ───────────────────────────────────────────────────── -->
+  <section class="how-to-play-section">
+    <h3>Magic</h3>
+    <p>
+      If your PC has spells in their inventory (inside a tresher), those spells appear in the
+      <strong>Inventory</strong> tab with a <strong>Cast (N AE)</strong> button.
+    </p>
+    <p class="htp-subsection-title">Casting a Spell</p>
+    <ul>
+      <li>Each spell costs <strong>N AE</strong> (magic points) — the cost is shown on the Cast button.</li>
+      <li>You must have a live monster within the spell's <strong>range</strong> to cast it.</li>
+      <li>
+        <strong>Spell hit roll:</strong> 1d12 + Mind vs the spell's Target Number + monster's Magic Resistance.
+        Roll equal to or above the total to succeed.
+      </li>
+      <li>On a success the spell applies its effect (e.g. HP damage, stat reduction).</li>
+      <li>On a failure the spell fizzles — AE is still spent.</li>
+    </ul>
+    <p class="htp-subsection-title">Magic Resistance</p>
+    <ul>
+      <li>
+        <strong>PC Magic Resistance:</strong> Mind ÷ 2 (rounded down). Monsters must overcome this
+        when they cast spells at you.
+      </li>
+      <li>
+        <strong>Monster Magic Resistance:</strong> set by the dungeon designer per monster.
+        Adds directly to the DC of your spell roll.
+      </li>
+    </ul>
+    <p class="htp-subsection-title">Tips</p>
+    <ul>
+      <li>Mage and Healer classes start with higher Magic Power, making them better spellcasters.</li>
+      <li>A higher Mind stat improves both your spell accuracy and your resistance to enemy magic.</li>
+      <li>Spells can hit from range — useful when you want to avoid melee.</li>
+    </ul>
+  </section>
+
+  <!-- ── SP and the Exit ────────────────────────────────────────── -->
+  <section class="how-to-play-section">
+    <h3>Skill Points and the Exit</h3>
+    <p>
+      <strong>SP (Skill Points)</strong> are earned by killing monsters and completing dungeons.
+      They appear in the status bar at the bottom and carry over to your PC.
+    </p>
+    <p>
+      When you step onto the <strong>Exit</strong> square a prompt appears — confirm to leave the
+      dungeon and collect any SP reward, or stay to keep exploring. Some exits use animated
+      transitions; reach the top of the stairs to win.
+    </p>
+  </section>
+
+  <!-- ── Status Bar ─────────────────────────────────────────────── -->
+  <section class="how-to-play-section">
+    <h3>Status Bar</h3>
+    <div class="htp-stat-row">
+      <span class="htp-stat htp-stat-hp">HP: 18 / 20</span>
+      <span class="htp-stat htp-stat-ae">AE: 3 / 5</span>
+      <span class="htp-stat htp-stat-sp">SP: 42</span>
+      <span class="htp-stat htp-stat-phase">Your Turn</span>
+    </div>
+    <ul>
+      <li><strong>HP</strong> — Current health out of max. Reach 0 → game over.</li>
+      <li><strong>AE</strong> — Actions left this turn. Resets at the start of your next turn.</li>
+      <li><strong>SP</strong> — Skill Points accumulated this run.</li>
+      <li><strong>Turn indicator</strong> — "Your Turn", "Monster Turn…", or "Game Over".</li>
+    </ul>
+  </section>
+
+  <!-- ── Create and Share ───────────────────────────────────────── -->
+  <section class="how-to-play-section htp-section-creator">
+    <h3>Build Your Own Dungeons &amp; Share Them</h3>
+    <p>
+      Love the game? You can design your own dungeons — place rooms, walls, doors, monsters,
+      treshers, keys, text, traps, portals, and hidden passages — then publish them for your
+      friends or open them to the whole community.
+    </p>
+    <ul>
+      <li>Keep a dungeon <strong>private</strong> for just you.</li>
+      <li>Share with <strong>specific friends</strong> from your friends list.</li>
+      <li>Go <strong>public</strong> so any player can start a run.</li>
+    </ul>
+    <p>
+      To unlock the Creator tools you need <strong>Creator access</strong>.
+      Just reach out and apply — tell us a bit about what you want to make and we will get you set
+      up. Once approved the <strong>Create</strong> link appears in the navigation bar.
     </p>
   </section>
 </section>

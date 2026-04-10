@@ -41,11 +41,27 @@ export class App {
     return this.router.url.startsWith('/create');
   }
 
+  isGamePage() {
+    return this.router.url.startsWith('/game/');
+  }
+
+  isSamplePlayPage() {
+    return this.router.url.startsWith('/sample-play');
+  }
+
+  exitGame() {
+    this.router.navigate(['/dashboard']);
+  }
+
+  exitSamplePlay() {
+    this.router.navigate(['/sample-game']);
+  }
+
   toggleCreateHeader() {
     this.creatorLayout.toggleHeader();
   }
 
   showMenuBar() {
-    return !this.isCreatePage() || !this.creatorLayout.isHeaderCollapsed();
+    return !this.isCreatePage() && !this.isSamplePlayPage() || !this.creatorLayout.isHeaderCollapsed();
   }
 }

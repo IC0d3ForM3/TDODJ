@@ -9,6 +9,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { forkJoin } from 'rxjs';
 import { API_BASE_URL } from '../../api-config';
+import { Account } from '../../services/account';
 
 interface AdminUser {
   id: number;
@@ -24,6 +25,20 @@ interface AdminUser {
 type EditableFlags = Pick<AdminUser, 'isactive' | 'isadmin' | 'iscreator'>;
 type EditableField = keyof EditableFlags;
 
+interface AdminDungon {
+  id: number;
+  name: string;
+  issample: boolean;
+}
+
+interface AdminPc {
+  id: number;
+  name: string;
+  species: string;
+  type: string;
+  issample: boolean;
+}
+
 @Component({
   selector: 'app-admin',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -32,6 +47,7 @@ type EditableField = keyof EditableFlags;
 })
 export class Admin implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly account = inject(Account);
 
   readonly users = signal<AdminUser[]>([]);
   readonly isLoading = signal(false);
@@ -39,6 +55,20 @@ export class Admin implements OnInit {
   readonly error = signal<string | null>(null);
   readonly saveError = signal<string | null>(null);
   readonly saveSuccess = signal<string | null>(null);
+
+  // Dungon sample management
+  readonly dungons = signal<AdminDungon[]>([]);
+  readonly isDungonsLoading = signal(false);
+  readonly dungonError = signal<string | null>(null);
+  readonly dungonSaving = signal<number | null>(null);
+  readonly dungonSaveSuccess = signal<string | null>(null);
+
+  // PC sample management
+  readonly allPcs = signal<AdminPc[]>([]);
+  readonly isPcsLoading = signal(false);
+  readonly pcError = signal<string | null>(null);
+  readonly pcSaving = signal<number | null>(null);
+  readonly pcSaveSuccess = signal<string | null>(null);
 
   private readonly originalFlagsById = signal<Record<number, EditableFlags>>({});
   private readonly pendingEditsById = signal<Record<number, EditableFlags>>({});
@@ -49,6 +79,8 @@ export class Admin implements OnInit {
 
   ngOnInit(): void {
     this.loadUsers();
+    this.loadDungons();
+    this.loadAllPcs();
   }
 
   private loadUsers(): void {
@@ -173,6 +205,83 @@ export class Admin implements OnInit {
         delete nextPending[userId];
       }
       return nextPending;
+    });
+  }
+
+  private loadDungons(): void {
+    const key = this.account.getKey();
+    if (!key) return;
+    this.isDungonsLoading.set(true);
+    this.dungonError.set(null);
+    this.http.get<AdminDungon[]>(`${API_BASE_URL}/dungons/admin-published?userkey=${key}`).subscribe({
+      next: (dungons) => {
+        this.dungons.set(dungons);
+        this.isDungonsLoading.set(false);
+      },
+      error: () => {
+        this.dungonError.set('Failed to load dungons.');
+        this.isDungonsLoading.set(false);
+      },
+    });
+  }
+
+  setSampleDungon(id: number): void {
+    const key = this.account.getKey();
+    if (!key || this.dungonSaving() !== null) return;
+    this.dungonSaving.set(id);
+    this.dungonSaveSuccess.set(null);
+    this.dungonError.set(null);
+    this.http.put<{ result: number }>(`${API_BASE_URL}/dungons/${id}/set-sample`, { userkey: key }).subscribe({
+      next: () => {
+        this.dungons.update((list) =>
+          list.map((d) => ({ ...d, issample: d.id === id }))
+        );
+        this.dungonSaving.set(null);
+        this.dungonSaveSuccess.set('Sample dungon updated.');
+      },
+      error: () => {
+        this.dungonError.set('Failed to set sample dungon.');
+        this.dungonSaving.set(null);
+      },
+    });
+  }
+
+  private loadAllPcs(): void {
+    const key = this.account.getKey();
+    if (!key) return;
+    this.isPcsLoading.set(true);
+    this.pcError.set(null);
+    this.http.get<AdminPc[]>(`${API_BASE_URL}/pcs/admin-all?userkey=${key}`).subscribe({
+      next: (pcs) => {
+        this.allPcs.set(pcs);
+        this.isPcsLoading.set(false);
+      },
+      error: () => {
+        this.pcError.set('Failed to load pcs.');
+        this.isPcsLoading.set(false);
+      },
+    });
+  }
+
+  toggleSamplePc(pc: AdminPc): void {
+    const key = this.account.getKey();
+    if (!key || this.pcSaving() !== null) return;
+    const newValue = !pc.issample;
+    this.pcSaving.set(pc.id);
+    this.pcSaveSuccess.set(null);
+    this.pcError.set(null);
+    this.http.put<{ result: number }>(`${API_BASE_URL}/pcs/${pc.id}/set-sample`, { userkey: key, issample: newValue }).subscribe({
+      next: () => {
+        this.allPcs.update((list) =>
+          list.map((p) => p.id === pc.id ? { ...p, issample: newValue } : p)
+        );
+        this.pcSaving.set(null);
+        this.pcSaveSuccess.set(`${pc.name} ${newValue ? 'added to' : 'removed from'} sample list.`);
+      },
+      error: () => {
+        this.pcError.set('Failed to update sample pc.');
+        this.pcSaving.set(null);
+      },
     });
   }
 }

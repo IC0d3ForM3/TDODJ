@@ -26,3 +26,6 @@ export * from './side-rule';
 export * from './nearby-discovery-item';
 export * from './dungon-exit';
 export * from './square-text';
+export * from './trap';
+export * from './floor-trap-placement';
+export * from './portal-placement';

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { UpsertPcPayload } from '../repositories/pcRepository';
+import { getUserByKey } from '../repositories/userRepository';
 import * as imageService from '../services/imageService';
 import * as pcService from '../services/pcService';
 import * as tresherService from '../services/tresherService';
@@ -32,11 +33,15 @@ interface PcWriteInput {
   movementEconomy?: unknown;
   movmentEconomy?: unknown;
   movementEconay?: unknown;
+  actionEconomy?: unknown;
+  actioneconomy?: unknown;
   poisonResest?: unknown;
   poisonresest?: unknown;
   magicPower?: unknown;
   magicpower?: unknown;
   mp?: unknown;
+  mind?: unknown;
+  stamina?: unknown;
   level?: unknown;
   strenth?: unknown;
   strength?: unknown;
@@ -66,6 +71,22 @@ interface PcWriteInput {
   leftlegarmortresherid?: unknown;
   rightLegArmorTresherId?: unknown;
   rightlegarmortresherid?: unknown;
+  ring1ItemId?: unknown;
+  ring1itemid?: unknown;
+  ring2ItemId?: unknown;
+  ring2itemid?: unknown;
+  ring3ItemId?: unknown;
+  ring3itemid?: unknown;
+  ring4ItemId?: unknown;
+  ring4itemid?: unknown;
+  ring5ItemId?: unknown;
+  ring5itemid?: unknown;
+  necklaceItemId?: unknown;
+  necklaceitemid?: unknown;
+  hand1ItemId?: unknown;
+  hand1itemid?: unknown;
+  hand2ItemId?: unknown;
+  hand2itemid?: unknown;
 }
 
 export const getPcs = async (req: Request, res: Response) => {
@@ -106,6 +127,35 @@ export const createPc = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error creating pc:', error);
     return res.status(500).json({ result: -1, error: 'Failed to create pc' });
+  }
+};
+
+export const awardSpToPc = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const { userkey, amount } = req.body as Partial<{ userkey: string; amount: number }>;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
+  }
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid positive amount is required' });
+  }
+
+  try {
+    const newSp = await pcService.awardSpToPc(id, userkey.trim(), amount);
+    if (newSp === null) {
+      return res.status(404).json({ result: -1, error: 'PC not found' });
+    }
+
+    return res.json({ result: 1, sp: newSp });
+  } catch (error) {
+    console.error('Error awarding SP to pc:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to award SP' });
   }
 };
 
@@ -176,15 +226,17 @@ const normalizePcPayload = (value: unknown): UpsertPcPayload | null => {
     maxHP,
     currentHP,
     ac: Math.max(0, normalizeNumber(input.ac, 10)),
-    movementEconomy: Math.max(
+    actionEconomy: Math.max(
       0,
       normalizeNumber(
-        input.movementEconomy ?? input.movmentEconomy ?? input.movementEconay,
+        input.actionEconomy ?? input.actioneconomy ?? input.movementEconomy ?? input.movmentEconomy ?? input.movementEconay,
         0
       )
     ),
     poisonResest: normalizeNumber(input.poisonResest ?? input.poisonresest, 0),
     magicPower: normalizeNumber(input.magicPower ?? input.magicpower ?? input.mp, 0),
+    mind: Math.max(0, normalizeNumber(input.mind, 0)),
+    stamina: Math.max(0, normalizeNumber(input.stamina, 0)),
     level: Math.max(1, normalizeNumber(input.level, 1)),
     strength: normalizeNumber(input.strength ?? input.strenth, 0),
     rangeOfView,
@@ -219,6 +271,14 @@ const normalizePcPayload = (value: unknown): UpsertPcPayload | null => {
     rightLegArmorTresherId: normalizeNullableNumber(
       input.rightLegArmorTresherId ?? input.rightlegarmortresherid
     ),
+    ring1ItemId: normalizeNullableNumber(input.ring1ItemId ?? input.ring1itemid),
+    ring2ItemId: normalizeNullableNumber(input.ring2ItemId ?? input.ring2itemid),
+    ring3ItemId: normalizeNullableNumber(input.ring3ItemId ?? input.ring3itemid),
+    ring4ItemId: normalizeNullableNumber(input.ring4ItemId ?? input.ring4itemid),
+    ring5ItemId: normalizeNullableNumber(input.ring5ItemId ?? input.ring5itemid),
+    necklaceItemId: normalizeNullableNumber(input.necklaceItemId ?? input.necklaceitemid),
+    hand1ItemId: normalizeNullableNumber(input.hand1ItemId ?? input.hand1itemid),
+    hand2ItemId: normalizeNullableNumber(input.hand2ItemId ?? input.hand2itemid),
   };
 };
 
@@ -367,4 +427,70 @@ const normalizeIdList = (value: unknown): number[] => {
     .filter((entry): entry is number => entry !== null && entry > 0);
 
   return Array.from(new Set(normalized));
+};
+
+export const getSamplePcs = async (_req: Request, res: Response) => {
+  try {
+    const pcs = await pcService.fetchSamplePcs();
+    return res.json(pcs);
+  } catch (error) {
+    console.error('Error fetching sample pcs:', error);
+    return res.status(500).json({ error: 'Failed to fetch sample pcs' });
+  }
+};
+
+export const setSamplePc = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const { userkey, issample } = req.body as Partial<{ userkey: string; issample: boolean }>;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
+  }
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+
+  if (typeof issample !== 'boolean') {
+    return res.status(400).json({ result: -1, error: 'issample must be a boolean' });
+  }
+
+  const trimmedKey = userkey.trim();
+  const user = await getUserByKey(trimmedKey);
+  if (!user || (!user.isadmin && !user.ismasteradmin)) {
+    return res.status(403).json({ result: -1, error: 'Only admins can set sample pcs' });
+  }
+
+  try {
+    const wasSet = await pcService.setSamplePc(id, issample);
+    if (!wasSet) {
+      return res.status(404).json({ result: -1, error: 'PC not found' });
+    }
+    return res.json({ result: 1 });
+  } catch (error) {
+    console.error('Error setting sample pc:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to set sample pc' });
+  }
+};
+
+export const getAdminPcs = async (req: Request, res: Response) => {
+  const userkey = req.query['userkey'];
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ error: 'Valid userkey query parameter is required' });
+  }
+
+  const trimmedKey = userkey.trim();
+  const user = await getUserByKey(trimmedKey);
+  if (!user || (!user.isadmin && !user.ismasteradmin)) {
+    return res.status(403).json({ error: 'Only admins can access this endpoint' });
+  }
+
+  try {
+    const pcs = await pcService.fetchAllPcsForAdmin();
+    return res.json(pcs);
+  } catch (error) {
+    console.error('Error fetching pcs for admin:', error);
+    return res.status(500).json({ error: 'Failed to fetch pcs' });
+  }
 };

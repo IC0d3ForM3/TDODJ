@@ -8,6 +8,8 @@ import { DungonExit } from './dungon-exit';
 import { Monster } from './monster';
 import { MonsterPlacement } from './monster-placement';
 import { SquareText } from './square-text';
+import { FloorTrapPlacement } from './floor-trap-placement';
+import { PortalPlacement } from './portal-placement';
 
 export interface DungonJsonPayload {
   filledSquares: Record<string, true>;
@@ -26,4 +28,6 @@ export interface DungonJsonPayload {
   monsters?: Monster[];
   monsterPlacementList?: MonsterPlacement[];
   squareTexts?: SquareText[];
+  floorTrapPlacements?: FloorTrapPlacement[];
+  portalPlacements?: PortalPlacement[];
 }

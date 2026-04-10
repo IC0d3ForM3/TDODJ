@@ -1,57 +1,93 @@
 import pool from '../db';
 
-export type TresherTypeValue = 'Weapon' | 'Armor' | 'Coins' | 'Potion' | 'OtherTresher';
-export type ArmorTypeValue = 'head' | 'hand' | 'body' | 'arms' | 'legs';
-export type CoinTypeValue = 'Gold' | 'Silver' | 'Copper' | 'Tin';
-export type PotionEffectTargetValue = 'Health' | 'AC' | 'AE';
-
 export interface TresherRecord {
   id: number;
   userguid: string;
-  type: TresherTypeValue;
+  type: string;
   name: string;
   description: string;
-  worth: number;
-  curseID: number | null;
-  trapID: number | null;
-  HP: number | null;
-  damage: number | null;
-  hands: number | null;
-  range: number | null;
-  ammoType: string | null;
-  speedReduction: number | null;
-  armorType: ArmorTypeValue | null;
-  coinType: CoinTypeValue | null;
-  effectNumber: number | null;
-  effectTarget: PotionEffectTargetValue | null;
-  effectDuration: number | null;
+  gold: number;
+  silver: number;
+  copper: number;
+  zinc: number;
+  item1Id: number | null;
+  item2Id: number | null;
+  item3Id: number | null;
+  item4Id: number | null;
+  spell1Id: number | null;
+  spell2Id: number | null;
+  spell3Id: number | null;
+  spell4Id: number | null;
+  curse1Id: number | null;
+  curse2Id: number | null;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
   spReward: number;
+  imageId: number | null;
+  soundId: number | null;
+  potion1Id: number | null;
+  potion2Id: number | null;
+  potion3Id: number | null;
 }
 
 export interface UpsertTresherPayload {
-  type: TresherTypeValue;
+  type: string;
   name: string;
   description: string;
-  worth: number;
-  curseID: number | null;
-  trapID: number | null;
-  HP: number | null;
-  damage: number | null;
-  hands: number | null;
-  range: number | null;
-  ammoType: string | null;
-  speedReduction: number | null;
-  armorType: ArmorTypeValue | null;
-  coinType: CoinTypeValue | null;
-  effectNumber: number | null;
-  effectTarget: PotionEffectTargetValue | null;
-  effectDuration: number | null;
+  gold: number;
+  silver: number;
+  copper: number;
+  zinc: number;
+  item1Id: number | null;
+  item2Id: number | null;
+  item3Id: number | null;
+  item4Id: number | null;
+  spell1Id: number | null;
+  spell2Id: number | null;
+  spell3Id: number | null;
+  spell4Id: number | null;
+  curse1Id: number | null;
+  curse2Id: number | null;
   isPublic: boolean;
   spReward: number;
+  imageId: number | null;
+  soundId: number | null;
+  potion1Id: number | null;
+  potion2Id: number | null;
+  potion3Id: number | null;
 }
+
+const SELECT_TRESHER_FIELDS = `
+  id,
+  userguid::text AS userguid,
+  type,
+  name,
+  description,
+  COALESCE(gold, 0) AS gold,
+  COALESCE(silver, 0) AS silver,
+  COALESCE(copper, 0) AS copper,
+  COALESCE(zinc, 0) AS zinc,
+  item1id AS "item1Id",
+  item2id AS "item2Id",
+  item3id AS "item3Id",
+  item4id AS "item4Id",
+  spell1id AS "spell1Id",
+  spell2id AS "spell2Id",
+  spell3id AS "spell3Id",
+  spell4id AS "spell4Id",
+  curse1id AS "curse1Id",
+  curse2id AS "curse2Id",
+  ispublic AS "isPublic",
+  createdat::text AS "createdAt",
+  updatedat::text AS "updatedAt",
+  COALESCE(spreward, 0) AS "spReward",
+  imageid AS "imageId",
+  soundid AS "soundId",
+  potion1id AS "potion1Id",
+  potion2id AS "potion2Id",
+  potion3id AS "potion3Id"
+`;
 
 export const isAdminUserByGuid = async (userguid: string): Promise<boolean> => {
   const { rows } = await pool.query<{ isadmin: boolean }>(
@@ -70,29 +106,7 @@ export const getTreshersByUserGuid = async (
   userguid: string
 ): Promise<TresherRecord[]> => {
   const { rows } = await pool.query<TresherRecord>(
-    `SELECT
-       id,
-       userguid::text AS userguid,
-       type,
-       name,
-       description,
-       worth,
-       curseid AS "curseID",
-       trapid AS "trapID",
-       hp AS "HP",
-       damage,
-       hands,
-       "range" AS range,
-       ammotype AS "ammoType",
-       speedreduction AS "speedReduction",
-       armortype AS "armorType",
-       cointype AS "coinType",
-       effectnumber AS "effectNumber",
-       effecttarget AS "effectTarget",
-       effectduration AS "effectDuration",
-       ispublic AS "isPublic",
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"
+    `SELECT ${SELECT_TRESHER_FIELDS}
      FROM treshers
      WHERE userguid = $1
      ORDER BY updatedat DESC, id DESC`,
@@ -106,29 +120,7 @@ export const getTresherLibraryByUserGuid = async (
   userguid: string
 ): Promise<TresherRecord[]> => {
   const { rows } = await pool.query<TresherRecord>(
-    `SELECT
-       id,
-       userguid::text AS userguid,
-       type,
-       name,
-       description,
-       worth,
-       curseid AS "curseID",
-       trapid AS "trapID",
-       hp AS "HP",
-       damage,
-       hands,
-       "range" AS range,
-       ammotype AS "ammoType",
-       speedreduction AS "speedReduction",
-       armortype AS "armorType",
-       cointype AS "coinType",
-       effectnumber AS "effectNumber",
-       effecttarget AS "effectTarget",
-       effectduration AS "effectDuration",
-       ispublic AS "isPublic",
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"
+    `SELECT ${SELECT_TRESHER_FIELDS}
      FROM treshers
      WHERE userguid = $1 OR ispublic = true
      ORDER BY
@@ -150,29 +142,7 @@ export const getTreshersByIds = async (
 
   const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
   const { rows } = await pool.query<TresherRecord>(
-    `SELECT
-       id,
-       userguid::text AS userguid,
-       type,
-       name,
-       description,
-       worth,
-       curseid AS "curseID",
-       trapid AS "trapID",
-       hp AS "HP",
-       damage,
-       hands,
-       "range" AS range,
-       ammotype AS "ammoType",
-       speedreduction AS "speedReduction",
-       armortype AS "armorType",
-       cointype AS "coinType",
-       effectnumber AS "effectNumber",
-       effecttarget AS "effectTarget",
-       effectduration AS "effectDuration",
-       ispublic AS "isPublic",
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"
+    `SELECT ${SELECT_TRESHER_FIELDS}
      FROM treshers
      WHERE id IN (${placeholders})`,
     ids
@@ -207,88 +177,61 @@ export const insertTresherForUser = async (
        type,
        name,
        description,
-       worth,
-       curseid,
-       trapid,
-       hp,
-       damage,
-       hands,
-       "range",
-       ammotype,
-       speedreduction,
-       armortype,
-       cointype,
-       effectnumber,
-       effecttarget,
-       effectduration,
+       gold,
+       silver,
+       copper,
+       zinc,
+       item1id,
+       item2id,
+       item3id,
+       item4id,
+       spell1id,
+       spell2id,
+       spell3id,
+       spell4id,
+       curse1id,
+       curse2id,
        ispublic,
+       spreward,
+       imageid,
+       soundid,
+       potion1id,
+       potion2id,
+       potion3id,
        updatedat
      )
      VALUES (
-       $1,
-       $2,
-       $3,
-       $4,
-       $5,
-       $6,
-       $7,
-       $8,
-       $9,
-       $10,
-       $11,
-       $12,
-       $13,
-       $14,
-       $15,
-       $16,
-       $17,
-       $18,
-       $19,
+       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+       $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
        NOW()
      )
-     RETURNING
-       id,
-       userguid::text AS userguid,
-       type,
-       name,
-       description,
-       worth,
-       curseid AS "curseID",
-       trapid AS "trapID",
-       hp AS "HP",
-       damage,
-       hands,
-       "range" AS range,
-       ammotype AS "ammoType",
-       speedreduction AS "speedReduction",
-       armortype AS "armorType",
-       cointype AS "coinType",
-       effectnumber AS "effectNumber",
-       effecttarget AS "effectTarget",
-       effectduration AS "effectDuration",
-       ispublic AS "isPublic",
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"`,
+     RETURNING ${SELECT_TRESHER_FIELDS}`,
     [
       userguid,
       payload.type,
       payload.name,
       payload.description,
-      payload.worth,
-      payload.curseID,
-      payload.trapID,
-      payload.HP,
-      payload.damage,
-      payload.hands,
-      payload.range,
-      payload.ammoType,
-      payload.speedReduction,
-      payload.armorType,
-      payload.coinType,
-      payload.effectNumber,
-      payload.effectTarget,
-      payload.effectDuration,
+      payload.gold,
+      payload.silver,
+      payload.copper,
+      payload.zinc,
+      payload.item1Id,
+      payload.item2Id,
+      payload.item3Id,
+      payload.item4Id,
+      payload.spell1Id,
+      payload.spell2Id,
+      payload.spell3Id,
+      payload.spell4Id,
+      payload.curse1Id,
+      payload.curse2Id,
       payload.isPublic,
+      payload.spReward,
+      payload.imageId,
+      payload.soundId,
+      payload.potion1Id,
+      payload.potion2Id,
+      payload.potion3Id,
     ]
   );
 
@@ -306,67 +249,57 @@ export const updateTresherForUser = async (
        type = $3,
        name = $4,
        description = $5,
-       worth = $6,
-       curseid = $7,
-       trapid = $8,
-       hp = $9,
-       damage = $10,
-       hands = $11,
-       "range" = $12,
-       ammotype = $13,
-       speedreduction = $14,
-       armortype = $15,
-       cointype = $16,
-       effectnumber = $17,
-       effecttarget = $18,
-       effectduration = $19,
+       gold = $6,
+       silver = $7,
+       copper = $8,
+       zinc = $9,
+       item1id = $10,
+       item2id = $11,
+       item3id = $12,
+       item4id = $13,
+       spell1id = $14,
+       spell2id = $15,
+       spell3id = $16,
+       spell4id = $17,
+       curse1id = $18,
+       curse2id = $19,
        ispublic = $20,
+       spreward = $21,
+       imageid = $22,
+       soundid = $23,
+       potion1id = $24,
+       potion2id = $25,
+       potion3id = $26,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
-     RETURNING
-       id,
-       userguid::text AS userguid,
-       type,
-       name,
-       description,
-       worth,
-       curseid AS "curseID",
-       trapid AS "trapID",
-       hp AS "HP",
-       damage,
-       hands,
-       "range" AS range,
-       ammotype AS "ammoType",
-       speedreduction AS "speedReduction",
-       armortype AS "armorType",
-       cointype AS "coinType",
-       effectnumber AS "effectNumber",
-       effecttarget AS "effectTarget",
-       effectduration AS "effectDuration",
-       ispublic AS "isPublic",
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"`,
+     RETURNING ${SELECT_TRESHER_FIELDS}`,
     [
       id,
       userguid,
       payload.type,
       payload.name,
       payload.description,
-      payload.worth,
-      payload.curseID,
-      payload.trapID,
-      payload.HP,
-      payload.damage,
-      payload.hands,
-      payload.range,
-      payload.ammoType,
-      payload.speedReduction,
-      payload.armorType,
-      payload.coinType,
-      payload.effectNumber,
-      payload.effectTarget,
-      payload.effectDuration,
+      payload.gold,
+      payload.silver,
+      payload.copper,
+      payload.zinc,
+      payload.item1Id,
+      payload.item2Id,
+      payload.item3Id,
+      payload.item4Id,
+      payload.spell1Id,
+      payload.spell2Id,
+      payload.spell3Id,
+      payload.spell4Id,
+      payload.curse1Id,
+      payload.curse2Id,
       payload.isPublic,
+      payload.spReward,
+      payload.imageId,
+      payload.soundId,
+      payload.potion1Id,
+      payload.potion2Id,
+      payload.potion3Id,
     ]
   );
 

@@ -161,3 +161,47 @@ export const updateImageForUser = async (
 
   return rows[0] ?? null;
 };
+
+export const getImagesByIds = async (ids: number[]): Promise<ImageRecord[]> => {
+  if (ids.length === 0) {
+    return [];
+  }
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+  const { rows } = await pool.query<ImageRecord>(
+    `SELECT
+       id,
+       userguid::text AS userguid,
+       path,
+       ispublic AS "isPublic",
+       isactive AS "isActive",
+       name,
+       createdat::text AS "createdAt",
+       updatedat::text AS "updatedAt"
+     FROM images
+     WHERE id IN (${placeholders})`,
+    ids
+  );
+  return rows;
+};
+
+export const getPublicImagesByIds = async (ids: number[]): Promise<ImageRecord[]> => {
+  if (ids.length === 0) {
+    return [];
+  }
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+  const { rows } = await pool.query<ImageRecord>(
+    `SELECT
+       id,
+       userguid::text AS userguid,
+       path,
+       ispublic AS "isPublic",
+       isactive AS "isActive",
+       name,
+       createdat::text AS "createdAt",
+       updatedat::text AS "updatedAt"
+     FROM images
+     WHERE id IN (${placeholders}) AND ispublic = true AND isactive = true`,
+    ids
+  );
+  return rows;
+};

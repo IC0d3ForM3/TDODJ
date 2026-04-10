@@ -10,4 +10,7 @@ export interface DungonDetails {
   minsplifetime: number;
   maxsplifetime: number;
   spreward: number;
+  ismaingame: boolean;
+  issample: boolean;
+  ispublic: boolean;
 }

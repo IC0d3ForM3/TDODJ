@@ -1,34 +1,45 @@
-
 <header>
-    <div class="page-title-row">
-      <h1 class="page-title">Dannys Dungens</h1>
-      <button
-        *ngIf="isCreatePage()"
-        type="button"
-        class="create-header-toggle"
-        (click)="toggleCreateHeader()"
-        [attr.aria-label]="creatorLayout.isHeaderCollapsed() ? 'Show Create section' : 'Hide Create section'"
-        [attr.aria-expanded]="!creatorLayout.isHeaderCollapsed()"
-      >
-        {{ creatorLayout.isHeaderCollapsed() ? '▼' : '▲' }}
-      </button>
-    </div>
-    <nav class="navbar" *ngIf="showMenuBar()">
-      <input type="checkbox" id="menu-toggle" class="menu-toggle">
-      <label for="menu-toggle" class="menu-icon">&#9776;</label>
-      <ul class="nav-links">
-        <li><a routerLink="/" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: true }">Home</a></li>
-        <li *ngIf="!isLoggedIn()"><a routerLink="/login" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: true }">Login</a></li>
-        <li *ngIf="!isLoggedIn()"><a routerLink="/signup" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: true }">Signup</a></li>
-        <li><a routerLink="/about" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: true }">About</a></li>
-        <li><a routerLink="/how-to-play" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: true }">How to Play</a></li>
-        <li *ngIf="isLoggedIn()"><a routerLink="/dashboard" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a></li>
-        <li *ngIf="isLoggedIn() && isAdmin()"><a routerLink="/admin" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: true }">Admin</a></li>
-        <li *ngIf="isLoggedIn() && isCreator()"><a routerLink="/create" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: true }">Create</a></li>
-        <li *ngIf="isLoggedIn()"><a href="#" (click)="logout()">Log out</a></li>
-      </ul>
-    </nav>
-  </header>
-  <main>
-    <router-outlet></router-outlet>
-  </main>
+  <div class="page-title-row">
+    <ng-container *ngIf="!isGamePage() && !isSamplePlayPage()">
+      <img src="/logo2.png" alt="The Dungeons of Danny Joe" class="site-logo" />
+    </ng-container>
+    <button *ngIf="isGamePage()" type="button" class="exit-game-button" (click)="exitGame()">
+      &#9664; Exit
+    </button>
+    <button *ngIf="isSamplePlayPage()" type="button" class="exit-game-button" (click)="exitSamplePlay()">
+      &#9664; Exit
+    </button>
+    <button *ngIf="isCreatePage()" type="button" class="create-header-toggle" (click)="toggleCreateHeader()"
+      [attr.aria-label]="creatorLayout.isHeaderCollapsed() ? 'Show Create section' : 'Hide Create section'"
+      [attr.aria-expanded]="!creatorLayout.isHeaderCollapsed()">
+      {{ creatorLayout.isHeaderCollapsed() ? '▼' : '▲' }}
+    </button>
+  </div>
+  <nav class="navbar" *ngIf="showMenuBar()">
+    <input type="checkbox" id="menu-toggle" class="menu-toggle">
+    <label for="menu-toggle" class="menu-icon">&#9776;</label>
+    <ul class="nav-links">
+      <li *ngIf="!isLoggedIn()"><a routerLink="/" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: true }">Home</a></li>
+      <li *ngIf="!isLoggedIn()"><a routerLink="/login" routerLinkActive="nav-link-active"
+          [routerLinkActiveOptions]="{ exact: true }">Login</a></li>
+      <li *ngIf="!isLoggedIn()"><a routerLink="/signup" routerLinkActive="nav-link-active"
+          [routerLinkActiveOptions]="{ exact: true }">Signup</a></li>
+      <li><a routerLink="/about" routerLinkActive="nav-link-active"
+          [routerLinkActiveOptions]="{ exact: true }">About</a></li>
+      <li><a routerLink="/how-to-play" routerLinkActive="nav-link-active"
+          [routerLinkActiveOptions]="{ exact: true }">How to Play</a></li>
+      <li *ngIf="!isLoggedIn()"><a routerLink="/sample-game" routerLinkActive="nav-link-active"
+          [routerLinkActiveOptions]="{ exact: true }">Sample Game</a></li>
+      <li *ngIf="isLoggedIn()"><a routerLink="/dashboard" routerLinkActive="nav-link-active"
+          [routerLinkActiveOptions]="{ exact: true }">Dashboard</a></li>
+      <li *ngIf="isLoggedIn() && isAdmin()"><a routerLink="/admin" routerLinkActive="nav-link-active"
+          [routerLinkActiveOptions]="{ exact: true }">Admin</a></li>
+      <li *ngIf="isLoggedIn() && isCreator()"><a routerLink="/create" routerLinkActive="nav-link-active"
+          [routerLinkActiveOptions]="{ exact: true }">Create</a></li>
+      <li *ngIf="isLoggedIn()"><a href="#" (click)="logout()">Log out</a></li>
+    </ul>
+  </nav>
+</header>
+<main>
+  <router-outlet></router-outlet>
+</main>

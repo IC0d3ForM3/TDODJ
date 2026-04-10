@@ -1,7 +1,9 @@
 <section class="game-page">
 	<header class="game-header">
 		<h2 class="game-title">{{ gameName() }}</h2>
-		@if (gameLastUpdated(); as updated) {
+		@if (isSampleMode()) {
+			<p class="game-sample-banner">Sample game — no progress is saved</p>
+		} @else if (gameLastUpdated(); as updated) {
 			<p class="game-subtitle">Last updated: {{ updated }}</p>
 		}
 	</header>
@@ -16,23 +18,38 @@
 			<section class="visual-panel-stack">
 				<div class="canvas-panel">
 					<h3 class="panel-title">First Person</h3>
-					<app-dungeon-first-person
-						[preview]="preview"
-						[cheater]="previewCheaterForView()"
-						[squares]="previewSquaresForView()"
-						[filledSquares]="previewFilledSquaresForView()"
-						[tresherPlacements]="previewTresherPlacementsForView()"
-						[monsterPlacements]="previewLiveMonsterPlacementsForView()"
-						[keyList]="keyList"
-						[squareTexts]="previewSquareTextsForView()"
-						[monsterImagesBySquare]="previewMonsterImagesBySquareForView()"
-					></app-dungeon-first-person>
-				</div>
-
-				<div class="canvas-panel">
-					<h3 class="panel-title">10x10 Map</h3>
-					<div class="map-with-pad" aria-label="Map direction controls">
-						<div class="map-canvas-wrap">
+					<div class="fpv-with-controls">
+						<div class="fpv-canvas-wrap">
+							<div class="fpv-viewport">
+								<app-dungeon-first-person
+									[preview]="preview"
+									[cheater]="previewCheaterForView()"
+									[squares]="previewSquaresForView()"
+									[filledSquares]="previewFilledSquaresForView()"
+									[tresherPlacements]="previewTresherPlacementsForView()"
+									[monsterPlacements]="previewLiveMonsterPlacementsForView()"
+									[keyList]="keyList"
+									[squareTexts]="previewSquareTextsForView()"
+									[monsterImagesBySquare]="previewMonsterImagesBySquareForView()"
+									[exits]="previewExitsForView()"
+								></app-dungeon-first-person>
+								@if (bloodSplatter().length) {
+									<div class="fpv-blood-overlay">
+										@for (s of bloodSplatter(); track $index) {
+											<div class="blood-drop" [style.left.px]="s.x" [style.top.px]="s.y" [style.width.px]="s.r * 2" [style.height.px]="s.r * 2"></div>
+										}
+									</div>
+								}
+								@if (playerHitFlash()) {
+									<div class="fpv-hit-flash"></div>
+								}
+							</div>
+							<div class="fpv-move-row">
+							<button type="button" class="fpv-move-btn fpv-move-btn-turn" title="Turn Left" (click)="turnFacingLeft()">↺</button>
+							<button type="button" class="fpv-move-btn fpv-move-btn-forward" title="Move Forward" (click)="moveForward()">👟</button>
+							<button type="button" class="fpv-move-btn fpv-move-btn-back" title="Move Backward" (click)="moveBackward()">🔙</button>
+							<button type="button" class="fpv-move-btn fpv-move-btn-turn" title="Turn Right" (click)="turnFacingRight()">↻</button>
+							</div>						<div class="map-canvas-wrap fpv-map-inline">
 							<app-dungeon-preview-grid
 								[preview]="preview"
 								[cheater]="previewCheaterForView()"
@@ -43,60 +60,77 @@
 								[keyList]="keyList"
 								[startPoint]="previewStartPointForView()"
 								[squareTexts]="previewSquareTextsForView()"
-							></app-dungeon-preview-grid>
-						</div>
-
-						<div class="direction-pad" aria-label="Direction pad">
-							@for (button of directionPadButtons; track $index) {
-								<button
-									type="button"
-									class="direction-pad-button"
-									[class.direction-pad-button-center]="button.direction === 'center'"
-									[class.is-active]="isFacingDirectionActive(button.direction)"
-									[attr.aria-label]="button.ariaLabel"
-									(click)="setFacingDirectionFromPad(button.direction)"
-								>
-									{{ button.label }}
-								</button>
-							}
+								[exits]="previewExitsForView()"							[combatRange]="combatRangeForMap()"
+							[selectedTargetRow]="selectedCombatTarget()?.row ?? null"
+							[selectedTargetColumn]="selectedCombatTarget()?.column ?? null"
+							(cellClicked)="onMapCellClicked($event)"							></app-dungeon-preview-grid>
+						</div>						</div>
+						<div class="fpv-icon-bar">
+							<button
+								type="button"
+								class="fpv-icon-btn fpv-icon-btn-eye"
+								title="Search for Traps"
+								(click)="searchForTraps()"
+							>👁</button>
+							<button
+								type="button"
+								class="fpv-icon-btn"
+								[class.fpv-icon-btn-active]="canPlayerAttack() || canAttackUnarmed()"
+								title="{{ hasWeaponEquipped() ? 'Attack' : 'Unarmed Attack' }}"
+								(click)="tryPlayerAttack()"
+							>{{ hasWeaponEquipped() ? '⚔' : '✊' }}</button>						<button
+							type="button"
+							class="fpv-icon-btn"
+							[class.fpv-icon-btn-active]="canPlayerDefend()"
+							[attr.data-stacks]="playerDefendStacks() > 0 ? playerDefendStacks() : null"
+							title="Defend (D) — costs 1 AE, +2 AC vs next attack"
+							(click)="tryPlayerDefend()"
+						>🛡</button>							<button
+								type="button"
+								class="fpv-icon-btn"
+								[class.fpv-icon-btn-active]="hasCurrentSquarePickupItems()"
+								title="Take All"
+								(click)="takeAllFromCurrentSquare()"
+							>&#x1F4B0;</button>
+							<button
+								type="button"
+								class="fpv-icon-btn"
+								[class.fpv-icon-btn-active]="canOpenAnyDoor()"
+								title="Open Door"
+								(click)="openAdjacentDoor(nearbyDoorsForPreview()[0])"
+							>🚪</button>
+							<button
+								type="button"
+								class="fpv-icon-btn"
+								[class.fpv-icon-btn-active]="canUnlockAnyDoor()"
+								title="Use Key"
+								(click)="unlockAdjacentDoor(nearbyDoorsForPreview()[0])"
+							>🔑</button>
+							<button
+								type="button"
+								class="fpv-icon-btn"
+								[class.fpv-icon-btn-active]="canPickAny()"
+								title="Pick Lock / Disarm Trap"
+								(click)="canPickAny() && foundTrap() ? tryDisarmTrap() : pickLockDoor(nearbyDoorsForPreview()[0])"
+							><span class="pick-icon">&#x2310;&#xAC;</span></button>
 						</div>
 					</div>
+
 				</div>
 
 				<p class="controls-help">
-					Use <strong>Arrow Keys</strong> or the pad to face a direction. Press <strong>Space</strong> or
-					the pad <strong>F</strong> button to move forward, or <strong>B</strong> to move backward.
-					Press <strong>A</strong> to attack an adjacent monster.
+					Press <strong>Space</strong> to move forward, <strong>S</strong> to move backward.
+					Press <strong>Q</strong> / <strong>E</strong> to turn left / right.
+					Press <strong>A</strong> to attack, <strong>D</strong> to defend.
 				</p>
 			</section>
 
 			<section class="right-panel-stack">
-				<aside class="info-panel" aria-label="Nearby discoveries">
-					<h3 class="panel-title panel-title-light">What You See</h3>
+				<aside class="info-panel info-panel-split" aria-label="Nearby and Inventory">
+					<div class="info-col">
+						<h3 class="panel-title panel-title-light">Nearby</h3>
 
-				<div class="info-tabs" role="tablist" aria-label="Info panel tabs">
-					<button
-						type="button"
-						class="info-tab-button"
-						[class.is-active]="activeInfoPanelTab() === 'nearby'"
-						[attr.aria-selected]="activeInfoPanelTab() === 'nearby'"
-						(click)="setActiveInfoPanelTab('nearby')"
-					>
-						Nearby
-					</button>
-					<button
-						type="button"
-						class="info-tab-button"
-						[class.is-active]="activeInfoPanelTab() === 'inventory'"
-						[attr.aria-selected]="activeInfoPanelTab() === 'inventory'"
-						(click)="setActiveInfoPanelTab('inventory')"
-					>
-						Inventory
-					</button>
-				</div>
-
-				@if (activeInfoPanelTab() === 'nearby') {
-					@if (nearbyDoorsForPreview().length > 0) {
+						@if (nearbyDoorsForPreview().length > 0) {
 						<ul class="discovery-list">
 							@for (doorInfo of nearbyDoorsForPreview(); track doorInfo.door.id) {
 								<li class="discovery-item discovery-item-door">
@@ -124,8 +158,11 @@
 											<button type="button" class="action-button action-button-key" (click)="unlockAdjacentDoor(doorInfo)">
 												Use Key
 											</button>
-										}
-									</div>
+										}									@if (doorInfo.canPick) {
+										<button type="button" class="action-button" (click)="pickLockDoor(doorInfo)">
+											Pick Lock
+										</button>
+									}									</div>
 								</li>
 							}
 						</ul>
@@ -147,9 +184,14 @@
 
 					@if (hasCurrentSquarePickupItems()) {
 						<div class="action-buttons">
-							<button type="button" class="action-button" (click)="lookForTrapsAtCurrentSquare()">
-								Look for Traps
+							<button type="button" class="action-button" (click)="searchForTraps()">
+								Search for Traps
 							</button>
+							@if (foundTrap()) {
+								<button type="button" class="action-button action-button-strong" (click)="tryDisarmTrap()">
+									Disarm Trap
+								</button>
+							}
 							<button type="button" class="action-button action-button-strong" (click)="takeAllFromCurrentSquare()">
 								Take All
 							</button>
@@ -159,16 +201,30 @@
 								</button>
 							}
 						</div>
+					} @else {
+						<div class="action-buttons">
+							<button type="button" class="action-button" (click)="searchForTraps()">
+								Search for Traps
+							</button>
+							@if (foundTrap()) {
+								<button type="button" class="action-button action-button-strong" (click)="tryDisarmTrap()">
+									Disarm Trap
+								</button>
+							}
+						</div>
 					}
-				} @else {
-					<div class="inventory-summary">
-						<p class="inventory-summary-line">
-							Hands Equipped: {{ inventoryHandsUsedForPreview() }} / {{ maxEquippableHands }}
-						</p>
-						<p class="inventory-summary-line">
-							Armor Equipped: {{ equippedArmorSummaryForPreview() }}
-						</p>
 					</div>
+
+					<div class="info-col">
+						<h3 class="panel-title panel-title-light">Inventory</h3>
+						<div class="inventory-summary">
+							<p class="inventory-summary-line">
+								Hands Equipped: {{ inventoryHandsUsedForPreview() }} / {{ maxEquippableHands }}
+							</p>
+							<p class="inventory-summary-line">
+								Armor Equipped: {{ equippedArmorSummaryForPreview() }}
+							</p>
+						</div>
 
 					@if (hasInventoryItemsForPreview()) {
 						@if (inventoryKeysForPreview().length > 0) {
@@ -187,12 +243,95 @@
 						@if (inventoryTreshersForPreview().length > 0) {
 							<p class="inventory-section-title">Tresher Items</p>
 							<ul class="discovery-list">
-								@for (tresher of inventoryTreshersForPreview(); track tresher.id + ':' + $index) {
+								@for (tresher of inventoryTreshersForPreview(); track tresher.id + ':' + $index; let tresherIdx = $index) {
 									<li class="discovery-item">
-										<span class="discovery-kind">{{ tresher.type }}</span>
+										<span class="discovery-kind">{{ tresher.type || 'Tresher' }}</span>
 										<p class="discovery-name">{{ tresher.name || 'Unnamed Tresher' }}</p>
 										<p class="discovery-description">{{ tresher.description || 'No description.' }}</p>
-										<p class="inventory-meta">{{ getInventoryTresherMeta(tresher) }}</p>
+											@if (getInventoryTresherMeta(tresher); as coinMeta) {
+												<p class="inventory-meta">{{ coinMeta }}</p>
+											}
+
+											@if (getTresherInnerItems(tresher).length > 0) {
+												<ul class="tresher-items-list">
+													@for (innerItem of getTresherInnerItems(tresher); track innerItem.id) {
+														<li class="tresher-inner-item">
+															<span class="discovery-kind">{{ innerItem.type }}</span>
+															<span class="tresher-item-name">{{ innerItem.name }}</span>												@if (innerItem.type === 'weapon' && innerItem.damage > 0) {
+													<span class="tresher-item-stat">Dmg: 1–{{ innerItem.damage }} | Range: {{ innerItem.range }}</span>
+												}
+												@if ((innerItem.type === 'armor' || innerItem.type === 'ring' || innerItem.type === 'necklace') && innerItem.effectValue) {
+													<span class="tresher-item-stat">+{{ innerItem.effectValue }} AC</span>
+												}															@if (isItemEquipable(innerItem.type)) {
+																<div class="inventory-item-actions">
+																	<button
+																		type="button"
+																		class="action-button"
+																		[class.action-button-strong]="isItemEquippedById(innerItem.id)"
+																		(click)="toggleItemEquipped(innerItem.id)"
+																	>
+																		{{ isItemEquippedById(innerItem.id) ? 'Unequip' : 'Equip' }}
+																	</button>
+																	@if (isItemEquippedById(innerItem.id)) {
+																		<span class="inventory-equipped-status">Equipped</span>
+																	}
+																</div>
+															}
+														</li>
+													}
+												</ul>
+											}
+
+										@if (getTresherInnerPotions(tresher).length > 0) {
+											<ul class="tresher-items-list">
+												@for (innerPotion of getTresherInnerPotions(tresher); track innerPotion.id) {
+													<li class="tresher-inner-item">
+														<span class="discovery-kind">Potion</span>
+														<span class="tresher-item-name">{{ innerPotion.name }}</span>
+														@if (innerPotion.description) {
+															<span class="tresher-item-desc">{{ innerPotion.description }}</span>
+														}													@if (isInnerPotionDrinkable(innerPotion)) {
+														<div class="inventory-item-actions">
+															<button
+																type="button"
+																class="action-button action-button-strong"
+																[disabled]="!canDrinkInnerPotion()"
+																(click)="drinkTresherInnerPotion(tresherIdx, innerPotion.id)"
+															>
+																Drink
+															</button>
+														</div>
+													}													</li>
+												}
+											</ul>
+										}
+
+										@if (getTresherInnerSpells(tresher).length > 0) {
+											<ul class="tresher-items-list">
+												@for (innerSpell of getTresherInnerSpells(tresher); track innerSpell.id) {
+													<li class="tresher-inner-item">
+														<span class="discovery-kind">Spell</span>
+														<span class="tresher-item-name">{{ innerSpell.name }}</span>
+														@if (innerSpell.description) {
+															<span class="tresher-item-desc">{{ innerSpell.description }}</span>
+														}
+														<span class="tresher-item-desc">
+															Cost: {{ innerSpell.sp }} MP (AE) | Range: {{ innerSpell.range }} | Effect: {{ innerSpell.effectOn }}
+														</span>
+														<div class="inventory-item-actions">
+															<button
+																type="button"
+																class="action-button action-button-strong"
+																[disabled]="!canCastSpell(innerSpell)"
+																(click)="castSpell(innerSpell.id)"
+															>
+																Cast ({{ innerSpell.sp }} AE)
+															</button>
+														</div>
+													</li>
+												}
+											</ul>
+										}
 
 										@if (isTresherEquipable(tresher) || isHealingPotion(tresher)) {
 											<div class="inventory-item-actions">
@@ -228,13 +367,39 @@
 					} @else {
 						<p class="discovery-empty">Inventory is empty.</p>
 					}
-				}
+					</div>
 
-				@if (previewActionMessage(); as actionMessage) {
-					<p class="action-message">{{ actionMessage }}</p>
-				}
 			</aside>
 
+				@if (pendingExitTransitionType()) {
+					<div class="exit-confirm-overlay" aria-live="assertive">
+						<p class="exit-confirm-title">You found an exit!</p>
+						@if (dungonSpReward() > 0) {
+							<p class="exit-confirm-sp">Reward: +{{ dungonSpReward() }} SP</p>
+						}
+						<p class="exit-confirm-prompt">Do you want to leave the dungeon?</p>
+						<div class="exit-confirm-actions">
+							<button type="button" class="action-button action-button-strong" (click)="confirmExit()">Exit Dungeon</button>
+							<button type="button" class="action-button" (click)="cancelExit()">Stay</button>
+						</div>
+					</div>
+				}
+				@if (dungonWon()) {
+					<div class="win-overlay" aria-live="polite">
+						@if (winStairsImageIndex(); as imgIdx) {
+							<img
+								[src]="'/images/stup' + imgIdx + '.jpg'"
+								alt="Stairs Up"
+								class="win-stairs-image"
+							/>
+						} @else {
+							<h2 class="win-title">You Win!</h2>
+						}
+						@if (dungonSpReward() > 0) {
+							<p class="win-sp">+{{ dungonSpReward() }} SP awarded!</p>
+						}
+					</div>
+				}
 				<div class="combat-bar" aria-label="Combat status">
 					<div class="combat-stats">
 						<span class="stat-badge stat-hp">
@@ -242,6 +407,9 @@
 						</span>
 						<span class="stat-badge stat-ae">
 							AE: {{ playerAE() }} / {{ playerMaxAE }}
+						</span>
+						<span class="stat-badge stat-sp">
+							SP: {{ playerSp() }}
 						</span>
 						<span class="stat-badge stat-phase">
 							@if (turnPhase() === 'player') {
@@ -252,13 +420,25 @@
 								Game Over
 							}
 						</span>
+						<span class="stat-badge stat-secondary" title="Strength">ST: {{ playerStrength() }}</span>
+						<span class="stat-badge stat-secondary" title="Mind">MN: {{ playerMind() }}</span>
+						<span class="stat-badge stat-secondary" title="Stamina (adds to AC)">STA: {{ playerStamina() }}</span>
+						<span class="stat-badge stat-secondary" title="Armour Class">AC: {{ playerACForView() }}</span>
 					</div>
+					@if (playerActiveEffects().length > 0) {
+						<div class="active-effects-bar">
+							@for (effect of playerActiveEffects(); track $index) {
+								<span class="stat-badge stat-effect">{{ effect.sourceName }}: {{ effect.effectOn }} +{{ effect.effectAmount }} ({{ effect.remainingAE }}⚡)</span>
+							}
+						</div>
+					}
 					@if (turnPhase() === 'player') {
 						<div class="combat-actions">
-							<button type="button" class="action-button action-button-strong" (click)="tryPlayerAttack()">
+							<button type="button" class="action-button action-button-strong" [disabled]="!canPlayerAttack()" (click)="tryPlayerAttack()">
 								Attack (A)
-							</button>
-							<button type="button" class="action-button" (click)="endPlayerTurnEarly()">
+							</button>						<button type="button" class="action-button" [disabled]="!canPlayerDefend()" (click)="tryPlayerDefend()" [title]="'Defend — costs 1 AE, +2 AC vs next attack' + (playerDefendStacks() > 0 ? ' (' + playerDefendStacks() + ' active)' : '')">
+							Defend (D){{ playerDefendStacks() > 0 ? ' ×' + playerDefendStacks() : '' }}
+						</button>							<button type="button" class="action-button" (click)="endPlayerTurnEarly()">
 								End Turn
 							</button>
 						</div>
@@ -269,8 +449,8 @@
 				</div>
 
 				@if (combatLog().length > 0) {
-					<div class="combat-log" aria-label="Combat log">
-						<h4 class="combat-log-title">Combat Log</h4>
+					<div class="combat-log" aria-label="Log">
+						<h4 class="combat-log-title">Log</h4>
 						<ul class="combat-log-list">
 							@for (entry of combatLog(); track $index) {
 								<li class="combat-log-entry">{{ entry.text }}</li>

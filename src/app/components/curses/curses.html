@@ -1,0 +1,84 @@
+<div class="cu-section" aria-label="My curses">
+	<div class="cu-section-header">
+		<h3 class="cu-title">My Curses</h3>
+		<button type="button" class="cu-toggle-btn" (click)="toggleSectionVisibility()">
+			{{ isCurseSectionVisible() ? 'Hide' : 'Show' }}
+		</button>
+	</div>
+
+	@if (!isCurseSectionVisible()) {
+		<p class="cu-message">Curse section is hidden.</p>
+	} @else if (!isLoggedIn()) {
+		<p class="cu-message">Log in to add or edit your curses.</p>
+	} @else {
+		<div class="cu-layout">
+
+			<!-- 1/3 LEFT: list -->
+			<aside class="cu-list-panel">
+				<h4 class="cu-panel-title">Your Curse Library</h4>
+				@if (isLoading()) {
+					<p class="cu-message">Loading your curses...</p>
+				} @else if (error()) {
+					<p class="cu-message cu-message-error">{{ error() }}</p>
+				} @else if (items().length === 0) {
+					<p class="cu-message">No curses yet.</p>
+				} @else {
+					<ul class="cu-list">
+						@for (item of items(); track item.id) {
+							<li class="cu-list-item">
+								<div class="cu-item-info">
+									<span class="cu-item-name">{{ item.name }}</span>
+									<small class="cu-item-meta">ID {{ item.id }} | {{ item.effectTo }}{{ item.effectTo2 ? '/' + item.effectTo2 : '' }} | Dmg {{ item.damage }}{{ item.damage2 ? '/' + item.damage2 : '' }} | Lasts {{ item.lastFor }} rnd</small>
+									@if (item.description) { <small class="cu-item-desc">{{ item.description }}</small> }
+								</div>
+								<button type="button" class="cu-edit-btn" (click)="editCurse(item)">Edit</button>
+							</li>
+						}
+					</ul>
+				}
+			</aside>
+
+			<!-- 2/3 RIGHT: form -->
+			<form class="cu-form" [formGroup]="userCurseForm" (ngSubmit)="save()">
+				<div class="cu-form-grid">
+					<label class="cu-field cu-field-wide"><span>Name</span><input type="text" formControlName="name" placeholder="Curse name" /></label>
+					<label class="cu-field cu-field-wide"><span>Description</span><input type="text" formControlName="description" placeholder="Description" /></label>
+					<label class="cu-field"><span>Effect To</span>
+						<select formControlName="effectTo">@for (option of effectToOptions; track option) { <option [value]="option">{{ option }}</option> }</select>
+					</label>
+					<label class="cu-field"><span>Effect To 2 (optional)</span>
+						<select formControlName="effectTo2"><option [ngValue]="null">None</option>@for (option of effectToOptions; track option) { <option [value]="option">{{ option }}</option> }</select>
+					</label>
+					<label class="cu-field"><span>Last For (rounds)</span><input type="number" formControlName="lastFor" min="0" /></label>
+					<label class="cu-field"><span>Damage 1</span><input type="number" formControlName="damage" min="0" /></label>
+					<label class="cu-field"><span>Damage 2</span><input type="number" formControlName="damage2" min="0" /></label>
+					<label class="cu-field cu-field-wide"><span>Image</span>
+						<div class="cu-upload-row">
+							<select formControlName="imageId"><option [ngValue]="null">No Image</option>@for (image of allImageOptions(); track image.id) { <option [ngValue]="image.id">{{ image.name }}</option> }</select>
+							<app-upload-popup mediaType="image" (mediaUploaded)="onImageUploaded($event)" />
+						</div>
+					</label>
+					@if (selectedImageUrl()) { <div class="cu-field cu-field-wide"><img class="cu-thumb" [src]="selectedImageUrl()" [alt]="selectedImageName() || 'Selected curse image'" /></div> }
+					<label class="cu-field cu-field-wide"><span>Sound</span>
+						<div class="cu-upload-row">
+							<select formControlName="soundId"><option [ngValue]="null">No Sound</option>@for (sound of allSoundOptions(); track sound.id) { <option [ngValue]="sound.id">{{ sound.name }}</option> }</select>
+							<app-upload-popup mediaType="sound" (mediaUploaded)="onSoundUploaded($event)" />
+						</div>
+					</label>
+					@if (isAdminUser()) {
+						<div class="cu-check-row"><input type="checkbox" formControlName="isPublic" id="curseIsPublic" /><label for="curseIsPublic">Public</label></div>
+					}
+				</div>
+				<div class="cu-actions">
+					<button type="submit" class="cu-btn-primary" [disabled]="isSavingUserCurse()">
+						@if (isSavingUserCurse()) { Saving... } @else if (editingUserCurseId() !== null) { Update Curse } @else { Add Curse }
+					</button>
+					@if (editingUserCurseId() !== null) { <button type="button" class="cu-btn-muted" (click)="cancelEdit()">Cancel Edit</button> }
+					<button type="button" class="cu-btn-muted" (click)="beginCreate()">New Blank</button>
+				</div>
+				@if (userCurseSaveMessage()) { <p class="cu-save-msg">{{ userCurseSaveMessage() }}</p> }
+			</form>
+
+		</div>
+	}
+</div>

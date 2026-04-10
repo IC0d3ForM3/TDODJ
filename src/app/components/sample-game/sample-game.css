@@ -1,0 +1,376 @@
+.sg-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+  color: #edf2ff;
+}
+
+/* Hero */
+.sg-hero {
+  background: linear-gradient(135deg, #1a2a50, #0e1827);
+  border: 1px solid rgba(160, 184, 220, 0.25);
+  border-radius: 12px;
+  padding: 1.3rem 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.sg-hero h2 {
+  margin: 0 0 0.6rem;
+  color: #f8fbff;
+}
+
+.sg-hero p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* How-to */
+.sg-howto {
+  background: rgba(17, 25, 40, 0.7);
+  border: 1px solid rgba(160, 184, 220, 0.2);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.sg-howto h3 {
+  margin: 0 0 0.6rem;
+  color: #d2e3ff;
+}
+
+.sg-howto-list {
+  margin: 0 0 0.6rem;
+  padding-left: 1.3rem;
+}
+
+.sg-howto-list li {
+  margin-bottom: 0.45rem;
+  line-height: 1.5;
+}
+
+.sg-howto-list kbd {
+  background: rgba(80, 130, 200, 0.25);
+  border: 1px solid rgba(160, 184, 220, 0.35);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.85rem;
+  font-family: monospace;
+  color: #b8d4f8;
+}
+
+.sg-howto-more {
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+  color: #a8c4e8;
+}
+
+.sg-howto-more a {
+  color: #7ecfff;
+  text-decoration: none;
+}
+
+.sg-howto-more a:hover {
+  text-decoration: underline;
+}
+
+/* Cards */
+.sg-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.sg-card {
+  background: rgba(17, 25, 40, 0.7);
+  border: 1px solid rgba(160, 184, 220, 0.2);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+
+.sg-card h3 {
+  margin: 0.3rem 0 0.5rem;
+  color: #d2e3ff;
+  font-size: 1.1rem;
+}
+
+.sg-card-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7ea8d8;
+  margin-bottom: 0.15rem;
+}
+
+/* Dungeon card specifics */
+.sg-card-dungon {
+  border-color: rgba(80, 160, 255, 0.3);
+}
+
+/* Play button */
+.sg-play-btn {
+  margin-top: 0.9rem;
+  width: 100%;
+  padding: 0.55rem 1rem;
+  background: linear-gradient(135deg, #1a5fa8, #0e3d72);
+  border: 1px solid rgba(80, 160, 255, 0.5);
+  border-radius: 7px;
+  color: #d6eaff;
+  font-size: 0.97rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.sg-play-btn:hover {
+  background: linear-gradient(135deg, #2070c0, #1050a0);
+  opacity: 0.92;
+}
+
+.sg-card-description {
+  margin: 0 0 0.55rem;
+  line-height: 1.5;
+  color: #ccdaf5;
+  font-size: 0.93rem;
+}
+
+.sg-intro {
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 3px solid rgba(80, 160, 255, 0.4);
+  border-radius: 0 6px 6px 0;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.sg-intro-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7ea8d8;
+  margin: 0 0 0.25rem;
+}
+
+.sg-intro-text {
+  margin: 0;
+  font-style: italic;
+  line-height: 1.5;
+  color: #b8cce8;
+  font-size: 0.91rem;
+}
+
+/* PC card specifics */
+.sg-card-pc {
+  border-color: rgba(180, 140, 255, 0.3);
+}
+
+.sg-pc-subtitle {
+  margin: 0 0 0.75rem;
+  color: #cdb3ff;
+  font-size: 0.88rem;
+}
+
+.sg-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.sg-stat {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(160, 184, 220, 0.15);
+  border-radius: 6px;
+  padding: 0.35rem 0.4rem;
+  text-align: center;
+}
+
+.sg-stat-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7ea8d8;
+  margin-bottom: 0.15rem;
+}
+
+.sg-stat-value {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e8f0ff;
+}
+
+.sg-stat-hp  { color: #ff9a9a; }
+.sg-stat-ac  { color: #7ecfff; }
+.sg-stat-ae  { color: #7fefab; }
+
+/* Loading / error */
+.sg-loading {
+  text-align: center;
+  color: #7ea8d8;
+  padding: 1.5rem 0;
+}
+
+.sg-no-sample {
+  background: rgba(17, 25, 40, 0.7);
+  border: 1px solid rgba(160, 184, 220, 0.2);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1rem;
+  color: #a8c4e8;
+  text-align: center;
+}
+
+/* CTA */
+.sg-cta {
+  background: rgba(10, 35, 22, 0.65);
+  border: 1px solid rgba(80, 200, 120, 0.3);
+  border-radius: 10px;
+  padding: 1.1rem 1.2rem;
+  text-align: center;
+}
+
+.sg-cta h3 {
+  margin: 0 0 0.4rem;
+  color: #7fefab;
+}
+
+.sg-cta p {
+  margin: 0 0 0.9rem;
+  color: #afd8c0;
+  line-height: 1.5;
+}
+
+.sg-cta-buttons {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.sg-btn {
+  display: inline-block;
+  padding: 0.5rem 1.4rem;
+  border-radius: 7px;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: opacity 0.15s;
+}
+
+.sg-btn:hover {
+  opacity: 0.85;
+}
+
+.sg-btn-primary {
+  background: #3a7f3e;
+  color: #e8fde8;
+  border: 1px solid rgba(80, 200, 120, 0.5);
+}
+
+.sg-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #d2e3ff;
+  border: 1px solid rgba(160, 184, 220, 0.3);
+}
+
+@media (max-width: 700px) {
+  .sg-page {
+    padding: 1.2rem 0.8rem 2rem;
+  }
+
+  .sg-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .sg-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .sg-picker-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* PC Picker */
+.sg-picker {
+  background: rgba(17, 25, 40, 0.7);
+  border: 1px solid rgba(180, 140, 255, 0.25);
+  border-radius: 10px;
+  padding: 1.2rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.sg-picker-title {
+  margin: 0 0 0.3rem;
+  color: #d2b8ff;
+  font-size: 1.1rem;
+}
+
+.sg-picker-subtitle {
+  margin: 0 0 0.9rem;
+  color: #a89ac8;
+  font-size: 0.9rem;
+}
+
+.sg-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.sg-pc-choice {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(180, 140, 255, 0.3);
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  transition: background 0.15s, border-color 0.15s;
+  width: 100%;
+}
+
+.sg-pc-choice:hover {
+  background: rgba(180, 140, 255, 0.12);
+  border-color: rgba(180, 140, 255, 0.55);
+}
+
+.sg-pc-choice-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #e2d4ff;
+}
+
+.sg-pc-choice-meta {
+  font-size: 0.82rem;
+  color: #b89fdb;
+}
+
+.sg-pc-choice-stats {
+  font-size: 0.78rem;
+  color: #8878a8;
+  margin-top: 0.1rem;
+}
+
+/* Change PC button */
+.sg-change-pc {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 0.9rem;
+  cursor: pointer;
+  font-size: 0.83rem;
+  color: #b89fdb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sg-change-pc:hover {
+  color: #d2b8ff;
+}

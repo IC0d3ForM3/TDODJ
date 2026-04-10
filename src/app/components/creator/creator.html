@@ -1,6 +1,18 @@
+﻿<nav class="creator-tab-nav" aria-label="Creator sections">
+	@for (tab of creatorTabs; track tab.id) {
+		<button
+			type="button"
+			class="creator-tab-btn"
+			[class.creator-tab-btn-active]="isCreatorTabActive(tab.id)"
+			(click)="setCreatorTab(tab.id)"
+		>{{ tab.label }}</button>
+	}
+</nav>
+
+@if (isCreatorTabActive('dungons')) {
 @if (!creatorLayout.isHeaderCollapsed()) {
 	<section class="creator-header">
-		<h3 class="creator-title">Create!</h3>
+		<h3 class="creator-title">Dungeons</h3>
 		<div class="creator-divider" aria-hidden="true"></div>
 	</section>
 }
@@ -38,6 +50,15 @@
 								(click)="selectDungon(dungon.id)"
 							>
 								{{ dungon.name }}
+								@if (dungon.ismaingame) {
+									<span class="dungon-badge dungon-badge-main">MAIN</span>
+								}
+								@if (dungon.issample) {
+									<span class="dungon-badge dungon-badge-sample">SAMPLE</span>
+								}
+								@if (dungon.status === 'pending') {
+									<span class="dungon-badge dungon-badge-pending">PENDING</span>
+								}
 							</button>
 						</li>
 					}
@@ -97,6 +118,19 @@
 					/>
 				</div>
 
+				@if (account.isAdmin()) {
+					<div class="form-admin-flags">
+						<label class="form-checkbox">
+							<input type="checkbox" formControlName="ismaingame" />
+							<span>Main Game</span>
+						</label>
+						<label class="form-checkbox">
+							<input type="checkbox" formControlName="issample" />
+							<span>Sample Game</span>
+						</label>
+					</div>
+				}
+
 				<div class="form-actions">
 					<button type="submit" class="save-button" [disabled]="isSaving()">
 						@if (isSaving()) {
@@ -138,19 +172,19 @@
 						<div class="open-block-main-row">
 							<span class="open-block-label">Open block:</span>
 							@for (option of openBlockOptions; track option.key) {
-								<label class="open-block-option">
-									<input
-										type="checkbox"
-										[checked]="openBlockSelections()[option.key]"
-										(change)="setOpenBlockSelection(option.key, $event)"
-									/>
-									{{ option.label }}
-								</label>
+								<button
+									type="button"
+									class="open-block-btn"
+									[class.open-block-btn--active]="openBlockSelections()[option.key]"
+									(click)="selectOpenBlockOption(option.key)"
+								>{{ option.label }}</button>
 							}
-							<label class="open-block-option open-block-option-move">
-								<input type="checkbox" [checked]="isMoveMode()" (change)="setMoveMode($event)" />
-								Clear
-							</label>
+							<button
+								type="button"
+								class="open-block-btn open-block-btn--clear"
+								[class.open-block-btn--active]="isMoveMode()"
+								(click)="toggleMoveMode()"
+							>Clear</button>
 						</div>
 						<div class="open-block-footer-row">
 							<div class="form-actions tools-inline-actions">
@@ -184,6 +218,8 @@
 									<option value="createMonseter">Create Monseter</option>
 									<option value="placeMonster" [disabled]="!hasAnyWhiteSpace()">Place Monster</option>
 									<option value="addCellWallText" [disabled]="!hasAnyWhiteSpace()">Add Cell/Wall text</option>
+						<option value="placeFloorTrap" [disabled]="!hasAnyWhiteSpace()">Place Floor Trap</option>
+							<option value="placePortal" [disabled]="!hasAnyWhiteSpace()">Place Portal</option>
 								</select>
 							</div>
 							<div class="publish-actions-column">
@@ -199,6 +235,16 @@
 										{{ publishButtonText() }}
 									}
 								</button>
+
+								@if (account.isAdmin() && selectedDungon()?.status === 'pending') {
+									<button
+										type="button"
+										class="save-button"
+										(click)="approveDungon()"
+									>
+										Approve Public
+									</button>
+								}
 
 								@if (hasUnsavedDungonJson()) {
 									<button
@@ -305,13 +351,121 @@
 						}
 					</div>
 
-					<div class="grid-canvas-wrap">
-						<canvas
-							#dungonGridCanvas
-							class="dungon-grid-canvas"
-							(click)="onGridCanvasClick($event)"
-							aria-label="Dungon grid canvas"
-						></canvas>
+					@if (selectedPlacedItem(); as selItem) {
+						<div class="placement-actions">
+							<span class="placement-actions-label">Selected: {{ selItem.label }}</span>
+							@if (selItem.type !== 'door') {
+								<button
+									type="button"
+									class="cancel-button"
+									(click)="moveSelectedPlacement()"
+								>Move</button>
+							}
+							@if (selItem.type === 'monster' || selItem.type === 'tresher') {
+								<button
+									type="button"
+									class="cancel-button"
+									(click)="editSelectedPlacement()"
+								>Edit</button>
+							}
+							<button
+								type="button"
+								class="cancel-button"
+								(click)="clearSelectedPlacement()"
+							>✕</button>
+						</div>
+					}
+
+					<div class="grid-canvas-row">
+						<div class="grid-canvas-wrap">
+							<canvas
+								#dungonGridCanvas
+								class="dungon-grid-canvas"
+								(click)="onGridCanvasClick($event)"
+								aria-label="Dungon grid canvas"
+							></canvas>
+						</div>
+						<div class="placement-inspector">
+							<label class="placement-inspector-label" for="pi-monsters">Monsters</label>
+							<select id="pi-monsters" class="placement-inspector-select" (change)="onPlacedItemSelect($event)">
+								<option value="">--</option>
+								@for (item of placedItemsForCurrentDungon(); track item.key) {
+									@if (item.type === 'monster') {
+										<option [value]="item.key" [selected]="selectedPlacedItemKey() === item.key" [title]="item.label">{{ item.label }}</option>
+									}
+								@if (portalPickMode() !== null) {
+									<span class="details-message">
+										click a white square to set portal {{ portalPickMode() === 'start' ? 'start' : 'end' }} point
+										<button
+											type="button"
+											class="cancel-button"
+											(click)="stopPickPortalPoint()"
+										>
+											cancel
+										</button>
+									</span>
+								}
+								}
+							</select>
+
+							<label class="placement-inspector-label" for="pi-treshers">Treshers</label>
+							<select id="pi-treshers" class="placement-inspector-select" (change)="onPlacedItemSelect($event)">
+								<option value="">--</option>
+								@for (item of placedItemsForCurrentDungon(); track item.key) {
+									@if (item.type === 'tresher') {
+										<option [value]="item.key" [selected]="selectedPlacedItemKey() === item.key" [title]="item.label">{{ item.label }}</option>
+									}
+								}
+							</select>
+
+							<label class="placement-inspector-label" for="pi-doors">Doors</label>
+							<select id="pi-doors" class="placement-inspector-select" (change)="onPlacedItemSelect($event)">
+								<option value="">--</option>
+								@for (item of placedItemsForCurrentDungon(); track item.key) {
+									@if (item.type === 'door') {
+										<option [value]="item.key" [selected]="selectedPlacedItemKey() === item.key" [title]="item.label">{{ item.label }}</option>
+									}
+								}
+							</select>
+
+							<label class="placement-inspector-label" for="pi-traps">Traps</label>
+							<select id="pi-traps" class="placement-inspector-select" (change)="onPlacedItemSelect($event)">
+								<option value="">--</option>
+								@for (item of placedItemsForCurrentDungon(); track item.key) {
+									@if (item.type === 'trap') {
+										<option [value]="item.key" [selected]="selectedPlacedItemKey() === item.key" [title]="item.label">{{ item.label }}</option>
+									}
+								}
+							</select>
+
+						<label class="placement-inspector-label" for="pi-portals">Portals</label>
+						<div class="portal-inspector">
+							<select id="pi-portals" class="placement-inspector-select" (change)="onPortalSelectChange($event)">
+								<option value="">--</option>
+								@for (portal of currentDungonPortals(); track portal.id) {
+									<option [value]="portal.id" [selected]="selectedPortalId() === portal.id">{{ portal.name }} ({{ portalLookLabel(portal.look) }})</option>
+								}
+							</select>
+							@if (selectedPortal(); as sp) {
+								<div class="portal-inspector-detail">
+									<span class="portal-detail-name">{{ sp.name }}</span>
+									@if (sp.description) {
+										<span class="portal-detail-desc">{{ sp.description }}</span>
+									}
+									<div class="portal-detail-points">
+										<span>Start: {{ sp.startRow !== null ? 'r' + sp.startRow + ',c' + sp.startColumn : 'not set' }}</span>
+										<span>End: {{ sp.endRow !== null ? 'r' + sp.endRow + ',c' + sp.endColumn : 'not set' }}</span>
+									</div>
+									<div class="portal-detail-actions">
+										<button type="button" class="cancel-button" (click)="startPickPortalPoint(sp.id, 'start')">Pick Start</button>
+										<button type="button" class="cancel-button" (click)="startPickPortalPoint(sp.id, 'end')">Pick End</button>
+										<button type="button" class="cancel-button" (click)="openPortalDialog(sp.id)">Edit</button>
+										<button type="button" class="cancel-button" (click)="removePortal(selectedDungonId()!, sp.id)">Remove</button>
+									</div>
+								</div>
+							}
+						</div>
+						</div>
 					</div>
 				}
 
@@ -413,6 +567,238 @@
 		}
 	</section>
 </section>
+} <!-- end dungons tab -->
+
+@if (isCreatorTabActive('treshers')) {
+<app-treshers
+	[imageOptions]="libImageOptions()"
+	[soundOptions]="libSoundOptions()"
+	[itemOptions]="libItems()"
+	[spellOptions]="libSpells()"
+	[curseOptions]="libCurses()"
+	[potionOptions]="libPotions()"
+/>
+}
+
+@if (isCreatorTabActive('monsters')) {
+<app-monsters
+	[imageOptions]="libImageOptions()"
+	[soundOptions]="libSoundOptions()"
+	[itemOptions]="libItems()"
+	[spellOptions]="libSpells()"
+	[curseOptions]="libCurses()"
+/>
+}
+
+@if (isCreatorTabActive('images')) {
+<section class="dashboard-wrap dashboard-wrap-secondary" aria-label="My images">
+	<div class="dashboard-section-header">
+		<h3 class="dashboard-title">My Images</h3>
+		<button type="button" class="dashboard-toggle-button" (click)="toggleLibImageSection()">{{ isLibImageSectionVisible() ? 'Hide' : 'Show' }}</button>
+	</div>
+	@if (!isLibImageSectionVisible()) {
+		<p class="dashboard-message dashboard-subtle">Image section is hidden.</p>
+	} @else {
+		<div class="creator-two-panel">
+			<!-- LEFT 1/3: list -->
+			<div class="creator-panel-list">
+				<h4 class="dashboard-subtitle">Your Images</h4>
+				@if (isLoadingLibImages()) { <p class="dashboard-message">Loading your images...</p> }
+				@else if (libImagesError()) { <p class="dashboard-message dashboard-message-error">{{ libImagesError() }}</p> }
+				@else if (libUserImages().length === 0) { <p class="dashboard-message">No images yet.</p> }
+				@else {
+					<ul class="dashboard-list">
+						@for (item of libUserImages(); track item.id) {
+							<li class="dashboard-list-item">
+								<div class="tresher-list-row">
+									<div>
+										<p class="dashboard-game-name">{{ item.name }}</p>
+										<small class="dashboard-game-meta">ID {{ item.id }} | {{ item.isActive ? 'Active' : 'Inactive' }}{{ item.isPublic ? ' | Public' : '' }}</small>
+										@if (libResolveImageUrl(item.path)) { <img class="dashboard-image-thumb" [src]="libResolveImageUrl(item.path)" [alt]="item.name" style="max-height:60px;margin-top:0.25rem" /> }
+									</div>
+									<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editLibImage(item)">Edit</button>
+								</div>
+							</li>
+						}
+					</ul>
+				}
+			</div>
+			<!-- RIGHT 2/3: form -->
+			<div class="creator-panel-form">
+				<form class="tresher-form" [formGroup]="libImageForm" (ngSubmit)="saveLibImage()">
+					<div class="tresher-form-grid">
+						<label class="tresher-field"><span>Name</span><input type="text" formControlName="name" placeholder="Image name" /></label>
+						@if (editingLibImageId() !== null) {
+							<label class="tresher-field tresher-field-wide"><span>Current Path</span><input type="text" formControlName="path" readonly /></label>
+						} @else {
+							<label class="tresher-field tresher-field-wide"><span>Image File</span><input type="file" accept="image/*" (change)="onLibImageFileSelected($event)" /></label>
+							@if (libImageUploadName()) { <p class="dashboard-message dashboard-subtle" style="margin:0">Selected: {{ libImageUploadName() }}</p> }
+						}
+						<label class="tresher-field-checkbox"><input type="checkbox" formControlName="isActive" /><span>Active</span></label>
+						@if (isAdminUser()) { <label class="tresher-field-checkbox"><input type="checkbox" formControlName="isPublic" /><span>Public</span></label> }
+					</div>
+					<div class="tresher-form-actions">
+						<button type="submit" class="dashboard-action-button" [disabled]="isSavingLibImage()">
+							@if (isSavingLibImage()) { Saving... } @else if (editingLibImageId() !== null) { Update Image } @else { Upload Image }
+						</button>
+						@if (editingLibImageId() !== null) { <button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="cancelEditLibImage()">Cancel Edit</button> }
+					</div>
+				</form>
+				@if (libImageSaveMessage()) { <p class="dashboard-message" style="margin-top:0.6rem">{{ libImageSaveMessage() }}</p> }
+			</div>
+		</div>
+	}
+</section>
+}
+
+@if (isCreatorTabActive('sounds')) {
+<section class="dashboard-wrap dashboard-wrap-secondary" aria-label="My sounds">
+	<div class="dashboard-section-header">
+		<h3 class="dashboard-title">My Sounds</h3>
+		<button type="button" class="dashboard-toggle-button" (click)="toggleLibSoundSection()">{{ isLibSoundSectionVisible() ? 'Hide' : 'Show' }}</button>
+	</div>
+	@if (!isLibSoundSectionVisible()) {
+		<p class="dashboard-message dashboard-subtle">Sound section is hidden.</p>
+	} @else {
+		<div class="creator-two-panel">
+			<!-- LEFT 1/3: list -->
+			<div class="creator-panel-list">
+				<h4 class="dashboard-subtitle">Your Sounds</h4>
+				@if (isLoadingLibSounds()) { <p class="dashboard-message">Loading your sounds...</p> }
+				@else if (libSoundsError()) { <p class="dashboard-message dashboard-message-error">{{ libSoundsError() }}</p> }
+				@else if (libUserSounds().length === 0) { <p class="dashboard-message">No sounds yet.</p> }
+				@else {
+					<ul class="dashboard-list">
+						@for (item of libUserSounds(); track item.id) {
+							<li class="dashboard-list-item">
+								<div class="tresher-list-row">
+									<div>
+										<p class="dashboard-game-name">{{ item.name }}</p>
+										<small class="dashboard-game-meta">ID {{ item.id }} | {{ item.isActive ? 'Active' : 'Inactive' }}{{ item.isPublic ? ' | Public' : '' }}</small>
+										@if (libResolveSoundUrl(item.path)) { <audio controls style="max-width:100%;margin-top:0.25rem"><source [src]="libResolveSoundUrl(item.path)" /></audio> }
+									</div>
+									<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editLibSound(item)">Edit</button>
+								</div>
+							</li>
+						}
+					</ul>
+				}
+			</div>
+			<!-- RIGHT 2/3: form -->
+			<div class="creator-panel-form">
+				<form class="tresher-form" [formGroup]="libSoundForm" (ngSubmit)="saveLibSound()">
+					<div class="tresher-form-grid">
+						<label class="tresher-field"><span>Name</span><input type="text" formControlName="name" placeholder="Sound name" /></label>
+						@if (editingLibSoundId() !== null) {
+							<label class="tresher-field tresher-field-wide"><span>Current Path</span><input type="text" formControlName="path" readonly /></label>
+						} @else {
+							<label class="tresher-field tresher-field-wide"><span>Sound File</span><input type="file" accept="audio/*" (change)="onLibSoundFileSelected($event)" /></label>
+							@if (libSoundUploadName()) { <p class="dashboard-message dashboard-subtle" style="margin:0">Selected: {{ libSoundUploadName() }}</p> }
+						}
+						<label class="tresher-field-checkbox"><input type="checkbox" formControlName="isActive" /><span>Active</span></label>
+						@if (isAdminUser()) { <label class="tresher-field-checkbox"><input type="checkbox" formControlName="isPublic" /><span>Public</span></label> }
+					</div>
+					<div class="tresher-form-actions">
+						<button type="submit" class="dashboard-action-button" [disabled]="isSavingLibSound()">
+							@if (isSavingLibSound()) { Saving... } @else if (editingLibSoundId() !== null) { Update Sound } @else { Upload Sound }
+						</button>
+						@if (editingLibSoundId() !== null) { <button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="cancelEditLibSound()">Cancel Edit</button> }
+					</div>
+				</form>
+				@if (libSoundSaveMessage()) { <p class="dashboard-message" style="margin-top:0.6rem">{{ libSoundSaveMessage() }}</p> }
+			</div>
+		</div>
+	}
+</section>
+}
+
+@if (isCreatorTabActive('spells')) {
+<section class="dashboard-wrap dashboard-wrap-secondary" aria-label="My spells">
+	<div class="dashboard-section-header">
+		<h3 class="dashboard-title">My Spells</h3>
+		<button type="button" class="dashboard-toggle-button" (click)="toggleLibSpellSection()">{{ isLibSpellSectionVisible() ? 'Hide' : 'Show' }}</button>
+	</div>
+	@if (!isLibSpellSectionVisible()) {
+		<p class="dashboard-message dashboard-subtle">Spell section is hidden.</p>
+	} @else {
+		<div class="creator-two-panel">
+			<div class="creator-panel-list">
+				<h4 class="dashboard-subtitle">Your Spells</h4>
+				@if (isLoadingLibSpells()) { <p class="dashboard-message">Loading your spells...</p> }
+				@else if (libSpellsError()) { <p class="dashboard-message dashboard-message-error">{{ libSpellsError() }}</p> }
+				@else if (libUserSpells().length === 0) { <p class="dashboard-message">No spells yet.</p> }
+				@else {
+					<ul class="dashboard-list">
+						@for (item of libUserSpells(); track item.id) {
+							<li class="dashboard-list-item">
+								<div class="tresher-list-row">
+									<div>
+										<p class="dashboard-game-name">{{ item.name }}</p>
+										<small class="dashboard-game-meta">ID {{ item.id }} | {{ item.effectOn }}{{ item.effectOn2 ? '/' + item.effectOn2 : '' }}</small>
+										<p class="tresher-description">{{ item.description }}</p>
+									</div>
+									<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editLibSpell(item)">Edit</button>
+								</div>
+							</li>
+						}
+					</ul>
+				}
+			</div>
+			<div class="creator-panel-form">
+				<form class="tresher-form" [formGroup]="libSpellForm" (ngSubmit)="saveLibSpell()">
+					<div class="tresher-form-grid">
+						<label class="tresher-field"><span>Name</span><input type="text" formControlName="name" placeholder="Spell name" /></label>
+						<label class="tresher-field tresher-field-wide"><span>Description</span><input type="text" formControlName="description" /></label>
+						<label class="tresher-field"><span>Range</span><input type="number" formControlName="range" min="0" /></label>
+						<label class="tresher-field"><span>Effect On 1</span><select formControlName="effectOn">@for (o of libSpellEffectToOptions; track o) { <option [value]="o">{{ o }}</option> }</select></label>
+						<label class="tresher-field"><span>Effect On 2</span><select formControlName="effectOn2"><option [ngValue]="null">None</option>@for (o of libSpellEffectToOptions; track o) { <option [value]="o">{{ o }}</option> }</select></label>
+						<label class="tresher-field"><span>Effect Amount 1</span><input type="number" formControlName="effectAmount" /></label>
+						<label class="tresher-field"><span>Effect Amount 2</span><input type="number" formControlName="effectAmount2" /></label>
+						<label class="tresher-field"><span>Last For (rounds)</span><input type="number" formControlName="lastFor" min="0" /></label>
+						<label class="tresher-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
+						<label class="tresher-field"><span>Skill Points</span><input type="number" formControlName="sp" min="0" /></label>
+						<label class="tresher-field"><span>Success Test Value</span><input type="number" formControlName="successTestValue" /></label>
+						<label class="tresher-field"><span>Magic Cost</span><input type="number" formControlName="magicCost" min="1" /></label>
+						<label class="tresher-field"><span>Image</span>
+							<div style="display:flex;gap:0.4rem;align-items:center">
+								<select formControlName="imageId"><option [ngValue]="null">No Image</option>@for (img of libImageOptions(); track img.id) { <option [ngValue]="img.id">{{ img.name }}</option> }</select>
+								<app-upload-popup mediaType="image" (mediaUploaded)="onLibSpellImageUploaded($event)" />
+							</div>
+						</label>
+						@if (libSelectedSpellImageUrl()) { <div class="monster-selected-image-wrap"><img class="dashboard-image-thumb" [src]="libSelectedSpellImageUrl()" alt="spell image" /></div> }
+						<label class="tresher-field"><span>Sound</span>
+							<div style="display:flex;gap:0.4rem;align-items:center">
+								<select formControlName="soundId"><option [ngValue]="null">No Sound</option>@for (snd of libSoundOptions(); track snd.id) { <option [ngValue]="snd.id">{{ snd.name }}</option> }</select>
+								<app-upload-popup mediaType="sound" (mediaUploaded)="onLibSpellSoundUploaded($event)" />
+							</div>
+						</label>
+						@if (isAdminUser()) { <label class="tresher-field-checkbox"><input type="checkbox" formControlName="isPublic" /><span>Public</span></label> }
+					</div>
+					<div class="tresher-form-actions">
+						<button type="submit" class="dashboard-action-button" [disabled]="isSavingLibSpell()">
+							@if (isSavingLibSpell()) { Saving... } @else if (editingLibSpellId() !== null) { Update Spell } @else { Add Spell }
+						</button>
+						@if (editingLibSpellId() !== null) { <button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="cancelEditLibSpell()">Cancel Edit</button> }
+					</div>
+				</form>
+				@if (libSpellSaveMessage()) { <p class="dashboard-message" style="margin-top:0.6rem">{{ libSpellSaveMessage() }}</p> }
+			</div>
+		</div>
+	}
+</section>
+}
+
+@if (isCreatorTabActive('potions')) {
+<app-potions [imageOptions]="libImageOptions()" [soundOptions]="libSoundOptions()" />
+}
+
+@if (isCreatorTabActive('items')) {
+<app-items [imageOptions]="libImageOptions()" [soundOptions]="libSoundOptions()" [curseOptions]="libCurses()" />
+}
+
+@if (isCreatorTabActive('curses')) {
+<app-curses [imageOptions]="libImageOptions()" [soundOptions]="libSoundOptions()" />
+}
 
 @if (isPublishDialogVisible()) {
 	<div class="door-dialog-backdrop">
@@ -429,7 +815,11 @@
 						[checked]="publishVisibility() === 'public'"
 						(change)="onPublishVisibilityChange($event)"
 					/>
-					<span>Public (everyone)</span>
+					@if (account.isAdmin()) {
+						<span>Public (everyone)</span>
+					} @else {
+						<span>Public (requires admin approval)</span>
+					}
 				</label>
 				<label class="publish-visibility-option">
 					<input
@@ -537,6 +927,10 @@
 						<input type="checkbox" formControlName="isLocked" />
 						Locked
 					</label>
+					@if (doorForm.controls.isLocked.value) {
+						<label class="form-label" for="door-to-pick">Pick Lock DC (Mind + d4 vs DC)</label>
+						<input id="door-to-pick" class="form-input" type="number" min="0" formControlName="toPick" />
+					}
 				}
 
 				<label class="form-label" for="door-name">Name</label>
@@ -552,6 +946,40 @@
 
 				<label class="form-label" for="door-sp-reward">Skill Points Reward (optional)</label>
 				<input id="door-sp-reward" class="form-input" type="number" min="0" formControlName="spReward" />
+
+				<label class="door-locked-toggle">
+					<input type="checkbox" formControlName="isHidden" />
+					Hidden Door
+				</label>
+				@if (doorForm.controls.isHidden.value) {
+					<label class="form-label" for="door-to-find">Find DC (Mind + d12 vs DC, 1–6)</label>
+					<input id="door-to-find" class="form-input" type="number" min="1" max="6" formControlName="toFind" />
+				}
+
+				<label class="door-locked-toggle">
+					<input type="checkbox" formControlName="hasTrap" />
+					Has Trap
+				</label>
+				@if (doorForm.controls.hasTrap.value) {
+					<label class="form-label" for="door-trap-name">Trap Name</label>
+					<input id="door-trap-name" class="form-input" type="text" formControlName="trapName" />
+					<label class="form-label" for="door-trap-description">Trap Description</label>
+					<textarea id="door-trap-description" class="form-textarea" rows="2" formControlName="trapDescription"></textarea>
+					<label class="form-label" for="door-trap-damage">Trap Damage</label>
+					<input id="door-trap-damage" class="form-input" type="number" min="0" formControlName="trapDamage" />
+					<label class="form-label" for="door-trap-damage-to">Damage To</label>
+					<select id="door-trap-damage-to" class="form-input" formControlName="trapDamageTo">
+						<option value="HP">HP</option>
+						<option value="Stamina">Stamina</option>
+						<option value="Mind">Mind</option>
+					</select>
+					<label class="form-label" for="door-trap-curse-id">Curse ID (optional)</label>
+					<input id="door-trap-curse-id" class="form-input" type="number" formControlName="trapCurseId" />
+					<label class="form-label" for="door-trap-to-detect">To Detect DC (Mind + d4)</label>
+					<input id="door-trap-to-detect" class="form-input" type="number" min="0" formControlName="trapToDetect" />
+					<label class="form-label" for="door-trap-to-disarm">To Disarm DC (Mind + d4)</label>
+					<input id="door-trap-to-disarm" class="form-input" type="number" min="0" formControlName="trapToDisarm" />
+				}
 
 				@if (doorDialogError()) {
 					<p class="form-error">{{ doorDialogError() }}</p>
@@ -573,15 +1001,6 @@
 		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Tresher details">
 			<h4 class="door-dialog-title">Create Tresher</h4>
 			<form class="door-settings-form" [formGroup]="tresherForm" (ngSubmit)="saveTresher()">
-				<label class="form-label" for="tresher-type">Type</label>
-				<select id="tresher-type" class="form-input" formControlName="type">
-					<option value="Weapon">Weapon</option>
-					<option value="Armor">Armor</option>
-					<option value="Coins">Coins</option>
-					<option value="Potion">Potion</option>
-					<option value="OtherTresher">OtherTresher</option>
-				</select>
-
 				<label class="form-label" for="tresher-name">Name</label>
 				<input id="tresher-name" class="form-input" type="text" formControlName="name" />
 
@@ -593,113 +1012,74 @@
 					formControlName="description"
 				></textarea>
 
-				<label class="form-label" for="tresher-worth">Worth</label>
-				<input id="tresher-worth" class="form-input" type="number" min="0" formControlName="worth" />
+				<label class="form-label" for="tresher-gold">Gold</label>
+				<input id="tresher-gold" class="form-input" type="number" min="0" formControlName="gold" />
+
+				<label class="form-label" for="tresher-silver">Silver</label>
+				<input id="tresher-silver" class="form-input" type="number" min="0" formControlName="silver" />
+
+				<label class="form-label" for="tresher-copper">Copper</label>
+				<input id="tresher-copper" class="form-input" type="number" min="0" formControlName="copper" />
+
+				<label class="form-label" for="tresher-zinc">Zinc</label>
+				<input id="tresher-zinc" class="form-input" type="number" min="0" formControlName="zinc" />
+
+				<label class="form-label" for="tresher-item1">Item 1 ID (optional)</label>
+				<input id="tresher-item1" class="form-input" type="number" formControlName="item1Id" />
+
+				<label class="form-label" for="tresher-item2">Item 2 ID (optional)</label>
+				<input id="tresher-item2" class="form-input" type="number" formControlName="item2Id" />
+
+				<label class="form-label" for="tresher-item3">Item 3 ID (optional)</label>
+				<input id="tresher-item3" class="form-input" type="number" formControlName="item3Id" />
+
+				<label class="form-label" for="tresher-item4">Item 4 ID (optional)</label>
+				<input id="tresher-item4" class="form-input" type="number" formControlName="item4Id" />
+
+				<label class="form-label" for="tresher-spell1">Spell 1 ID (optional)</label>
+				<input id="tresher-spell1" class="form-input" type="number" formControlName="spell1Id" />
+
+				<label class="form-label" for="tresher-spell2">Spell 2 ID (optional)</label>
+				<input id="tresher-spell2" class="form-input" type="number" formControlName="spell2Id" />
+
+				<label class="form-label" for="tresher-spell3">Spell 3 ID (optional)</label>
+				<input id="tresher-spell3" class="form-input" type="number" formControlName="spell3Id" />
+
+				<label class="form-label" for="tresher-spell4">Spell 4 ID (optional)</label>
+				<input id="tresher-spell4" class="form-input" type="number" formControlName="spell4Id" />
+
+				<label class="form-label" for="tresher-curse1">Curse 1 ID (optional)</label>
+				<input id="tresher-curse1" class="form-input" type="number" formControlName="curse1Id" />
+
+				<label class="form-label" for="tresher-curse2">Curse 2 ID (optional)</label>
+				<input id="tresher-curse2" class="form-input" type="number" formControlName="curse2Id" />
 
 				<label class="form-label" for="tresher-sp-reward">Skill Points Reward</label>
 				<input id="tresher-sp-reward" class="form-input" type="number" min="0" formControlName="spReward" />
 
-				<label class="form-label" for="tresher-curse-id">curseID (optional)</label>
-				<input id="tresher-curse-id" class="form-input" type="number" formControlName="curseID" />
-
-				<label class="form-label" for="tresher-trap-id">trapID (optional)</label>
-				<input id="tresher-trap-id" class="form-input" type="number" formControlName="trapID" />
-
-				@if (shouldTresherHaveHp()) {
-					<label class="form-label" for="tresher-hp">HP</label>
-					<input id="tresher-hp" class="form-input" type="number" min="0" formControlName="HP" />
-				}
-
-				@if (isWeaponTresherSelected()) {
-					<label class="form-label" for="tresher-weapon-damage">Damage</label>
-					<input
-						id="tresher-weapon-damage"
-						class="form-input"
-						type="number"
-						min="0"
-						formControlName="damage"
-					/>
-
-					<label class="form-label" for="tresher-weapon-hands">Hands</label>
-					<input
-						id="tresher-weapon-hands"
-						class="form-input"
-						type="number"
-						min="1"
-						formControlName="hands"
-					/>
-
-					<label class="form-label" for="tresher-weapon-range">Range</label>
-					<input
-						id="tresher-weapon-range"
-						class="form-input"
-						type="number"
-						min="0"
-						formControlName="range"
-					/>
-
-					<label class="form-label" for="tresher-weapon-ammo-type">ammoType (optional)</label>
-					<input
-						id="tresher-weapon-ammo-type"
-						class="form-input"
-						type="text"
-						formControlName="ammoType"
-					/>
-				}
-
-				@if (isArmorTresherSelected()) {
-					<label class="form-label" for="tresher-armor-speed-reduction">Speed Reduction</label>
-					<input
-						id="tresher-armor-speed-reduction"
-						class="form-input"
-						type="number"
-						formControlName="speedReduction"
-					/>
-
-					<label class="form-label" for="tresher-armor-hands">Hands</label>
-					<input
-						id="tresher-armor-hands"
-						class="form-input"
-						type="number"
-						min="0"
-						formControlName="hands"
-					/>
-
-					<label class="form-label" for="tresher-armor-type">Armor Type</label>
-					<select id="tresher-armor-type" class="form-input" formControlName="armorType">
-						<option value="head">head</option>
-						<option value="hand">hand</option>
-						<option value="body">body</option>
-						<option value="arms">arms</option>
-						<option value="legs">legs</option>
+				<label class="door-locked-toggle">
+					<input type="checkbox" formControlName="hasTrap" />
+					Has Trap
+				</label>
+				@if (tresherForm.controls.hasTrap.value) {
+					<label class="form-label" for="tresher-trap-name">Trap Name</label>
+					<input id="tresher-trap-name" class="form-input" type="text" formControlName="trapName" />
+					<label class="form-label" for="tresher-trap-description">Trap Description</label>
+					<textarea id="tresher-trap-description" class="form-textarea" rows="2" formControlName="trapDescription"></textarea>
+					<label class="form-label" for="tresher-trap-damage">Trap Damage</label>
+					<input id="tresher-trap-damage" class="form-input" type="number" min="0" formControlName="trapDamage" />
+					<label class="form-label" for="tresher-trap-damage-to">Damage To</label>
+					<select id="tresher-trap-damage-to" class="form-input" formControlName="trapDamageTo">
+						<option value="HP">HP</option>
+						<option value="Stamina">Stamina</option>
+						<option value="Mind">Mind</option>
 					</select>
-				}
-
-				@if (isCoinsTresherSelected()) {
-					<label class="form-label" for="tresher-coins-type">Coin Type</label>
-					<select id="tresher-coins-type" class="form-input" formControlName="coinType">
-						<option value="Gold">Gold</option>
-						<option value="Silver">Silver (10 = 1 gold)</option>
-						<option value="Copper">Copper (10 = 1 Silver)</option>
-						<option value="Tin">Tin (20 = 1 copper)</option>
-					</select>
-				}
-
-				@if (isPotionTresherSelected()) {
-					<label class="form-label" for="tresher-effect-number">Effect Number</label>
-					<input id="tresher-effect-number" class="form-input" type="number" formControlName="effectNumber" />
-
-					<label class="form-label" for="tresher-effect-target">Affects</label>
-					<select id="tresher-effect-target" class="form-input" formControlName="effectTarget">
-						<option value="Health">Health</option>
-						<option value="AC">AC</option>
-						<option value="AE">AE</option>
-					</select>
-
-					@if (tresherForm.controls.effectTarget.value === 'AC' || tresherForm.controls.effectTarget.value === 'AE') {
-						<label class="form-label" for="tresher-effect-duration">Duration (turns)</label>
-						<input id="tresher-effect-duration" class="form-input" type="number" min="1" formControlName="effectDuration" />
-					}
+					<label class="form-label" for="tresher-trap-curse-id">Curse ID (optional)</label>
+					<input id="tresher-trap-curse-id" class="form-input" type="number" formControlName="trapCurseId" />
+					<label class="form-label" for="tresher-trap-to-detect">To Detect DC (Mind + d4)</label>
+					<input id="tresher-trap-to-detect" class="form-input" type="number" min="0" formControlName="trapToDetect" />
+					<label class="form-label" for="tresher-trap-to-disarm">To Disarm DC (Mind + d4)</label>
+					<input id="tresher-trap-to-disarm" class="form-input" type="number" min="0" formControlName="trapToDisarm" />
 				}
 
 				<div class="form-actions">
@@ -718,10 +1098,7 @@
 							<div class="dungons-list-button" style="cursor: default">
 								<strong>{{ tresher.name }}</strong>
 								<small>
-									{{ tresher.type }} | Worth {{ tresher.worth }}
-									@if (tresher.HP !== null) {
-										| HP {{ tresher.HP }}
-									}
+									Gold {{ tresher.gold }} | Slvr {{ tresher.silver }} | Cpr {{ tresher.copper }} | Znc {{ tresher.zinc }} | SP {{ tresher.spReward }}
 								</small>
 							</div>
 						</li>
@@ -958,10 +1335,12 @@
 							<button
 								type="button"
 								class="dungons-list-button"
+								[disabled]="isKeyPlaced(key.id)"
+								[style.opacity]="isKeyPlaced(key.id) ? '0.45' : '1'"
 								(click)="selectKeyForPlacement(key.id)"
 							>
 								<span>{{ key.name }}</span>
-								<small>{{ keyPositionLabel(key) }}</small>
+								<small>{{ isKeyPlaced(key.id) ? 'already placed' : keyPositionLabel(key) }}</small>
 							</button>
 						</li>
 					}
@@ -1002,7 +1381,7 @@
 								(click)="placeSelectedTresherAtPendingPlacement(tresher.id)"
 							>
 								<span>{{ tresher.name }}</span>
-								<small>{{ tresher.type }} | Worth {{ tresher.worth }} | Dungon</small>
+								<small>Gold {{ tresher.gold }} | Slvr {{ tresher.silver }} | Cpr {{ tresher.copper }} | Znc {{ tresher.zinc }} | SP {{ tresher.spReward }} | Dungon</small>
 							</button>
 						</li>
 					}
@@ -1028,7 +1407,7 @@
 								>
 									<span>{{ tresher.name }}</span>
 									<small>
-										{{ tresher.type }} | Worth {{ tresher.worth }} | {{ libraryTresherSourceLabel(tresher) }}
+										Gold {{ tresher.gold }} | Slvr {{ tresher.silver }} | Cpr {{ tresher.copper }} | Znc {{ tresher.zinc }} | SP {{ tresher.spReward }} | {{ libraryTresherSourceLabel(tresher) }}
 									</small>
 								</button>
 							</li>
@@ -1065,7 +1444,11 @@
 				<input id="monster-name" class="form-input" type="text" formControlName="name" />
 
 				<label class="form-label" for="monster-type">Type</label>
-				<input id="monster-type" class="form-input" type="text" formControlName="type" />
+				<select id="monster-type" class="form-input" formControlName="type">
+					@for (opt of monsterTypeOptions; track opt) {
+						<option [value]="opt">{{ opt }}</option>
+					}
+				</select>
 
 				<label class="form-label" for="monster-description">Description</label>
 				<textarea
@@ -1093,35 +1476,69 @@
 				<label class="form-label" for="monster-run-at">Run At (HP)</label>
 				<input id="monster-run-at" class="form-input" type="number" min="0" formControlName="runAt" />
 
-				<label class="form-label" for="monster-num-attacks">Number of Attacks</label>
-				<input
-					id="monster-num-attacks"
-					class="form-input"
-					type="number"
-					min="0"
-					formControlName="numberOfAttacks"
-				/>
-
 				<label class="form-label" for="monster-sp-reward">Skill Points Reward</label>
 				<input id="monster-sp-reward" class="form-input" type="number" min="0" formControlName="spReward" />
 
-				@if (keyList.length > 0) {
-					<p class="form-label" style="margin-top: 0.4rem">Keys Held</p>
-					<ul class="monster-key-list">
-						@for (key of keyList; track key.id) {
-							<li class="monster-key-item">
-								<label class="monster-key-label">
-									<input
-										type="checkbox"
-										[checked]="isKeyAssignedToMonster(key.id)"
-										(change)="toggleMonsterKey(key.id)"
-									/>
-									{{ key.name }}
-								</label>
-							</li>
+				<label class="form-label" for="monster-image-id" style="margin-top: 0.4rem">Image</label>
+				<select id="monster-image-id" class="form-input" (change)="setMonsterDialogImageId($any($event.target).value)">
+					<option value="">None</option>
+					@for (img of monsterDialogImages(); track img.id) {
+						<option [value]="img.id" [attr.selected]="editingMonsterImageId() === img.id ? true : null">{{ img.name }}</option>
+					}
+				</select>
+
+				<label class="form-label" for="monster-sound-id">Sound</label>
+				<select id="monster-sound-id" class="form-input" (change)="setMonsterDialogSoundId($any($event.target).value)">
+					<option value="">None</option>
+					@for (snd of monsterDialogSounds(); track snd.id) {
+						<option [value]="snd.id" [attr.selected]="editingMonsterSoundId() === snd.id ? true : null">{{ snd.name }}</option>
+					}
+				</select>
+
+				<p class="form-label" style="margin-top: 0.6rem">Attacks</p>
+				@for (attack of editingMonsterAttacks(); track $index; let i = $index) {
+					<div class="monster-attack-row">
+						<div class="monster-attack-header">
+							<span>Attack {{ i + 1 }}</span>
+							<button type="button" class="cancel-button monster-attack-remove" (click)="removeMonsterAttack(i)">Remove</button>
+						</div>
+						<select class="form-input" [value]="attack.type" (change)="setMonsterAttackType(i, $any($event.target).value)">
+							<option value="Bite">Bite</option>
+							<option value="Claw">Claw</option>
+							<option value="Weapon">Weapon</option>
+							<option value="Spell">Spell</option>
+						</select>
+						<div class="monster-attack-stats">
+							<div>
+								<label class="form-label" style="font-size: 0.8rem">Damage</label>
+								<input class="form-input" type="number" min="0" [value]="attack.damage" (change)="setMonsterAttackDamage(i, $any($event.target).value)" />
+							</div>
+							<div>
+								<label class="form-label" style="font-size: 0.8rem">+To Hit</label>
+								<input class="form-input" type="number" [value]="attack.plusToHit" (change)="setMonsterAttackHit(i, $any($event.target).value)" />
+							</div>
+						</div>
+						@if (attack.type === 'Weapon') {
+							<label class="form-label" style="font-size: 0.8rem; margin-top: 0.25rem">Weapon Item</label>
+							<select class="form-input" (change)="setMonsterAttackWeaponId(i, $any($event.target).value)">
+								<option value="">None</option>
+								@for (item of monsterDialogWeaponItems(); track item.id) {
+									<option [value]="item.id" [attr.selected]="attack.weaponItemId === item.id ? true : null">{{ item.name }}</option>
+								}
+							</select>
 						}
-					</ul>
+						@if (attack.type === 'Spell') {
+							<label class="form-label" style="font-size: 0.8rem; margin-top: 0.25rem">Spell</label>
+							<select class="form-input" (change)="setMonsterAttackSpellId(i, $any($event.target).value)">
+								<option value="">None</option>
+								@for (spell of monsterDialogSpells(); track spell.id) {
+									<option [value]="spell.id" [attr.selected]="attack.spellId === spell.id ? true : null">{{ spell.name }}</option>
+								}
+							</select>
+						}
+					</div>
 				}
+				<button type="button" class="cancel-button" style="margin-top: 0.3rem; width: 100%" (click)="addMonsterAttack()">+ Add Attack</button>
 
 				<div class="form-actions">
 					<button type="submit" class="save-button">Save</button>
@@ -1184,8 +1601,78 @@
 				Roam
 			</label>
 
-			@if (selectedDungonMonsters().length > 0) {
-				<p class="details-message" style="margin: 0 0 0.4rem">Current Dungon Monsters</p>
+			<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
+				<input
+					type="checkbox"
+					[checked]="placeMonsterIsDormant()"
+					(change)="onPlaceMonsterIsDormantChange($event)"
+				/>
+				Dormant (only acts when triggered)
+			</label>
+
+			@if (placeMonsterIsDormant()) {
+				<div style="margin-bottom: 0.7rem; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; font-size: 0.85rem;">
+					<p class="details-message" style="margin: 0 0 0.4rem; font-weight: 600;">Guard Square (optional)</p>
+					@if (placeMonsterGuardRow() !== null) {
+						<p class="details-message" style="margin: 0 0 0.4rem; color: #ff9500;">
+							Guarding row {{ placeMonsterGuardRow() }}, col {{ placeMonsterGuardCol() }}
+						</p>
+						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem; margin-right: 0.4rem" (click)="clearMonsterGuardSquare()">Clear</button>
+						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingGuardSquare()">Change</button>
+					} @else {
+						<p class="details-message" style="margin: 0 0 0.4rem; opacity: 0.7;">No guard square — will only wake on reinforcement call or if attacked.</p>
+						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingGuardSquare()">Click to set guard square</button>
+					}
+				</div>
+			}
+
+			@if (selectedDungonTreshers().length > 0) {
+				<p class="details-message" style="margin: 0 0 0.3rem">Drop Treshers</p>
+				<ul class="dungons-list" style="margin-bottom: 0.6rem">
+					@for (tresher of selectedDungonTreshers(); track tresher.id) {
+						<li class="dungons-list-item">
+							<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box">
+								<input
+									type="checkbox"
+									[checked]="isMonsterDropTresherSelected(tresher.id)"
+									(change)="toggleMonsterDropTresher(tresher.id)"
+								/>
+								{{ tresher.name || 'Unnamed Tresher' }}
+								<small style="margin-left: 0.4rem; opacity: 0.7">({{ tresher.type }})</small>
+							</label>
+						</li>
+					}
+				</ul>
+			}
+
+			@if (keyList.length > 0) {
+				<p class="details-message" style="margin: 0 0 0.3rem">Drop Keys</p>
+				<ul class="dungons-list" style="margin-bottom: 0.6rem">
+					@for (key of keyList; track key.id) {
+						<li class="dungons-list-item">
+							<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box" [style.opacity]="isKeyPlaced(key.id) ? '0.45' : '1'">
+								<input
+									type="checkbox"
+									[checked]="isMonsterDropKeySelected(key.id)"
+									[disabled]="isKeyPlaced(key.id)"
+									(change)="toggleMonsterDropKey(key.id)"
+								/>
+								{{ key.name || 'Unnamed Key' }}{{ isKeyPlaced(key.id) ? ' (placed)' : '' }}
+							</label>
+						</li>
+					}
+				</ul>
+			}
+
+			@if (isLoadingMonsterLibrary()) {
+				<p class="details-message" style="margin-top: 0.6rem">Loading monsters...</p>
+			}
+			@if (monsterLibraryError()) {
+				<p class="details-message details-message-error" style="margin-top: 0.6rem">{{ monsterLibraryError() }}</p>
+			}
+
+			@if (selectedDungonMonsters().length > 0 || placeDialogLibraryMonsters().length > 0) {
+				<p class="details-message" style="margin: 0.7rem 0 0.4rem">My Available Monsters</p>
 				<ul class="dungons-list">
 					@for (monster of selectedDungonMonsters(); track monster.id) {
 						<li class="dungons-list-item">
@@ -1195,39 +1682,23 @@
 								(click)="placeSelectedMonsterAtPendingPlacement(monster.id)"
 							>
 								<span>{{ monster.name }}</span>
-								<small>{{ monster.type }} | HP {{ monster.hp }} | Dungon</small>
+								<small>{{ monster.type }} | HP {{ monster.hp }} | Mine</small>
+							</button>
+						</li>
+					}
+					@for (monster of placeDialogLibraryMonsters(); track monster.userguid + ':' + monster.id) {
+						<li class="dungons-list-item">
+							<button
+								type="button"
+								class="dungons-list-button"
+								(click)="placeLibraryMonsterAtPendingPlacement(monster.id)"
+							>
+								<span>{{ monster.name }}</span>
+								<small>{{ monster.type }} | HP {{ monster.hp }} | {{ libraryMonsterSourceLabel(monster) }}</small>
 							</button>
 						</li>
 					}
 				</ul>
-			}
-
-			@if (isLoadingMonsterLibrary()) {
-				<p class="details-message" style="margin-top: 0.6rem">Loading your/public monsters...</p>
-			} @else {
-				@if (monsterLibraryError()) {
-					<p class="details-message details-message-error" style="margin-top: 0.6rem">{{ monsterLibraryError() }}</p>
-				}
-
-				@if (placeDialogLibraryMonsters().length > 0) {
-					<p class="details-message" style="margin: 0.7rem 0 0.4rem">My and Public Monsters</p>
-					<ul class="dungons-list">
-						@for (monster of placeDialogLibraryMonsters(); track monster.userguid + ':' + monster.id) {
-							<li class="dungons-list-item">
-								<button
-									type="button"
-									class="dungons-list-button"
-									(click)="placeLibraryMonsterAtPendingPlacement(monster.id)"
-								>
-									<span>{{ monster.name }}</span>
-									<small>
-										{{ monster.type }} | HP {{ monster.hp }} | {{ libraryMonsterSourceLabel(monster) }}
-									</small>
-								</button>
-							</li>
-						}
-					</ul>
-				}
 			}
 
 			@if (!isLoadingMonsterLibrary() && !hasAnyPlaceableMonsters()) {
@@ -1284,6 +1755,73 @@
 					Close
 				</button>
 			</div>
+		</section>
+	</div>
+}
+
+@if (isFloorTrapDialogVisible()) {
+	<div class="door-dialog-backdrop">
+		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Floor trap settings">
+			<h4 class="door-dialog-title">Floor Trap</h4>
+			<form class="door-settings-form" [formGroup]="floorTrapForm" (ngSubmit)="saveFloorTrap()">
+				<label class="form-label" for="floor-trap-name">Trap Name</label>
+				<input id="floor-trap-name" class="form-input" type="text" formControlName="trapName" />
+
+				<label class="form-label" for="floor-trap-description">Trap Description</label>
+				<textarea id="floor-trap-description" class="form-textarea" rows="2" formControlName="trapDescription"></textarea>
+
+				<label class="form-label" for="floor-trap-damage">Trap Damage</label>
+				<input id="floor-trap-damage" class="form-input" type="number" min="0" formControlName="trapDamage" />
+
+				<label class="form-label" for="floor-trap-damage-to">Damage To</label>
+				<select id="floor-trap-damage-to" class="form-input" formControlName="trapDamageTo">
+					<option value="HP">HP</option>
+					<option value="Stamina">Stamina</option>
+					<option value="Mind">Mind</option>
+				</select>
+
+				<label class="form-label" for="floor-trap-curse-id">Curse ID (optional)</label>
+				<input id="floor-trap-curse-id" class="form-input" type="number" formControlName="trapCurseId" />
+
+				<label class="form-label" for="floor-trap-to-detect">To Detect DC (Mind + d4)</label>
+				<input id="floor-trap-to-detect" class="form-input" type="number" min="0" formControlName="trapToDetect" />
+
+				<label class="form-label" for="floor-trap-to-disarm">To Disarm DC (Mind + d4)</label>
+				<input id="floor-trap-to-disarm" class="form-input" type="number" min="0" formControlName="trapToDisarm" />
+
+				<div class="form-actions">
+					<button type="submit" class="save-button">Save</button>
+					<button type="button" class="cancel-button" (click)="cancelFloorTrap()">Cancel</button>
+				</div>
+			</form>
+		</section>
+	</div>
+}
+@if (isPortalDialogVisible()) {
+	<div class="door-dialog-backdrop">
+		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Portal settings">
+			<h4 class="door-dialog-title">{{ editingPortalId() !== null ? 'Edit Portal' : 'New Portal' }}</h4>
+			<form class="door-settings-form" [formGroup]="portalForm" (ngSubmit)="savePortal()">
+				<label class="form-label" for="portal-name">Name</label>
+				<input id="portal-name" class="form-input" type="text" formControlName="name" />
+
+				<label class="form-label" for="portal-description">Description</label>
+				<textarea id="portal-description" class="form-textarea" rows="2" formControlName="description"></textarea>
+
+				<label class="form-label" for="portal-look">Look</label>
+				<select id="portal-look" class="form-input" formControlName="look">
+					<option value="starUp">Star (Up) ▲</option>
+					<option value="starDown">Star (Down) ▼</option>
+					<option value="magicDoor">Magic Door ⊡</option>
+				</select>
+
+				<div class="form-actions">
+					<button type="submit" class="save-button">
+						{{ editingPortalId() !== null ? 'Save' : 'Save &amp; Place' }}
+					</button>
+					<button type="button" class="cancel-button" (click)="cancelPortalDialog()">Cancel</button>
+				</div>
+			</form>
 		</section>
 	</div>
 }

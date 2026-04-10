@@ -1,0 +1,120 @@
+.upload-popup-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.upload-popup-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 50%;
+  background: #4a7c59;
+  color: white;
+  font-size: 0.9rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  padding: 0;
+}
+
+.upload-popup-btn:hover {
+  background: #3a6249;
+}
+
+.upload-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.upload-popup-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1001;
+  background: #fff;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  min-width: 300px;
+  max-width: 420px;
+  width: 90vw;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.upload-popup-title {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.upload-popup-field {
+  margin-bottom: 0.75rem;
+}
+
+.upload-popup-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.upload-popup-input {
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  box-sizing: border-box;
+}
+
+.upload-popup-error {
+  color: #dc3545;
+  font-size: 0.875rem;
+  margin: 0.5rem 0 0;
+}
+
+.upload-popup-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.upload-popup-submit {
+  padding: 0.375rem 1rem;
+  background: #4a7c59;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.upload-popup-submit:hover:not(:disabled) {
+  background: #3a6249;
+}
+
+.upload-popup-submit:disabled,
+.upload-popup-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.upload-popup-cancel {
+  padding: 0.375rem 1rem;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.upload-popup-cancel:hover:not(:disabled) {
+  background: #5c636a;
+}

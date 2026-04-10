@@ -17,11 +17,13 @@ export interface DungonRecord {
   minsplifetime: number;
   maxsplifetime: number;
   ismaingame: boolean;
+  issample: boolean;
 }
 
 export interface PublishDungonOptions {
   visibility: PublishVisibility;
   friendUserKeys: string[];
+  isAdminUser?: boolean;
 }
 
 export interface PublishedDungonListItemRecord {
@@ -63,13 +65,14 @@ export interface NewDungon {
   minsplifetime?: number;
   maxsplifetime?: number;
   ismaingame?: boolean;
+  issample?: boolean;
 }
 
 export const getDungonsByUserKey = async (
   userkey: string
 ): Promise<DungonRecord[]> => {
   const { rows } = await pool.query<DungonRecord>(
-    `SELECT id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame
+    `SELECT id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample
      FROM dungons
      WHERE userkey = $1
      ORDER BY id DESC`,
@@ -120,7 +123,7 @@ export const getDungonByIdForUser = async (
   userkey: string
 ): Promise<DungonRecord | null> => {
   const { rows } = await pool.query<DungonRecord>(
-    `SELECT id, key, userkey, name, description, intro, "dungenJson" AS "dungenJson", ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime
+    `SELECT id, key, userkey, name, description, intro, "dungenJson" AS "dungenJson", ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample
      FROM dungons
      WHERE id = $1 AND userkey = $2`,
     [id, userkey]
@@ -154,8 +157,13 @@ export const publishDungonForUser = async (
   try {
     await client.query('BEGIN');
 
-    const isPublic = options.visibility === 'public';
+    const isPublicRequest = options.visibility === 'public';
     const isFriendShared = options.visibility === 'friends';
+    const isAdminUser = options.isAdminUser === true;
+
+    // Admins publish directly as public; creators submit a pending request
+    const newStatus = (isPublicRequest && !isAdminUser) ? 'pending' : 'published';
+    const newIspublic = isPublicRequest && isAdminUser;
     const requestedFriendUserKeys = Array.from(
       new Set(
         options.friendUserKeys
@@ -166,11 +174,11 @@ export const publishDungonForUser = async (
 
     const published = await client.query<{ id: number }>(
       `UPDATE dungons
-       SET status = 'published',
-           ispublic = $3
+       SET status = $3,
+           ispublic = $4
        WHERE id = $1 AND userkey = $2
        RETURNING id`,
-      [id, userkey, isPublic]
+      [id, userkey, newStatus, newIspublic]
     );
 
     if ((published.rowCount ?? 0) === 0) {
@@ -281,7 +289,10 @@ export const startGameFromPublishedDungon = async (
      FROM source
      ON CONFLICT (dungonid, userkey, pcid)
      DO UPDATE SET
-       lastupdated = games.lastupdated
+       "dungenJson" = EXCLUDED."dungenJson",
+       inventory = EXCLUDED.inventory,
+       monsters = EXCLUDED.monsters,
+       lastupdated = NOW()
      RETURNING
        id,
        dungonid,
@@ -394,10 +405,10 @@ export const insertDungon = async (
   payload: NewDungon
 ): Promise<DungonRecord> => {
   const { rows } = await pool.query<DungonRecord>(
-    `INSERT INTO dungons (key, userkey, name, description, intro, status, minsplifetime, maxsplifetime, ismaingame)
-     VALUES ($1, $1, $2, $3, $4, 'pending', COALESCE($5, 0), COALESCE($6, 1000000), COALESCE($7, FALSE))
-     RETURNING id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame`,
-    [payload.userkey, payload.name, payload.description, payload.intro, payload.minsplifetime, payload.maxsplifetime, payload.ismaingame]
+    `INSERT INTO dungons (key, userkey, name, description, intro, status, minsplifetime, maxsplifetime, ismaingame, issample)
+     VALUES ($1, $1, $2, $3, $4, 'inproces', COALESCE($5, 0), COALESCE($6, 1000000), COALESCE($7, FALSE), COALESCE($8, FALSE))
+     RETURNING id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample`,
+    [payload.userkey, payload.name, payload.description, payload.intro, payload.minsplifetime, payload.maxsplifetime, payload.ismaingame, payload.issample]
   );
 
   return rows[0];
@@ -446,4 +457,69 @@ export const updateDungonMetadataForUser = async (
   );
 
   return rows[0] ?? null;
+};
+
+export const approveDungon = async (
+  id: number,
+  adminKey: string
+): Promise<boolean> => {
+  const { rowCount } = await pool.query(
+    `UPDATE dungons
+     SET status = 'published',
+         ispublic = TRUE,
+         approvedby = $2,
+         approveddate = NOW()
+     WHERE id = $1 AND status = 'pending'`,
+    [id, adminKey]
+  );
+
+  return (rowCount ?? 0) > 0;
+};
+
+export const getDungonSpRewardById = async (id: number): Promise<number> => {
+  const { rows } = await pool.query<{ spreward: number }>(
+    `SELECT COALESCE(spreward, 0) AS spreward FROM dungons WHERE id = $1`,
+    [id]
+  );
+
+  return rows[0]?.spreward ?? 0;
+};
+
+export const getSampleDungonFromDb = async (): Promise<{ id: number; name: string; description: string; intro: string } | null> => {
+  const { rows } = await pool.query<{ id: number; name: string; description: string; intro: string }>(
+    `SELECT id, name, description, intro
+     FROM dungons
+     WHERE issample = TRUE AND status = 'published'
+     LIMIT 1`
+  );
+  return rows[0] ?? null;
+};
+
+export const getSampleDungonFullFromDb = async (): Promise<{ id: number; name: string; description: string; intro: string; dungenJson: unknown; spreward: number } | null> => {
+  const { rows } = await pool.query<{ id: number; name: string; description: string; intro: string; dungenJson: unknown; spreward: number }>(
+    `SELECT id, name, description, intro, "dungenJson" AS "dungenJson", COALESCE(spreward, 0) AS spreward
+     FROM dungons
+     WHERE issample = TRUE AND status = 'published'
+     LIMIT 1`
+  );
+  return rows[0] ?? null;
+};
+
+export const setSampleDungonInDb = async (id: number): Promise<boolean> => {
+  await pool.query(`UPDATE dungons SET issample = FALSE WHERE issample = TRUE`);
+  const { rowCount } = await pool.query(
+    `UPDATE dungons SET issample = TRUE WHERE id = $1 AND status = 'published'`,
+    [id]
+  );
+  return (rowCount ?? 0) > 0;
+};
+
+export const getAllPublishedDungonsForAdmin = async (): Promise<{ id: number; name: string; issample: boolean }[]> => {
+  const { rows } = await pool.query<{ id: number; name: string; issample: boolean }>(
+    `SELECT id, name, issample
+     FROM dungons
+     WHERE status = 'published'
+     ORDER BY id DESC`
+  );
+  return rows;
 };

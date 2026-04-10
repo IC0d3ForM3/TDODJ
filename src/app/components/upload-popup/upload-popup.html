@@ -1,0 +1,48 @@
+<div class="upload-popup-wrap">
+  <button
+    type="button"
+    class="upload-popup-btn"
+    (click)="open()"
+    [title]="mediaType() === 'image' ? 'Upload new image' : 'Upload new sound'"
+  >{{ mediaType() === 'image' ? '🖼' : '🔊' }}</button>
+
+  @if (isOpen()) {
+    <div class="upload-popup-overlay" (click)="close()"></div>
+    <div class="upload-popup-modal" role="dialog">
+      <h4 class="upload-popup-title">Upload {{ mediaType() === 'image' ? 'Image' : 'Sound' }}</h4>
+
+      <div class="upload-popup-field">
+        <label class="upload-popup-label">Name</label>
+        <input
+          type="text"
+          class="upload-popup-input"
+          [value]="uploadName()"
+          (input)="onNameInput($event)"
+          placeholder="Enter a name"
+        />
+      </div>
+
+      <div class="upload-popup-field">
+        <label class="upload-popup-label">File</label>
+        <input
+          type="file"
+          [accept]="mediaType() === 'image' ? 'image/*' : 'audio/*'"
+          (change)="onFileSelected($event)"
+        />
+      </div>
+
+      @if (errorMessage()) {
+        <p class="upload-popup-error">{{ errorMessage() }}</p>
+      }
+
+      <div class="upload-popup-actions">
+        <button type="button" class="upload-popup-submit" (click)="upload()" [disabled]="isUploading()">
+          {{ isUploading() ? 'Uploading...' : 'Upload' }}
+        </button>
+        <button type="button" class="upload-popup-cancel" (click)="close()" [disabled]="isUploading()">
+          Cancel
+        </button>
+      </div>
+    </div>
+  }
+</div>

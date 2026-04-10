@@ -1,0 +1,158 @@
+<section class="sg-page">
+
+  <!-- ── Mini how-to ────────────────────────────────────────────── -->
+  <header class="sg-hero">
+    <h2>Try a Sample Game</h2>
+    <p>
+      See what DandDanny is all about before you sign up. Below is a published sample dungeon and
+      the pre-built character you would take into it. When you're ready to play for real — create
+      an account, pick your own character, and dive in.
+    </p>
+  </header>
+
+  <section class="sg-howto">
+    <h3>How it Works in 30 Seconds</h3>
+    <ol class="sg-howto-list">
+      <li>
+        <strong>Explore</strong> — navigate a 10 × 10 dungeon from a first-person view with a
+        live mini-map. Use arrow keys to face a direction, <kbd>Space</kbd> or <kbd>F</kbd> to
+        move forward, and <kbd>B</kbd> to step back.
+      </li>
+      <li>
+        <strong>Act on your turn</strong> — you have a pool of Action Economy (AE) points each
+        turn. Moving, attacking, casting spells, or drinking potions each cost 1 AE.
+        When AE hits 0 it's the monsters' turn.
+      </li>
+      <li>
+        <strong>Fight</strong> — hit roll: d12 + weapon bonus + Stamina vs monster AC.
+        Damage: dice + Strength. Monsters fight back when it's their turn.
+      </li>
+      <li>
+        <strong>Loot</strong> — open treshers (containers) on the floor or dropped by monsters.
+        Pick up weapons, armor, potions, spells, and coin from your Inventory tab.
+      </li>
+      <li>
+        <strong>Find the exit</strong> — step onto the Exit square to finish the dungeon and
+        collect your SP (Skill Points) reward.
+      </li>
+    </ol>
+    <p class="sg-howto-more">
+      Want the full breakdown?
+      <a routerLink="/how-to-play">Read the How to Play guide →</a>
+    </p>
+  </section>
+
+  <!-- ── Loading / error ───────────────────────────────────────── -->
+  @if (isLoading()) {
+    <p class="sg-loading">Loading sample game…</p>
+  }
+
+  @if (hasError()) {
+    <div class="sg-no-sample">
+      <p>No sample game has been configured yet. Check back soon!</p>
+    </div>
+  }
+
+  <!-- ── PC picker (dungeon loaded, no PC selected yet, multiple choices) ── -->
+  @if (!isLoading() && !hasError() && dungon() && samplePcs().length > 1 && !selectedPc()) {
+    <section class="sg-picker">
+      <h3 class="sg-picker-title">Choose Your Character</h3>
+      <p class="sg-picker-subtitle">Pick one of these pre-built adventurers to take into the dungeon.</p>
+      <div class="sg-picker-grid">
+        @for (pc of samplePcs(); track pc.id) {
+          <button type="button" class="sg-pc-choice" (click)="selectPc(pc)">
+            <span class="sg-pc-choice-name">{{ pc.name }}</span>
+            <span class="sg-pc-choice-meta">{{ pc.species }} · {{ pc.type }}</span>
+            <span class="sg-pc-choice-stats">
+              HP {{ pc.maxHP }} &nbsp;·&nbsp; AC {{ pc.ac }} &nbsp;·&nbsp; AE {{ pc.actionEconomy }}
+            </span>
+          </button>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- ── No sample PCs configured ─────────────────────────────── -->
+  @if (!isLoading() && !hasError() && dungon() && samplePcs().length === 0) {
+    <div class="sg-no-sample">
+      <p>No sample characters have been configured yet. Check back soon!</p>
+    </div>
+  }
+
+  <!-- ── Sample dungeon + selected PC ──────────────────────────── -->
+  @if (!isLoading() && !hasError() && dungon() && selectedPc()) {
+    <div class="sg-cards">
+
+      <!-- Dungeon card -->
+      <section class="sg-card sg-card-dungon">
+        <div class="sg-card-label">Sample Dungeon</div>
+        <h3>{{ dungon()!.name }}</h3>
+        <p class="sg-card-description">{{ dungon()!.description }}</p>
+        @if (dungon()!.intro) {
+          <div class="sg-intro">
+            <p class="sg-intro-label">Intro</p>
+            <p class="sg-intro-text">{{ dungon()!.intro }}</p>
+          </div>
+        }
+        <button type="button" class="sg-play-btn" (click)="playNow()">
+          ▶ Play {{ dungon()!.name }}
+        </button>
+      </section>
+
+      <!-- PC card -->
+      <section class="sg-card sg-card-pc">
+        <div class="sg-card-label">Your Character</div>
+        <h3>{{ selectedPc()!.name }}</h3>
+        <p class="sg-pc-subtitle">{{ selectedPc()!.species }} · {{ selectedPc()!.type }}</p>
+        <div class="sg-stats">
+          <div class="sg-stat">
+            <span class="sg-stat-label">HP</span>
+            <span class="sg-stat-value sg-stat-hp">{{ selectedPc()!.maxHP }}</span>
+          </div>
+          <div class="sg-stat">
+            <span class="sg-stat-label">AC</span>
+            <span class="sg-stat-value sg-stat-ac">{{ selectedPc()!.ac }}</span>
+          </div>
+          <div class="sg-stat">
+            <span class="sg-stat-label">AE</span>
+            <span class="sg-stat-value sg-stat-ae">{{ selectedPc()!.actionEconomy }}</span>
+          </div>
+          <div class="sg-stat">
+            <span class="sg-stat-label">STR</span>
+            <span class="sg-stat-value">{{ selectedPc()!.strength }}</span>
+          </div>
+          <div class="sg-stat">
+            <span class="sg-stat-label">STA</span>
+            <span class="sg-stat-value">{{ selectedPc()!.stamina }}</span>
+          </div>
+          <div class="sg-stat">
+            <span class="sg-stat-label">MIND</span>
+            <span class="sg-stat-value">{{ selectedPc()!.mind }}</span>
+          </div>
+          <div class="sg-stat">
+            <span class="sg-stat-label">RoV</span>
+            <span class="sg-stat-value">{{ selectedPc()!.rangeOfView }}</span>
+          </div>
+          <div class="sg-stat">
+            <span class="sg-stat-label">MP</span>
+            <span class="sg-stat-value">{{ selectedPc()!.magicPower }}</span>
+          </div>
+        </div>
+        @if (samplePcs().length > 1) {
+          <button type="button" class="sg-change-pc" (click)="changePc()">← Change character</button>
+        }
+      </section>
+    </div>
+  }
+
+  <!-- ── CTA ───────────────────────────────────────────────────── -->
+  <section class="sg-cta">
+    <h3>Ready to Play?</h3>
+    <p>Create a free account to start a real run, save your progress, and build your own dungeons.</p>
+    <div class="sg-cta-buttons">
+      <a routerLink="/signup" class="sg-btn sg-btn-primary">Create Account</a>
+      <a routerLink="/login" class="sg-btn sg-btn-secondary">Log In</a>
+    </div>
+  </section>
+
+</section>

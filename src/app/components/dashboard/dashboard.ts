@@ -1,125 +1,14 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
-import { ActiveGameListItem, ArmorType, CoinType, DungonListItem, PotionEffectTarget, TresherType } from '../../interfaces/game';
+import { ActiveGameListItem, DungonListItem } from '../../interfaces/game';
 import { Account } from '../../services/account';
 import { API_BASE_URL } from '../../api-config';
-
-interface UserTresherListItem {
-  id: number;
-  userguid: string;
-  type: TresherType;
-  name: string;
-  description: string;
-  worth: number;
-  curseID: number | null;
-  trapID: number | null;
-  HP: number | null;
-  damage: number | null;
-  hands: number | null;
-  range: number | null;
-  ammoType: string | null;
-  speedReduction: number | null;
-  armorType: ArmorType | null;
-  coinType: CoinType | null;
-  effectNumber: number | null;
-  effectTarget: PotionEffectTarget | null;
-  effectDuration: number | null;
-  isPublic: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface UserTresherEditorValue {
-  type: TresherType;
-  name: string;
-  description: string;
-  worth: number;
-  trapID: number | null;
-  curseID: number | null;
-  HP: number | null;
-  damage: number | null;
-  hands: number | null;
-  range: number | null;
-  ammoType: string | null;
-  speedReduction: number | null;
-  armorType: ArmorType | null;
-  coinType: CoinType | null;
-  effectNumber: number | null;
-  effectTarget: PotionEffectTarget | null;
-  effectDuration: number | null;
-  isPublic: boolean;
-}
-
-interface UserTresherWritePayload {
-  type: TresherType;
-  name: string;
-  description: string;
-  worth: number;
-  trapID: number | null;
-  curseID: number | null;
-  HP: number | null;
-  damage: number | null;
-  hands: number | null;
-  range: number | null;
-  ammoType: string | null;
-  speedReduction: number | null;
-  armorType: ArmorType | null;
-  coinType: CoinType | null;
-  effectNumber: number | null;
-  effectTarget: PotionEffectTarget | null;
-  effectDuration: number | null;
-  isPublic: boolean;
-}
-
-interface UserMonsterAttackListItem {
-  description: string;
-  damage: number;
-  plusToHit: number;
-}
-
-interface UserMonsterListItem {
-  id: number;
-  userguid: string;
-  imageId: number | null;
-  tresherIds: number[];
-  name: string;
-  type: string;
-  description: string;
-  hp: number;
-  movementEconomy: number;
-  ac: number;
-  runAt: number;
-  numberOfAttacks: number;
-  attacks: UserMonsterAttackListItem[];
-  isPublic: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface UserMonsterAttackEditorValue {
-  description: string;
-  damage: number;
-  plusToHit: number;
-}
-
-interface UserMonsterWritePayload {
-  imageId: number | null;
-  tresherIds: number[];
-  name: string;
-  type: string;
-  description: string;
-  hp: number;
-  movementEconomy: number;
-  ac: number;
-  runAt: number;
-  numberOfAttacks: number;
-  attacks: UserMonsterAttackEditorValue[];
-  isPublic: boolean;
-}
+import { TresherService, UserTresherListItem } from '../../services/tresher';
+import { UploadPopup, UploadedMediaItem } from '../upload-popup/upload-popup';
 
 interface UserImageListItem {
   id: number;
@@ -132,20 +21,6 @@ interface UserImageListItem {
   updatedAt: string;
 }
 
-interface UserImageEditorValue {
-  path: string;
-  isPublic: boolean;
-  isActive: boolean;
-  name: string;
-}
-
-interface UserImageWritePayload {
-  path: string;
-  isPublic: boolean;
-  isActive: boolean;
-  name: string;
-}
-
 interface UserFriendListItem {
   id: number;
   userurid: string;
@@ -155,7 +30,7 @@ interface UserFriendListItem {
 }
 
 type PcSpeciesOption = 'Human' | 'Elph' | 'DwarPh' | 'Shorties';
-type PcTypeOption = 'Figher' | 'Mage' | 'thieph' | 'Healer';
+type PcTypeOption = 'Figher' | 'Mage' | 'Thieph' | 'Healer';
 
 interface UserPcListItem {
   id: number;
@@ -167,9 +42,11 @@ interface UserPcListItem {
   maxHP: number;
   currentHP: number;
   ac: number;
-  movementEconomy: number;
+  actionEconomy: number;
   poisonResest: number;
   magicPower: number;
+  mind: number;
+  stamina: number;
   level: number;
   strength: number;
   rangeOfView: number;
@@ -182,8 +59,23 @@ interface UserPcListItem {
   rightArmArmorTresherId: number | null;
   leftLegArmorTresherId: number | null;
   rightLegArmorTresherId: number | null;
+  ring1ItemId: number | null;
+  ring2ItemId: number | null;
+  ring3ItemId: number | null;
+  ring4ItemId: number | null;
+  ring5ItemId: number | null;
+  necklaceItemId: number | null;
+  hand1ItemId: number | null;
+  hand2ItemId: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface UserItemOption {
+  id: number;
+  name: string;
+  type: string;
+  armorSlot: string | null;
 }
 
 interface UserPcWritePayload {
@@ -194,9 +86,11 @@ interface UserPcWritePayload {
   maxHP: number;
   currentHP: number;
   ac: number;
-  movementEconomy: number;
+  actionEconomy: number;
   poisonResest: number;
   magicPower: number;
+  mind: number;
+  stamina: number;
   level: number;
   strength: number;
   rangeOfView: number;
@@ -209,24 +103,22 @@ interface UserPcWritePayload {
   rightArmArmorTresherId: number | null;
   leftLegArmorTresherId: number | null;
   rightLegArmorTresherId: number | null;
+  ring1ItemId: number | null;
+  ring2ItemId: number | null;
+  ring3ItemId: number | null;
+  ring4ItemId: number | null;
+  ring5ItemId: number | null;
+  necklaceItemId: number | null;
+  hand1ItemId: number | null;
+  hand2ItemId: number | null;
 }
 
-type MonsterAttackFormGroup = FormGroup<{
-  description: FormControl<string>;
-  damage: FormControl<number>;
-  plusToHit: FormControl<number>;
-}>;
-
-type MonsterTresherControl = FormControl<number | null>;
 type PcTresherControl = FormControl<number | null>;
 
 type DashboardTabId =
   | 'published-games'
   | 'active-games'
   | 'friend'
-  | 'treshers'
-  | 'monsters'
-  | 'images'
   | 'pc';
 
 interface DashboardTabItem {
@@ -236,7 +128,7 @@ interface DashboardTabItem {
 
 @Component({
   selector: 'app-dashboard',
-  imports: [ReactiveFormsModule, DatePipe],
+  imports: [ReactiveFormsModule, DatePipe, UploadPopup],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -245,6 +137,7 @@ export class Dashboard implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly account = inject(Account);
   private readonly router = inject(Router);
+  private readonly tresherService = inject(TresherService);
 
   readonly isLoadingPublishedGames = signal(false);
   readonly publishedGamesError = signal<string | null>(null);
@@ -263,9 +156,6 @@ export class Dashboard implements OnInit {
     { id: 'published-games', label: 'Available Games' },
     { id: 'active-games', label: 'Active Games' },
     { id: 'friend', label: 'Friend' },
-    { id: 'treshers', label: 'Treshers' },
-    { id: 'monsters', label: 'Monsters' },
-    { id: 'images', label: 'Images' },
     { id: 'pc', label: 'PC' },
   ] as const;
 
@@ -275,93 +165,29 @@ export class Dashboard implements OnInit {
   readonly isSavingUserFriend = signal(false);
   readonly userFriendSaveMessage = signal<string | null>(null);
 
-  readonly isLoadingUserTreshers = signal(false);
-  readonly userTreshersError = signal<string | null>(null);
-  readonly userTreshers = signal<UserTresherListItem[]>([]);
-  readonly isSavingUserTresher = signal(false);
-  readonly editingUserTresherId = signal<number | null>(null);
-  readonly userTresherSaveMessage = signal<string | null>(null);
-  readonly isTresherSectionVisible = signal(true);
+  readonly userTreshers = this.tresherService.items;
+  readonly monsterTresherOptions = this.tresherService.tresherOptions;
+  readonly isLoadingMonsterTresherOptions = this.tresherService.isLoadingOptions;
+  readonly monsterTresherOptionsError = this.tresherService.optionsError;
 
-  readonly isLoadingUserMonsters = signal(false);
-  readonly userMonstersError = signal<string | null>(null);
-  readonly userMonsters = signal<UserMonsterListItem[]>([]);
-  readonly isSavingUserMonster = signal(false);
-  readonly editingUserMonsterId = signal<number | null>(null);
-  readonly userMonsterSaveMessage = signal<string | null>(null);
-  readonly isMonsterSectionVisible = signal(true);
   readonly monsterImageOptions = signal<UserImageListItem[]>([]);
   readonly monsterImageOptionsError = signal<string | null>(null);
   readonly isLoadingMonsterImageOptions = signal(false);
-  readonly monsterTresherOptions = signal<UserTresherListItem[]>([]);
-  readonly monsterTresherOptionsError = signal<string | null>(null);
-  readonly isLoadingMonsterTresherOptions = signal(false);
-
-  readonly isLoadingUserImages = signal(false);
-  readonly userImagesError = signal<string | null>(null);
-  readonly userImages = signal<UserImageListItem[]>([]);
-  readonly isSavingUserImage = signal(false);
-  readonly editingUserImageId = signal<number | null>(null);
-  readonly userImageSaveMessage = signal<string | null>(null);
-  readonly isImageSectionVisible = signal(true);
-  readonly selectedImageFile = signal<File | null>(null);
+  private readonly _localPcImages = signal<UserImageListItem[]>([]);
+  readonly allMonsterImageOptions = computed(() => [...this.monsterImageOptions(), ...this._localPcImages()]);
 
   readonly isLoadingUserPcs = signal(false);
   readonly userPcsError = signal<string | null>(null);
   readonly userPcs = signal<UserPcListItem[]>([]);
   readonly isSavingUserPc = signal(false);
   readonly editingUserPcId = signal<number | null>(null);
+  readonly pcStatsRolled = signal(false);
   readonly userPcSaveMessage = signal<string | null>(null);
+  readonly userItems = signal<UserItemOption[]>([]);
+  readonly isLoadingUserItems = signal(false);
 
-  readonly tresherTypeOptions: TresherType[] = ['Weapon', 'Armor', 'Coins', 'Potion', 'OtherTresher'];
-  readonly armorTypeOptions: ArmorType[] = ['head', 'hand', 'body', 'arms', 'legs'];
-  readonly coinTypeOptions: CoinType[] = ['Gold', 'Silver', 'Copper', 'Tin'];
-  readonly potionEffectTargetOptions: PotionEffectTarget[] = ['Health', 'AC', 'AE'];
   readonly pcSpeciesOptions: PcSpeciesOption[] = ['Human', 'Elph', 'DwarPh', 'Shorties'];
-  readonly pcTypeOptions: PcTypeOption[] = ['Figher', 'Mage', 'thieph', 'Healer'];
-
-  readonly userTresherForm = new FormGroup({
-    type: new FormControl<TresherType>('Weapon', { nonNullable: true }),
-    name: new FormControl<string>('', { nonNullable: true }),
-    description: new FormControl<string>('', { nonNullable: true }),
-    worth: new FormControl<number>(0, { nonNullable: true }),
-    trapID: new FormControl<number | null>(null),
-    curseID: new FormControl<number | null>(null),
-    HP: new FormControl<number | null>(10),
-    damage: new FormControl<number | null>(0),
-    hands: new FormControl<number | null>(1),
-    range: new FormControl<number | null>(0),
-    ammoType: new FormControl<string | null>(null),
-    speedReduction: new FormControl<number | null>(0),
-    armorType: new FormControl<ArmorType | null>('body'),
-    coinType: new FormControl<CoinType | null>('Gold'),
-    effectNumber: new FormControl<number | null>(0),
-    effectTarget: new FormControl<PotionEffectTarget | null>('Health'),
-    effectDuration: new FormControl<number | null>(1),
-    isPublic: new FormControl<boolean>(false, { nonNullable: true }),
-  });
-
-  readonly userMonsterForm = new FormGroup({
-    tresherIds: new FormArray<MonsterTresherControl>([this.createMonsterTresherControl()]),
-    imageId: new FormControl<number | null>(null),
-    name: new FormControl<string>('', { nonNullable: true }),
-    type: new FormControl<string>('Unknown', { nonNullable: true }),
-    description: new FormControl<string>('', { nonNullable: true }),
-    hp: new FormControl<number>(1, { nonNullable: true }),
-    movementEconomy: new FormControl<number>(0, { nonNullable: true }),
-    ac: new FormControl<number>(10, { nonNullable: true }),
-    runAt: new FormControl<number>(0, { nonNullable: true }),
-    numberOfAttacks: new FormControl<number>(1, { nonNullable: true }),
-    attacks: new FormArray<MonsterAttackFormGroup>([this.createMonsterAttackForm()]),
-    isPublic: new FormControl<boolean>(false, { nonNullable: true }),
-  });
-
-  readonly userImageForm = new FormGroup({
-    path: new FormControl<string>('', { nonNullable: true }),
-    isPublic: new FormControl<boolean>(false, { nonNullable: true }),
-    isActive: new FormControl<boolean>(true, { nonNullable: true }),
-    name: new FormControl<string>('', { nonNullable: true }),
-  });
+  readonly pcTypeOptions: PcTypeOption[] = ['Figher', 'Mage', 'Thieph', 'Healer'];
 
   readonly userFriendForm = new FormGroup({
     email: new FormControl<string>('', { nonNullable: true }),
@@ -375,9 +201,11 @@ export class Dashboard implements OnInit {
     maxHP: new FormControl<number>(10, { nonNullable: true }),
     currentHP: new FormControl<number>(10, { nonNullable: true }),
     ac: new FormControl<number>(10, { nonNullable: true }),
-    movementEconomy: new FormControl<number>(0, { nonNullable: true }),
+    actionEconomy: new FormControl<number>(0, { nonNullable: true }),
     poisonResest: new FormControl<number>(0, { nonNullable: true }),
     magicPower: new FormControl<number>(0, { nonNullable: true }),
+    mind: new FormControl<number>(0, { nonNullable: true }),
+    stamina: new FormControl<number>(0, { nonNullable: true }),
     level: new FormControl<number>(1, { nonNullable: true }),
     strength: new FormControl<number>(0, { nonNullable: true }),
     rangeOfView: new FormControl<number>(5, { nonNullable: true }),
@@ -390,18 +218,28 @@ export class Dashboard implements OnInit {
     rightArmArmorTresherId: new FormControl<number | null>(null),
     leftLegArmorTresherId: new FormControl<number | null>(null),
     rightLegArmorTresherId: new FormControl<number | null>(null),
+    ring1ItemId: new FormControl<number | null>(null),
+    ring2ItemId: new FormControl<number | null>(null),
+    ring3ItemId: new FormControl<number | null>(null),
+    ring4ItemId: new FormControl<number | null>(null),
+    ring5ItemId: new FormControl<number | null>(null),
+    necklaceItemId: new FormControl<number | null>(null),
+    hand1ItemId: new FormControl<number | null>(null),
+    hand2ItemId: new FormControl<number | null>(null),
   });
 
   ngOnInit(): void {
     this.loadPublishedGames();
     this.loadActiveGames();
     this.loadUserFriends();
-    this.loadUserTreshers();
-    this.loadMonsterTresherOptions();
     this.loadMonsterImageOptions();
-    this.loadUserMonsters();
-    this.loadUserImages();
     this.loadUserPcs();
+    this.loadUserItems();
+    const userkey = this.account.getKey();
+    if (userkey) {
+      this.tresherService.loadTreshers(userkey);
+      this.tresherService.loadTresherOptions(userkey);
+    }
   }
 
   private loadPublishedGames(): void {
@@ -629,244 +467,8 @@ export class Dashboard implements OnInit {
       });
   }
 
-  toggleTresherSectionVisibility(): void {
-    this.isTresherSectionVisible.update((value) => !value);
-  }
 
-  selectedTresherType(): TresherType {
-    return this.userTresherForm.controls.type.value;
-  }
 
-  isWeaponTresherSelected(): boolean {
-    return this.selectedTresherType() === 'Weapon';
-  }
-
-  isArmorTresherSelected(): boolean {
-    return this.selectedTresherType() === 'Armor';
-  }
-
-  isCoinsTresherSelected(): boolean {
-    return this.selectedTresherType() === 'Coins';
-  }
-
-  isPotionTresherSelected(): boolean {
-    return this.selectedTresherType() === 'Potion';
-  }
-
-  shouldTresherHaveHp(): boolean {
-    const type = this.selectedTresherType();
-    return type === 'Weapon' || type === 'Armor' || type === 'OtherTresher';
-  }
-
-  beginCreateTresher(clearMessage: boolean = true): void {
-    this.editingUserTresherId.set(null);
-    if (clearMessage) {
-      this.userTresherSaveMessage.set(null);
-    }
-    this.resetUserTresherForm();
-  }
-
-  editTresher(item: UserTresherListItem): void {
-    this.editingUserTresherId.set(item.id);
-    this.userTresherSaveMessage.set(null);
-    this.userTresherForm.reset({
-      type: item.type,
-      name: item.name,
-      description: item.description,
-      worth: item.worth,
-      trapID: item.trapID,
-      curseID: item.curseID,
-      HP: item.HP,
-      damage: item.damage,
-      hands: item.hands,
-      range: item.range,
-      ammoType: item.ammoType,
-      speedReduction: item.speedReduction,
-      armorType: item.armorType,
-      coinType: item.coinType,
-      effectNumber: item.effectNumber,
-      effectTarget: item.effectTarget,
-      effectDuration: item.effectDuration,
-      isPublic: item.isPublic,
-    });
-  }
-
-  cancelEditTresher(): void {
-    this.beginCreateTresher();
-  }
-
-  saveTresher(): void {
-    if (this.isSavingUserTresher()) {
-      return;
-    }
-
-    const userkey = this.account.getKey();
-    if (!userkey) {
-      this.userTresherSaveMessage.set('Please log in to save treshers.');
-      return;
-    }
-
-    const payload = this.buildTresherPayload(this.userTresherForm.getRawValue());
-    const editingId = this.editingUserTresherId();
-    const request$ = editingId
-      ? this.http.put<{ result: number; error?: string; tresher?: UserTresherListItem }>(
-          `${API_BASE_URL}/treshers/${editingId}`,
-          {
-            userkey,
-            tresher: payload,
-          }
-        )
-      : this.http.post<{ result: number; error?: string; tresher?: UserTresherListItem }>(
-          `${API_BASE_URL}/treshers`,
-          {
-            userkey,
-            tresher: payload,
-          }
-        );
-
-    this.isSavingUserTresher.set(true);
-    this.userTresherSaveMessage.set(null);
-
-    request$
-      .pipe(finalize(() => this.isSavingUserTresher.set(false)))
-      .subscribe({
-        next: (response) => {
-          if (response.result !== 1 || !response.tresher) {
-            this.userTresherSaveMessage.set(response.error || 'Failed to save tresher.');
-            return;
-          }
-
-          this.loadUserTreshers();
-          this.userTresherSaveMessage.set(
-            editingId ? 'Tresher updated.' : 'Tresher created.'
-          );
-          this.beginCreateTresher(false);
-        },
-        error: () => {
-          this.userTresherSaveMessage.set('Failed to save tresher.');
-        },
-      });
-  }
-
-  toggleMonsterSectionVisibility(): void {
-    this.isMonsterSectionVisible.update((value) => !value);
-  }
-
-  toggleImageSectionVisibility(): void {
-    this.isImageSectionVisible.update((value) => !value);
-  }
-
-  selectedImageUploadName(): string | null {
-    return this.selectedImageFile()?.name ?? null;
-  }
-
-  onImageFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement | null;
-    const file = input?.files && input.files.length > 0 ? input.files[0] : null;
-    this.selectedImageFile.set(file);
-
-    if (!file || this.editingUserImageId() !== null) {
-      return;
-    }
-
-    const currentName = this.userImageForm.controls.name.value.trim();
-    if (!currentName) {
-      this.userImageForm.controls.name.setValue(this.fileNameWithoutExtension(file.name));
-    }
-  }
-
-  beginCreateImage(clearMessage: boolean = true): void {
-    this.editingUserImageId.set(null);
-    this.selectedImageFile.set(null);
-    if (clearMessage) {
-      this.userImageSaveMessage.set(null);
-    }
-    this.resetUserImageForm();
-  }
-
-  editImage(item: UserImageListItem): void {
-    this.editingUserImageId.set(item.id);
-    this.selectedImageFile.set(null);
-    this.userImageSaveMessage.set(null);
-    this.userImageForm.reset({
-      path: item.path,
-      isPublic: item.isPublic,
-      isActive: item.isActive,
-      name: item.name,
-    });
-  }
-
-  cancelEditImage(): void {
-    this.beginCreateImage();
-  }
-
-  saveImage(): void {
-    if (this.isSavingUserImage()) {
-      return;
-    }
-
-    const userkey = this.account.getKey();
-    if (!userkey) {
-      this.userImageSaveMessage.set('Please log in to save images.');
-      return;
-    }
-
-    const payload = this.buildImagePayload(this.userImageForm.getRawValue());
-    const editingId = this.editingUserImageId();
-
-    const request$ = editingId
-      ? this.http.put<{ result: number; error?: string; image?: UserImageListItem }>(
-          `${API_BASE_URL}/images/${editingId}`,
-          {
-            userkey,
-            image: payload,
-          }
-        )
-      : (() => {
-          const uploadFile = this.selectedImageFile();
-          if (!uploadFile) {
-            this.userImageSaveMessage.set('Select an image file to upload.');
-            return null;
-          }
-
-          const formData = new FormData();
-          formData.append('userkey', userkey);
-          formData.append('name', payload.name);
-          formData.append('isPublic', payload.isPublic ? 'true' : 'false');
-          formData.append('isActive', payload.isActive ? 'true' : 'false');
-          formData.append('image', uploadFile);
-
-          return this.http.post<{ result: number; error?: string; image?: UserImageListItem }>(
-            `${API_BASE_URL}/images`,
-            formData
-          );
-        })();
-
-    if (!request$) {
-      return;
-    }
-
-    this.isSavingUserImage.set(true);
-    this.userImageSaveMessage.set(null);
-
-    request$
-      .pipe(finalize(() => this.isSavingUserImage.set(false)))
-      .subscribe({
-        next: (response) => {
-          if (response.result !== 1 || !response.image) {
-            this.userImageSaveMessage.set(response.error || 'Failed to save image.');
-            return;
-          }
-
-          this.loadUserImages();
-          this.userImageSaveMessage.set(editingId ? 'Image updated.' : 'Image uploaded.');
-          this.beginCreateImage(false);
-        },
-        error: () => {
-          this.userImageSaveMessage.set('Failed to save image.');
-        },
-      });
-  }
 
   resolveImageUrl(imagePath: string): string {
     const trimmed = typeof imagePath === 'string' ? imagePath.trim() : '';
@@ -884,7 +486,30 @@ export class Dashboard implements OnInit {
   }
 
   onPcSpeciesChanged(): void {
-    this.syncPcRangeOfView();
+    this.clearPcStats();
+  }
+
+  onPcTypeChanged(): void {
+    this.clearPcStats();
+  }
+
+  rerollPcStats(): void {
+    this.generatePcStats();
+  }
+
+  private clearPcStats(): void {
+    this.pcStatsRolled.set(false);
+    const controls = this.userPcForm.controls;
+    controls.actionEconomy.setValue(0);
+    controls.strength.setValue(0);
+    controls.stamina.setValue(0);
+    controls.mind.setValue(0);
+    controls.magicPower.setValue(0);
+    controls.rangeOfView.setValue(0);
+    controls.maxHP.setValue(0);
+    controls.currentHP.setValue(0);
+    controls.poisonResest.setValue(0);
+    controls.ac.setValue(0);
   }
 
   pcTresherControls(): PcTresherControl[] {
@@ -950,6 +575,60 @@ export class Dashboard implements OnInit {
     return this.monsterTresherOptions().filter((item) => selectedIds.has(item.id));
   }
 
+  availablePcHandTreshers(): UserTresherListItem[] {
+    return this.availablePcLoadoutTreshers().filter((item) => {
+      const t = (item.type ?? '').toLowerCase();
+      return t === 'weapon' || t === 'shield' || t === 'light';
+    });
+  }
+
+  availablePcWeaponShieldItems(): UserItemOption[] {
+    const treshers = this.availablePcLoadoutTreshers();
+    const itemIds = new Set<number>();
+    for (const t of treshers) {
+      if (t.item1Id) itemIds.add(t.item1Id);
+      if (t.item2Id) itemIds.add(t.item2Id);
+      if (t.item3Id) itemIds.add(t.item3Id);
+      if (t.item4Id) itemIds.add(t.item4Id);
+    }
+    return this.userItems().filter((item) => {
+      if (!itemIds.has(item.id)) return false;
+      const t = (item.type ?? '').toLowerCase();
+      if (t === 'weapon' || t === 'shield') return true;
+      if (t === 'armor') {
+        const slot = (item.armorSlot ?? '').toLowerCase();
+        return slot === 'shield' || slot === '';
+      }
+      return false;
+    });
+  }
+
+  availablePcHand1Items(): UserItemOption[] {
+    const hand2Id = this.userPcForm.controls.hand2ItemId.value;
+    return this.availablePcWeaponShieldItems().filter((i) => i.id !== hand2Id);
+  }
+
+  availablePcHand2Items(): UserItemOption[] {
+    const hand1Id = this.userPcForm.controls.hand1ItemId.value;
+    return this.availablePcWeaponShieldItems().filter((i) => i.id !== hand1Id);
+  }
+
+  availablePcEquipItems(): UserItemOption[] {
+    const treshers = this.availablePcLoadoutTreshers();
+    const itemIds = new Set<number>();
+    for (const t of treshers) {
+      if (t.item1Id) itemIds.add(t.item1Id);
+      if (t.item2Id) itemIds.add(t.item2Id);
+      if (t.item3Id) itemIds.add(t.item3Id);
+      if (t.item4Id) itemIds.add(t.item4Id);
+    }
+    return this.userItems().filter((item) => itemIds.has(item.id));
+  }
+
+  availablePcArmorTreshers(): UserTresherListItem[] {
+    return this.availablePcLoadoutTreshers().filter((item) => item.type === 'Armor');
+  }
+
   beginCreatePc(clearMessage: boolean = true): void {
     this.editingUserPcId.set(null);
     if (clearMessage) {
@@ -973,11 +652,13 @@ export class Dashboard implements OnInit {
       Math.max(0, this.normalizeNumber(item.currentHP, controls.maxHP.value))
     );
     controls.ac.setValue(Math.max(0, this.normalizeNumber(item.ac, 10)));
-    controls.movementEconomy.setValue(
-      Math.max(0, this.normalizeNumber(item.movementEconomy, 0))
+    controls.actionEconomy.setValue(
+      Math.max(0, this.normalizeNumber(item.actionEconomy, 0))
     );
     controls.poisonResest.setValue(this.normalizeNumber(item.poisonResest, 0));
     controls.magicPower.setValue(this.normalizeNumber(item.magicPower, 0));
+    controls.mind.setValue(this.normalizeNumber(item.mind, 0));
+    controls.stamina.setValue(this.normalizeNumber(item.stamina, 0));
     controls.level.setValue(Math.max(1, this.normalizeNumber(item.level, 1)));
     controls.strength.setValue(this.normalizeNumber(item.strength, 0));
     controls.rangeOfView.setValue(
@@ -991,7 +672,15 @@ export class Dashboard implements OnInit {
     controls.rightArmArmorTresherId.setValue(this.normalizeNullableNumber(item.rightArmArmorTresherId));
     controls.leftLegArmorTresherId.setValue(this.normalizeNullableNumber(item.leftLegArmorTresherId));
     controls.rightLegArmorTresherId.setValue(this.normalizeNullableNumber(item.rightLegArmorTresherId));
-    this.syncPcRangeOfView();
+    controls.ring1ItemId.setValue(this.normalizeNullableNumber(item.ring1ItemId));
+    controls.ring2ItemId.setValue(this.normalizeNullableNumber(item.ring2ItemId));
+    controls.ring3ItemId.setValue(this.normalizeNullableNumber(item.ring3ItemId));
+    controls.ring4ItemId.setValue(this.normalizeNullableNumber(item.ring4ItemId));
+    controls.ring5ItemId.setValue(this.normalizeNullableNumber(item.ring5ItemId));
+    controls.necklaceItemId.setValue(this.normalizeNullableNumber(item.necklaceItemId));
+    controls.hand1ItemId.setValue(this.normalizeNullableNumber(item.hand1ItemId));
+    controls.hand2ItemId.setValue(this.normalizeNullableNumber(item.hand2ItemId));
+    this.pcStatsRolled.set(true);
   }
 
   cancelEditPc(): void {
@@ -1049,213 +738,6 @@ export class Dashboard implements OnInit {
       });
   }
 
-  selectedMonsterImage(): UserImageListItem | null {
-    const selectedId = this.userMonsterForm.controls.imageId.value;
-    if (selectedId === null) {
-      return null;
-    }
-
-    return this.monsterImageOptions().find((item) => item.id === selectedId) ?? null;
-  }
-
-  selectedMonsterImageUrl(): string {
-    const selected = this.selectedMonsterImage();
-    return selected ? this.resolveImageUrl(selected.path) : '';
-  }
-
-  selectedMonsterImageName(): string | null {
-    const selected = this.selectedMonsterImage();
-    return selected ? selected.name : null;
-  }
-
-  monsterTresherControls(): MonsterTresherControl[] {
-    return this.userMonsterTresherIdsArray.controls;
-  }
-
-  addMonsterTresher(): void {
-    this.userMonsterTresherIdsArray.push(this.createMonsterTresherControl());
-  }
-
-  removeMonsterTresher(index: number): void {
-    if (this.userMonsterTresherIdsArray.length <= 1) {
-      this.userMonsterTresherIdsArray.at(0).setValue(null);
-      return;
-    }
-
-    this.userMonsterTresherIdsArray.removeAt(index);
-  }
-
-  selectedMonsterTresherSummary(): string {
-    const selectedIds = this.normalizeIdList(this.userMonsterTresherIdsArray.getRawValue());
-    return this.buildTresherSummaryByIds(selectedIds);
-  }
-
-  monsterTresherSummaryForMonster(monster: UserMonsterListItem): string {
-    return this.buildTresherSummaryByIds(monster.tresherIds);
-  }
-
-  monsterImageForMonster(monster: UserMonsterListItem): UserImageListItem | null {
-    if (monster.imageId === null) {
-      return null;
-    }
-
-    return this.monsterImageOptions().find((item) => item.id === monster.imageId) ?? null;
-  }
-
-  monsterImageUrlForMonster(monster: UserMonsterListItem): string {
-    const image = this.monsterImageForMonster(monster);
-    return image ? this.resolveImageUrl(image.path) : '';
-  }
-
-  monsterAttackControls(): MonsterAttackFormGroup[] {
-    return this.userMonsterAttacksArray.controls;
-  }
-
-  addMonsterAttack(): void {
-    this.userMonsterAttacksArray.push(this.createMonsterAttackForm());
-    this.syncMonsterAttackCount();
-  }
-
-  removeMonsterAttack(index: number): void {
-    if (this.userMonsterAttacksArray.length <= 1) {
-      this.userMonsterAttacksArray.at(0).reset({
-        description: '',
-        damage: 0,
-        plusToHit: 0,
-      });
-      this.syncMonsterAttackCount();
-      return;
-    }
-
-    this.userMonsterAttacksArray.removeAt(index);
-    this.syncMonsterAttackCount();
-  }
-
-  beginCreateMonster(clearMessage: boolean = true): void {
-    this.editingUserMonsterId.set(null);
-    if (clearMessage) {
-      this.userMonsterSaveMessage.set(null);
-    }
-    this.resetUserMonsterForm();
-  }
-
-  editMonster(item: UserMonsterListItem): void {
-    this.editingUserMonsterId.set(item.id);
-    this.userMonsterSaveMessage.set(null);
-
-    const attacks = Array.isArray(item.attacks)
-      ? item.attacks.map((attack) => ({
-          description: attack.description || '',
-          damage: this.normalizeNumber(attack.damage, 0),
-          plusToHit: this.normalizeNumber(attack.plusToHit, 0),
-        }))
-      : [];
-
-    this.replaceMonsterAttackForms(attacks);
-    this.replaceMonsterTresherForms(item.tresherIds ?? []);
-
-    const controls = this.userMonsterForm.controls;
-    controls.imageId.setValue(this.normalizeNullableNumber(item.imageId));
-    controls.name.setValue(item.name || '');
-    controls.type.setValue(item.type || 'Unknown');
-    controls.description.setValue(item.description || '');
-    controls.hp.setValue(Math.max(0, this.normalizeNumber(item.hp, 1)));
-    controls.movementEconomy.setValue(
-      Math.max(0, this.normalizeNumber(item.movementEconomy, 0))
-    );
-    controls.ac.setValue(Math.max(0, this.normalizeNumber(item.ac, 10)));
-    controls.runAt.setValue(Math.max(0, this.normalizeNumber(item.runAt, 0)));
-    controls.numberOfAttacks.setValue(
-      Math.max(this.normalizeNumber(item.numberOfAttacks, 0), this.userMonsterAttacksArray.length)
-    );
-    controls.isPublic.setValue(item.isPublic);
-  }
-
-  cancelEditMonster(): void {
-    this.beginCreateMonster();
-  }
-
-  saveMonster(): void {
-    if (this.isSavingUserMonster()) {
-      return;
-    }
-
-    const userkey = this.account.getKey();
-    if (!userkey) {
-      this.userMonsterSaveMessage.set('Please log in to save monsters.');
-      return;
-    }
-
-    const payload = this.buildMonsterPayload();
-    const editingId = this.editingUserMonsterId();
-    const request$ = editingId
-      ? this.http.put<{ result: number; error?: string; monster?: UserMonsterListItem }>(
-          `${API_BASE_URL}/monsters/${editingId}`,
-          {
-            userkey,
-            monster: payload,
-          }
-        )
-      : this.http.post<{ result: number; error?: string; monster?: UserMonsterListItem }>(
-          `${API_BASE_URL}/monsters`,
-          {
-            userkey,
-            monster: payload,
-          }
-        );
-
-    this.isSavingUserMonster.set(true);
-    this.userMonsterSaveMessage.set(null);
-
-    request$
-      .pipe(finalize(() => this.isSavingUserMonster.set(false)))
-      .subscribe({
-        next: (response) => {
-          if (response.result !== 1 || !response.monster) {
-            this.userMonsterSaveMessage.set(response.error || 'Failed to save monster.');
-            return;
-          }
-
-          this.loadUserMonsters();
-          this.userMonsterSaveMessage.set(
-            editingId ? 'Monster updated.' : 'Monster created.'
-          );
-          this.beginCreateMonster(false);
-        },
-        error: () => {
-          this.userMonsterSaveMessage.set('Failed to save monster.');
-        },
-      });
-  }
-
-  private loadUserTreshers(): void {
-    const userkey = this.account.getKey();
-    if (!userkey) {
-      this.userTreshers.set([]);
-      this.userTreshersError.set('Log in to manage your treshers.');
-      return;
-    }
-
-    this.isLoadingUserTreshers.set(true);
-    this.userTreshersError.set(null);
-
-    this.http
-      .get<UserTresherListItem[]>(`${API_BASE_URL}/treshers`, {
-        params: { userkey },
-      })
-      .pipe(finalize(() => this.isLoadingUserTreshers.set(false)))
-      .subscribe({
-        next: (items) => {
-          this.userTreshers.set(items);
-          this.loadMonsterTresherOptions();
-        },
-        error: () => {
-          this.userTreshers.set([]);
-          this.userTreshersError.set('Failed to load your treshers.');
-        },
-      });
-  }
-
   private loadUserFriends(): void {
     const userkey = this.account.getKey();
     if (!userkey) {
@@ -1283,70 +765,22 @@ export class Dashboard implements OnInit {
       });
   }
 
-  private loadMonsterTresherOptions(): void {
+  private loadUserItems(): void {
     const userkey = this.account.getKey();
-    if (!userkey) {
-      this.monsterTresherOptions.set([]);
-      this.monsterTresherOptionsError.set('Log in to select monster treshers.');
-      return;
-    }
-
-    this.isLoadingMonsterTresherOptions.set(true);
-    this.monsterTresherOptionsError.set(null);
-
+    if (!userkey) return;
+    this.isLoadingUserItems.set(true);
     this.http
-      .get<UserTresherListItem[]>(`${API_BASE_URL}/treshers`, {
-        params: { userkey, scope: 'library' },
-      })
-      .pipe(finalize(() => this.isLoadingMonsterTresherOptions.set(false)))
+      .get<UserItemOption[]>(`${API_BASE_URL}/items`, { params: { userkey } })
+      .pipe(finalize(() => this.isLoadingUserItems.set(false)))
       .subscribe({
-        next: (items) => {
-          this.monsterTresherOptions.set(items);
-        },
-        error: () => {
-          this.monsterTresherOptions.set([]);
-          this.monsterTresherOptionsError.set('Failed to load monster tresher options.');
-        },
+        next: (items) => this.userItems.set(items),
+        error: () => this.userItems.set([]),
       });
   }
 
-  private loadUserMonsters(): void {
-    const userkey = this.account.getKey();
-    if (!userkey) {
-      this.userMonsters.set([]);
-      this.userMonstersError.set('Log in to manage your monsters.');
-      return;
-    }
-
-    this.isLoadingUserMonsters.set(true);
-    this.userMonstersError.set(null);
-
-    this.http
-      .get<UserMonsterListItem[]>(`${API_BASE_URL}/monsters`, {
-        params: { userkey },
-      })
-      .pipe(finalize(() => this.isLoadingUserMonsters.set(false)))
-      .subscribe({
-        next: (items) => {
-          const normalizedItems = items.map((item) => ({
-            ...item,
-            imageId: this.normalizeNullableNumber(item.imageId),
-            tresherIds: this.normalizeIdList(item.tresherIds),
-            attacks: Array.isArray(item.attacks)
-              ? item.attacks.map((attack) => ({
-                  description: attack.description || '',
-                  damage: this.normalizeNumber(attack.damage, 0),
-                  plusToHit: this.normalizeNumber(attack.plusToHit, 0),
-                }))
-              : [],
-          }));
-          this.userMonsters.set(normalizedItems);
-        },
-        error: () => {
-          this.userMonsters.set([]);
-          this.userMonstersError.set('Failed to load your monsters.');
-        },
-      });
+  onPcImageUploaded(item: UploadedMediaItem): void {
+    this._localPcImages.update((opts) => [...opts, item as unknown as UserImageListItem]);
+    this.userPcForm.controls.imageId.setValue(item.id);
   }
 
   private loadMonsterImageOptions(): void {
@@ -1376,33 +810,6 @@ export class Dashboard implements OnInit {
       });
   }
 
-  private loadUserImages(): void {
-    const userkey = this.account.getKey();
-    if (!userkey) {
-      this.userImages.set([]);
-      this.userImagesError.set('Log in to manage your images.');
-      return;
-    }
-
-    this.isLoadingUserImages.set(true);
-    this.userImagesError.set(null);
-
-    this.http
-      .get<UserImageListItem[]>(`${API_BASE_URL}/images`, {
-        params: { userkey },
-      })
-      .pipe(finalize(() => this.isLoadingUserImages.set(false)))
-      .subscribe({
-        next: (items) => {
-          this.userImages.set(items);
-          this.loadMonsterImageOptions();
-        },
-        error: () => {
-          this.userImages.set([]);
-          this.userImagesError.set('Failed to load your images.');
-        },
-      });
-  }
 
   private loadUserPcs(): void {
     const userkey = this.account.getKey();
@@ -1436,6 +843,12 @@ export class Dashboard implements OnInit {
             rightArmArmorTresherId: this.normalizeNullableNumber(item.rightArmArmorTresherId),
             leftLegArmorTresherId: this.normalizeNullableNumber(item.leftLegArmorTresherId),
             rightLegArmorTresherId: this.normalizeNullableNumber(item.rightLegArmorTresherId),
+            ring1ItemId: this.normalizeNullableNumber(item.ring1ItemId),
+            ring2ItemId: this.normalizeNullableNumber(item.ring2ItemId),
+            ring3ItemId: this.normalizeNullableNumber(item.ring3ItemId),
+            ring4ItemId: this.normalizeNullableNumber(item.ring4ItemId),
+            ring5ItemId: this.normalizeNullableNumber(item.ring5ItemId),
+            necklaceItemId: this.normalizeNullableNumber(item.necklaceItemId),
           }));
 
           this.userPcs.set(normalized);
@@ -1447,105 +860,6 @@ export class Dashboard implements OnInit {
       });
   }
 
-  private buildTresherPayload(value: UserTresherEditorValue): UserTresherWritePayload {
-    const type = value.type;
-
-    const payload: UserTresherWritePayload = {
-      type,
-      name: (value.name || '').trim() || 'Unnamed Tresher',
-      description: (value.description || '').trim(),
-      worth: Math.max(0, this.normalizeNumber(value.worth, 0)),
-      trapID: this.normalizeNullableNumber(value.trapID),
-      curseID: this.normalizeNullableNumber(value.curseID),
-      HP: null,
-      damage: null,
-      hands: null,
-      range: null,
-      ammoType: null,
-      speedReduction: null,
-      armorType: null,
-      coinType: null,
-      effectNumber: null,
-      effectTarget: null,
-      effectDuration: null,
-      isPublic: this.isAdminUser() ? value.isPublic === true : false,
-    };
-
-    if (type === 'Weapon') {
-      payload.HP = this.normalizeNumber(value.HP, 10);
-      payload.damage = this.normalizeNumber(value.damage, 0);
-      payload.hands = Math.max(1, this.normalizeNumber(value.hands, 1));
-      payload.range = Math.max(0, this.normalizeNumber(value.range, 0));
-      payload.ammoType = this.normalizeNullableText(value.ammoType);
-      return payload;
-    }
-
-    if (type === 'Armor') {
-      payload.HP = this.normalizeNumber(value.HP, 10);
-      payload.hands = Math.max(0, this.normalizeNumber(value.hands, 0));
-      payload.speedReduction = this.normalizeNumber(value.speedReduction, 0);
-      payload.armorType = value.armorType;
-      return payload;
-    }
-
-    if (type === 'Coins') {
-      payload.coinType = value.coinType;
-      return payload;
-    }
-
-    if (type === 'Potion') {
-      payload.effectNumber = this.normalizeNumber(value.effectNumber, 0);
-      payload.effectTarget = value.effectTarget;
-      const target = payload.effectTarget;
-      if (target === 'AC' || target === 'AE') {
-        payload.effectDuration = Math.max(0, this.normalizeNumber(value.effectDuration, 1));
-      }
-      return payload;
-    }
-
-    payload.HP = this.normalizeNumber(value.HP, 10);
-    return payload;
-  }
-
-  private buildMonsterPayload(): UserMonsterWritePayload {
-    const controls = this.userMonsterForm.controls;
-    const attackValues = this.userMonsterAttacksArray.getRawValue();
-
-    const attacks: UserMonsterAttackEditorValue[] = attackValues.map((attack) => ({
-      description: (attack.description || '').trim(),
-      damage: Math.max(0, this.normalizeNumber(attack.damage, 0)),
-      plusToHit: this.normalizeNumber(attack.plusToHit, 0),
-    }));
-
-    const requestedAttackCount = Math.max(
-      0,
-      this.normalizeNumber(controls.numberOfAttacks.value, attacks.length)
-    );
-
-    return {
-      tresherIds: this.normalizeIdList(this.userMonsterTresherIdsArray.getRawValue()),
-      imageId: this.normalizeNullableNumber(controls.imageId.value),
-      name: (controls.name.value || '').trim() || 'Unnamed Monster',
-      type: (controls.type.value || '').trim() || 'Unknown',
-      description: (controls.description.value || '').trim(),
-      hp: Math.max(0, this.normalizeNumber(controls.hp.value, 1)),
-      movementEconomy: Math.max(0, this.normalizeNumber(controls.movementEconomy.value, 0)),
-      ac: Math.max(0, this.normalizeNumber(controls.ac.value, 10)),
-      runAt: Math.max(0, this.normalizeNumber(controls.runAt.value, 0)),
-      numberOfAttacks: Math.max(requestedAttackCount, attacks.length),
-      attacks,
-      isPublic: this.isAdminUser() ? controls.isPublic.value === true : false,
-    };
-  }
-
-  private buildImagePayload(value: UserImageEditorValue): UserImageWritePayload {
-    return {
-      path: this.normalizeImagePath(value.path),
-      isPublic: this.isAdminUser() ? value.isPublic === true : false,
-      isActive: value.isActive === true,
-      name: (value.name || '').trim() || 'Unnamed Image',
-    };
-  }
 
   private buildPcPayload(): UserPcWritePayload {
     const controls = this.userPcForm.controls;
@@ -1566,9 +880,11 @@ export class Dashboard implements OnInit {
       maxHP,
       currentHP,
       ac: Math.max(0, this.normalizeNumber(controls.ac.value, 10)),
-      movementEconomy: Math.max(0, this.normalizeNumber(controls.movementEconomy.value, 0)),
+      actionEconomy: Math.max(0, this.normalizeNumber(controls.actionEconomy.value, 0)),
       poisonResest: this.normalizeNumber(controls.poisonResest.value, 0),
       magicPower: this.normalizeNumber(controls.magicPower.value, 0),
+      mind: Math.max(0, this.normalizeNumber(controls.mind.value, 0)),
+      stamina: Math.max(0, this.normalizeNumber(controls.stamina.value, 0)),
       level: Math.max(1, this.normalizeNumber(controls.level.value, 1)),
       strength: this.normalizeNumber(controls.strength.value, 0),
       rangeOfView: this.rangeOfViewBySpecies(species),
@@ -1605,88 +921,38 @@ export class Dashboard implements OnInit {
         this.normalizeNullableNumber(controls.rightLegArmorTresherId.value),
         tresherIds
       ),
+      ring1ItemId: this.normalizeNullableNumber(controls.ring1ItemId.value),
+      ring2ItemId: this.normalizeNullableNumber(controls.ring2ItemId.value),
+      ring3ItemId: this.normalizeNullableNumber(controls.ring3ItemId.value),
+      ring4ItemId: this.normalizeNullableNumber(controls.ring4ItemId.value),
+      ring5ItemId: this.normalizeNullableNumber(controls.ring5ItemId.value),
+      necklaceItemId: this.normalizeNullableNumber(controls.necklaceItemId.value),
+      hand1ItemId: this.normalizeNullableNumber(controls.hand1ItemId.value),
+      hand2ItemId: this.normalizeNullableNumber(controls.hand2ItemId.value),
     };
   }
 
-  private resetUserTresherForm(): void {
-    this.userTresherForm.reset({
-      type: 'Weapon',
-      name: '',
-      description: '',
-      worth: 0,
-      trapID: null,
-      curseID: null,
-      HP: 10,
-      damage: 0,
-      hands: 1,
-      range: 0,
-      ammoType: null,
-      speedReduction: 0,
-      armorType: 'body',
-      coinType: 'Gold',
-      effectNumber: 0,
-      effectTarget: 'Health',
-      effectDuration: 1,
-      isPublic: false,
-    });
-  }
-
-  private resetUserMonsterForm(): void {
-    this.replaceMonsterAttackForms([{ description: '', damage: 0, plusToHit: 0 }]);
-    this.replaceMonsterTresherForms([]);
-
-    const controls = this.userMonsterForm.controls;
-    controls.imageId.setValue(null);
-    controls.name.setValue('');
-    controls.type.setValue('Unknown');
-    controls.description.setValue('');
-    controls.hp.setValue(1);
-    controls.movementEconomy.setValue(0);
-    controls.ac.setValue(10);
-    controls.runAt.setValue(0);
-    controls.numberOfAttacks.setValue(1);
-    controls.isPublic.setValue(false);
-  }
-
-  private replaceMonsterTresherForms(tresherIds: number[]): void {
-    this.userMonsterTresherIdsArray.clear();
-
-    const normalized = this.normalizeIdList(tresherIds);
-    if (normalized.length === 0) {
-      this.userMonsterTresherIdsArray.push(this.createMonsterTresherControl());
-      return;
-    }
-
-    for (const tresherId of normalized) {
-      this.userMonsterTresherIdsArray.push(this.createMonsterTresherControl(tresherId));
-    }
-  }
-
-  private resetUserImageForm(): void {
-    this.userImageForm.reset({
-      path: '',
-      isPublic: false,
-      isActive: true,
-      name: '',
-    });
-  }
 
   private resetUserPcForm(): void {
     this.replacePcTresherForms([]);
+    this.pcStatsRolled.set(false);
 
     const controls = this.userPcForm.controls;
     controls.name.setValue('');
     controls.species.setValue('Human');
     controls.type.setValue('Figher');
     controls.imageId.setValue(null);
-    controls.maxHP.setValue(10);
-    controls.currentHP.setValue(10);
-    controls.ac.setValue(10);
-    controls.movementEconomy.setValue(0);
-    controls.poisonResest.setValue(0);
-    controls.magicPower.setValue(0);
-    controls.level.setValue(1);
+    controls.actionEconomy.setValue(0);
     controls.strength.setValue(0);
+    controls.stamina.setValue(0);
+    controls.mind.setValue(0);
+    controls.magicPower.setValue(0);
+    controls.rangeOfView.setValue(0);
+    controls.maxHP.setValue(0);
+    controls.currentHP.setValue(0);
+    controls.poisonResest.setValue(0);
+    controls.ac.setValue(0);
+    controls.level.setValue(1);
     controls.primaryTresherId.setValue(null);
     controls.weaponTresherId.setValue(null);
     controls.headArmorTresherId.setValue(null);
@@ -1695,7 +961,14 @@ export class Dashboard implements OnInit {
     controls.rightArmArmorTresherId.setValue(null);
     controls.leftLegArmorTresherId.setValue(null);
     controls.rightLegArmorTresherId.setValue(null);
-    this.syncPcRangeOfView();
+    controls.ring1ItemId.setValue(null);
+    controls.ring2ItemId.setValue(null);
+    controls.ring3ItemId.setValue(null);
+    controls.ring4ItemId.setValue(null);
+    controls.ring5ItemId.setValue(null);
+    controls.necklaceItemId.setValue(null);
+    controls.hand1ItemId.setValue(null);
+    controls.hand2ItemId.setValue(null);
   }
 
   private replacePcTresherForms(tresherIds: number[]): void {
@@ -1712,61 +985,8 @@ export class Dashboard implements OnInit {
     }
   }
 
-  private replaceMonsterAttackForms(
-    attacks: UserMonsterAttackEditorValue[] | UserMonsterAttackListItem[]
-  ): void {
-    this.userMonsterAttacksArray.clear();
-
-    const normalizedAttacks = attacks.length
-      ? attacks.map((attack) => ({
-          description: attack.description || '',
-          damage: this.normalizeNumber(attack.damage, 0),
-          plusToHit: this.normalizeNumber(attack.plusToHit, 0),
-        }))
-      : [{ description: '', damage: 0, plusToHit: 0 }];
-
-    for (const attack of normalizedAttacks) {
-      this.userMonsterAttacksArray.push(this.createMonsterAttackForm(attack));
-    }
-  }
-
-  private syncMonsterAttackCount(): void {
-    const current = Math.max(0, this.normalizeNumber(this.userMonsterForm.controls.numberOfAttacks.value, 0));
-    const minimum = this.userMonsterAttacksArray.length;
-
-    if (current < minimum) {
-      this.userMonsterForm.controls.numberOfAttacks.setValue(minimum);
-    }
-  }
-
-  private createMonsterAttackForm(
-    value?: Partial<UserMonsterAttackEditorValue>
-  ): MonsterAttackFormGroup {
-    return new FormGroup({
-      description: new FormControl<string>(value?.description || '', { nonNullable: true }),
-      damage: new FormControl<number>(this.normalizeNumber(value?.damage ?? null, 0), {
-        nonNullable: true,
-      }),
-      plusToHit: new FormControl<number>(this.normalizeNumber(value?.plusToHit ?? null, 0), {
-        nonNullable: true,
-      }),
-    });
-  }
-
-  private createMonsterTresherControl(value: number | null = null): MonsterTresherControl {
-    return new FormControl<number | null>(value);
-  }
-
   private createPcTresherControl(value: number | null = null): PcTresherControl {
     return new FormControl<number | null>(value);
-  }
-
-  private get userMonsterAttacksArray(): FormArray<MonsterAttackFormGroup> {
-    return this.userMonsterForm.controls.attacks;
-  }
-
-  private get userMonsterTresherIdsArray(): FormArray<MonsterTresherControl> {
-    return this.userMonsterForm.controls.tresherIds;
   }
 
   private get userPcTresherIdsArray(): FormArray<PcTresherControl> {
@@ -1803,21 +1023,78 @@ export class Dashboard implements OnInit {
     return trimmed;
   }
 
-  private syncPcRangeOfView(): void {
-    const species = this.normalizePcSpecies(this.userPcForm.controls.species.value);
-    this.userPcForm.controls.rangeOfView.setValue(this.rangeOfViewBySpecies(species));
+  private rangeOfViewBySpecies(species: PcSpeciesOption): number {
+    return species === 'Elph' || species === 'DwarPh' ? 7 : 5;
   }
 
-  private rangeOfViewBySpecies(species: PcSpeciesOption): number {
-    if (species === 'Elph') {
-      return 6;
-    }
+  private rollDn(sides: number): number {
+    return Math.floor(Math.random() * sides) + 1;
+  }
 
-    if (species === 'DwarPh') {
-      return 7;
-    }
+  private generatePcStats(): void {
+    this.pcStatsRolled.set(true);
+    const species = this.normalizePcSpecies(this.userPcForm.controls.species.value);
+    const type = this.normalizePcType(this.userPcForm.controls.type.value);
+    const controls = this.userPcForm.controls;
 
-    return 5;
+    // AE: Human/Elph=5, DwarPh/Shorties=4
+    controls.actionEconomy.setValue(species === 'Human' || species === 'Elph' ? 5 : 4);
+
+    // Strength by species (from species table)
+    let strength: number;
+    if (species === 'Human')        strength = Math.floor(this.rollDn(12) / 2) + 1;
+    else if (species === 'Elph')   strength = Math.floor(this.rollDn(12) / 2);
+    else if (species === 'DwarPh') strength = Math.floor(this.rollDn(12) / 2) + 4;
+    else                           strength = Math.floor(this.rollDn(12) / 4) + 2; // Shorties
+    controls.strength.setValue(strength);
+
+    // Stamina: species base + type bonus
+    // Base: Human=1d4, Elph=1d3, DwarPh=1d6, Shorties=1d3
+    const staminaBase = species === 'Human' ? this.rollDn(4)
+      : species === 'Elph'   ? this.rollDn(3)
+      : species === 'DwarPh' ? this.rollDn(6)
+      : this.rollDn(3); // Shorties
+    // Type bonus: Fighter=+1d6, Thieph=+1d2, Mage=+1d3, Healer=+1d4
+    const staminaBonus = type === 'Figher'  ? this.rollDn(6)
+      : type === 'Thieph'  ? this.rollDn(2)
+      : type === 'Mage'    ? this.rollDn(3)
+      : this.rollDn(4); // Healer
+    const stamina = staminaBase + staminaBonus;
+    controls.stamina.setValue(stamina);
+
+    // Mind: 1d6 + (Elph +1d4) + (Mage +1d4, Healer +1d3, Thieph +1d2)
+    let mind = this.rollDn(6);
+    if (species === 'Elph')       mind += this.rollDn(4);
+    if (type === 'Mage')          mind += this.rollDn(4);
+    else if (type === 'Healer')   mind += this.rollDn(3);
+    else if (type === 'Thieph')   mind += this.rollDn(2);
+    controls.mind.setValue(mind);
+
+    // Magic Power: Mind + (Elph +1d4) + (Mage +1d6, Healer +1d4)
+    let magicPower = mind;
+    if (species === 'Elph')     magicPower += this.rollDn(4);
+    if (type === 'Mage')        magicPower += this.rollDn(6);
+    else if (type === 'Healer') magicPower += this.rollDn(4);
+    controls.magicPower.setValue(magicPower);
+
+    // Range of View (species-based)
+    controls.rangeOfView.setValue(this.rangeOfViewBySpecies(species));
+
+    // Max HP: stamina + (DwarPh +2) + (Fighter +2) + 1d4
+    let maxHP = stamina;
+    if (species === 'DwarPh') maxHP += 2;
+    if (type === 'Figher')    maxHP += 2;
+    maxHP += this.rollDn(4);
+    controls.maxHP.setValue(maxHP);
+    controls.currentHP.setValue(maxHP);
+
+    // Poison Resist: floor(stamina/2) + (Elph or DwarPh +1d4)
+    let poisonResist = Math.floor(stamina / 2);
+    if (species === 'Elph' || species === 'DwarPh') poisonResist += this.rollDn(4);
+    controls.poisonResest.setValue(poisonResist);
+
+    // AC: floor(d12/2) + (Fighter +4, others +2)
+    controls.ac.setValue(Math.floor(this.rollDn(12) / 2) + (type === 'Figher' ? 4 : 2));
   }
 
   private normalizePcSpecies(value: string): PcSpeciesOption {
@@ -1844,7 +1121,7 @@ export class Dashboard implements OnInit {
     }
 
     if (lower === 'thieph') {
-      return 'thieph';
+      return 'Thieph';
     }
 
     if (lower === 'healer') {
@@ -1894,14 +1171,4 @@ export class Dashboard implements OnInit {
       .join(', ');
   }
 
-  private fileNameWithoutExtension(fileName: string): string {
-    const trimmed = (fileName || '').trim();
-    const extensionIndex = trimmed.lastIndexOf('.');
-    if (extensionIndex <= 0) {
-      return trimmed || 'Uploaded Image';
-    }
-
-    const name = trimmed.slice(0, extensionIndex).trim();
-    return name || 'Uploaded Image';
-  }
 }

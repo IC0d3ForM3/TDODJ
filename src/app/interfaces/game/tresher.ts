@@ -1,23 +1,29 @@
-import { ArmorType, CoinType, PotionEffectTarget, TresherType } from './creator-types';
+import { Trap } from './trap';
 
 export interface Tresher {
   id: number;
-  type: TresherType;
+  type?: string;
   name: string;
   description: string;
-  worth: number;
-  curseID: number | null;
-  trapID: number | null;
-  HP: number | null;
-  damage: number | null;
-  hands: number | null;
-  range: number | null;
-  ammoType: string | null;
-  speedReduction: number | null;
-  armorType: ArmorType | null;
-  coinType: CoinType | null;
-  effectNumber: number | null;
-  effectTarget: PotionEffectTarget | null;
-  effectDuration: number | null;
+  gold: number;
+  silver: number;
+  copper: number;
+  zinc: number;
+  item1Id: number | null;
+  item2Id: number | null;
+  item3Id: number | null;
+  item4Id: number | null;
+  spell1Id: number | null;
+  spell2Id: number | null;
+  spell3Id: number | null;
+  spell4Id: number | null;
+  curse1Id: number | null;
+  curse2Id: number | null;
+  potion1Id: number | null;
+  potion2Id: number | null;
+  potion3Id: number | null;
+  imageId: number | null;
+  soundId: number | null;
   spReward: number;
+  trap: Trap | null;
 }

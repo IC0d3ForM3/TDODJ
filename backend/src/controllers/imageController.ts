@@ -74,6 +74,30 @@ export const getImages = async (req: Request, res: Response) => {
   }
 };
 
+export const getPublicImagesByIds = async (req: Request, res: Response) => {
+  const idsRaw = req.query['ids'];
+  if (typeof idsRaw !== 'string' || !idsRaw.trim()) {
+    return res.status(400).json({ error: 'ids query parameter is required' });
+  }
+
+  const ids = idsRaw
+    .split(',')
+    .map((s) => Number.parseInt(s.trim(), 10))
+    .filter((n) => Number.isInteger(n) && n > 0);
+
+  if (ids.length === 0) {
+    return res.json([]);
+  }
+
+  try {
+    const images = await imageService.fetchPublicImagesByIds(ids);
+    return res.json(images);
+  } catch (error) {
+    console.error('Error fetching public images by ids:', error);
+    return res.status(500).json({ error: 'Failed to fetch images' });
+  }
+};
+
 export const createImage = async (req: Request, res: Response) => {
   const userkeyRaw = req.body?.['userkey'];
   if (typeof userkeyRaw !== 'string' || !UUID_REGEX.test(userkeyRaw.trim())) {

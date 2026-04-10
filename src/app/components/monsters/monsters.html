@@ -1,0 +1,259 @@
+﻿<div class="mn-section">
+  <div class="mn-section-header">
+    <h3 class="mn-title">My Monsters</h3>
+    <button type="button" class="mn-toggle-btn" (click)="toggleSectionVisibility()">
+      {{ isSectionVisible() ? 'Hide' : 'Show' }}
+    </button>
+  </div>
+
+  @if (!isSectionVisible()) {
+    <p class="mn-message">Monster section is hidden.</p>
+  } @else if (!isLoggedIn()) {
+    <p class="mn-message">Log in to add or edit your monsters.</p>
+  } @else {
+    <div class="mn-layout">
+
+      <!-- â”€â”€ 1/3 LEFT: Current library â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+      <aside class="mn-list-panel">
+        <h4 class="mn-panel-title">Your Monster Library</h4>
+        @if (isLoading()) {
+          <p class="mn-message">Loading your monsters...</p>
+        } @else if (error()) {
+          <p class="mn-message mn-message-error">{{ error() }}</p>
+        } @else if (items().length === 0) {
+          <p class="mn-message">No monsters yet.</p>
+        } @else {
+          <ul class="mn-list">
+            @for (item of items(); track item.id) {
+              <li class="mn-list-item">
+                <div class="mn-item-img-row">
+                  @if (imageUrlForMonster(item)) {
+                    <img class="mn-thumb" [src]="imageUrlForMonster(item)" [alt]="item.name" />
+                  }
+                  <div class="mn-item-info">
+                    <span class="mn-item-name">{{ item.name }}</span>
+                    <span class="mn-badge">{{ item.type }}</span>
+                  </div>
+                </div>
+                <small class="mn-item-meta">ID {{ item.id }} Â· HP {{ item.hp }} Â· AC {{ item.ac }} Â· Move {{ item.movementEconomy }} Â· Run&#64; {{ item.runAt }}</small>
+                <small class="mn-item-meta">Attacks {{ item.numberOfAttacks }} Â· Magic {{ item.magic }} Â· SP {{ item.spReward }} Â· {{ item.isPublic ? 'Public' : 'Private' }}</small>
+                @if (item.description) {
+                  <small class="mn-item-desc">{{ item.description }}</small>
+                }
+                @if (item.attacks.length > 0) {
+                  <ul class="mn-attack-list">
+                    @for (attack of item.attacks; track $index) {
+                      <li>{{ attack.type }} Â· {{ attack.description || 'Attack' }} Â· Dmg {{ attack.damage }} Â· +Hit {{ attack.plusToHit }}</li>
+                    }
+                  </ul>
+                }
+                <button type="button" class="mn-edit-btn" (click)="editMonster(item)">Edit</button>
+              </li>
+            }
+          </ul>
+        }
+      </aside>
+
+      <!-- â”€â”€ 2/3 RIGHT: Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+      <form class="mn-form" [formGroup]="userMonsterForm" (ngSubmit)="save()">
+
+        <div class="mn-form-grid">
+          <label class="mn-field mn-field-wide">
+            <span>Name</span>
+            <input type="text" formControlName="name" placeholder="Monster name" />
+          </label>
+          <label class="mn-field">
+            <span>Type</span>
+            <select formControlName="type">
+              @for (t of monsterTypeOptions; track t) {
+                <option [value]="t">{{ t }}</option>
+              }
+            </select>
+          </label>
+          <label class="mn-field mn-field-wide">
+            <span>Description</span>
+            <input type="text" formControlName="description" placeholder="Description" />
+          </label>
+
+          <label class="mn-field">
+            <span>HP</span>
+            <input type="number" formControlName="hp" min="0" />
+          </label>
+          <label class="mn-field">
+            <span>Movement</span>
+            <input type="number" formControlName="movementEconomy" min="0" />
+          </label>
+          <label class="mn-field">
+            <span>AC</span>
+            <input type="number" formControlName="ac" min="0" />
+          </label>
+          <label class="mn-field">
+            <span>Run At</span>
+            <input type="number" formControlName="runAt" min="0" />
+          </label>
+          <label class="mn-field">
+            <span># Attacks</span>
+            <input type="number" formControlName="numberOfAttacks" min="0" />
+          </label>
+          <label class="mn-field">
+            <span>Magic</span>
+            <input type="number" formControlName="magic" min="0" />
+          </label>
+          <label class="mn-field">
+            <span>SP Reward</span>
+            <input type="number" formControlName="spReward" min="0" />
+          </label>
+
+          <label class="mn-field mn-field-wide">
+            <span>Image</span>
+            <div class="mn-upload-row">
+              <select formControlName="imageId">
+                <option [ngValue]="null">No Image</option>
+                @for (image of allImageOptions(); track image.id) {
+                  <option [ngValue]="image.id">{{ image.name }} (ID {{ image.id }})</option>
+                }
+              </select>
+              <app-upload-popup mediaType="image" (mediaUploaded)="onImageUploaded($event)" />
+              @if (selectedImageUrl()) {
+                <img class="mn-thumb" [src]="selectedImageUrl()" [alt]="selectedImageName() || 'image'" />
+              }
+            </div>
+          </label>
+
+          <label class="mn-field mn-field-wide">
+            <span>Sound</span>
+            <div class="mn-upload-row">
+              <select formControlName="soundId">
+                <option [ngValue]="null">No Sound</option>
+                @for (sound of allSoundOptions(); track sound.id) {
+                  <option [ngValue]="sound.id">{{ sound.name }} (ID {{ sound.id }})</option>
+                }
+              </select>
+              <app-upload-popup mediaType="sound" (mediaUploaded)="onSoundUploaded($event)" />
+            </div>
+          </label>
+        </div>
+
+        <!-- Treshers FormArray -->
+        <div class="mn-sub-section">
+          <div class="mn-sub-header">
+            <h5 class="mn-sub-title">Monster Treshers</h5>
+            <button type="button" class="mn-btn-muted" (click)="addTresher()">+ Tresher</button>
+          </div>
+          @if (isLoadingTresherOptions()) {
+            <p class="mn-message">Loading tresher options...</p>
+          } @else if (tresherOptionsError()) {
+            <p class="mn-message mn-message-error">{{ tresherOptionsError() }}</p>
+          }
+          <div formArrayName="tresherIds" class="mn-array-row">
+            @for (ctrl of tresherControls(); track $index) {
+              <div class="mn-array-item">
+                <select [formControlName]="$index">
+                  <option [ngValue]="null">No Tresher</option>
+                  @for (tresher of tresherOptions(); track tresher.id) {
+                    <option [ngValue]="tresher.id">{{ tresher.name }}</option>
+                  }
+                </select>
+                <button type="button" class="mn-remove-btn" (click)="removeTresher($index)" [disabled]="tresherControls().length === 1">Ã—</button>
+              </div>
+            }
+          </div>
+          <small class="mn-hint">Selected: {{ selectedTresherSummary() }}</small>
+        </div>
+
+        <!-- Attacks FormArray -->
+        <div class="mn-sub-section">
+          <div class="mn-sub-header">
+            <h5 class="mn-sub-title">Attacks</h5>
+            <button type="button" class="mn-btn-muted" (click)="addAttack()">+ Attack</button>
+          </div>
+          <div formArrayName="attacks">
+            @for (attackForm of attackControls(); track $index) {
+              <div class="mn-attack-card" [formGroupName]="$index">
+                <div class="mn-form-grid">
+                  <label class="mn-field">
+                    <span>Type</span>
+                    <select formControlName="type">
+                      @for (t of ['Bite','Claw','Spell','Weapon']; track t) {
+                        <option [value]="t">{{ t }}</option>
+                      }
+                    </select>
+                  </label>
+                  <label class="mn-field mn-field-wide">
+                    <span>Description</span>
+                    <input type="text" formControlName="description" placeholder="Description" />
+                  </label>
+                  <label class="mn-field">
+                    <span>Damage</span>
+                    <input type="number" formControlName="damage" min="0" />
+                  </label>
+                  <label class="mn-field">
+                    <span>+To Hit</span>
+                    <input type="number" formControlName="plusToHit" />
+                  </label>
+                  <label class="mn-field">
+                    <span>Weapon Item</span>
+                    <select formControlName="weaponItemId">
+                      <option [ngValue]="null">None</option>
+                      @for (item of itemOptions(); track item.id) {
+                        <option [ngValue]="item.id">{{ item.name }}</option>
+                      }
+                    </select>
+                  </label>
+                  <label class="mn-field">
+                    <span>Spell</span>
+                    <select formControlName="spellId">
+                      <option [ngValue]="null">None</option>
+                      @for (spell of spellOptions(); track spell.id) {
+                        <option [ngValue]="spell.id">{{ spell.name }}</option>
+                      }
+                    </select>
+                  </label>
+                  <label class="mn-field">
+                    <span>Curse</span>
+                    <select formControlName="curseId">
+                      <option [ngValue]="null">None</option>
+                      @for (curse of curseOptions(); track curse.id) {
+                        <option [ngValue]="curse.id">{{ curse.name }}</option>
+                      }
+                    </select>
+                  </label>
+                </div>
+                <button type="button" class="mn-remove-btn" (click)="removeAttack($index)" [disabled]="attackControls().length === 1">Remove</button>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="mn-check-row">
+          <input type="checkbox" id="monsterCallsReinforcements" formControlName="callsReinforcements" />
+          <label for="monsterCallsReinforcements">Calls Reinforcements</label>
+          <small class="mn-hint">Uses first combat turn to wake dormant monsters nearby.</small>
+        </div>
+
+        <div class="mn-check-row">
+          <input type="checkbox" id="monsterIsPublic" formControlName="isPublic" [attr.disabled]="!isAdminUser() || null" />
+          <label for="monsterIsPublic">Public</label>
+          @if (!isAdminUser()) {
+            <small class="mn-hint">Only admins can mark a monster as public.</small>
+          }
+        </div>
+
+        <div class="mn-actions">
+          <button type="submit" class="mn-btn-primary" [disabled]="isSaving()">
+            {{ isSaving() ? 'Savingâ€¦' : editingId() !== null ? 'Update Monster' : 'Add Monster' }}
+          </button>
+          @if (editingId() !== null) {
+            <button type="button" class="mn-btn-muted" (click)="cancelEdit()">Cancel Edit</button>
+          }
+          <button type="button" class="mn-btn-muted" (click)="beginCreate()">New Blank</button>
+        </div>
+
+        @if (saveMessage()) {
+          <p class="mn-message" style="margin-top:0.5rem">{{ saveMessage() }}</p>
+        }
+      </form>
+
+    </div>
+  }
+</div>

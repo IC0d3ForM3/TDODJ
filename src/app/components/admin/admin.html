@@ -80,3 +80,133 @@
 		</table>
 	}
 </div>
+
+<!-- ── Sample Game Management ──────────────────────────────────── -->
+<div class="container mt-5">
+	<h2 class="mb-3">Sample Game</h2>
+	<p class="text-muted">
+		Mark one published dungeon as the <strong>Sample Game</strong> shown to logged-out visitors.
+		Only admin-published dungeons are listed.
+	</p>
+
+	@if (dungonSaveSuccess()) {
+		<p class="text-success">{{ dungonSaveSuccess() }}</p>
+	}
+
+	@if (dungonError()) {
+		<p class="text-danger">{{ dungonError() }}</p>
+	}
+
+	@if (isDungonsLoading()) {
+		<p>Loading dungons…</p>
+	}
+
+	@if (!isDungonsLoading() && dungons().length === 0 && !dungonError()) {
+		<p class="text-muted">No published dungeons found.</p>
+	}
+
+	@if (!isDungonsLoading() && dungons().length > 0) {
+		<table class="table table-bordered table-striped">
+			<thead>
+				<tr>
+					<th>ID</th>
+					<th>Name</th>
+					<th>Sample</th>
+					<th>Action</th>
+				</tr>
+			</thead>
+			<tbody>
+				@for (dungon of dungons(); track dungon.id) {
+					<tr [class.table-success]="dungon.issample">
+						<td>{{ dungon.id }}</td>
+						<td>{{ dungon.name }}</td>
+						<td>{{ dungon.issample ? '✅ Yes' : '—' }}</td>
+						<td>
+							<button
+								type="button"
+								class="btn btn-sm btn-outline-primary"
+								[disabled]="dungon.issample || dungonSaving() !== null"
+								(click)="setSampleDungon(dungon.id)"
+							>
+								@if (dungonSaving() === dungon.id) {
+									Saving…
+								} @else {
+									Set as Sample
+								}
+							</button>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+</div>
+
+<!-- ── Sample PCs Management ───────────────────────────────────── -->
+<div class="container mt-5">
+	<h2 class="mb-3">Sample PCs</h2>
+	<p class="text-muted">
+		Mark one or more PCs as <strong>Sample PCs</strong>. Visitors on the Sample Game page will be
+		able to pick from this list before exploring the sample dungeon.
+	</p>
+
+	@if (pcSaveSuccess()) {
+		<p class="text-success">{{ pcSaveSuccess() }}</p>
+	}
+
+	@if (pcError()) {
+		<p class="text-danger">{{ pcError() }}</p>
+	}
+
+	@if (isPcsLoading()) {
+		<p>Loading PCs…</p>
+	}
+
+	@if (!isPcsLoading() && allPcs().length === 0 && !pcError()) {
+		<p class="text-muted">No PCs found.</p>
+	}
+
+	@if (!isPcsLoading() && allPcs().length > 0) {
+		<table class="table table-bordered table-striped">
+			<thead>
+				<tr>
+					<th>ID</th>
+					<th>Name</th>
+					<th>Species</th>
+					<th>Type</th>
+					<th>Sample</th>
+					<th>Action</th>
+				</tr>
+			</thead>
+			<tbody>
+				@for (pc of allPcs(); track pc.id) {
+					<tr [class.table-success]="pc.issample">
+						<td>{{ pc.id }}</td>
+						<td>{{ pc.name }}</td>
+						<td>{{ pc.species }}</td>
+						<td>{{ pc.type }}</td>
+						<td>{{ pc.issample ? '✅ Yes' : '—' }}</td>
+						<td>
+							<button
+								type="button"
+								class="btn btn-sm"
+								[class.btn-outline-danger]="pc.issample"
+								[class.btn-outline-primary]="!pc.issample"
+								[disabled]="pcSaving() !== null"
+								(click)="toggleSamplePc(pc)"
+							>
+								@if (pcSaving() === pc.id) {
+									Saving…
+								} @else if (pc.issample) {
+									Remove from Sample
+								} @else {
+									Add to Sample
+								}
+							</button>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+</div>

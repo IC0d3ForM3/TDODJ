@@ -1,0 +1,107 @@
+<div class="it-section" aria-label="My items">
+	<div class="it-section-header">
+		<h3 class="it-title">My Items</h3>
+		<button type="button" class="it-toggle-btn" (click)="toggleSectionVisibility()">
+			{{ isItemSectionVisible() ? 'Hide' : 'Show' }}
+		</button>
+	</div>
+
+	@if (!isItemSectionVisible()) {
+		<p class="it-message">Item section is hidden.</p>
+	} @else if (!isLoggedIn()) {
+		<p class="it-message">Log in to add or edit your items.</p>
+	} @else {
+		<div class="it-layout">
+
+			<!-- 1/3 LEFT: list -->
+			<aside class="it-list-panel">
+				<h4 class="it-panel-title">Your Item Library</h4>
+				@if (isLoading()) {
+					<p class="it-message">Loading your items...</p>
+				} @else if (error()) {
+					<p class="it-message it-message-error">{{ error() }}</p>
+				} @else if (items().length === 0) {
+					<p class="it-message">No items yet.</p>
+				} @else {
+					<ul class="it-list">
+						@for (item of items(); track item.id) {
+							<li class="it-list-item">
+								<div class="it-item-info">
+									<span class="it-item-name">{{ item.name }}</span>
+									<small class="it-item-meta">ID {{ item.id }} | {{ item.type }}{{ item.armorSlot ? ' · ' + item.armorSlot : '' }}{{ item.effectOn ? ' · ' + item.effectOn : '' }}{{ item.effectValue ? ' | Eff ' + item.effectValue : '' }}{{ item.value ? ' | Val ' + item.value : '' }}{{ curseNameForItem(item.curseId) ? ' | Curse: ' + curseNameForItem(item.curseId) : '' }}</small>
+									@if (item.description) { <small class="it-item-desc">{{ item.description }}</small> }
+								</div>
+								<button type="button" class="it-edit-btn" (click)="editItem(item)">Edit</button>
+							</li>
+						}
+					</ul>
+				}
+			</aside>
+
+			<!-- 2/3 RIGHT: form -->
+			<form class="it-form" [formGroup]="userItemForm" (ngSubmit)="save()">
+				<div class="it-form-grid">
+					<label class="it-field it-field-wide"><span>Name</span><input type="text" formControlName="name" placeholder="Item name" /></label>
+					<label class="it-field it-field-wide"><span>Description</span><input type="text" formControlName="description" placeholder="Description" /></label>
+					<label class="it-field"><span>Type</span>
+						<select formControlName="type">@for (option of itemTypeOptions; track option) { <option [value]="option">{{ option }}</option> }</select>
+					</label>
+					@if (userItemForm.controls.type.value === 'armor') {
+						<label class="it-field"><span>Armor Slot</span>
+							<select formControlName="armorSlot"><option [ngValue]="null">-- Choose Slot --</option>@for (slot of armorSlotOptions; track slot.value) { <option [value]="slot.value">{{ slot.label }}</option> }</select>
+						</label>
+					}
+					@if (showEffectOn()) {
+						<label class="it-field"><span>Effect</span>
+							<select formControlName="effectOn"><option [ngValue]="null">-- Choose Effect --</option>@for (opt of effectOnOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }</select>
+						</label>
+					}
+					@if (showRange()) {
+						<label class="it-field"><span>Range</span><input type="number" formControlName="range" min="0" /></label>
+					}
+					<label class="it-field"><span>{{ effectValueLabel() }}</span><input type="number" formControlName="effectValue" /></label>
+					@if (showDamage()) {
+						<label class="it-field"><span>Damage</span>
+							<select formControlName="damage">
+								<option [ngValue]="6">d12/6 — 1d2</option>
+								<option [ngValue]="4">d12/4 — 1d3</option>
+								<option [ngValue]="3">d12/3 — 1d4</option>
+								<option [ngValue]="2">d12/2 — 1d6</option>
+							</select>
+						</label>
+					}
+					<label class="it-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
+					<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
+					<label class="it-field it-field-wide"><span>Curse</span>
+						<select formControlName="curseId"><option [ngValue]="null">No Curse</option>@for (curse of curseOptions(); track curse.id) { <option [ngValue]="curse.id">{{ curse.name }}</option> }</select>
+					</label>
+					<label class="it-field it-field-wide"><span>Sound</span>
+						<div class="it-upload-row">
+							<select formControlName="soundId"><option [ngValue]="null">No Sound</option>@for (sound of allSoundOptions(); track sound.id) { <option [ngValue]="sound.id">{{ sound.name }}</option> }</select>
+							<app-upload-popup mediaType="sound" (mediaUploaded)="onSoundUploaded($event)" />
+						</div>
+					</label>
+					<label class="it-field it-field-wide"><span>Image</span>
+						<div class="it-upload-row">
+							<select formControlName="imageId"><option [ngValue]="null">No Image</option>@for (image of allImageOptions(); track image.id) { <option [ngValue]="image.id">{{ image.name }}</option> }</select>
+							<app-upload-popup mediaType="image" (mediaUploaded)="onImageUploaded($event)" />
+						</div>
+					</label>
+					@if (selectedImageUrl()) { <div class="it-field it-field-wide"><img class="it-thumb" [src]="selectedImageUrl()" [alt]="selectedImageName() || 'Selected item image'" /></div> }
+					@if (isAdminUser()) {
+						<div class="it-check-row"><input type="checkbox" formControlName="isPublic" id="itemIsPublic" /><label for="itemIsPublic">Public</label></div>
+					}
+				</div>
+				<div class="it-actions">
+					<button type="submit" class="it-btn-primary" [disabled]="isSavingUserItem()">
+						@if (isSavingUserItem()) { Saving... } @else if (editingUserItemId() !== null) { Update Item } @else { Add Item }
+					</button>
+					@if (editingUserItemId() !== null) { <button type="button" class="it-btn-muted" (click)="cancelEdit()">Cancel Edit</button> }
+					<button type="button" class="it-btn-muted" (click)="beginCreate()">New Blank</button>
+				</div>
+				@if (userItemSaveMessage()) { <p class="it-save-msg">{{ userItemSaveMessage() }}</p> }
+			</form>
+
+		</div>
+	}
+</div>

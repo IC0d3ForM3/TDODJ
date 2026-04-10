@@ -95,3 +95,11 @@ export const getActiveUserByCredentials = async (username: string, password: str
     return rows[0] || null;
 };
 
+export const getUserByKey = async (key: string): Promise<UserRecord | null> => {
+    const { rows } = await pool.query<UserRecord>(
+        'SELECT id, username, email, isactive, isconfirmed, isadmin, ismasteradmin, iscreator, key FROM users WHERE key = $1 AND isactive = true LIMIT 1',
+        [key]
+    );
+    return rows[0] || null;
+};
+
