@@ -484,6 +484,16 @@
 	background-color: #2b6b35;
 }
 
+.action-button-danger {
+	border-color: #7a3030;
+	background-color: #4a1a1a;
+	color: #f4a0a0;
+}
+
+.action-button-danger:hover {
+	background-color: #5e2020;
+}
+
 .action-message {
 	margin: 0.7rem 0 0;
 	padding: 0.48rem 0.55rem;
@@ -579,9 +589,32 @@
 
 .combat-actions {
 	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
 	gap: 0.5rem;
 	margin-top: 0.45rem;
 }
+
+.currency-badge {
+	display: flex;
+	gap: 0.3rem;
+	align-items: center;
+	margin-left: 0.25rem;
+}
+
+.currency-coin {
+	font-size: 0.72rem;
+	font-weight: 700;
+	padding: 2px 6px;
+	border-radius: 4px;
+	letter-spacing: 0.02em;
+}
+
+.currency-gold   { background: #7a5c00; color: #ffd966; }
+.currency-silver { background: #3a3a3a; color: #d6d6d6; }
+.currency-copper { background: #5c2e00; color: #e8a87c; }
+.currency-zinc   { background: #2a3320; color: #b0c490; }
+
 
 .combat-gameover {
 	margin: 0.45rem 0 0;

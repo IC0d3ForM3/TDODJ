@@ -156,7 +156,8 @@
 	@if (!isLoggedIn()) {
 		<p class="dashboard-message">Log in to add and view friends.</p>
 	} @else {
-		<form class="tresher-form" [formGroup]="userFriendForm" (ngSubmit)="saveFriend()">
+		<h4 class="dashboard-subtitle">Invite a Friend</h4>
+		<form class="tresher-form" [formGroup]="userFriendForm" (ngSubmit)="createFriendInvite()">
 			<div class="tresher-form-grid">
 				<label class="tresher-field">
 					<span>Friend Email</span>
@@ -167,16 +168,50 @@
 			<div class="tresher-form-actions">
 				<button type="submit" class="dashboard-action-button" [disabled]="isSavingUserFriend()">
 					@if (isSavingUserFriend()) {
-						Saving...
+						Generating...
 					} @else {
-						Save Friend
+						Generate Invite Code
 					}
 				</button>
 			</div>
 		</form>
 
 		@if (userFriendSaveMessage()) {
-			<p class="dashboard-message" style="margin-top: 0.6rem">{{ userFriendSaveMessage() }}</p>
+			<p class="dashboard-message dashboard-message-error" style="margin-top: 0.6rem">{{ userFriendSaveMessage() }}</p>
+		}
+
+		@if (generatedInviteCode()) {
+			<div class="dashboard-invite-code-box">
+				<p class="dashboard-message" style="margin: 0 0 0.4rem">
+					Invite code for <strong>{{ generatedInviteeEmail() }}</strong>:
+				</p>
+				<div class="dashboard-invite-code">{{ generatedInviteCode() }}</div>
+				<p class="dashboard-message" style="margin: 0.4rem 0 0; font-size: 0.8rem;">Share this code with your friend. They enter it below to accept.</p>
+			</div>
+		}
+
+		<h4 class="dashboard-subtitle" style="margin-top: 1.2rem">Accept an Invite</h4>
+		<form class="tresher-form" [formGroup]="userAcceptInviteForm" (ngSubmit)="acceptFriendInvite()">
+			<div class="tresher-form-grid">
+				<label class="tresher-field">
+					<span>Invite Code</span>
+					<input type="text" formControlName="code" placeholder="e.g. A3F7B2E9" maxlength="16" style="text-transform: uppercase;" />
+				</label>
+			</div>
+
+			<div class="tresher-form-actions">
+				<button type="submit" class="dashboard-action-button" [disabled]="isSavingAcceptInvite()">
+					@if (isSavingAcceptInvite()) {
+						Accepting...
+					} @else {
+						Accept Invite
+					}
+				</button>
+			</div>
+		</form>
+
+		@if (acceptInviteMessage()) {
+			<p class="dashboard-message" style="margin-top: 0.6rem">{{ acceptInviteMessage() }}</p>
 		}
 
 		<div class="tresher-list-wrap">
@@ -566,7 +601,7 @@
 										ID {{ item.id }} | {{ item.species }} | {{ item.type }} | Lvl {{ item.level }}
 									</small>
 									<p class="tresher-description">
-										HP {{ item.currentHP }}/{{ item.maxHP }} | AC {{ item.ac }} | AE {{ item.actionEconomy }} | MP {{ item.magicPower }} | Mind {{ item.mind }} | Stamina {{ item.stamina }} | POV {{ item.rangeOfView }}
+										HP {{ item.currentHP }}/{{ item.maxHP }} | AC {{ item.ac }} | AE {{ item.actionEconomy }} | NOA {{ item.numberOfAttacks }} | SP {{ item.sp }} | MP {{ item.magicPower }} | Mind {{ item.mind }} | Stamina {{ item.stamina }} | POV {{ item.rangeOfView }}
 									</p>
 									<p class="tresher-description">Treshers: {{ pcTresherSummaryForPc(item) }}</p>
 								</div>
@@ -574,10 +609,22 @@
 								<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editPc(item)">
 									Edit
 								</button>
+								<button
+									type="button"
+									class="dashboard-action-button dashboard-action-button-small"
+									(click)="upgradeNoa(item.id)"
+									[disabled]="isUpgradingNoa() === item.id || item.sp < 5"
+									title="Spend 5 SP to gain +1 NOA"
+								>
+									+1 NOA (5 SP)
+								</button>
 							</div>
 						</li>
 					}
 				</ul>
+			}
+			@if (noaUpgradeMessage()) {
+				<p class="dashboard-message">{{ noaUpgradeMessage() }}</p>
 			}
 		</div>
 	}

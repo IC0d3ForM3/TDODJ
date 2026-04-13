@@ -22,6 +22,7 @@ export interface UserItemListItem {
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;
+  isTwoHanded: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -41,6 +42,7 @@ export interface UserItemWritePayload {
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;
+  isTwoHanded: boolean;
 }
 
 export interface ItemResponse {

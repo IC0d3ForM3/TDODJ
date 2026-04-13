@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Account } from '../../services/account';
 import { User } from '../../interfaces/user';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-signup',
@@ -19,8 +19,9 @@ export class Signup {
   confirmPassword = '';
   result: number | null = null;
   error: string | null = null;
+  showSuccess = false;
 
-  constructor(private account: Account) {}
+  constructor(private account: Account, private router: Router) {}
 
   isEmailValid(email: string): boolean {
     return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
@@ -53,8 +54,12 @@ export class Signup {
       next: (res) => {
         this.result = res.result;
         this.error = null;
+        if (res.result === 1) {
+          this.showSuccess = true;
+          setTimeout(() => this.router.navigate(['/login']), 2500);
+        }
       },
-      error: (err) => {
+      error: () => {
         this.result = -1;
         this.error = 'Signup failed';
       }

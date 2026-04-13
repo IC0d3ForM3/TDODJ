@@ -69,6 +69,8 @@ interface UserPcListItem {
   hand2ItemId: number | null;
   createdAt: string;
   updatedAt: string;
+  sp: number;
+  numberOfAttacks: number;
 }
 
 interface UserItemOption {
@@ -111,6 +113,7 @@ interface UserPcWritePayload {
   necklaceItemId: number | null;
   hand1ItemId: number | null;
   hand2ItemId: number | null;
+  numberOfAttacks: number;
 }
 
 type PcTresherControl = FormControl<number | null>;
@@ -164,6 +167,10 @@ export class Dashboard implements OnInit {
   readonly userFriends = signal<UserFriendListItem[]>([]);
   readonly isSavingUserFriend = signal(false);
   readonly userFriendSaveMessage = signal<string | null>(null);
+  readonly generatedInviteCode = signal<string | null>(null);
+  readonly generatedInviteeEmail = signal<string | null>(null);
+  readonly isSavingAcceptInvite = signal(false);
+  readonly acceptInviteMessage = signal<string | null>(null);
 
   readonly userTreshers = this.tresherService.items;
   readonly monsterTresherOptions = this.tresherService.tresherOptions;
@@ -185,12 +192,18 @@ export class Dashboard implements OnInit {
   readonly userPcSaveMessage = signal<string | null>(null);
   readonly userItems = signal<UserItemOption[]>([]);
   readonly isLoadingUserItems = signal(false);
+  readonly isUpgradingNoa = signal<number | null>(null);
+  readonly noaUpgradeMessage = signal<string | null>(null);
 
   readonly pcSpeciesOptions: PcSpeciesOption[] = ['Human', 'Elph', 'DwarPh', 'Shorties'];
   readonly pcTypeOptions: PcTypeOption[] = ['Figher', 'Mage', 'Thieph', 'Healer'];
 
   readonly userFriendForm = new FormGroup({
     email: new FormControl<string>('', { nonNullable: true }),
+  });
+
+  readonly userAcceptInviteForm = new FormGroup({
+    code: new FormControl<string>('', { nonNullable: true }),
   });
 
   readonly userPcForm = new FormGroup({
@@ -226,6 +239,7 @@ export class Dashboard implements OnInit {
     necklaceItemId: new FormControl<number | null>(null),
     hand1ItemId: new FormControl<number | null>(null),
     hand2ItemId: new FormControl<number | null>(null),
+    numberOfAttacks: new FormControl<number>(1, { nonNullable: true }),
   });
 
   ngOnInit(): void {
@@ -422,14 +436,14 @@ export class Dashboard implements OnInit {
     return this.activeDashboardTab() === tabId;
   }
 
-  saveFriend(): void {
+  createFriendInvite(): void {
     if (this.isSavingUserFriend()) {
       return;
     }
 
     const userkey = this.account.getKey();
     if (!userkey) {
-      this.userFriendSaveMessage.set('Please log in to save friends.');
+      this.userFriendSaveMessage.set('Please log in to invite friends.');
       return;
     }
 
@@ -441,27 +455,75 @@ export class Dashboard implements OnInit {
 
     this.isSavingUserFriend.set(true);
     this.userFriendSaveMessage.set(null);
+    this.generatedInviteCode.set(null);
+    this.generatedInviteeEmail.set(null);
 
     this.http
-      .post<{ result: number; error?: string; friend?: UserFriendListItem }>(
-        `${API_BASE_URL}/friends`,
+      .post<{ result: number; error?: string; code?: string; inviteeEmail?: string }>(
+        `${API_BASE_URL}/friends/invite`,
         { userkey, email }
       )
       .pipe(finalize(() => this.isSavingUserFriend.set(false)))
       .subscribe({
         next: (response) => {
-          if (response.result !== 1 || !response.friend) {
-            this.userFriendSaveMessage.set(response.error || 'Failed to save friend.');
+          if (response.result !== 1 || !response.code) {
+            this.userFriendSaveMessage.set(response.error || 'Failed to create invite.');
             return;
           }
 
           this.userFriendForm.controls.email.setValue('');
-          this.userFriendSaveMessage.set('Friend saved.');
-          this.loadUserFriends();
+          this.generatedInviteCode.set(response.code);
+          this.generatedInviteeEmail.set(response.inviteeEmail ?? null);
+          this.userFriendSaveMessage.set(null);
         },
         error: (errorResponse: { error?: { error?: string } }) => {
           this.userFriendSaveMessage.set(
-            errorResponse?.error?.error || 'Failed to save friend.'
+            errorResponse?.error?.error || 'Failed to create invite.'
+          );
+        },
+      });
+  }
+
+  acceptFriendInvite(): void {
+    if (this.isSavingAcceptInvite()) {
+      return;
+    }
+
+    const userkey = this.account.getKey();
+    if (!userkey) {
+      this.acceptInviteMessage.set('Please log in to accept an invite.');
+      return;
+    }
+
+    const code = this.userAcceptInviteForm.controls.code.value.trim().toUpperCase();
+    if (!code) {
+      this.acceptInviteMessage.set('Enter an invite code.');
+      return;
+    }
+
+    this.isSavingAcceptInvite.set(true);
+    this.acceptInviteMessage.set(null);
+
+    this.http
+      .post<{ result: number; error?: string }>(
+        `${API_BASE_URL}/friends/accept`,
+        { userkey, code }
+      )
+      .pipe(finalize(() => this.isSavingAcceptInvite.set(false)))
+      .subscribe({
+        next: (response) => {
+          if (response.result !== 1) {
+            this.acceptInviteMessage.set(response.error || 'Failed to accept invite.');
+            return;
+          }
+
+          this.userAcceptInviteForm.controls.code.setValue('');
+          this.acceptInviteMessage.set('You are now friends!');
+          this.loadUserFriends();
+        },
+        error: (errorResponse: { error?: { error?: string } }) => {
+          this.acceptInviteMessage.set(
+            errorResponse?.error?.error || 'Failed to accept invite.'
           );
         },
       });
@@ -680,11 +742,36 @@ export class Dashboard implements OnInit {
     controls.necklaceItemId.setValue(this.normalizeNullableNumber(item.necklaceItemId));
     controls.hand1ItemId.setValue(this.normalizeNullableNumber(item.hand1ItemId));
     controls.hand2ItemId.setValue(this.normalizeNullableNumber(item.hand2ItemId));
+    controls.numberOfAttacks.setValue(Math.max(1, this.normalizeNumber(item.numberOfAttacks, 1)));
     this.pcStatsRolled.set(true);
   }
 
   cancelEditPc(): void {
     this.beginCreatePc();
+  }
+
+  upgradeNoa(pcId: number): void {
+    const userkey = this.account.getKey();
+    if (!userkey || this.isUpgradingNoa() !== null) return;
+    this.isUpgradingNoa.set(pcId);
+    this.noaUpgradeMessage.set(null);
+    this.http
+      .patch<{ result: number; sp: number; numberOfAttacks: number; error?: string }>(
+        `${API_BASE_URL}/pcs/${pcId}/upgrade-noa`,
+        { userkey }
+      )
+      .pipe(finalize(() => this.isUpgradingNoa.set(null)))
+      .subscribe({
+        next: (r) => {
+          if (r.result !== 1) {
+            this.noaUpgradeMessage.set(r.error ?? 'Failed to upgrade NOA.');
+            return;
+          }
+          this.noaUpgradeMessage.set(`NOA upgraded to ${r.numberOfAttacks}! SP remaining: ${r.sp}`);
+          this.loadUserPcs();
+        },
+        error: () => this.noaUpgradeMessage.set('Failed to upgrade NOA.'),
+      });
   }
 
   savePc(): void {
@@ -929,6 +1016,7 @@ export class Dashboard implements OnInit {
       necklaceItemId: this.normalizeNullableNumber(controls.necklaceItemId.value),
       hand1ItemId: this.normalizeNullableNumber(controls.hand1ItemId.value),
       hand2ItemId: this.normalizeNullableNumber(controls.hand2ItemId.value),
+      numberOfAttacks: Math.max(1, this.normalizeNumber(controls.numberOfAttacks.value, 1)),
     };
   }
 
@@ -969,6 +1057,7 @@ export class Dashboard implements OnInit {
     controls.necklaceItemId.setValue(null);
     controls.hand1ItemId.setValue(null);
     controls.hand2ItemId.setValue(null);
+    controls.numberOfAttacks.setValue(1);
   }
 
   private replacePcTresherForms(tresherIds: number[]): void {

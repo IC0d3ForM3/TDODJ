@@ -17,6 +17,7 @@ export interface ItemRecord {
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;
+  isTwoHanded: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,6 +37,7 @@ export interface UpsertItemPayload {
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;
+  isTwoHanded: boolean;
 }
 
 const SELECT_ITEM_FIELDS = `
@@ -55,6 +57,7 @@ const SELECT_ITEM_FIELDS = `
   imageid AS "imageId",
   soundid AS "soundId",
   ispublic AS "isPublic",
+  COALESCE(istwohanded, false) AS "isTwoHanded",
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -85,8 +88,8 @@ export const insertItemForUser = async (
   const { rows } = await pool.query<ItemRecord>(
     `INSERT INTO items
        (userguid, name, description, type, range, value, weight, curseid,
-        effectvalue, damage, armorslot, effecton, imageid, soundid, ispublic)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        effectvalue, damage, armorslot, effecton, imageid, soundid, ispublic, istwohanded)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      RETURNING ${SELECT_ITEM_FIELDS}`,
     [
       userguid,
@@ -104,6 +107,7 @@ export const insertItemForUser = async (
       payload.imageId,
       payload.soundId,
       payload.isPublic,
+      payload.isTwoHanded,
     ]
   );
   return rows[0];
@@ -130,8 +134,9 @@ export const updateItemForUser = async (
          imageid = $12,
          soundid = $13,
          ispublic = $14,
+         istwohanded = $15,
          updatedat = NOW()
-     WHERE id = $15 AND userguid = $16
+     WHERE id = $16 AND userguid = $17
      RETURNING ${SELECT_ITEM_FIELDS}`,
     [
       payload.name,
@@ -148,6 +153,7 @@ export const updateItemForUser = async (
       payload.imageId,
       payload.soundId,
       payload.isPublic,
+      payload.isTwoHanded,
       id,
       userguid,
     ]

@@ -39,6 +39,7 @@ export interface PcRecord {
   createdAt: string;
   updatedAt: string;
   sp: number;
+  numberOfAttacks: number;
 }
 
 export interface UpsertPcPayload {
@@ -74,6 +75,7 @@ export interface UpsertPcPayload {
   necklaceItemId: number | null;
   hand1ItemId: number | null;
   hand2ItemId: number | null;
+  numberOfAttacks: number;
 }
 
 export const getPcsByUserGuid = async (userguid: string): Promise<PcRecord[]> => {
@@ -114,6 +116,7 @@ export const getPcsByUserGuid = async (userguid: string): Promise<PcRecord[]> =>
        necklaceitemid AS "necklaceItemId",
        hand1itemid AS "hand1ItemId",
        hand2itemid AS "hand2ItemId",
+       COALESCE(numberofattacks, 1) AS "numberOfAttacks",
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM pcs
@@ -166,6 +169,7 @@ export const getPcByIdForUser = async (
        necklaceitemid AS "necklaceItemId",
        hand1itemid AS "hand1ItemId",
        hand2itemid AS "hand2ItemId",
+       COALESCE(numberofattacks, 1) AS "numberOfAttacks",
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM pcs
@@ -232,6 +236,7 @@ export const insertPcForUser = async (
        necklaceitemid,
        hand1itemid,
        hand2itemid,
+       numberofattacks,
        updatedat
      )
      VALUES (
@@ -268,6 +273,7 @@ export const insertPcForUser = async (
        $31,
        $32,
        $33,
+       $34,
        NOW()
      )
      RETURNING
@@ -305,6 +311,7 @@ export const insertPcForUser = async (
        necklaceitemid AS "necklaceItemId",
        hand1itemid AS "hand1ItemId",
        hand2itemid AS "hand2ItemId",
+       COALESCE(numberofattacks, 1) AS "numberOfAttacks",
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"`,
     [
@@ -341,6 +348,7 @@ export const insertPcForUser = async (
       payload.necklaceItemId,
       payload.hand1ItemId,
       payload.hand2ItemId,
+      Math.max(1, Math.floor(payload.numberOfAttacks ?? 1)),
     ]
   );
 
@@ -387,6 +395,7 @@ export const updatePcForUser = async (
        necklaceitemid = $32,
        hand1itemid = $33,
        hand2itemid = $34,
+       numberofattacks = $35,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING
@@ -424,6 +433,7 @@ export const updatePcForUser = async (
        necklaceitemid AS "necklaceItemId",
        hand1itemid AS "hand1ItemId",
        hand2itemid AS "hand2ItemId",
+       COALESCE(numberofattacks, 1) AS "numberOfAttacks",
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"`,
     [
@@ -461,10 +471,30 @@ export const updatePcForUser = async (
       payload.necklaceItemId,
       payload.hand1ItemId,
       payload.hand2ItemId,
+      Math.max(1, Math.floor(payload.numberOfAttacks ?? 1)),
     ]
   );
 
   return rows[0] ?? null;
+};
+
+export const upgradeNoa = async (
+  id: number,
+  userguid: string,
+  spCost: number
+): Promise<{ sp: number; numberOfAttacks: number } | null> => {
+  const { rows } = await pool.query<{ sp: number; numberofattacks: number }>(
+    `UPDATE pcs
+     SET sp = GREATEST(0, COALESCE(sp, 0) - $3),
+         numberofattacks = COALESCE(numberofattacks, 1) + 1,
+         updatedat = NOW()
+     WHERE id = $1 AND userguid = $2 AND COALESCE(sp, 0) >= $3
+     RETURNING COALESCE(sp, 0) AS sp, COALESCE(numberofattacks, 1) AS numberofattacks`,
+    [id, userguid, spCost]
+  );
+
+  if (!rows[0]) return null;
+  return { sp: rows[0].sp, numberOfAttacks: rows[0].numberofattacks };
 };
 
 export interface SamplePcRecord {

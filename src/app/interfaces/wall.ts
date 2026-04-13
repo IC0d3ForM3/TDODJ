@@ -6,4 +6,5 @@ export interface Wall {
     description: string;
     HP: number;
     state: 'intact' | 'destroyed';
+    isDestructible?: boolean;
 }

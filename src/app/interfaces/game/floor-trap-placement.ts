@@ -7,4 +7,5 @@ export interface FloorTrapPlacement {
   trap: Trap;
   isTriggered: boolean;
   isDisarmed: boolean;
+  isDetected: boolean;
 }

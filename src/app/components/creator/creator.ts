@@ -1004,6 +1004,7 @@ export class Creator implements OnInit {
       trap,
       isTriggered: false,
       isDisarmed: false,
+      isDetected: false,
     };
     this.nextFloorTrapId += 1;
 
@@ -3493,6 +3494,24 @@ export class Creator implements OnInit {
       return;
     }
 
+    const hasWallSelection = this.hasAnyWallSelection(selections);
+    if (hasWallSelection && isFilledSquare) {
+      this.squaresByDungon.update((allSquares) => ({
+        ...allSquares,
+        [dungonId]: this.applyDoorToExistingSquare(
+          row,
+          column,
+          allSquares[dungonId] ?? {},
+          selections,
+          null
+        ),
+      }));
+      this.openBlockSelections.set({ ...EMPTY_OPEN_BLOCK_SELECTIONS });
+      this.markDungonJsonChanged();
+      this.drawGridCanvas();
+      return;
+    }
+
     if (isFilledSquare) {
       return;
     }
@@ -4582,6 +4601,7 @@ export class Creator implements OnInit {
         trap,
         isTriggered: Boolean(src['isTriggered']),
         isDisarmed: Boolean(src['isDisarmed']),
+        isDetected: src['isDetected'] === true,
       });
       if (id > maxId) maxId = id;
     }
@@ -5115,6 +5135,27 @@ export class Creator implements OnInit {
             this.gridCellSize,
             this.gridCellSize
           );
+        }
+      }
+
+      // Draw dark-gray "wall shadow" cells adjacent to filled squares across wall connections,
+      // so that wall structures look solid instead of showing a black void.
+      const wallSquares = Object.values(this.squaresByDungon()[dungonId] ?? {});
+      context.fillStyle = '#555555';
+      for (const wsq of wallSquares) {
+        const wallDirs: Array<{ dRow: number; dCol: number; connected: boolean }> = [
+          { dRow: -1, dCol:  0, connected: this.isWallConnection(wsq.toTop) },
+          { dRow:  1, dCol:  0, connected: this.isWallConnection(wsq.toBottom) },
+          { dRow:  0, dCol: -1, connected: this.isWallConnection(wsq.toLeft) },
+          { dRow:  0, dCol:  1, connected: this.isWallConnection(wsq.toRight) },
+        ];
+        for (const { dRow, dCol, connected } of wallDirs) {
+          if (!connected) continue;
+          const adjRow = wsq.row + dRow;
+          const adjCol = wsq.column + dCol;
+          const adjKey = this.getSquareKey(adjRow, adjCol);
+          if (filledSquares[adjKey]) continue; // already shown as floor gray
+          context.fillRect(adjCol * this.gridCellSize, adjRow * this.gridCellSize, this.gridCellSize, this.gridCellSize);
         }
       }
     }
@@ -7412,10 +7453,11 @@ export class Creator implements OnInit {
     return `#${red}${green}${blue}`;
   }
 
-  private toFirstPersonBlock(type: PathBlockType, door: Door | null): FirstPersonBlock {
+  private toFirstPersonBlock(type: PathBlockType, door: Door | null, wall: Wall | null = null): FirstPersonBlock {
     return {
       type,
       hasKeyhole: Boolean(door?.keyLock),
+      isDestructible: wall?.isDestructible === true,
     };
   }
 
@@ -8209,6 +8251,17 @@ export class Creator implements OnInit {
     );
   }
 
+  private hasAnyWallSelection(
+    selections: Record<OpenBlockOptionKey, boolean>
+  ): boolean {
+    return (
+      selections['wallTop'] ||
+      selections['wallRight'] ||
+      selections['wallBottom'] ||
+      selections['wallLeft']
+    );
+  }
+
   private synchronizeDoorConnections(
     squares: Record<string, Square>
   ): Record<string, Square> {
@@ -8308,15 +8361,12 @@ export class Creator implements OnInit {
       }
 
       if (wantsWall) {
-        if (!this.isWallConnection(nextSquare[sideRule.side])) {
-          nextSquare = this.withSquareSide(nextSquare, sideRule.side, this.buildWall());
-        }
-
-        if (neighborSquare && !this.isWallConnection(neighborSquare[sideRule.oppositeSide])) {
+        nextSquare = this.withSquareSide(nextSquare, sideRule.side, this.buildDestructibleWall(10));
+        if (neighborSquare) {
           nextSquares[neighborKey] = this.withSquareSide(
             neighborSquare,
             sideRule.oppositeSide,
-            this.buildWall()
+            this.buildDestructibleWall(10)
           );
         }
         continue;
@@ -8326,16 +8376,20 @@ export class Creator implements OnInit {
         continue;
       }
 
-      if (this.isWallConnection(nextSquare[sideRule.side])) {
+      const neighborConnection = neighborSquare[sideRule.oppositeSide];
+      if (this.isWallConnection(neighborConnection) && neighborConnection.isDestructible) {
+        // Neighbor already has a deliberately-placed destructible wall — share it with the new square
+        nextSquare = this.withSquareSide(nextSquare, sideRule.side, neighborConnection);
+      } else {
+        // Open the passage, removing structural walls on both sides
         nextSquare = this.withSquareSide(nextSquare, sideRule.side, null);
-      }
-
-      if (this.isWallConnection(neighborSquare[sideRule.oppositeSide])) {
-        nextSquares[neighborKey] = this.withSquareSide(
-          neighborSquare,
-          sideRule.oppositeSide,
-          null
-        );
+        if (this.isWallConnection(neighborConnection)) {
+          nextSquares[neighborKey] = this.withSquareSide(
+            neighborSquare,
+            sideRule.oppositeSide,
+            null
+          );
+        }
       }
     }
 
@@ -8348,7 +8402,7 @@ export class Creator implements OnInit {
     column: number,
     existingSquares: Record<string, Square>,
     selections: Record<OpenBlockOptionKey, boolean>,
-    doorPromptResult: DoorPromptResult
+    doorPromptResult: DoorPromptResult | null
   ): Record<string, Square> {
     const nextSquares = { ...existingSquares };
     const squareKey = this.getSquareKey(row, column);
@@ -8371,7 +8425,7 @@ export class Creator implements OnInit {
       const neighborKey = this.getSquareKey(neighborRow, neighborColumn);
       const neighborSquare = nextSquares[neighborKey];
 
-      if (wantsDoor) {
+      if (wantsDoor && doorPromptResult) {
         const sharedDoor = this.buildDoor(doorPromptResult, row, column);
         nextSquare = this.withSquareSide(nextSquare, sideRule.side, sharedDoor);
 
@@ -8385,14 +8439,13 @@ export class Creator implements OnInit {
         continue;
       }
 
-      const wall = this.buildWall();
-      nextSquare = this.withSquareSide(nextSquare, sideRule.side, wall);
+      nextSquare = this.withSquareSide(nextSquare, sideRule.side, this.buildDestructibleWall(10));
 
       if (neighborSquare) {
         nextSquares[neighborKey] = this.withSquareSide(
           neighborSquare,
           sideRule.oppositeSide,
-          wall
+          this.buildDestructibleWall(10)
         );
       }
     }
@@ -8536,6 +8589,21 @@ export class Creator implements OnInit {
       description: '',
       HP: 10,
       state: 'intact',
+      isDestructible: false,
+    };
+
+    this.nextWallId += 1;
+    return wall;
+  }
+
+  private buildDestructibleWall(hp = 20): Wall {
+    const wall: Wall = {
+      id: this.nextWallId,
+      name: 'Destructible Wall',
+      description: '',
+      HP: hp,
+      state: 'intact',
+      isDestructible: true,
     };
 
     this.nextWallId += 1;

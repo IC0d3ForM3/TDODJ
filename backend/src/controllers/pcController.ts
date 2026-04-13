@@ -87,6 +87,8 @@ interface PcWriteInput {
   hand1itemid?: unknown;
   hand2ItemId?: unknown;
   hand2itemid?: unknown;
+  numberOfAttacks?: unknown;
+  numberofattacks?: unknown;
 }
 
 export const getPcs = async (req: Request, res: Response) => {
@@ -279,6 +281,7 @@ const normalizePcPayload = (value: unknown): UpsertPcPayload | null => {
     necklaceItemId: normalizeNullableNumber(input.necklaceItemId ?? input.necklaceitemid),
     hand1ItemId: normalizeNullableNumber(input.hand1ItemId ?? input.hand1itemid),
     hand2ItemId: normalizeNullableNumber(input.hand2ItemId ?? input.hand2itemid),
+    numberOfAttacks: Math.max(1, normalizeNumber(input.numberOfAttacks ?? input.numberofattacks, 1)),
   };
 };
 
@@ -492,5 +495,32 @@ export const getAdminPcs = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching pcs for admin:', error);
     return res.status(500).json({ error: 'Failed to fetch pcs' });
+  }
+};
+
+export const upgradeNoa = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const { userkey } = req.body as Partial<{ userkey: string }>;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
+  }
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+
+  const SP_COST = 5;
+
+  try {
+    const result = await pcService.upgradeNoa(id, userkey.trim(), SP_COST);
+    if (!result) {
+      return res.status(400).json({ result: -1, error: 'Not enough SP or PC not found' });
+    }
+
+    return res.json({ result: 1, sp: result.sp, numberOfAttacks: result.numberOfAttacks });
+  } catch (error) {
+    console.error('Error upgrading NOA:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to upgrade NOA' });
   }
 };

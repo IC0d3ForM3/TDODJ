@@ -408,6 +408,7 @@ export const getGameById = async (req: Request, res: Response) => {
     let pcStamina: number = 0;
     let pcStrength: number = 0;
     let pcMagicPower: number = 0;
+    let pcNumberOfAttacks: number = 1;
     const currentPcId: number | null = game.pcid ?? null;
     if (game.pcid !== null && game.pcid > 0) {
       const pc = await pcService.fetchPcByIdForUser(game.pcid, userkey.trim());
@@ -419,6 +420,7 @@ export const getGameById = async (req: Request, res: Response) => {
         pcStamina = pc.stamina ?? 0;
         pcStrength = pc.strength ?? 0;
         pcMagicPower = pc.magicPower ?? 0;
+        pcNumberOfAttacks = pc.numberOfAttacks ?? 1;
 
         const allPcTresherIds = Array.from(new Set([
           ...(Array.isArray(pc.tresherIds) ? pc.tresherIds : []),
@@ -520,7 +522,7 @@ export const getGameById = async (req: Request, res: Response) => {
 
     const dungonSpReward = await dungonService.fetchDungonSpReward(game.dungonid);
 
-    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcStrength, pcMagicPower, currentPcId, dungonSpReward });
+    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcStrength, pcMagicPower, pcNumberOfAttacks, currentPcId, dungonSpReward });
   } catch (error) {
     console.error('Error fetching game by id:', error);
     return res.status(500).json({ error: 'Failed to fetch game' });
@@ -846,6 +848,7 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
       pcStamina: pc.stamina,
       pcStrength: pc.strength,
       pcMagicPower: pc.magicPower,
+      pcNumberOfAttacks: 1,
       currentPcId: null,
       dungonSpReward: dungon.spreward,
       monsterImages,

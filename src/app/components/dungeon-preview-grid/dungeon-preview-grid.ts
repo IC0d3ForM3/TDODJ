@@ -18,6 +18,7 @@ import {
   DungonExit,
   ExitTransitionType,
   FacingDirection,
+  FloorTrapPlacement,
   GridPreviewContext,
   MonsterPlacement,
   SquareSide,
@@ -58,6 +59,7 @@ export class DungeonPreviewGridComponent {
   readonly exits = input<DungonExit[]>([]);
   readonly startPoint = input<StartPoint | null>(null);
   readonly squareTexts = input<SquareText[]>([]);
+  readonly floorTrapPlacements = input<FloorTrapPlacement[]>([]);
   /** Chebyshev range for combat targeting overlay (0 = no overlay). */
   readonly combatRange = input<number>(0);
   /** Row of the currently selected combat target (null = none). */
@@ -91,6 +93,7 @@ export class DungeonPreviewGridComponent {
       this.exits();
       this.startPoint();
       this.squareTexts();
+      this.floorTrapPlacements();
       this.combatRange();
       this.selectedTargetRow();
       this.selectedTargetColumn();
@@ -126,15 +129,14 @@ export class DungeonPreviewGridComponent {
     const filledSquares = this.filledSquares();
     const visibleSquareKeys = this.getVisibleSquareKeysForPreview(preview);
 
-    context.fillStyle = '#c7c7c7';
+    // Draw visible squares as white; non-visible stay black (background)
+    context.fillStyle = '#ffffff';
     for (let previewRow = 0; previewRow < this.dimension; previewRow += 1) {
       for (let previewColumn = 0; previewColumn < this.dimension; previewColumn += 1) {
         const sourceRow = preview.startRow + previewRow;
         const sourceColumn = preview.startColumn + previewColumn;
         const sourceSquareKey = this.getSquareKey(sourceRow, sourceColumn);
-        if (!filledSquares[sourceSquareKey] || !visibleSquareKeys.has(sourceSquareKey)) {
-          continue;
-        }
+        if (!filledSquares[sourceSquareKey] || !visibleSquareKeys.has(sourceSquareKey)) continue;
         context.fillRect(
           previewColumn * this.cellSize,
           previewRow * this.cellSize,
@@ -144,7 +146,7 @@ export class DungeonPreviewGridComponent {
       }
     }
 
-    context.strokeStyle = 'rgba(255, 255, 255, 0.88)';
+    context.strokeStyle = 'rgba(0, 0, 0, 0.2)';
     context.lineWidth = 1;
     context.beginPath();
     for (let column = 0; column <= this.dimension; column += 1) {
@@ -161,7 +163,8 @@ export class DungeonPreviewGridComponent {
 
     const squares = Object.values(this.squares());
     if (squares.length > 0) {
-      context.strokeStyle = '#ff2f2f';
+      // Draw thin black lines where there are walls, on visible squares only
+      context.strokeStyle = '#000000';
       context.lineWidth = 2;
       context.beginPath();
       for (const square of squares) {
@@ -313,6 +316,23 @@ export class DungeonPreviewGridComponent {
       }
     }
 
+    // Draw lowercase 't' markers for detected, active floor traps
+    for (const fp of this.floorTrapPlacements()) {
+      if (fp.isTriggered || fp.isDisarmed) continue;
+      if (!visibleSquareKeys.has(this.getSquareKey(fp.row, fp.column))) continue;
+      const previewRow = fp.row - preview.startRow;
+      const previewColumn = fp.column - preview.startColumn;
+      if (previewRow >= 0 && previewColumn >= 0 && previewRow < this.dimension && previewColumn < this.dimension) {
+        const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+        const centerY = previewRow * this.cellSize + this.cellSize / 2;
+        context.fillStyle = '#ffcc00';
+        context.font = 'bold 8px sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText('t', centerX + 4, centerY + 4);
+      }
+    }
+
     const cheater = this.cheater();
     const centerPreviewRow = preview.centerRow - preview.startRow;
     const centerPreviewColumn = preview.centerColumn - preview.startColumn;
@@ -322,14 +342,6 @@ export class DungeonPreviewGridComponent {
       centerPreviewRow < this.dimension &&
       centerPreviewColumn < this.dimension
     ) {
-      context.strokeStyle = '#f3d13d';
-      context.lineWidth = 2;
-      context.strokeRect(
-        centerPreviewColumn * this.cellSize + 1,
-        centerPreviewRow * this.cellSize + 1,
-        this.cellSize - 2,
-        this.cellSize - 2
-      );
       this.drawFacingArrow(
         context,
         centerPreviewColumn * this.cellSize,
@@ -387,6 +399,7 @@ export class DungeonPreviewGridComponent {
       visibleSquareKeys.add(sourceSquareKey);
     }
 
+    // Phase 1: strict ray cast — diagonal corners are blocked if EITHER direction is walled.
     for (let previewRow = 0; previewRow < this.dimension; previewRow += 1) {
       for (let previewColumn = 0; previewColumn < this.dimension; previewColumn += 1) {
         const sourceRow = preview.startRow + previewRow;
@@ -398,6 +411,27 @@ export class DungeonPreviewGridComponent {
         visibleSquareKeys.add(squareKey);
       }
     }
+
+    // Phase 2: expand one step through open passages from each directly-visible cell.
+    // This reveals cells immediately beyond an open doorway without diagonal corner-peeking.
+    const cardinalDirs: Array<{ dRow: number; dCol: number }> = [
+      { dRow: -1, dCol: 0 }, { dRow: 1, dCol: 0 },
+      { dRow: 0, dCol: -1 }, { dRow: 0, dCol: 1 },
+    ];
+    for (const key of [...visibleSquareKeys]) {
+      const [row, col] = key.split(':').map(Number);
+      for (const { dRow, dCol } of cardinalDirs) {
+        const adjRow = row + dRow;
+        const adjCol = col + dCol;
+        const adjKey = this.getSquareKey(adjRow, adjCol);
+        if (visibleSquareKeys.has(adjKey)) continue;
+        if (!filledSquares[adjKey]) continue;
+        if (!this.isWithinSightRange(preview.centerRow, preview.centerColumn, adjRow, adjCol, range)) continue;
+        if (this.isSightBlockedBetweenAdjacentSquares(row, col, adjRow, adjCol)) continue;
+        visibleSquareKeys.add(adjKey);
+      }
+    }
+
     return visibleSquareKeys;
   }
 
@@ -428,7 +462,6 @@ export class DungeonPreviewGridComponent {
     let tMaxY = stepY === 0 ? Number.POSITIVE_INFINITY : (stepY > 0 ? currentRow + 1 - startY : startY - currentRow) / absoluteDeltaY;
     const tDeltaX = stepX === 0 ? Number.POSITIVE_INFINITY : 1 / absoluteDeltaX;
     const tDeltaY = stepY === 0 ? Number.POSITIVE_INFINITY : 1 / absoluteDeltaY;
-    const cornerPeekDistance = 1;
     const epsilon = 0.0000001;
     let guard = 0;
     const maxSteps = 50 * 50 + 5;
@@ -449,15 +482,13 @@ export class DungeonPreviewGridComponent {
         tMaxY += tDeltaY;
         continue;
       }
+      // Diagonal corner: the ray hits the exact corner of 4 cells.
+      // Block if EITHER cardinal direction is walled off — no corner peeking.
       const nextColumn = currentColumn + stepX;
       const nextRow = currentRow + stepY;
       const blockedToHorizontal = stepX !== 0 && this.isSightBlockedBetweenAdjacentSquares(currentRow, currentColumn, currentRow, nextColumn);
       const blockedToVertical = stepY !== 0 && this.isSightBlockedBetweenAdjacentSquares(currentRow, currentColumn, nextRow, currentColumn);
-      if (blockedToHorizontal && blockedToVertical) return false;
-      if (blockedToHorizontal || blockedToVertical) {
-        const cornerDistanceFromSource = Math.max(Math.abs(currentRow - fromRow), Math.abs(currentColumn - fromColumn));
-        if (cornerDistanceFromSource > cornerPeekDistance) return false;
-      }
+      if (blockedToHorizontal || blockedToVertical) return false;
       currentColumn = nextColumn;
       currentRow = nextRow;
       tMaxX += tDeltaX;

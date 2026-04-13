@@ -4,8 +4,11 @@ import path from 'node:path';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
+const useSSL = (process.env.DATABASE_URL || '').includes('sslmode=require');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || '',
+  ssl: useSSL ? { rejectUnauthorized: false } : false,
 });
 
 export default pool;

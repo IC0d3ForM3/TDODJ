@@ -32,6 +32,7 @@
 									[squareTexts]="previewSquareTextsForView()"
 									[monsterImagesBySquare]="previewMonsterImagesBySquareForView()"
 									[exits]="previewExitsForView()"
+									[floorTrapPlacements]="previewDetectedFloorTrapsForView()"
 								></app-dungeon-first-person>
 								@if (bloodSplatter().length) {
 									<div class="fpv-blood-overlay">
@@ -60,6 +61,7 @@
 								[keyList]="keyList"
 								[startPoint]="previewStartPointForView()"
 								[squareTexts]="previewSquareTextsForView()"
+								[floorTrapPlacements]="previewDetectedFloorTrapsForView()"
 								[exits]="previewExitsForView()"							[combatRange]="combatRangeForMap()"
 							[selectedTargetRow]="selectedCombatTarget()?.row ?? null"
 							[selectedTargetColumn]="selectedCombatTarget()?.column ?? null"
@@ -126,6 +128,73 @@
 			</section>
 
 			<section class="right-panel-stack">
+				<div class="combat-bar" aria-label="Combat status">
+					<div class="combat-stats">
+						<span class="stat-badge stat-hp">
+							HP: {{ playerHp() }} / {{ playerMaxHp() }}
+						</span>
+						<span class="stat-badge stat-ae">
+							AE: {{ playerAE() }} / {{ playerMaxAE }}
+						</span>
+						<span class="stat-badge stat-sp">
+							SP: {{ playerSp() }}
+						</span>
+						<span class="stat-badge stat-phase">
+							@if (turnPhase() === 'player') {
+								Your Turn
+							} @else if (turnPhase() === 'monsters') {
+								Monster Turn...
+							} @else {
+								Game Over
+							}
+						</span>
+						<span class="stat-badge stat-secondary" title="Strength">ST: {{ playerStrength() }}</span>
+						<span class="stat-badge stat-secondary" title="Mind">MN: {{ playerMind() }}</span>
+						<span class="stat-badge stat-secondary" title="Stamina (adds to AC)">STA: {{ playerStamina() }}</span>
+						<span class="stat-badge stat-secondary" title="Armour Class">AC: {{ playerACForView() }}</span>
+					</div>
+					@if (playerActiveEffects().length > 0) {
+						<div class="active-effects-bar">
+							@for (effect of playerActiveEffects(); track $index) {
+								<span class="stat-badge stat-effect">{{ effect.sourceName }}: {{ effect.effectOn }} +{{ effect.effectAmount }} ({{ effect.remainingAE }}⚡)</span>
+							}
+						</div>
+					}
+					@if (turnPhase() === 'player') {
+						<div class="combat-actions">
+							<button type="button" class="action-button action-button-strong" [disabled]="!canPlayerAttack()" (click)="tryPlayerAttack()">
+								Attack (A)
+							</button>						<button type="button" class="action-button" [disabled]="!canPlayerDefend()" (click)="tryPlayerDefend()" [title]="'Defend — costs 1 AE, +2 AC vs next attack' + (playerDefendStacks() > 0 ? ' (' + playerDefendStacks() + ' active)' : '')">
+							Defend (D){{ playerDefendStacks() > 0 ? ' ×' + playerDefendStacks() : '' }}
+						</button>							<button type="button" class="action-button" (click)="endPlayerTurnEarly()">
+								End Turn
+							</button>
+							@if (hasCurrencyInInventory()) {
+								<span class="currency-badge" title="Coins in inventory">
+									@if (totalInventoryCurrency().gold > 0) {<span class="currency-coin currency-gold">G:{{ totalInventoryCurrency().gold }}</span>}
+									@if (totalInventoryCurrency().silver > 0) {<span class="currency-coin currency-silver">S:{{ totalInventoryCurrency().silver }}</span>}
+									@if (totalInventoryCurrency().copper > 0) {<span class="currency-coin currency-copper">C:{{ totalInventoryCurrency().copper }}</span>}
+									@if (totalInventoryCurrency().zinc > 0) {<span class="currency-coin currency-zinc">Z:{{ totalInventoryCurrency().zinc }}</span>}
+								</span>
+							}
+						</div>
+					}
+					@if (turnPhase() === 'gameover') {
+						<p class="combat-gameover">You have fallen. Your adventure ends here.</p>
+					}
+				</div>
+
+				@if (combatLog().length > 0) {
+					<div class="combat-log" aria-label="Log">
+						<h4 class="combat-log-title">Log</h4>
+						<ul class="combat-log-list">
+							@for (entry of combatLog(); track $index) {
+								<li class="combat-log-entry">{{ entry.text }}</li>
+							}
+						</ul>
+					</div>
+				}
+
 				<aside class="info-panel info-panel-split" aria-label="Nearby and Inventory">
 					<div class="info-col">
 						<h3 class="panel-title panel-title-light">Nearby</h3>
@@ -262,8 +331,8 @@
 												}
 												@if ((innerItem.type === 'armor' || innerItem.type === 'ring' || innerItem.type === 'necklace') && innerItem.effectValue) {
 													<span class="tresher-item-stat">+{{ innerItem.effectValue }} AC</span>
-												}															@if (isItemEquipable(innerItem.type)) {
-																<div class="inventory-item-actions">
+												}															<div class="inventory-item-actions">
+																@if (isItemEquipable(innerItem.type)) {
 																	<button
 																		type="button"
 																		class="action-button"
@@ -275,8 +344,15 @@
 																	@if (isItemEquippedById(innerItem.id)) {
 																		<span class="inventory-equipped-status">Equipped</span>
 																	}
-																</div>
-															}
+																}
+																<button
+																	type="button"
+																	class="action-button action-button-danger"
+																	(click)="dropInventoryInnerItem(tresherIdx, innerItem.id)"
+																>
+																	Drop
+																</button>
+															</div>
 														</li>
 													}
 												</ul>
@@ -333,9 +409,9 @@
 											</ul>
 										}
 
-										@if (isTresherEquipable(tresher) || isHealingPotion(tresher)) {
+										@if ((isTresherEquipable(tresher) && getTresherInnerItems(tresher).length === 0) || isHealingPotion(tresher)) {
 											<div class="inventory-item-actions">
-												@if (isTresherEquipable(tresher)) {
+												@if (isTresherEquipable(tresher) && getTresherInnerItems(tresher).length === 0) {
 													<button
 														type="button"
 														class="action-button"
@@ -398,64 +474,6 @@
 						@if (dungonSpReward() > 0) {
 							<p class="win-sp">+{{ dungonSpReward() }} SP awarded!</p>
 						}
-					</div>
-				}
-				<div class="combat-bar" aria-label="Combat status">
-					<div class="combat-stats">
-						<span class="stat-badge stat-hp">
-							HP: {{ playerHp() }} / {{ playerMaxHp() }}
-						</span>
-						<span class="stat-badge stat-ae">
-							AE: {{ playerAE() }} / {{ playerMaxAE }}
-						</span>
-						<span class="stat-badge stat-sp">
-							SP: {{ playerSp() }}
-						</span>
-						<span class="stat-badge stat-phase">
-							@if (turnPhase() === 'player') {
-								Your Turn
-							} @else if (turnPhase() === 'monsters') {
-								Monster Turn...
-							} @else {
-								Game Over
-							}
-						</span>
-						<span class="stat-badge stat-secondary" title="Strength">ST: {{ playerStrength() }}</span>
-						<span class="stat-badge stat-secondary" title="Mind">MN: {{ playerMind() }}</span>
-						<span class="stat-badge stat-secondary" title="Stamina (adds to AC)">STA: {{ playerStamina() }}</span>
-						<span class="stat-badge stat-secondary" title="Armour Class">AC: {{ playerACForView() }}</span>
-					</div>
-					@if (playerActiveEffects().length > 0) {
-						<div class="active-effects-bar">
-							@for (effect of playerActiveEffects(); track $index) {
-								<span class="stat-badge stat-effect">{{ effect.sourceName }}: {{ effect.effectOn }} +{{ effect.effectAmount }} ({{ effect.remainingAE }}⚡)</span>
-							}
-						</div>
-					}
-					@if (turnPhase() === 'player') {
-						<div class="combat-actions">
-							<button type="button" class="action-button action-button-strong" [disabled]="!canPlayerAttack()" (click)="tryPlayerAttack()">
-								Attack (A)
-							</button>						<button type="button" class="action-button" [disabled]="!canPlayerDefend()" (click)="tryPlayerDefend()" [title]="'Defend — costs 1 AE, +2 AC vs next attack' + (playerDefendStacks() > 0 ? ' (' + playerDefendStacks() + ' active)' : '')">
-							Defend (D){{ playerDefendStacks() > 0 ? ' ×' + playerDefendStacks() : '' }}
-						</button>							<button type="button" class="action-button" (click)="endPlayerTurnEarly()">
-								End Turn
-							</button>
-						</div>
-					}
-					@if (turnPhase() === 'gameover') {
-						<p class="combat-gameover">You have fallen. Your adventure ends here.</p>
-					}
-				</div>
-
-				@if (combatLog().length > 0) {
-					<div class="combat-log" aria-label="Log">
-						<h4 class="combat-log-title">Log</h4>
-						<ul class="combat-log-list">
-							@for (entry of combatLog(); track $index) {
-								<li class="combat-log-entry">{{ entry.text }}</li>
-							}
-						</ul>
 					</div>
 				}
 			</section>

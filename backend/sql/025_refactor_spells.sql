@@ -6,16 +6,25 @@
 -- 5. Rename 'Site' → 'Sight' in stored data
 
 -- Change range to integer (drop default first to allow type change, then re-add)
-ALTER TABLE spells
-  ALTER COLUMN range DROP DEFAULT;
-
-ALTER TABLE spells
-  ALTER COLUMN range TYPE INTEGER USING (
-    CASE WHEN range ~ '^[0-9]+$' THEN range::INTEGER ELSE 0 END
-  );
-
-ALTER TABLE spells
-  ALTER COLUMN range SET DEFAULT 0;
+-- Guard: only convert if the column is still VARCHAR/TEXT
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'spells' AND column_name = 'range'
+      AND data_type IN ('character varying', 'text')
+  ) THEN
+    ALTER TABLE spells ALTER COLUMN range DROP DEFAULT;
+    ALTER TABLE spells
+      ALTER COLUMN range TYPE INTEGER USING (
+        CASE WHEN range ~ '^[0-9]+$' THEN range::INTEGER ELSE 0 END
+      );
+    ALTER TABLE spells ALTER COLUMN range SET DEFAULT 0;
+  ELSE
+    -- Already INTEGER; just ensure the default is set
+    ALTER TABLE spells ALTER COLUMN range SET DEFAULT 0;
+  END IF;
+END $$;
 
 ALTER TABLE spells
   ADD COLUMN IF NOT EXISTS effecton2 VARCHAR(255) NOT NULL DEFAULT '',

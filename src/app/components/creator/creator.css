@@ -56,6 +56,7 @@
 
 .creator-title {
 	margin: 0;
+	color: #0f172a;
 }
 
 .creator-divider {
@@ -192,6 +193,7 @@
 	gap: 0.4rem;
 	cursor: pointer;
 	font-size: 0.92rem;
+	color: #0f172a;
 }
 
 .creator-main {
@@ -210,6 +212,7 @@
 	margin: 0 0 0.35rem;
 	font-size: 0.95rem;
 	font-weight: 600;
+	color: #e2e8f0;
 }
 
 .form-input,
@@ -232,9 +235,10 @@
 .form-sp-fields {
 	margin: 1.2rem 0 1.2rem;
 	padding: 1rem;
-	border: 1px solid #d0d0d0;
+	border: 1px solid #3a4a6a;
 	border-radius: 4px;
-	background-color: #fafafa;
+	background-color: #0d1b2e;
+	color: #e2e8f0;
 }
 
 .form-sp-fields .form-label {
@@ -659,10 +663,17 @@
 	border-radius: 8px;
 	background-color: #fff;
 	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.26);
+	color: #0f172a;
 }
 
 .door-dialog-title {
 	margin: 0 0 0.75rem;
+	color: #0f172a;
+}
+
+.door-dialog .form-label,
+.door-dialog .door-locked-toggle {
+	color: #0f172a;
 }
 
 .door-locked-toggle {

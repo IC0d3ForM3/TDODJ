@@ -20,6 +20,7 @@ import {
   FirstPersonBlock,
   FirstPersonStep,
   FirstPersonView,
+  FloorTrapPlacement,
   GridPreviewContext,
   MonsterPlacement,
   PathBlockType,
@@ -54,6 +55,7 @@ export class DungeonFirstPersonComponent {
   readonly showMonsters = input<boolean>(true);
   readonly squareTexts = input<SquareText[]>([]);
   readonly monsterImagesBySquare = input<Map<string, HTMLImageElement | null>>(new Map());
+  readonly floorTrapPlacements = input<FloorTrapPlacement[]>([]);
 
   readonly canvasWidth = 330;
   readonly canvasHeight = 220;
@@ -61,6 +63,8 @@ export class DungeonFirstPersonComponent {
   private readonly doorImageCache = new Map<string, HTMLImageElement>();
   private readonly stairsUpImageCache = new Map<string, HTMLImageElement>();
   private readonly stairsUpSquareAssignment = new Map<string, 1 | 2 | 3>();
+  private readonly stairsDownImageCache = new Map<string, HTMLImageElement>();
+  private readonly stairsDownSquareAssignment = new Map<string, number>();
 
   constructor() {
     effect(() => {
@@ -76,10 +80,12 @@ export class DungeonFirstPersonComponent {
       this.showMonsters();
       this.squareTexts();
       this.monsterImagesBySquare();
+      this.floorTrapPlacements();
       untracked(() => this.drawCanvas());
     });
     this.loadDoorImages();
     this.loadStairsUpImages();
+    this.loadStairsDownImages();
   }
 
   private drawCanvas(): void {
@@ -400,11 +406,21 @@ export class DungeonFirstPersonComponent {
     // Pass 3: draw floor markers and monsters last so they stay visible.
     const showMonsters = this.showMonsters();
     const monsterImages = this.monsterImagesBySquare();
+    const detectedTraps = this.floorTrapPlacements();
+    const pitTrapSquareKeys = new Set(
+      detectedTraps
+        .filter(fp => !fp.isTriggered && !fp.isDisarmed && fp.trap.name.toLowerCase().includes('pit'))
+        .map(fp => this.getSquareKey(fp.row, fp.column))
+    );
 
     for (const segment of farToNearSegments) {
       const { step, nearFrame, farFrame } = segment;
       const squareKey = this.getSquareKey(step.row, step.column);
       const tresherCount = tresherCountBySquare.get(squareKey) ?? 0;
+      if (pitTrapSquareKeys.has(squareKey)) {
+        this.drawFirstPersonPitTrap(context, nearFrame, farFrame);
+      }
+
       if (tresherCount > 0) {
         this.drawFirstPersonFloorCoinStack(context, nearFrame, farFrame, tresherCount);
       }
@@ -609,7 +625,7 @@ export class DungeonFirstPersonComponent {
       }
 
       if (forwardConnection.type === 'wall' || forwardConnection.type === 'closedDoor') {
-        endBlock = this.toFirstPersonBlock(forwardConnection.type, forwardConnection.door);
+        endBlock = this.toFirstPersonBlock(forwardConnection.type, forwardConnection.door, forwardConnection.wall ?? null);
         break;
       }
 
@@ -656,9 +672,7 @@ export class DungeonFirstPersonComponent {
     }
 
     const seamPad = block.type === 'wall' ? 1.4 : 1;
-    const verticalPad = block.type === 'wall' ? 0.8 : 0.5;
-
-    const points =
+    const verticalPad = block.type === 'wall' ? 0.8 : 0.5;    const points =
       side === 'left'
         ? [
             { x: nearFrame.left - seamPad, y: nearFrame.top - verticalPad },
@@ -701,7 +715,7 @@ export class DungeonFirstPersonComponent {
     }
 
     if (block.type === 'closedDoor') {
-      this.drawFirstPersonSideDoorMarker(context, nearFrame, farFrame, side, block.type);
+      this.drawFirstPersonSideDoorMarker(context, nearFrame, farFrame, side, 'closedDoor');
     }
   }
 
@@ -855,6 +869,38 @@ export class DungeonFirstPersonComponent {
       context.lineTo(x + swing, midTop + 9);
       context.stroke();
     }
+  }
+
+  private drawFirstPersonPitTrap(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number }
+  ): void {
+    // Draw a dark ellipse on the floor to look like a pit / black hole
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midFloor = (nearFrame.bottom + farFrame.bottom) / 2;
+    const cellW = midRight - midLeft;
+    const rx = Math.max(4, cellW * 0.38);
+    const ry = Math.max(2, rx * 0.32);
+    const cx = (midLeft + midRight) / 2;
+    const cy = midFloor - ry * 0.5;
+
+    // dark pit fill
+    const pitGrad = context.createRadialGradient(cx, cy, 0, cx, cy, rx);
+    pitGrad.addColorStop(0, 'rgba(0,0,0,0.95)');
+    pitGrad.addColorStop(0.7, 'rgba(10,10,10,0.85)');
+    pitGrad.addColorStop(1, 'rgba(30,20,10,0.3)');
+    context.save();
+    context.beginPath();
+    context.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    context.fillStyle = pitGrad;
+    context.fill();
+    // faint dark‐brown rim
+    context.strokeStyle = 'rgba(80,50,20,0.7)';
+    context.lineWidth = 1.5;
+    context.stroke();
+    context.restore();
   }
 
   private drawFirstPersonFloorKey(
@@ -1024,6 +1070,26 @@ export class DungeonFirstPersonComponent {
       }
     }
 
+    if (transitionType === 'stairsDown') {
+      if (squareKey && !this.stairsDownSquareAssignment.has(squareKey)) {
+        this.stairsDownSquareAssignment.set(squareKey, 1);
+      }
+      const assignedIdx = squareKey ? (this.stairsDownSquareAssignment.get(squareKey) ?? 1) : 1;
+      const stairImg = this.stairsDownImageCache.get(`stdown${assignedIdx}`) ?? null;
+      if (stairImg) {
+        const midLeft = nearFrame.left * 0.65 + farFrame.left * 0.35;
+        const midRight = nearFrame.right * 0.65 + farFrame.right * 0.35;
+        const midTop = nearFrame.top * 0.65 + farFrame.top * 0.35;
+        const midBottom = nearFrame.bottom * 0.65 + farFrame.bottom * 0.35;
+        const drawW = Math.max(8, (midRight - midLeft) * 0.9);
+        const drawH = Math.max(8, (midBottom - midTop) * 0.92);
+        const drawX = (midLeft + midRight) / 2 - drawW / 2;
+        const drawY = midBottom - drawH;
+        context.drawImage(stairImg, drawX, drawY, drawW, drawH);
+        return;
+      }
+    }
+
     const slopeFrontY = transitionType === 'stairsUp' ? frontY : frontY - depthSize * 0.1;
     const slopeBackY =
       transitionType === 'stairsUp' ? backBaseY - depthSize * 0.58 : frontY + depthSize * 0.62;
@@ -1156,6 +1222,19 @@ export class DungeonFirstPersonComponent {
     }
   }
 
+  private loadStairsDownImages(): void {
+    for (let i = 1; i <= 1; i++) {
+      const key = `stdown${i}`;
+      if (this.stairsDownImageCache.has(key)) continue;
+      const img = new Image();
+      img.onload = () => {
+        this.stairsDownImageCache.set(key, img);
+        this.drawCanvas();
+      };
+      img.src = `/images/${key}.jpg`;
+    }
+  }
+
   private drawFirstPersonDoorFace(
     context: CanvasRenderingContext2D,
     frame: { left: number; right: number; top: number; bottom: number },
@@ -1223,6 +1302,48 @@ export class DungeonFirstPersonComponent {
 
     if (highlight) {
       this.drawWallGlowRect(context, doorLeft, doorTop, doorW, doorH);
+    }
+  }
+
+  private drawFirstPersonDestructibleWallFace(
+    context: CanvasRenderingContext2D,
+    frame: { left: number; right: number; top: number; bottom: number },
+    isPortal: boolean,
+    highlight = false
+  ): void {
+    const frameWidth = frame.right - frame.left;
+    const frameHeight = frame.bottom - frame.top;
+    const insetX = Math.max(2, frameWidth * 0.1);
+    const insetY = Math.max(2, frameHeight * 0.08);
+    const panelLeft = frame.left + insetX;
+    const panelRight = frame.right - insetX;
+    const panelTop = frame.top + insetY;
+    const panelBottom = frame.bottom - insetY;
+    const panelW = panelRight - panelLeft;
+    const panelH = panelBottom - panelTop;
+
+    context.save();
+    context.globalAlpha = isPortal ? 0.84 : 1;
+
+    context.fillStyle = '#555555';
+    context.fillRect(panelLeft, panelTop, panelW, panelH);
+    context.strokeStyle = '#888888';
+    context.lineWidth = Math.max(1, Math.min(2, panelW * 0.04));
+    context.strokeRect(panelLeft, panelTop, panelW, panelH);
+    {
+      const centerX = (panelLeft + panelRight) / 2;
+      context.strokeStyle = '#6a6a6a';
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(centerX, panelTop + 1);
+      context.lineTo(centerX, panelBottom - 1);
+      context.stroke();
+    }
+
+    context.restore();
+
+    if (highlight) {
+      this.drawWallGlowRect(context, panelLeft, panelTop, panelW, panelH);
     }
   }
 
@@ -1330,9 +1451,12 @@ export class DungeonFirstPersonComponent {
     }
     const connection = sourceSquare[side];
     if (this.isWallConnection(connection)) {
-      return this.toFirstPersonBlock('wall', null);
+      return this.toFirstPersonBlock('wall', null, connection);
     }
     if (this.isDoorConnection(connection)) {
+      if (connection.isHidden && !connection.isFound) {
+        return this.toFirstPersonBlock('wall', null);
+      }
       return this.toFirstPersonBlock(connection.state === 'closed' ? 'closedDoor' : 'openDoor', connection);
     }
     const neighborSquareKey = this.getSquareKey(row + rowOffset, column + columnOffset);
@@ -1358,7 +1482,7 @@ export class DungeonFirstPersonComponent {
     if (sideForwardConnection.type === 'none') {
       return null;
     }
-    return this.toFirstPersonBlock(sideForwardConnection.type, sideForwardConnection.door);
+    return this.toFirstPersonBlock(sideForwardConnection.type, sideForwardConnection.door, sideForwardConnection.wall ?? null);
   }
 
   private getMovementConnectionInfoBetweenAdjacentSquares(
@@ -1386,9 +1510,12 @@ export class DungeonFirstPersonComponent {
 
     const fromConnection = fromSquare[fromSide];
     if (this.isWallConnection(fromConnection)) {
-      return { type: 'wall', door: null };
+      return { type: 'wall', door: null, wall: fromConnection };
     }
     if (this.isDoorConnection(fromConnection)) {
+      if (fromConnection.isHidden && !fromConnection.isFound) {
+        return { type: 'wall', door: null };
+      }
       return { type: fromConnection.state === 'closed' ? 'closedDoor' : 'openDoor', door: fromConnection };
     }
     const toSquare = squares[this.getSquareKey(toRow, toColumn)];
@@ -1397,9 +1524,12 @@ export class DungeonFirstPersonComponent {
     }
     const toConnection = toSquare[toSide];
     if (this.isWallConnection(toConnection)) {
-      return { type: 'wall', door: null };
+      return { type: 'wall', door: null, wall: toConnection };
     }
     if (this.isDoorConnection(toConnection)) {
+      if (toConnection.isHidden && !toConnection.isFound) {
+        return { type: 'wall', door: null };
+      }
       return { type: toConnection.state === 'closed' ? 'closedDoor' : 'openDoor', door: toConnection };
     }
     return { type: 'none', door: null };
@@ -1838,8 +1968,9 @@ export class DungeonFirstPersonComponent {
     return `#${parseChannel(0).toString(16).padStart(2, '0')}${parseChannel(2).toString(16).padStart(2, '0')}${parseChannel(4).toString(16).padStart(2, '0')}`;
   }
 
-  private toFirstPersonBlock(type: PathBlockType, door: Door | null): FirstPersonBlock {
-    return { type, hasKeyhole: Boolean(door?.keyLock) };
+  private toFirstPersonBlock(type: PathBlockType, door: Door | null, wall: Wall | null = null): FirstPersonBlock {
+    const isDestructible = wall?.isDestructible === true;
+    return { type, hasKeyhole: Boolean(door?.keyLock), isDestructible };
   }
 
   private isWallConnection(connection: Door | Wall | null): connection is Wall {

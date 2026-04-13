@@ -87,6 +87,7 @@ export class Items implements OnInit {
     imageId: new FormControl<number | null>(null),
     soundId: new FormControl<number | null>(null),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
+    isTwoHanded: new FormControl<boolean>(false, { nonNullable: true }),
   });
 
   effectValueLabel(): string {
@@ -183,6 +184,7 @@ export class Items implements OnInit {
       imageId: this.normalizeNullableNumber(item.imageId),
       soundId: this.normalizeNullableNumber(item.soundId),
       isPublic: item.isPublic,
+      isTwoHanded: item.isTwoHanded,
     });
   }
 
@@ -251,6 +253,7 @@ export class Items implements OnInit {
       imageId: this.normalizeNullableNumber(c.imageId.value),
       soundId: this.normalizeNullableNumber(c.soundId.value),
       isPublic: this.isAdminUser() ? c.isPublic.value === true : false,
+      isTwoHanded: type === 'weapon' ? c.isTwoHanded.value === true : false,
     };
   }
 
@@ -270,6 +273,7 @@ export class Items implements OnInit {
       imageId: null,
       soundId: null,
       isPublic: false,
+      isTwoHanded: false,
     });
   }
 

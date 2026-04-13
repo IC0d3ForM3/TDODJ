@@ -9,6 +9,7 @@ import {
   insertPcForUser,
   updatePcForUser,
   addSpToPc,
+  upgradeNoa as upgradeNoaInDb,
   getSamplePcsFromDb,
   setSamplePcInDb,
   getAllPcsForAdmin,
@@ -31,6 +32,14 @@ export const awardSpToPc = async (
   amount: number
 ): Promise<number | null> => {
   return await addSpToPc(id, userguid, amount);
+};
+
+export const upgradeNoa = async (
+  id: number,
+  userguid: string,
+  spCost: number
+): Promise<{ sp: number; numberOfAttacks: number } | null> => {
+  return await upgradeNoaInDb(id, userguid, spCost);
 };
 
 export const createPcForUser = async (

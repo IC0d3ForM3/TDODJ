@@ -36,6 +36,8 @@ interface ItemWriteInput {
   soundid?: unknown;
   isPublic?: unknown;
   ispublic?: unknown;
+  isTwoHanded?: unknown;
+  istwohanded?: unknown;
 }
 
 function normalizeText(value: unknown, fallback: string): string {
@@ -79,6 +81,7 @@ function buildItemPayload(input: ItemWriteInput, isAdmin: boolean): UpsertItemPa
     imageId: normalizeNullableInt(input.imageId ?? input.imageid),
     soundId: normalizeNullableInt(input.soundId ?? input.soundid),
     isPublic: isAdmin ? input.isPublic === true || input.ispublic === true : false,
+    isTwoHanded: input.isTwoHanded === true || input.istwohanded === true,
   };
 }
 
