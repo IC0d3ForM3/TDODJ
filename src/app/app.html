@@ -28,6 +28,8 @@
           [routerLinkActiveOptions]="{ exact: true }">About</a></li>
       <li><a routerLink="/how-to-play" routerLinkActive="nav-link-active"
           [routerLinkActiveOptions]="{ exact: true }">How to Play</a></li>
+      <li><a routerLink="/paper-and-pencil" routerLinkActive="nav-link-active"
+          [routerLinkActiveOptions]="{ exact: true }">Paper &amp; Pencil</a></li>
       <li *ngIf="!isLoggedIn()"><a routerLink="/sample-game" routerLinkActive="nav-link-active"
           [routerLinkActiveOptions]="{ exact: true }">Sample Game</a></li>
       <li *ngIf="isLoggedIn()"><a routerLink="/dashboard" routerLinkActive="nav-link-active"

@@ -22,8 +22,11 @@ import {
   FirstPersonView,
   FloorTrapPlacement,
   GridPreviewContext,
+  ItemPlacement,
   MonsterPlacement,
+  ObstaclePlacement,
   PathBlockType,
+  PotionPlacement,
   SquareSide,
   SquareText,
   TresherPlacement,
@@ -56,6 +59,12 @@ export class DungeonFirstPersonComponent {
   readonly squareTexts = input<SquareText[]>([]);
   readonly monsterImagesBySquare = input<Map<string, HTMLImageElement | null>>(new Map());
   readonly floorTrapPlacements = input<FloorTrapPlacement[]>([]);
+  readonly itemPlacements = input<ItemPlacement[]>([]);
+  readonly potionPlacements = input<PotionPlacement[]>([]);
+  readonly obstaclePlacements = input<ObstaclePlacement[]>([]);
+  readonly obstacleImagesBySquare = input<Map<string, HTMLImageElement | null>>(new Map());
+  readonly playerHp = input<number>(20);
+  readonly playerMaxHp = input<number>(20);
 
   readonly canvasWidth = 330;
   readonly canvasHeight = 220;
@@ -81,6 +90,12 @@ export class DungeonFirstPersonComponent {
       this.squareTexts();
       this.monsterImagesBySquare();
       this.floorTrapPlacements();
+      this.itemPlacements();
+      this.potionPlacements();
+      this.obstaclePlacements();
+      this.obstacleImagesBySquare();
+      this.playerHp();
+      this.playerMaxHp();
       untracked(() => this.drawCanvas());
     });
     this.loadDoorImages();
@@ -143,15 +158,33 @@ export class DungeonFirstPersonComponent {
     const currentTextWallGlow = this.getCurrentSquareTextWallGlowTarget(preview, cheater.facingDir);
     const tresherPlacements = this.tresherPlacements();
     const tresherCountBySquare = new Map<string, number>();
+    const bagSquareKeys = new Set<string>();
     for (const placement of tresherPlacements) {
       const squareKey = this.getSquareKey(placement.row, placement.column);
       tresherCountBySquare.set(squareKey, (tresherCountBySquare.get(squareKey) ?? 0) + 1);
+      bagSquareKeys.add(squareKey);
+    }
+    for (const placement of this.itemPlacements()) {
+      bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
+    }
+    for (const placement of this.potionPlacements()) {
+      bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
     }
 
     const monsterPlacements = this.monsterPlacements();
     const monsterSquareKeys = new Set<string>();
     for (const placement of monsterPlacements) {
       monsterSquareKeys.add(this.getSquareKey(placement.row, placement.column));
+    }
+
+    const obstacleImagesBySquare = this.obstacleImagesBySquare();
+    const obstacleImageBySquare = new Map<string, HTMLImageElement | null>();
+    const obstacleBySquare = new Map<string, ObstaclePlacement>();
+    for (const obs of this.obstaclePlacements()) {
+      if (obs.isDestroyed) continue;
+      const key = this.getSquareKey(obs.row, obs.column);
+      obstacleImageBySquare.set(key, obstacleImagesBySquare.get(key) ?? null);
+      obstacleBySquare.set(key, obs);
     }
 
     if (visibleFirstPersonView.steps.length === 0) {
@@ -309,6 +342,15 @@ export class DungeonFirstPersonComponent {
             endWallWidth,
             endFrame.bottom - endFrame.top
           );
+          const runeSeed = Math.floor(extendedEndLeft * 3 + endFrame.top * 7 + endWallWidth * 11);
+          this.drawRunicInscription(
+            context,
+            extendedEndLeft,
+            endFrame.top,
+            endWallWidth,
+            endFrame.bottom - endFrame.top,
+            runeSeed
+          );
         }
       }
 
@@ -425,6 +467,46 @@ export class DungeonFirstPersonComponent {
         this.drawFirstPersonFloorCoinStack(context, nearFrame, farFrame, tresherCount);
       }
 
+      if (bagSquareKeys.has(squareKey) && tresherCount === 0) {
+        this.drawFirstPersonFloorBag(context, nearFrame, farFrame);
+      }
+
+      if (step.visibleMonsterSlots.length > 0) {
+        const visibleObstacleSlots = [...step.visibleMonsterSlots].sort(
+          (a, b) => Math.abs(b.lateralOffset) - Math.abs(a.lateralOffset)
+        );
+        const obstacleLateralRange = Math.max(
+          1,
+          ...visibleObstacleSlots.map((s) => Math.abs(s.lateralOffset))
+        );
+        for (const slot of visibleObstacleSlots) {
+          if (!obstacleImageBySquare.has(slot.squareKey)) continue;
+          const obsImage = obstacleImageBySquare.get(slot.squareKey) ?? null;
+          const obsPlacement = obstacleBySquare.get(slot.squareKey);
+          if (slot.isPeek) {
+            this.drawFirstPersonPeekObstacle(
+              context,
+              width,
+              nearFrame,
+              farFrame,
+              obsImage,
+              slot.lateralOffset < 0 ? 'left' : 'right',
+              obsPlacement
+            );
+          } else {
+            this.drawFirstPersonObstacle(
+              context,
+              nearFrame,
+              farFrame,
+              obsImage,
+              slot.lateralOffset,
+              obstacleLateralRange,
+              obsPlacement
+            );
+          }
+        }
+      }
+
       if (step.hasKey) {
         this.drawFirstPersonFloorKey(context, nearFrame, farFrame);
       }
@@ -449,19 +531,80 @@ export class DungeonFirstPersonComponent {
           }
 
           const image = monsterImages.get(slot.squareKey) ?? null;
-          this.drawFirstPersonMonster(
-            context,
-            nearFrame,
-            farFrame,
-            image,
-            slot.lateralOffset,
-            lateralRange
-          );
+          if (slot.isPeek) {
+            this.drawFirstPersonPeekMonster(
+              context,
+              width,
+              nearFrame,
+              farFrame,
+              image,
+              slot.lateralOffset < 0 ? 'left' : 'right'
+            );
+          } else {
+            this.drawFirstPersonMonster(
+              context,
+              nearFrame,
+              farFrame,
+              image,
+              slot.lateralOffset,
+              lateralRange
+            );
+          }
         }
       }
     }
 
     this.drawCompass(context, cheater.facingDir);
+    this.drawHealthHeart(context, width);
+  }
+
+  private drawHealthHeart(context: CanvasRenderingContext2D, width: number): void {
+    const hp = this.playerHp();
+    const maxHp = this.playerMaxHp();
+    const hpRatio = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 1;
+    const hW = 34;
+    const hH = 32;
+    const hCx = width - hW / 2 - 8;
+    const hTop = 6;
+
+    const buildHeartPath = () => {
+      context.beginPath();
+      context.moveTo(hCx, hTop + hH * 0.3);
+      // Left bump
+      context.bezierCurveTo(hCx, hTop, hCx - hW / 2, hTop, hCx - hW / 2, hTop + hH * 0.3);
+      // Left side down to tip
+      context.bezierCurveTo(hCx - hW / 2, hTop + hH * 0.7, hCx, hTop + hH * 0.9, hCx, hTop + hH);
+      // Tip up right side
+      context.bezierCurveTo(hCx, hTop + hH * 0.9, hCx + hW / 2, hTop + hH * 0.7, hCx + hW / 2, hTop + hH * 0.3);
+      // Right bump back to cleft
+      context.bezierCurveTo(hCx + hW / 2, hTop, hCx, hTop, hCx, hTop + hH * 0.3);
+      context.closePath();
+    };
+
+    // Dark empty background
+    context.save();
+    buildHeartPath();
+    context.fillStyle = '#3d0a0a';
+    context.fill();
+    context.restore();
+
+    // HP fill from bottom up, clipped to heart shape
+    context.save();
+    buildHeartPath();
+    context.clip();
+    const fillColor = hpRatio <= 0.25 ? '#ff2020' : hpRatio <= 0.5 ? '#e05010' : '#cc1616';
+    context.fillStyle = fillColor;
+    const fillH = hH * hpRatio;
+    context.fillRect(hCx - hW / 2 - 1, hTop + hH - fillH, hW + 2, fillH + 2);
+    context.restore();
+
+    // Outline
+    context.save();
+    buildHeartPath();
+    context.strokeStyle = '#ff7070';
+    context.lineWidth = 1.5;
+    context.stroke();
+    context.restore();
   }
 
   private hasClearSideSightToDepth(
@@ -494,7 +637,9 @@ export class DungeonFirstPersonComponent {
   ): Array<{ squareKey: string; lateralOffset: number }> {
     const squares = this.squares();
     const filledSquares = this.filledSquares();
-    const visibleSlots = [{ squareKey: this.getSquareKey(row, column), lateralOffset: 0 }];
+    const visibleSlots: Array<{ squareKey: string; lateralOffset: number; isPeek?: boolean }> = [
+      { squareKey: this.getSquareKey(row, column), lateralOffset: 0 },
+    ];
 
     if (depth <= 0) {
       return visibleSlots;
@@ -540,6 +685,33 @@ export class DungeonFirstPersonComponent {
 
     collectSideSlots('left', leftOffset, -1);
     collectSideSlots('right', rightOffset, 1);
+
+    // Corner-peek: side just opened at this depth (wall before, opening now)
+    if (depth >= 1) {
+      const addPeekIfMonsterPresent = (
+        side: 'left' | 'right',
+        offset: { rowOffset: number; columnOffset: number },
+        lateralDirection: number
+      ): void => {
+        const prevStep = steps[depth - 1];
+        const currStep = steps[depth];
+        if (!prevStep || !currStep) return;
+        const prevBlock = side === 'left' ? prevStep.leftBlock : prevStep.rightBlock;
+        const currBlock = side === 'left' ? currStep.leftBlock : currStep.rightBlock;
+        // Previous step must have been a wall, current step must be open
+        if (this.isSideSightTransparent(prevBlock)) return;
+        if (!this.isSideSightTransparent(currBlock)) return;
+        // Check the diagonal square (one ahead, one to the side)
+        const diagRow = row + offset.rowOffset;
+        const diagCol = column + offset.columnOffset;
+        const squareKey = this.getSquareKey(diagRow, diagCol);
+        if (!squares[squareKey] || !filledSquares[squareKey]) return;
+        if (visibleSlots.some((s) => s.squareKey === squareKey)) return;
+        visibleSlots.push({ squareKey, lateralOffset: lateralDirection, isPeek: true });
+      };
+      addPeekIfMonsterPresent('left', leftOffset, -1);
+      addPeekIfMonsterPresent('right', rightOffset, 1);
+    }
 
     return visibleSlots;
   }
@@ -712,6 +884,13 @@ export class DungeonFirstPersonComponent {
 
     if (highlight) {
       this.drawWallGlowPolygon(context, points);
+      // Derive a bounding box from the trapezoid for the runic inscription
+      const minX = Math.min(...points.map((p) => p.x));
+      const maxX = Math.max(...points.map((p) => p.x));
+      const minY = Math.min(...points.map((p) => p.y));
+      const maxY = Math.max(...points.map((p) => p.y));
+      const runeSeed = Math.floor(nearFrame.left * 5 + nearFrame.top * 11 + (side === 'left' ? 17 : 29));
+      this.drawRunicInscription(context, minX, minY, maxX - minX, maxY - minY, runeSeed);
     }
 
     if (block.type === 'closedDoor') {
@@ -989,6 +1168,300 @@ export class DungeonFirstPersonComponent {
     context.fill();
     context.strokeStyle = '#ff7675';
     context.lineWidth = 1;
+    context.stroke();
+  }
+
+  private drawFirstPersonPeekMonster(
+    context: CanvasRenderingContext2D,
+    canvasWidth: number,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    image: HTMLImageElement | null,
+    side: 'left' | 'right'
+  ): void {
+    const midLeft = nearFrame.left * 0.65 + farFrame.left * 0.35;
+    const midRight = nearFrame.right * 0.65 + farFrame.right * 0.35;
+    const midTop = nearFrame.top * 0.65 + farFrame.top * 0.35;
+    const midBottom = nearFrame.bottom * 0.65 + farFrame.bottom * 0.35;
+    const tileWidth = midRight - midLeft;
+    const tileHeight = midBottom - midTop;
+    const edgeX = side === 'left' ? nearFrame.left : nearFrame.right;
+
+    context.save();
+    context.beginPath();
+    if (side === 'left') {
+      context.rect(nearFrame.left, 0, canvasWidth - nearFrame.left, context.canvas.height);
+    } else {
+      context.rect(0, 0, nearFrame.right, context.canvas.height);
+    }
+    context.clip();
+    context.globalAlpha = 0.8;
+
+    if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+      const maxWidth = tileWidth * 0.6;
+      const maxHeight = tileHeight * 0.75;
+      const aspectRatio = image.naturalWidth / image.naturalHeight;
+      let drawWidth = maxWidth;
+      let drawHeight = drawWidth / aspectRatio;
+      if (drawHeight > maxHeight) {
+        drawHeight = maxHeight;
+        drawWidth = drawHeight * aspectRatio;
+      }
+      drawWidth = Math.max(8, drawWidth);
+      drawHeight = Math.max(8, drawHeight);
+      context.drawImage(image, edgeX - drawWidth / 2, midBottom - drawHeight, drawWidth, drawHeight);
+    } else {
+      const centerY = midTop + tileHeight * 0.55;
+      const size = Math.max(4, Math.min(tileWidth, tileHeight) * 0.25);
+      context.fillStyle = '#d63031';
+      context.beginPath();
+      context.moveTo(edgeX, centerY - size);
+      context.lineTo(edgeX + size, centerY);
+      context.lineTo(edgeX, centerY + size);
+      context.lineTo(edgeX - size, centerY);
+      context.closePath();
+      context.fill();
+      context.strokeStyle = '#ff7675';
+      context.lineWidth = 1;
+      context.stroke();
+    }
+
+    context.globalAlpha = 1;
+    context.restore();
+  }
+
+  private drawFirstPersonPeekObstacle(
+    context: CanvasRenderingContext2D,
+    canvasWidth: number,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    image: HTMLImageElement | null,
+    side: 'left' | 'right',
+    obs?: ObstaclePlacement
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midTop = (nearFrame.top + farFrame.top) / 2;
+    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
+    const tileWidth = midRight - midLeft;
+    const tileHeight = midBottom - midTop;
+    const edgeX = side === 'left' ? nearFrame.left : nearFrame.right;
+
+    const heightPct = Math.max(1, Math.min(100, obs?.heightPercent ?? 100)) / 100;
+    const heightAnchor = obs?.heightAnchor ?? 'floor';
+    const widthPct = Math.max(1, Math.min(100, obs?.widthPercent ?? 100)) / 100;
+    const color = obs?.color ?? null;
+
+    context.save();
+    context.beginPath();
+    if (side === 'left') {
+      context.rect(nearFrame.left, 0, canvasWidth - nearFrame.left, context.canvas.height);
+    } else {
+      context.rect(0, 0, nearFrame.right, context.canvas.height);
+    }
+    context.clip();
+    context.globalAlpha = 0.8;
+
+    if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+      const maxWidth = tileWidth * 0.72 * widthPct;
+      const maxHeight = tileHeight * 0.88 * heightPct;
+      const aspectRatio = image.naturalWidth / image.naturalHeight;
+      let drawWidth = maxWidth;
+      let drawHeight = drawWidth / aspectRatio;
+      if (drawHeight > maxHeight) {
+        drawHeight = maxHeight;
+        drawWidth = drawHeight * aspectRatio;
+      }
+      drawWidth = Math.max(8, drawWidth);
+      drawHeight = Math.max(8, drawHeight);
+      const drawY = heightAnchor === 'ceiling' ? midTop : midBottom - drawHeight;
+      context.drawImage(image, edgeX - drawWidth / 2, drawY, drawWidth, drawHeight);
+    } else {
+      const w = Math.max(6, tileWidth * 0.22 * widthPct);
+      const h = Math.max(10, tileHeight * 0.82 * heightPct);
+      const x = edgeX - w / 2;
+      const y = heightAnchor === 'ceiling' ? midTop : midBottom - h;
+      if (color) {
+        context.fillStyle = color;
+        context.fillRect(x, y, w, h);
+        context.strokeStyle = 'rgba(0,0,0,0.35)';
+        context.lineWidth = 1;
+        context.strokeRect(x, y, w, h);
+      } else {
+        const grad = context.createLinearGradient(x, 0, x + w, 0);
+        grad.addColorStop(0, '#888');
+        grad.addColorStop(0.25, '#eee');
+        grad.addColorStop(0.5, '#fff');
+        grad.addColorStop(0.75, '#ddd');
+        grad.addColorStop(1, '#999');
+        context.fillStyle = grad;
+        context.fillRect(x, y, w, h);
+        context.strokeStyle = 'rgba(0,0,0,0.35)';
+        context.lineWidth = 1;
+        context.strokeRect(x, y, w, h);
+      }
+    }
+
+    context.globalAlpha = 1;
+    context.restore();
+  }
+
+  private drawFirstPersonObstacle(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    image: HTMLImageElement | null,
+    lateralOffset: number = 0,
+    lateralRange: number = 1,
+    obs?: ObstaclePlacement
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midTop = (nearFrame.top + farFrame.top) / 2;
+    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
+    const tileWidth = midRight - midLeft;
+    const tileHeight = midBottom - midTop;
+    const normalizedOffset =
+      lateralRange <= 0 ? 0 : lateralOffset / (Math.max(1, lateralRange) + 0.65);
+    const centeredX = (midLeft + midRight) / 2 + normalizedOffset * tileWidth * 0.82;
+    const minCenterX = midLeft + tileWidth * 0.12;
+    const maxCenterX = midRight - tileWidth * 0.12;
+    const centerX = Math.max(minCenterX, Math.min(maxCenterX, centeredX));
+    const lateralScale = 1 - Math.min(0.32, Math.abs(normalizedOffset) * 0.22);
+
+    const heightPct = Math.max(1, Math.min(100, obs?.heightPercent ?? 100)) / 100;
+    const heightAnchor = obs?.heightAnchor ?? 'floor';
+    const widthPct = Math.max(1, Math.min(100, obs?.widthPercent ?? 100)) / 100;
+    const widthAnchor = obs?.widthAnchor ?? 'center';
+    const color = obs?.color ?? null;
+
+    if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+      const baseWidth = tileWidth * 0.72 * lateralScale;
+      const maxWidth = baseWidth * widthPct;
+      const maxHeight = tileHeight * 0.88 * lateralScale * heightPct;
+      const aspectRatio = image.naturalWidth / image.naturalHeight;
+      let drawWidth = maxWidth;
+      let drawHeight = drawWidth / aspectRatio;
+      if (drawHeight > maxHeight) {
+        drawHeight = maxHeight;
+        drawWidth = drawHeight * aspectRatio;
+      }
+      drawWidth = Math.max(8, drawWidth);
+      drawHeight = Math.max(8, drawHeight);
+      const halfSlack = (baseWidth - drawWidth) / 2;
+      const drawX = widthAnchor === 'east'
+        ? centerX - drawWidth / 2 + halfSlack
+        : widthAnchor === 'west'
+          ? centerX - drawWidth / 2 - halfSlack
+          : centerX - drawWidth / 2;
+      const drawY = heightAnchor === 'ceiling' ? midTop : midBottom - drawHeight;
+      context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      return;
+    }
+
+    // Fallback: thin column
+    const baseW = tileWidth * 0.22 * lateralScale;
+    const w = Math.max(6, baseW * widthPct);
+    const h = Math.max(10, tileHeight * 0.82 * lateralScale * heightPct);
+    const halfSlack = (baseW - w) / 2;
+    const x = widthAnchor === 'east'
+      ? centerX - w / 2 + halfSlack
+      : widthAnchor === 'west'
+        ? centerX - w / 2 - halfSlack
+        : centerX - w / 2;
+    const y = heightAnchor === 'ceiling' ? midTop : midBottom - h;
+    if (color) {
+      context.fillStyle = color;
+      context.fillRect(x, y, w, h);
+      context.strokeStyle = 'rgba(0,0,0,0.35)';
+      context.lineWidth = 1;
+      context.strokeRect(x, y, w, h);
+    } else {
+      const grad = context.createLinearGradient(x, 0, x + w, 0);
+      grad.addColorStop(0, '#888');
+      grad.addColorStop(0.25, '#eee');
+      grad.addColorStop(0.5, '#fff');
+      grad.addColorStop(0.75, '#ddd');
+      grad.addColorStop(1, '#999');
+      context.fillStyle = grad;
+      context.fillRect(x, y, w, h);
+      context.strokeStyle = 'rgba(0,0,0,0.35)';
+      context.lineWidth = 1;
+      context.strokeRect(x, y, w, h);
+    }
+  }
+
+  private drawFirstPersonFloorBag(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number }
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const tileWidth = midRight - midLeft;
+    const centerX = (midLeft + midRight) / 2;
+    const floorY = (nearFrame.bottom + farFrame.bottom) / 2;
+    const bagW = Math.max(12, Math.min(64, tileWidth * 0.45));
+    const bagH = bagW * 1.15;
+    const bagLeft = centerX - bagW / 2;
+    const bagBottom = floorY - 1;
+    const bagTop = bagBottom - bagH;
+    const r = bagW * 0.20;
+
+    const glowRadius = bagW * 0.65;
+    const glowGrad = context.createRadialGradient(centerX, bagBottom, 0, centerX, bagBottom, glowRadius);
+    glowGrad.addColorStop(0, 'rgba(210, 140, 30, 0.45)');
+    glowGrad.addColorStop(1, 'rgba(210, 140, 30, 0)');
+    context.fillStyle = glowGrad;
+    context.beginPath();
+    context.ellipse(centerX, bagBottom, glowRadius, glowRadius * 0.35, 0, 0, Math.PI * 2);
+    context.fill();
+
+    context.fillStyle = '#a06820';
+    context.beginPath();
+    context.moveTo(bagLeft + r, bagTop);
+    context.lineTo(bagLeft + bagW - r, bagTop);
+    context.quadraticCurveTo(bagLeft + bagW, bagTop, bagLeft + bagW, bagTop + r);
+    context.lineTo(bagLeft + bagW, bagBottom - r);
+    context.quadraticCurveTo(bagLeft + bagW, bagBottom, bagLeft + bagW - r, bagBottom);
+    context.lineTo(bagLeft + r, bagBottom);
+    context.quadraticCurveTo(bagLeft, bagBottom, bagLeft, bagBottom - r);
+    context.lineTo(bagLeft, bagTop + r);
+    context.quadraticCurveTo(bagLeft, bagTop, bagLeft + r, bagTop);
+    context.closePath();
+    context.fill();
+
+    const neckW = bagW * 0.38;
+    const neckH = bagH * 0.18;
+    context.fillStyle = '#6b430e';
+    context.fillRect(centerX - neckW / 2, bagTop - neckH, neckW, neckH);
+
+    context.fillStyle = '#ffd700';
+    context.beginPath();
+    context.arc(centerX, bagTop - neckH * 0.4, bagW * 0.16, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = '#b8860b';
+    context.lineWidth = Math.max(0.5, bagW * 0.02);
+    context.stroke();
+
+    context.fillStyle = 'rgba(255, 210, 100, 0.28)';
+    context.beginPath();
+    context.ellipse(bagLeft + bagW * 0.28, bagTop + bagH * 0.27, bagW * 0.18, bagH * 0.20, -0.3, 0, Math.PI * 2);
+    context.fill();
+
+    context.strokeStyle = '#3a1e04';
+    context.lineWidth = Math.max(1, bagW * 0.04);
+    context.beginPath();
+    context.moveTo(bagLeft + r, bagTop);
+    context.lineTo(bagLeft + bagW - r, bagTop);
+    context.quadraticCurveTo(bagLeft + bagW, bagTop, bagLeft + bagW, bagTop + r);
+    context.lineTo(bagLeft + bagW, bagBottom - r);
+    context.quadraticCurveTo(bagLeft + bagW, bagBottom, bagLeft + bagW - r, bagBottom);
+    context.lineTo(bagLeft + r, bagBottom);
+    context.quadraticCurveTo(bagLeft, bagBottom, bagLeft, bagBottom - r);
+    context.lineTo(bagLeft, bagTop + r);
+    context.quadraticCurveTo(bagLeft, bagTop, bagLeft + r, bagTop);
+    context.closePath();
     context.stroke();
   }
 
@@ -1430,6 +1903,56 @@ export class DungeonFirstPersonComponent {
     context.closePath();
     context.fill();
     context.stroke();
+    context.restore();
+  }
+
+  private drawRunicInscription(
+    context: CanvasRenderingContext2D,
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+    seed: number
+  ): void {
+    if (width < 20 || height < 20) return;
+
+    // Runic / Elvish-looking glyphs drawn as decorative wall inscriptions
+    const glyphs = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟᛣᛥᛦᚸᚻᛋᛝᛠᚳᚴᚵᚶᚷᚸ';
+    const rng = (n: number): number => {
+      const x = Math.sin(seed * 9301 + n * 49297 + 233) * 46839.5453;
+      return x - Math.floor(x);
+    };
+
+    const padding = Math.max(6, Math.min(width, height) * 0.10);
+    const availW = width - padding * 2;
+    const availH = height - padding * 2;
+    const fontSize = Math.max(7, Math.min(16, availW * 0.065));
+    const lineHeight = fontSize * 1.65;
+    const charWidth = fontSize * 0.68;
+    const charsPerLine = Math.max(1, Math.floor(availW / charWidth));
+    const numLines = Math.max(1, Math.floor(availH / lineHeight));
+
+    context.save();
+    context.font = `${fontSize}px serif`;
+    context.textBaseline = 'alphabetic';
+    context.shadowColor = 'rgba(255, 190, 60, 0.75)';
+    context.shadowBlur = 5;
+    context.fillStyle = 'rgba(255, 215, 110, 0.82)';
+
+    let counter = 0;
+    for (let line = 0; line < numLines; line++) {
+      const lineLen = Math.max(2, Math.floor(charsPerLine * (0.65 + rng(counter++) * 0.35)));
+      const y = top + padding + (line + 0.9) * lineHeight;
+      let x = left + padding;
+      for (let c = 0; c < lineLen; c++) {
+        const gi = Math.floor(rng(counter++) * glyphs.length);
+        const char = glyphs[gi] ?? glyphs[0];
+        context.fillText(char, x, y);
+        x += charWidth * (0.85 + rng(counter++) * 0.30);
+        if (x > left + width - padding) break;
+      }
+    }
+
     context.restore();
   }
 
@@ -1914,15 +2437,42 @@ export class DungeonFirstPersonComponent {
 
     const normalizedDepth = Math.max(0, surfaceDepth);
     const area = width * height;
-    const dotCount = Math.max(4, Math.floor(area / (surface === 'floor' ? 190 : 210)));
-    const alphaBase = Math.max(0.02, 0.085 - normalizedDepth * 0.008);
+
+    // Stone tile grid lines
+    const tileSize = surface === 'floor' ? 18 : 22;
+    const gridAlpha = Math.max(0.06, 0.22 - normalizedDepth * 0.018);
+    context.strokeStyle =
+      surface === 'floor'
+        ? `rgba(40, 32, 24, ${gridAlpha})`
+        : `rgba(50, 54, 68, ${gridAlpha})`;
+    context.lineWidth = 0.7;
+    const colCount = Math.ceil(width / tileSize) + 1;
+    const rowCount = Math.ceil(height / tileSize) + 1;
+    for (let col = 0; col <= colCount; col += 1) {
+      const lx = left + (col / colCount) * width;
+      context.beginPath();
+      context.moveTo(lx, top);
+      context.lineTo(lx, top + height);
+      context.stroke();
+    }
+    for (let row = 0; row <= rowCount; row += 1) {
+      const ly = top + (row / rowCount) * height;
+      context.beginPath();
+      context.moveTo(left, ly);
+      context.lineTo(left + width, ly);
+      context.stroke();
+    }
+
+    // Grain dots
+    const dotCount = Math.max(8, Math.floor(area / (surface === 'floor' ? 70 : 85)));
+    const alphaBase = Math.max(0.07, 0.20 - normalizedDepth * 0.012);
     const toneBase = surface === 'floor' ? 122 : 134;
     const toneRange = surface === 'floor' ? 30 : 24;
 
     for (let index = 0; index < dotCount; index += 1) {
       const x = left + this.getSeededNoise(seed, index * 6 + 1) * width;
       const y = top + this.getSeededNoise(seed, index * 6 + 2) * height;
-      const radius = 0.35 + this.getSeededNoise(seed, index * 6 + 3) * 0.8;
+      const radius = 0.5 + this.getSeededNoise(seed, index * 6 + 3) * 1.4;
       const tone = toneBase + Math.floor(this.getSeededNoise(seed, index * 6 + 4) * toneRange);
       const alpha = alphaBase * (0.55 + this.getSeededNoise(seed, index * 6 + 5) * 0.9);
 
@@ -1932,8 +2482,9 @@ export class DungeonFirstPersonComponent {
       context.fill();
     }
 
-    const streakCount = Math.max(1, Math.floor(area / 2200));
-    const streakAlpha = Math.max(0.02, 0.09 - normalizedDepth * 0.008);
+    // Short scratches / grain streaks
+    const streakCount = Math.max(3, Math.floor(area / 900));
+    const streakAlpha = Math.max(0.07, 0.22 - normalizedDepth * 0.012);
     context.strokeStyle =
       surface === 'floor'
         ? `rgba(74, 62, 50, ${streakAlpha})`
@@ -1943,11 +2494,38 @@ export class DungeonFirstPersonComponent {
     for (let index = 0; index < streakCount; index += 1) {
       const startX = left + this.getSeededNoise(seed + 41, index * 7 + 1) * width;
       const startY = top + this.getSeededNoise(seed + 41, index * 7 + 2) * height;
-      const length = 4 + this.getSeededNoise(seed + 41, index * 7 + 3) * 8;
+      const length = 6 + this.getSeededNoise(seed + 41, index * 7 + 3) * 14;
       const angle = this.getSeededNoise(seed + 41, index * 7 + 4) * Math.PI * 2;
       context.beginPath();
       context.moveTo(startX, startY);
       context.lineTo(startX + Math.cos(angle) * length, startY + Math.sin(angle) * length);
+      context.stroke();
+    }
+
+    // Longer jagged cracks
+    const crackCount = Math.max(2, Math.floor(area / 2400));
+    const crackAlpha = Math.max(0.06, 0.16 - normalizedDepth * 0.013);
+    context.strokeStyle =
+      surface === 'floor'
+        ? `rgba(45, 36, 26, ${crackAlpha})`
+        : `rgba(52, 57, 73, ${crackAlpha})`;
+    context.lineWidth = 0.9;
+
+    for (let index = 0; index < crackCount; index += 1) {
+      const startX = left + this.getSeededNoise(seed + 97, index * 9 + 1) * width;
+      const startY = top + this.getSeededNoise(seed + 97, index * 9 + 2) * height;
+      const segCount = 2 + Math.floor(this.getSeededNoise(seed + 97, index * 9 + 3) * 3);
+      context.beginPath();
+      context.moveTo(startX, startY);
+      let cx = startX;
+      let cy = startY;
+      for (let seg = 0; seg < segCount; seg += 1) {
+        const angle = this.getSeededNoise(seed + 97, index * 9 + 4 + seg) * Math.PI * 2;
+        const len = 8 + this.getSeededNoise(seed + 97, index * 9 + 5 + seg) * 18;
+        cx += Math.cos(angle) * len;
+        cy += Math.sin(angle) * len;
+        context.lineTo(cx, cy);
+      }
       context.stroke();
     }
   }

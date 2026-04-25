@@ -70,7 +70,7 @@ function buildItemPayload(input: ItemWriteInput, isAdmin: boolean): UpsertItemPa
     name: normalizeText(input.name, 'Unnamed Item'),
     description: normalizeText(input.description, ''),
     type: ITEM_TYPES.has(type) ? type : 'other',
-    range: normalizeOptionalText(input.range),
+    range: String(normalizeNumber(input.range, 0)),
     value: Math.max(0, normalizeNumber(input.value, 0)),
     weight: Math.max(0, normalizeNumber(input.weight, 0)),
     curseId: normalizeNullableInt(input.curseId ?? input.curseid),

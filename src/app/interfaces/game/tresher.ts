@@ -26,4 +26,5 @@ export interface Tresher {
   soundId: number | null;
   spReward: number;
   trap: Trap | null;
+  isquest?: boolean;
 }

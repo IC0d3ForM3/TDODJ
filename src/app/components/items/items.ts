@@ -43,7 +43,7 @@ export class Items implements OnInit {
   readonly allSoundOptions = computed(() => [...this.soundOptions(), ...this._localSounds()]);
   readonly curseOptions = input<CurseOption[]>([]);
 
-  readonly itemTypeOptions: ItemType[] = ['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'other'];
+  readonly itemTypeOptions: ItemType[] = ['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'gem', 'other'];
   readonly armorSlotOptions = [
     { value: 'shield', label: 'Shield' },
     { value: 'head', label: 'Head' },
@@ -98,9 +98,13 @@ export class Items implements OnInit {
     return 'Effect Value';
   }
 
+  showEffectValue(): boolean {
+    return this.userItemForm.controls.type.value !== 'gem';
+  }
+
   showRange(): boolean {
     const type = this.userItemForm.controls.type.value;
-    return type !== 'armor' && type !== 'ring' && type !== 'necklace';
+    return type !== 'armor' && type !== 'ring' && type !== 'necklace' && type !== 'gem';
   }
 
   showDamage(): boolean {
@@ -175,7 +179,7 @@ export class Items implements OnInit {
       type: item.type || 'other',
       armorSlot: item.armorSlot ?? null,
       effectOn: item.effectOn ?? null,
-      range: this.normalizeNumber(item.range as unknown as number, 0),
+      range: Math.max(0, Math.trunc(Number(item.range)) || 0),
       value: Math.max(0, this.normalizeNumber(item.value, 0)),
       weight: Math.max(0, this.normalizeNumber(item.weight, 0)),
       curseId: this.normalizeNullableNumber(item.curseId),

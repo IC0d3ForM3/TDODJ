@@ -20,7 +20,10 @@ import {
   FacingDirection,
   FloorTrapPlacement,
   GridPreviewContext,
+  ItemPlacement,
   MonsterPlacement,
+  ObstaclePlacement,
+  PotionPlacement,
   SquareSide,
   SquareText,
   StartPoint,
@@ -60,6 +63,10 @@ export class DungeonPreviewGridComponent {
   readonly startPoint = input<StartPoint | null>(null);
   readonly squareTexts = input<SquareText[]>([]);
   readonly floorTrapPlacements = input<FloorTrapPlacement[]>([]);
+  readonly obstaclePlacements = input<ObstaclePlacement[]>([]);
+  readonly obstacleImagesBySquare = input<Map<string, HTMLImageElement | null>>(new Map());
+  readonly itemPlacements = input<ItemPlacement[]>([]);
+  readonly potionPlacements = input<PotionPlacement[]>([]);
   /** Chebyshev range for combat targeting overlay (0 = no overlay). */
   readonly combatRange = input<number>(0);
   /** Row of the currently selected combat target (null = none). */
@@ -94,6 +101,10 @@ export class DungeonPreviewGridComponent {
       this.startPoint();
       this.squareTexts();
       this.floorTrapPlacements();
+      this.obstaclePlacements();
+      this.obstacleImagesBySquare();
+      this.itemPlacements();
+      this.potionPlacements();
       this.combatRange();
       this.selectedTargetRow();
       this.selectedTargetColumn();
@@ -197,10 +208,10 @@ export class DungeonPreviewGridComponent {
         const top = previewRow * this.cellSize;
         const right = left + this.cellSize;
         const bottom = top + this.cellSize;
-        if (this.isDoorConnection(square.toTop) && square.toTop.state !== 'open') { context.moveTo(left, top); context.lineTo(right, top); }
-        if (this.isDoorConnection(square.toRight) && square.toRight.state !== 'open') { context.moveTo(right, top); context.lineTo(right, bottom); }
-        if (this.isDoorConnection(square.toBottom) && square.toBottom.state !== 'open') { context.moveTo(left, bottom); context.lineTo(right, bottom); }
-        if (this.isDoorConnection(square.toLeft) && square.toLeft.state !== 'open') { context.moveTo(left, top); context.lineTo(left, bottom); }
+        if (this.isDoorConnection(square.toTop) && square.toTop.state !== 'open' && (!square.toTop.isHidden || square.toTop.isFound)) { context.moveTo(left, top); context.lineTo(right, top); }
+        if (this.isDoorConnection(square.toRight) && square.toRight.state !== 'open' && (!square.toRight.isHidden || square.toRight.isFound)) { context.moveTo(right, top); context.lineTo(right, bottom); }
+        if (this.isDoorConnection(square.toBottom) && square.toBottom.state !== 'open' && (!square.toBottom.isHidden || square.toBottom.isFound)) { context.moveTo(left, bottom); context.lineTo(right, bottom); }
+        if (this.isDoorConnection(square.toLeft) && square.toLeft.state !== 'open' && (!square.toLeft.isHidden || square.toLeft.isFound)) { context.moveTo(left, top); context.lineTo(left, bottom); }
       }
       context.stroke();
     }
@@ -266,6 +277,28 @@ export class DungeonPreviewGridComponent {
       this.drawMonsterMarker(context, centerX, centerY, 3.5);
     }
 
+    for (const placement of this.itemPlacements()) {
+      const squareKey = this.getSquareKey(placement.row, placement.column);
+      if (!visibleSquareKeys.has(squareKey)) continue;
+      const previewRow = placement.row - preview.startRow;
+      const previewColumn = placement.column - preview.startColumn;
+      if (previewRow < 0 || previewColumn < 0 || previewRow >= this.dimension || previewColumn >= this.dimension) continue;
+      const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+      const centerY = previewRow * this.cellSize + this.cellSize / 2;
+      this.drawItemMarker(context, centerX, centerY, 3.5);
+    }
+
+    for (const placement of this.potionPlacements()) {
+      const squareKey = this.getSquareKey(placement.row, placement.column);
+      if (!visibleSquareKeys.has(squareKey)) continue;
+      const previewRow = placement.row - preview.startRow;
+      const previewColumn = placement.column - preview.startColumn;
+      if (previewRow < 0 || previewColumn < 0 || previewRow >= this.dimension || previewColumn >= this.dimension) continue;
+      const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+      const centerY = previewRow * this.cellSize + this.cellSize / 2;
+      this.drawItemMarker(context, centerX, centerY, 3.5);
+    }
+
     for (const exit of this.exits()) {
       const exitSquareKey = this.getSquareKey(exit.row, exit.column);
       if (!visibleSquareKeys.has(exitSquareKey)) continue;
@@ -313,6 +346,32 @@ export class DungeonPreviewGridComponent {
         context.textAlign = 'center';
         context.textBaseline = 'middle';
         context.fillText('T', centerX, centerY);
+      }
+    }
+
+    // Draw obstacle markers (image thumbnail or unfilled circle)
+    const obstacleImages = this.obstacleImagesBySquare();
+    for (const obs of this.obstaclePlacements()) {
+      if (obs.isDestroyed) continue;
+      const obsSquareKey = this.getSquareKey(obs.row, obs.column);
+      if (!visibleSquareKeys.has(obsSquareKey)) continue;
+      const previewRow = obs.row - preview.startRow;
+      const previewColumn = obs.column - preview.startColumn;
+      if (previewRow >= 0 && previewColumn >= 0 && previewRow < this.dimension && previewColumn < this.dimension) {
+        const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+        const centerY = previewRow * this.cellSize + this.cellSize / 2;
+        const obsImg = obstacleImages.get(obsSquareKey) ?? null;
+        if (obsImg && obsImg.naturalWidth > 0) {
+          const imgSize = this.cellSize - 2;
+          context.drawImage(obsImg, previewColumn * this.cellSize + 1, previewRow * this.cellSize + 1, imgSize, imgSize);
+        } else {
+          const radius = this.cellSize * 0.32;
+          context.strokeStyle = '#a0856a';
+          context.lineWidth = 1.5;
+          context.beginPath();
+          context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+          context.stroke();
+        }
       }
     }
 
@@ -483,12 +542,15 @@ export class DungeonPreviewGridComponent {
         continue;
       }
       // Diagonal corner: the ray hits the exact corner of 4 cells.
-      // Block if EITHER cardinal direction is walled off — no corner peeking.
+      // Block if ANY of the 4 inner boundaries of the corner cells is walled off.
       const nextColumn = currentColumn + stepX;
       const nextRow = currentRow + stepY;
       const blockedToHorizontal = stepX !== 0 && this.isSightBlockedBetweenAdjacentSquares(currentRow, currentColumn, currentRow, nextColumn);
       const blockedToVertical = stepY !== 0 && this.isSightBlockedBetweenAdjacentSquares(currentRow, currentColumn, nextRow, currentColumn);
-      if (blockedToHorizontal || blockedToVertical) return false;
+      // Also check walls approaching the destination from the two intermediate cells.
+      const blockedDestFromH = stepX !== 0 && stepY !== 0 && this.isSightBlockedBetweenAdjacentSquares(currentRow, nextColumn, nextRow, nextColumn);
+      const blockedDestFromV = stepX !== 0 && stepY !== 0 && this.isSightBlockedBetweenAdjacentSquares(nextRow, currentColumn, nextRow, nextColumn);
+      if (blockedToHorizontal || blockedToVertical || blockedDestFromH || blockedDestFromV) return false;
       currentColumn = nextColumn;
       currentRow = nextRow;
       tMaxX += tDeltaX;
@@ -624,6 +686,21 @@ export class DungeonPreviewGridComponent {
     context.closePath();
     context.fill();
     context.strokeStyle = '#ff7675';
+    context.lineWidth = 1;
+    context.stroke();
+  }
+
+  private drawItemMarker(context: CanvasRenderingContext2D, centerX: number, centerY: number, size: number): void {
+    const s = Math.max(2, size);
+    context.fillStyle = '#4fc3f7';
+    context.beginPath();
+    context.moveTo(centerX, centerY - s);
+    context.lineTo(centerX + s, centerY);
+    context.lineTo(centerX, centerY + s);
+    context.lineTo(centerX - s, centerY);
+    context.closePath();
+    context.fill();
+    context.strokeStyle = '#b3e5fc';
     context.lineWidth = 1;
     context.stroke();
   }

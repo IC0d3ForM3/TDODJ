@@ -17,7 +17,7 @@ export class App {
   readonly creatorLayout = inject(CreatorLayout);
   private readonly router = inject(Router);
 
-  protected readonly title = signal('DandDanny');
+  protected readonly title = signal('TDODJ');
   constructor() {
     this.account.restoreKey();
   }

@@ -76,13 +76,15 @@ export const getDungonById = async (req: Request, res: Response) => {
 };
 
 export const createDungon = async (req: Request, res: Response) => {
-  const { userkey, name, description, intro, ismaingame, issample } = req.body as Partial<{
+  const { userkey, name, description, intro, ismaingame, issample, resettable_per_pc, imageid } = req.body as Partial<{
     userkey: string;
     name: string;
     description: string;
     intro: string;
     ismaingame?: boolean;
     issample?: boolean;
+    resettable_per_pc?: boolean;
+    imageid?: number | null;
   }>;
 
   if (
@@ -124,11 +126,8 @@ export const createDungon = async (req: Request, res: Response) => {
     return res.status(403).json({ result: -1, error: 'Only admins can mark a dungon as a sample' });
   }
 
-  if (ismaingame === true) {
-    const existingMainGame = await dungonService.fetchMainGame();
-    if (existingMainGame) {
-      return res.status(409).json({ result: -1, error: 'A Main Game dungon already exists' });
-    }
+  if (resettable_per_pc === true && !isAdmin) {
+    return res.status(403).json({ result: -1, error: 'Only admins can mark a dungon as resettable per PC' });
   }
 
   const trimmedName = name.trim();
@@ -144,6 +143,8 @@ export const createDungon = async (req: Request, res: Response) => {
       intro: intro.trim(),
       ismaingame: isAdmin ? !!ismaingame : false,
       issample: isAdmin ? !!issample : false,
+      resettable_per_pc: isAdmin ? !!resettable_per_pc : false,
+      imageid: typeof imageid === 'number' ? imageid : null,
     });
 
     return res.status(201).json({ result: 1, dungon });
@@ -194,13 +195,15 @@ export const updateDungonJson = async (req: Request, res: Response) => {
 
 export const updateDungonMetadata = async (req: Request, res: Response) => {
   const id = Number.parseInt(req.params['id'], 10);
-  const { userkey, name, description, intro, minsplifetime, maxsplifetime } = req.body as Partial<{
+  const { userkey, name, description, intro, minsplifetime, maxsplifetime, resettable_per_pc, imageid } = req.body as Partial<{
     userkey: string;
     name: string;
     description: string;
     intro: string;
     minsplifetime: number;
     maxsplifetime: number;
+    resettable_per_pc?: boolean;
+    imageid?: number | null;
   }>;
 
   if (!Number.isInteger(id) || id <= 0) {
@@ -222,6 +225,9 @@ export const updateDungonMetadata = async (req: Request, res: Response) => {
   }
 
   try {
+    const user = await getUserByKey(userkey.trim());
+    const isAdmin = user ? (user.isadmin || user.ismasteradmin) : false;
+
     const updated = await dungonService.updateDungonMetadata(
       id,
       userkey.trim(),
@@ -231,6 +237,8 @@ export const updateDungonMetadata = async (req: Request, res: Response) => {
         ...(typeof intro === 'string' && { intro }),
         ...(typeof minsplifetime === 'number' && { minsplifetime }),
         ...(typeof maxsplifetime === 'number' && { maxsplifetime }),
+        ...(typeof resettable_per_pc === 'boolean' && isAdmin && { resettable_per_pc }),
+        ...('imageid' in req.body && { imageid: typeof imageid === 'number' ? imageid : null }),
       }
     );
 
@@ -338,8 +346,32 @@ export const startGameFromPublishedDungon = async (req: Request, res: Response) 
     return res.status(400).json({ result: -1, error: 'Valid pcId is required' });
   }
 
+  const trimmedUserKey = userkey.trim();
+
+  // Check the PC and dungeon are compatible (both ismaingame or both not)
+  const [dungonStatus, pc] = await Promise.all([
+    dungonService.fetchDungonIsMainGameStatus(id),
+    pcService.fetchPcByIdForUser(pcId, trimmedUserKey),
+  ]);
+
+  if (!dungonStatus) {
+    return res.status(404).json({ result: -1, error: 'Published dungon not found' });
+  }
+
+  if (!pc) {
+    return res.status(403).json({ result: -1, error: 'PC not found or does not belong to this user' });
+  }
+
+  if (dungonStatus.ismaingame && !pc.ismaingame) {
+    return res.status(403).json({ result: -1, error: 'Only main game PCs can play main game dungons' });
+  }
+
+  if (!dungonStatus.ismaingame && pc.ismaingame) {
+    return res.status(403).json({ result: -1, error: 'Main game PCs can only play main game dungons' });
+  }
+
   try {
-    const game = await dungonService.startGameForUserFromPublishedDungon(id, userkey.trim(), pcId);
+    const game = await dungonService.startGameForUserFromPublishedDungon(id, trimmedUserKey, pcId);
 
     if (!game) {
       return res
@@ -409,6 +441,10 @@ export const getGameById = async (req: Request, res: Response) => {
     let pcStrength: number = 0;
     let pcMagicPower: number = 0;
     let pcNumberOfAttacks: number = 1;
+    let pcNumberOfDefends: number = 1;
+    let pcType: string | null = null;
+    let pcSpecies: string | null = null;
+    let pcName: string | null = null;
     const currentPcId: number | null = game.pcid ?? null;
     if (game.pcid !== null && game.pcid > 0) {
       const pc = await pcService.fetchPcByIdForUser(game.pcid, userkey.trim());
@@ -421,6 +457,10 @@ export const getGameById = async (req: Request, res: Response) => {
         pcStrength = pc.strength ?? 0;
         pcMagicPower = pc.magicPower ?? 0;
         pcNumberOfAttacks = pc.numberOfAttacks ?? 1;
+        pcNumberOfDefends = pc.numberOfDefends ?? 1;
+        pcType = pc.type ?? null;
+        pcSpecies = pc.species ?? null;
+        pcName = pc.name ?? null;
 
         const allPcTresherIds = Array.from(new Set([
           ...(Array.isArray(pc.tresherIds) ? pc.tresherIds : []),
@@ -520,9 +560,12 @@ export const getGameById = async (req: Request, res: Response) => {
       }
     }
 
-    const dungonSpReward = await dungonService.fetchDungonSpReward(game.dungonid);
+    const [dungonSpReward, dungonStatus] = await Promise.all([
+      dungonService.fetchDungonSpReward(game.dungonid),
+      dungonService.fetchDungonIsMainGameStatus(game.dungonid),
+    ]);
 
-    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcStrength, pcMagicPower, pcNumberOfAttacks, currentPcId, dungonSpReward });
+    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false });
   } catch (error) {
     console.error('Error fetching game by id:', error);
     return res.status(500).json({ error: 'Failed to fetch game' });
@@ -556,6 +599,31 @@ export const saveGame = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error saving game:', error);
     return res.status(500).json({ error: 'Failed to save game' });
+  }
+};
+
+export const deleteDungon = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const userkey = req.body?.['userkey'];
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid dungon id is required' });
+  }
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+
+  try {
+    const deleted = await dungonService.removeDungonForUser(id, userkey.trim());
+    if (!deleted) {
+      return res.status(404).json({ result: -1, error: 'Dungeon not found or not yours' });
+    }
+
+    return res.json({ result: 1 });
+  } catch (error) {
+    console.error('Error deleting dungon:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to delete dungeon' });
   }
 };
 
@@ -849,6 +917,10 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
       pcStrength: pc.strength,
       pcMagicPower: pc.magicPower,
       pcNumberOfAttacks: 1,
+      pcNumberOfDefends: 1,
+      pcType: pc.type ?? null,
+      pcSpecies: pc.species ?? null,
+      pcName: pc.name ?? null,
       currentPcId: null,
       dungonSpReward: dungon.spreward,
       monsterImages,

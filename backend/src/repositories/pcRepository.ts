@@ -8,6 +8,7 @@ export interface PcRecord {
   type: string;
   imageId: number | null;
   issample: boolean;
+  ismaingame: boolean;
   maxHP: number;
   currentHP: number;
   ac: number;
@@ -40,6 +41,7 @@ export interface PcRecord {
   updatedAt: string;
   sp: number;
   numberOfAttacks: number;
+  numberOfDefends: number;
 }
 
 export interface UpsertPcPayload {
@@ -76,6 +78,8 @@ export interface UpsertPcPayload {
   hand1ItemId: number | null;
   hand2ItemId: number | null;
   numberOfAttacks: number;
+  numberOfDefends: number;
+  ismaingame?: boolean;
 }
 
 export const getPcsByUserGuid = async (userguid: string): Promise<PcRecord[]> => {
@@ -117,6 +121,9 @@ export const getPcsByUserGuid = async (userguid: string): Promise<PcRecord[]> =>
        hand1itemid AS "hand1ItemId",
        hand2itemid AS "hand2ItemId",
        COALESCE(numberofattacks, 1) AS "numberOfAttacks",
+       COALESCE(numberofdefends, 1) AS "numberOfDefends",
+       COALESCE(issample, FALSE) AS issample,
+       COALESCE(ismaingame, FALSE) AS ismaingame,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM pcs
@@ -170,6 +177,9 @@ export const getPcByIdForUser = async (
        hand1itemid AS "hand1ItemId",
        hand2itemid AS "hand2ItemId",
        COALESCE(numberofattacks, 1) AS "numberOfAttacks",
+       COALESCE(numberofdefends, 1) AS "numberOfDefends",
+       COALESCE(issample, FALSE) AS issample,
+       COALESCE(ismaingame, FALSE) AS ismaingame,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM pcs
@@ -195,6 +205,17 @@ export const addSpToPc = async (
   );
 
   return rows[0]?.sp ?? null;
+};
+
+/** Append a single tresher id to the PC's tresherids JSON array. */
+export const addTresherIdToPcInDb = async (pcId: number, tresherId: number): Promise<void> => {
+  await pool.query(
+    `UPDATE pcs
+     SET tresherids = COALESCE(tresherids, '[]'::jsonb) || to_jsonb($2::int),
+         updatedat = NOW()
+     WHERE id = $1`,
+    [pcId, tresherId]
+  );
 };
 
 export const insertPcForUser = async (
@@ -237,6 +258,7 @@ export const insertPcForUser = async (
        hand1itemid,
        hand2itemid,
        numberofattacks,
+       ismaingame,
        updatedat
      )
      VALUES (
@@ -274,6 +296,7 @@ export const insertPcForUser = async (
        $32,
        $33,
        $34,
+       $35,
        NOW()
      )
      RETURNING
@@ -312,6 +335,9 @@ export const insertPcForUser = async (
        hand1itemid AS "hand1ItemId",
        hand2itemid AS "hand2ItemId",
        COALESCE(numberofattacks, 1) AS "numberOfAttacks",
+       COALESCE(numberofdefends, 1) AS "numberOfDefends",
+       COALESCE(issample, FALSE) AS issample,
+       COALESCE(ismaingame, FALSE) AS ismaingame,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"`,
     [
@@ -349,6 +375,7 @@ export const insertPcForUser = async (
       payload.hand1ItemId,
       payload.hand2ItemId,
       Math.max(1, Math.floor(payload.numberOfAttacks ?? 1)),
+      payload.ismaingame === true,
     ]
   );
 
@@ -434,6 +461,9 @@ export const updatePcForUser = async (
        hand1itemid AS "hand1ItemId",
        hand2itemid AS "hand2ItemId",
        COALESCE(numberofattacks, 1) AS "numberOfAttacks",
+       COALESCE(numberofdefends, 1) AS "numberOfDefends",
+       COALESCE(issample, FALSE) AS issample,
+       COALESCE(ismaingame, FALSE) AS ismaingame,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"`,
     [
@@ -481,20 +511,107 @@ export const updatePcForUser = async (
 export const upgradeNoa = async (
   id: number,
   userguid: string,
-  spCost: number
-): Promise<{ sp: number; numberOfAttacks: number } | null> => {
-  const { rows } = await pool.query<{ sp: number; numberofattacks: number }>(
-    `UPDATE pcs
-     SET sp = GREATEST(0, COALESCE(sp, 0) - $3),
-         numberofattacks = COALESCE(numberofattacks, 1) + 1,
-         updatedat = NOW()
-     WHERE id = $1 AND userguid = $2 AND COALESCE(sp, 0) >= $3
-     RETURNING COALESCE(sp, 0) AS sp, COALESCE(numberofattacks, 1) AS numberofattacks`,
-    [id, userguid, spCost]
-  );
+  spCost: number,
+  goldCost: number,
+  tresherId: number | null
+): Promise<{ sp: number; numberOfAttacks: number; newGold: number | null } | null> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  if (!rows[0]) return null;
-  return { sp: rows[0].sp, numberOfAttacks: rows[0].numberofattacks };
+    const { rows } = await client.query<{ sp: number; numberofattacks: number }>(
+      `UPDATE pcs
+       SET sp = GREATEST(0, COALESCE(sp, 0) - $3),
+           numberofattacks = COALESCE(numberofattacks, 1) + 1,
+           updatedat = NOW()
+       WHERE id = $1 AND userguid = $2 AND COALESCE(sp, 0) >= $3
+       RETURNING COALESCE(sp, 0) AS sp, COALESCE(numberofattacks, 1) AS numberofattacks`,
+      [id, userguid, spCost]
+    );
+
+    if (!rows[0]) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    let newGold: number | null = null;
+    if (goldCost > 0 && tresherId !== null) {
+      const goldResult = await client.query<{ gold: number }>(
+        `UPDATE treshers
+         SET gold = GREATEST(0, COALESCE(gold, 0) - $3),
+             updatedat = NOW()
+         WHERE id = $1 AND userguid = $2 AND COALESCE(gold, 0) >= $3
+         RETURNING COALESCE(gold, 0) AS gold`,
+        [tresherId, userguid, goldCost]
+      );
+      if (!goldResult.rows[0]) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      newGold = goldResult.rows[0].gold;
+    }
+
+    await client.query('COMMIT');
+    return { sp: rows[0].sp, numberOfAttacks: rows[0].numberofattacks, newGold };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const upgradeNod = async (
+  id: number,
+  userguid: string,
+  spCost: number,
+  goldCost: number,
+  tresherId: number | null
+): Promise<{ sp: number; numberOfDefends: number; newGold: number | null } | null> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query<{ sp: number; numberofdefends: number }>(
+      `UPDATE pcs
+       SET sp = GREATEST(0, COALESCE(sp, 0) - $3),
+           numberofdefends = COALESCE(numberofdefends, 1) + 1,
+           updatedat = NOW()
+       WHERE id = $1 AND userguid = $2 AND COALESCE(sp, 0) >= $3
+       RETURNING COALESCE(sp, 0) AS sp, COALESCE(numberofdefends, 1) AS numberofdefends`,
+      [id, userguid, spCost]
+    );
+
+    if (!rows[0]) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    let newGold: number | null = null;
+    if (goldCost > 0 && tresherId !== null) {
+      const goldResult = await client.query<{ gold: number }>(
+        `UPDATE treshers
+         SET gold = GREATEST(0, COALESCE(gold, 0) - $3),
+             updatedat = NOW()
+         WHERE id = $1 AND userguid = $2 AND COALESCE(gold, 0) >= $3
+         RETURNING COALESCE(gold, 0) AS gold`,
+        [tresherId, userguid, goldCost]
+      );
+      if (!goldResult.rows[0]) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      newGold = goldResult.rows[0].gold;
+    }
+
+    await client.query('COMMIT');
+    return { sp: rows[0].sp, numberOfDefends: rows[0].numberofdefends, newGold };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 export interface SamplePcRecord {
@@ -519,6 +636,7 @@ export interface AdminPcRecord {
   species: string;
   type: string;
   issample: boolean;
+  ismaingame: boolean;
 }
 
 export const getSamplePcsFromDb = async (): Promise<SamplePcRecord[]> => {
@@ -548,6 +666,14 @@ export const setSamplePcInDb = async (id: number, issample: boolean): Promise<bo
   const { rowCount } = await pool.query(
     `UPDATE pcs SET issample = $2 WHERE id = $1`,
     [id, issample]
+  );
+  return (rowCount ?? 0) > 0;
+};
+
+export const setIsMainGamePcInDb = async (id: number, ismaingame: boolean): Promise<boolean> => {
+  const { rowCount } = await pool.query(
+    `UPDATE pcs SET ismaingame = $2 WHERE id = $1`,
+    [id, ismaingame]
   );
   return (rowCount ?? 0) > 0;
 };
@@ -588,6 +714,8 @@ export const getPcByIdPublic = async (id: number): Promise<PcRecord | null> => {
        ring4itemid AS "ring4ItemId",
        ring5itemid AS "ring5ItemId",
        necklaceitemid AS "necklaceItemId",
+       COALESCE(issample, FALSE) AS issample,
+       COALESCE(ismaingame, FALSE) AS ismaingame,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM pcs
@@ -597,6 +725,39 @@ export const getPcByIdPublic = async (id: number): Promise<PcRecord | null> => {
   return rows[0] ?? null;
 };
 
+export type UpgradeStatName = 'strength' | 'stamina' | 'mind' | 'magicPower' | 'numberOfAttacks' | 'numberOfDefends';
+
+const STAT_COLUMN_MAP: Record<UpgradeStatName, { column: string; cost: number }> = {
+  strength:        { column: 'strength',        cost: 1 },
+  stamina:         { column: 'stamina',          cost: 1 },
+  mind:            { column: 'mind',             cost: 1 },
+  magicPower:      { column: 'mp',               cost: 1 },
+  numberOfAttacks: { column: 'numberofattacks',  cost: 5 },
+  numberOfDefends: { column: 'numberofdefends',  cost: 5 },
+};
+
+export const upgradeStat = async (
+  id: number,
+  userguid: string,
+  stat: UpgradeStatName
+): Promise<{ sp: number; newValue: number } | null> => {
+  const mapping = STAT_COLUMN_MAP[stat];
+  if (!mapping) return null;
+  const { column, cost } = mapping;
+  // column is safe: it comes from our hardcoded whitelist, not user input.
+  const { rows } = await pool.query<{ sp: number; newvalue: number }>(
+    `UPDATE pcs
+     SET sp = GREATEST(0, COALESCE(sp, 0) - $3),
+         ${column} = COALESCE(${column}, 0) + 1,
+         updatedat = NOW()
+     WHERE id = $1 AND userguid = $2 AND COALESCE(sp, 0) >= $3
+     RETURNING COALESCE(sp, 0) AS sp, COALESCE(${column}, 0) AS newvalue`,
+    [id, userguid, cost]
+  );
+  if (!rows[0]) return null;
+  return { sp: rows[0].sp, newValue: rows[0].newvalue };
+};
+
 export const getAllPcsForAdmin = async (): Promise<AdminPcRecord[]> => {
   const { rows } = await pool.query<AdminPcRecord>(
     `SELECT
@@ -604,7 +765,8 @@ export const getAllPcsForAdmin = async (): Promise<AdminPcRecord[]> => {
        name,
        species,
        type,
-       COALESCE(issample, FALSE) AS issample
+       COALESCE(issample, FALSE) AS issample,
+       COALESCE(ismaingame, FALSE) AS ismaingame
      FROM pcs
      ORDER BY id DESC`
   );

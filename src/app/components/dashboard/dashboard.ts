@@ -30,7 +30,7 @@ interface UserFriendListItem {
 }
 
 type PcSpeciesOption = 'Human' | 'Elph' | 'DwarPh' | 'Shorties';
-type PcTypeOption = 'Figher' | 'Mage' | 'Thieph' | 'Healer';
+type PcTypeOption = 'Fighter' | 'Mage' | 'Thieph' | 'Healer';
 
 interface UserPcListItem {
   id: number;
@@ -71,6 +71,7 @@ interface UserPcListItem {
   updatedAt: string;
   sp: number;
   numberOfAttacks: number;
+  ismaingame: boolean;
 }
 
 interface UserItemOption {
@@ -85,6 +86,7 @@ interface UserPcWritePayload {
   species: PcSpeciesOption;
   type: PcTypeOption;
   imageId: number | null;
+  ismaingame?: boolean;
   maxHP: number;
   currentHP: number;
   ac: number;
@@ -149,6 +151,28 @@ export class Dashboard implements OnInit {
   readonly startGameMessage = signal<string | null>(null);
   readonly pendingStartGame = signal<DungonListItem | null>(null);
   readonly selectedStartPcId = signal<number | null>(null);
+
+  /** For main-game dungeons: whether the player is creating a new PC or picking an existing one. */
+  readonly mainGamePcChoice = signal<'create' | 'existing' | null>(null);
+
+  /** PCs eligible for the currently-selected dungeon (filtered by ismaingame). */
+  readonly pcsForSelectedGame = computed(() => {
+    const game = this.pendingStartGame();
+    if (!game) return this.userPcs();
+    return this.userPcs().filter((pc) => pc.ismaingame === game.ismaingame);
+  });
+
+  readonly selectedPcForGame = computed(() => {
+    const id = this.selectedStartPcId();
+    if (id === null) return null;
+    return this.pcsForSelectedGame().find((pc) => pc.id === id) ?? null;
+  });
+
+  readonly selectedPcForGameImageUrl = computed(() => {
+    const pc = this.selectedPcForGame();
+    if (!pc) return '';
+    return this.pcImageUrlForPc(pc);
+  });
   readonly activeGames = signal<ActiveGameListItem[]>([]);
   readonly isLoadingActiveGames = signal(false);
   readonly activeGamesError = signal<string | null>(null);
@@ -188,6 +212,7 @@ export class Dashboard implements OnInit {
   readonly userPcs = signal<UserPcListItem[]>([]);
   readonly isSavingUserPc = signal(false);
   readonly editingUserPcId = signal<number | null>(null);
+  readonly expandedPcId = signal<number | null>(null);
   readonly pcStatsRolled = signal(false);
   readonly userPcSaveMessage = signal<string | null>(null);
   readonly userItems = signal<UserItemOption[]>([]);
@@ -196,7 +221,7 @@ export class Dashboard implements OnInit {
   readonly noaUpgradeMessage = signal<string | null>(null);
 
   readonly pcSpeciesOptions: PcSpeciesOption[] = ['Human', 'Elph', 'DwarPh', 'Shorties'];
-  readonly pcTypeOptions: PcTypeOption[] = ['Figher', 'Mage', 'Thieph', 'Healer'];
+  readonly pcTypeOptions: PcTypeOption[] = ['Fighter', 'Mage', 'Thieph', 'Healer'];
 
   readonly userFriendForm = new FormGroup({
     email: new FormControl<string>('', { nonNullable: true }),
@@ -209,7 +234,7 @@ export class Dashboard implements OnInit {
   readonly userPcForm = new FormGroup({
     name: new FormControl<string>('', { nonNullable: true }),
     species: new FormControl<PcSpeciesOption>('Human', { nonNullable: true }),
-    type: new FormControl<PcTypeOption>('Figher', { nonNullable: true }),
+    type: new FormControl<PcTypeOption>('Fighter', { nonNullable: true }),
     imageId: new FormControl<number | null>(null),
     maxHP: new FormControl<number>(10, { nonNullable: true }),
     currentHP: new FormControl<number>(10, { nonNullable: true }),
@@ -347,12 +372,23 @@ export class Dashboard implements OnInit {
     this.pendingStartGame.set(game);
     this.selectedStartPcId.set(null);
     this.startGameMessage.set(null);
+    this.mainGamePcChoice.set(null);
+    this.beginCreatePc();
   }
 
   cancelStartGame(): void {
     this.pendingStartGame.set(null);
     this.selectedStartPcId.set(null);
     this.startGameMessage.set(null);
+    this.mainGamePcChoice.set(null);
+  }
+
+  chooseMainGameOption(choice: 'create' | 'existing'): void {
+    this.mainGamePcChoice.set(choice);
+    this.selectedStartPcId.set(null);
+    if (choice === 'create') {
+      this.beginCreatePc();
+    }
   }
 
   confirmStartGame(): void {
@@ -699,6 +735,10 @@ export class Dashboard implements OnInit {
     this.resetUserPcForm();
   }
 
+  togglePcExpanded(id: number): void {
+    this.expandedPcId.set(this.expandedPcId() === id ? null : id);
+  }
+
   editPc(item: UserPcListItem): void {
     this.editingUserPcId.set(item.id);
     this.userPcSaveMessage.set(null);
@@ -787,19 +827,24 @@ export class Dashboard implements OnInit {
 
     const payload = this.buildPcPayload();
     const editingId = this.editingUserPcId();
+
+    // When creating a PC in the main-game flow, flag it as a main game PC
+    const isMainGameCreate = !editingId && this.mainGamePcChoice() === 'create' && this.pendingStartGame()?.ismaingame === true;
+    const pcBody = isMainGameCreate ? { ...payload, ismaingame: true } : payload;
+
     const request$ = editingId
       ? this.http.put<{ result: number; error?: string; pc?: UserPcListItem }>(
           `${API_BASE_URL}/pcs/${editingId}`,
           {
             userkey,
-            pc: payload,
+            pc: pcBody,
           }
         )
       : this.http.post<{ result: number; error?: string; pc?: UserPcListItem }>(
           `${API_BASE_URL}/pcs`,
           {
             userkey,
-            pc: payload,
+            pc: pcBody,
           }
         );
 
@@ -818,6 +863,12 @@ export class Dashboard implements OnInit {
           this.loadUserPcs();
           this.userPcSaveMessage.set(editingId ? 'PC updated.' : 'PC created.');
           this.beginCreatePc(false);
+
+          // If created a new PC in the main-game flow, auto-start the game
+          const pendingGame = this.pendingStartGame();
+          if (!editingId && this.mainGamePcChoice() === 'create' && pendingGame?.ismaingame && response.pc?.id) {
+            this.startPublishedGame(pendingGame, response.pc.id);
+          }
         },
         error: () => {
           this.userPcSaveMessage.set('Failed to save PC.');
@@ -1028,7 +1079,7 @@ export class Dashboard implements OnInit {
     const controls = this.userPcForm.controls;
     controls.name.setValue('');
     controls.species.setValue('Human');
-    controls.type.setValue('Figher');
+    controls.type.setValue('Fighter');
     controls.imageId.setValue(null);
     controls.actionEconomy.setValue(0);
     controls.strength.setValue(0);
@@ -1144,7 +1195,7 @@ export class Dashboard implements OnInit {
       : species === 'DwarPh' ? this.rollDn(6)
       : this.rollDn(3); // Shorties
     // Type bonus: Fighter=+1d6, Thieph=+1d2, Mage=+1d3, Healer=+1d4
-    const staminaBonus = type === 'Figher'  ? this.rollDn(6)
+    const staminaBonus = type === 'Fighter' ? this.rollDn(6)
       : type === 'Thieph'  ? this.rollDn(2)
       : type === 'Mage'    ? this.rollDn(3)
       : this.rollDn(4); // Healer
@@ -1172,7 +1223,7 @@ export class Dashboard implements OnInit {
     // Max HP: stamina + (DwarPh +2) + (Fighter +2) + 1d4
     let maxHP = stamina;
     if (species === 'DwarPh') maxHP += 2;
-    if (type === 'Figher')    maxHP += 2;
+    if (type === 'Fighter')   maxHP += 2;
     maxHP += this.rollDn(4);
     controls.maxHP.setValue(maxHP);
     controls.currentHP.setValue(maxHP);
@@ -1183,7 +1234,7 @@ export class Dashboard implements OnInit {
     controls.poisonResest.setValue(poisonResist);
 
     // AC: floor(d12/2) + (Fighter +4, others +2)
-    controls.ac.setValue(Math.floor(this.rollDn(12) / 2) + (type === 'Figher' ? 4 : 2));
+    controls.ac.setValue(Math.floor(this.rollDn(12) / 2) + (type === 'Fighter' ? 4 : 2));
   }
 
   private normalizePcSpecies(value: string): PcSpeciesOption {
@@ -1217,7 +1268,7 @@ export class Dashboard implements OnInit {
       return 'Healer';
     }
 
-    return 'Figher';
+    return 'Fighter';
   }
 
   private normalizeLinkedTresherId(

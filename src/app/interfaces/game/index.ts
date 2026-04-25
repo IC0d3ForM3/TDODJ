@@ -29,3 +29,8 @@ export * from './square-text';
 export * from './trap';
 export * from './floor-trap-placement';
 export * from './portal-placement';
+export * from './item-placement';
+export * from './pending-item-placement';
+export * from './potion-placement';
+export * from './spell-placement';
+export * from './obstacle-placement';

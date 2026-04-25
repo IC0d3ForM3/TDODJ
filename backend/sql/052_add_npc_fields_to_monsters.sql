@@ -1,0 +1,10 @@
+-- Add NPC interactivity fields to monsters table
+ALTER TABLE monsters
+  ADD COLUMN IF NOT EXISTS npc_greeting TEXT,
+  ADD COLUMN IF NOT EXISTS npc_info_1 TEXT,
+  ADD COLUMN IF NOT EXISTS npc_info_2 TEXT,
+  ADD COLUMN IF NOT EXISTS npc_info_3 TEXT,
+  ADD COLUMN IF NOT EXISTS npc_only_attack_when_attacked BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS npc_gives_info_after_damaged BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS npc_attacks_after_info BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS npc_can_trade BOOLEAN NOT NULL DEFAULT FALSE;

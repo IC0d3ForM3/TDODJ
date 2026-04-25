@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { finalize, Observable } from 'rxjs';
 import { API_BASE_URL } from '../api-config';
 
-export type ItemType = 'weapon' | 'armor' | 'pick' | 'light' | 'ring' | 'necklace' | 'other';
+export type ItemType = 'weapon' | 'armor' | 'pick' | 'light' | 'ring' | 'necklace' | 'gem' | 'other';
 
 export interface UserItemListItem {
   id: number;

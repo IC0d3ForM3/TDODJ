@@ -63,7 +63,7 @@ export const getPotionsByUserGuid = async (userguid: string): Promise<PotionReco
     `SELECT ${SELECT_POTION_FIELDS}
      FROM potions
      WHERE userguid = $1
-     ORDER BY updatedat DESC, id DESC`,
+     ORDER BY LOWER(name) ASC, id ASC`,
     [userguid]
   );
   return rows;
@@ -77,6 +77,17 @@ export const getPotionsByIds = async (ids: number[]): Promise<PotionRecord[]> =>
      FROM potions
      WHERE id IN (${placeholders})`,
     ids
+  );
+  return rows;
+};
+
+/** Look up public potions by exact name and return their id + name. */
+export const getPublicPotionsByNames = async (names: string[]): Promise<Array<{ id: number; name: string }>> => {
+  if (names.length === 0) return [];
+  const placeholders = names.map((_, i) => `$${i + 1}`).join(', ');
+  const { rows } = await pool.query<{ id: number; name: string }>(
+    `SELECT id, name FROM potions WHERE ispublic = TRUE AND name IN (${placeholders})`,
+    names
   );
   return rows;
 };

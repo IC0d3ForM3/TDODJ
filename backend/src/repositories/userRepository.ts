@@ -1,3 +1,7 @@
+import bcrypt from 'bcrypt';
+
+const SALT_ROUNDS = 12;
+
 export const getAllUsers = async (): Promise<Omit<UserRecord, 'password'>[]> => {
     const { rows } = await pool.query(
         'SELECT id, username, email, isactive, isconfirmed, isadmin, ismasteradmin, iscreator, key FROM users'
@@ -58,10 +62,11 @@ export interface LoginUserRecord {
 
 export const insertUser = async (user: NewUser): Promise<boolean> => {
     try {
+        const hashedPassword = await bcrypt.hash(user.password, SALT_ROUNDS);
         await pool.query(
             `INSERT INTO users (username, email, password, isactive, isconfirmed, isadmin, ismasteradmin, iscreator, key)
        VALUES ($1, $2, $3, false, false, false, false, false, gen_random_uuid())`,
-            [user.username, user.email, user.password]
+            [user.username, user.email, hashedPassword]
         );
         return true;
     } catch (err) {
@@ -88,11 +93,16 @@ export const updateUserFlags = async (
 
 
 export const getActiveUserByCredentials = async (username: string, password: string): Promise<LoginUserRecord | null> => {
-    const { rows } = await pool.query<LoginUserRecord>(
-        'SELECT username, key, isadmin, ismasteradmin, iscreator FROM users WHERE username = $1 AND password = $2 AND isactive = true',
-        [username, password]
+    const { rows } = await pool.query<LoginUserRecord & { password: string }>(
+        'SELECT username, key, isadmin, ismasteradmin, iscreator, password FROM users WHERE username = $1 AND isactive = true',
+        [username]
     );
-    return rows[0] || null;
+    const user = rows[0];
+    if (!user) return null;
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return null;
+    const { password: _pw, ...safeUser } = user;
+    return safeUser;
 };
 
 export const getUserByKey = async (key: string): Promise<UserRecord | null> => {

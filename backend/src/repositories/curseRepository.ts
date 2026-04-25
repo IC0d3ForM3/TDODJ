@@ -60,7 +60,7 @@ export const getCursesByUserGuid = async (userguid: string): Promise<CurseRecord
     `SELECT ${SELECT_CURSE_FIELDS}
      FROM curses
      WHERE userguid = $1
-     ORDER BY updatedat DESC, id DESC`,
+     ORDER BY LOWER(name) ASC, id ASC`,
     [userguid]
   );
   return rows;

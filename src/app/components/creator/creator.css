@@ -132,6 +132,30 @@
 
 .dungons-list-item {
 	margin: 0 0 0.45rem;
+	display: flex;
+	align-items: stretch;
+	gap: 0.25rem;
+}
+
+.dungons-delete-btn {
+	flex-shrink: 0;
+	padding: 0 0.5rem;
+	border: 1px solid #c0392b;
+	border-radius: 4px;
+	background: transparent;
+	color: #c0392b;
+	font-size: 0.85rem;
+	cursor: pointer;
+	line-height: 1;
+}
+
+.dungons-delete-btn:hover:not(:disabled) {
+	background-color: #fdecec;
+}
+
+.dungons-delete-btn:disabled {
+	opacity: 0.5;
+	cursor: default;
 }
 
 .dungons-list-button {
@@ -258,6 +282,21 @@
 .form-actions {
 	display: flex;
 	gap: 0.6rem;
+}
+
+.dungon-image-row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	margin-bottom: 0.8rem;
+}
+
+.dungon-image-preview {
+	width: 100%;
+	max-height: 160px;
+	object-fit: cover;
+	border-radius: 6px;
+	border: 1px solid rgba(160, 184, 220, 0.2);
 }
 
 .monster-key-list {
@@ -440,7 +479,7 @@
 }
 
 .tools-dropdown-select {
-	min-width: 300px;
+	min-width: 150px;
 	margin: 0;
 	padding: 0.48rem 0.75rem;
 	border: 1px solid #9e9e9e;
@@ -611,6 +650,16 @@
 	font-weight: 600;
 }
 
+.remove-button {
+	background-color: #ffe8e8;
+	border-color: #e57373;
+	color: #b71c1c;
+}
+
+.remove-button:hover {
+	background-color: #ffcdd2;
+}
+
 .dungon-grid-canvas {
 	display: block;
 	background-color: #000;
@@ -674,6 +723,39 @@
 .door-dialog .form-label,
 .door-dialog .door-locked-toggle {
 	color: #0f172a;
+}
+
+/* Placement dialog list buttons with thumbnail */
+.place-select-btn {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.place-select-thumb {
+	flex-shrink: 0;
+	width: 40px;
+	height: 40px;
+	object-fit: cover;
+	border-radius: 4px;
+	border: 1px solid #ddd;
+	background: #f0f0f0;
+}
+
+.place-select-info {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+	min-width: 0;
+	text-align: left;
+}
+
+.place-select-info > small {
+	font-size: 0.76rem;
+	color: #666;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .door-locked-toggle {
@@ -958,13 +1040,50 @@
 }
 
 .creator-panel-list {
-	background: rgba(10, 18, 40, 0.7);
-	border: 1px solid rgba(160, 184, 220, 0.14);
+	background: #fff;
+	border: 1px solid #e8e8e8;
+	border-top: 4px solid #94a3b8;
 	border-radius: 9px;
 	padding: 0.85rem;
 	max-height: 72vh;
 	overflow-y: auto;
 }
+
+.cpanel--images {
+	border-top-color: #2a5fd6;
+}
+.cpanel--images .dashboard-list-item {
+	background: #f4f7ff;
+	border: 1px solid #c4d4f8;
+	border-left: 4px solid #2a5fd6;
+	border-radius: 6px;
+	transition: box-shadow 0.15s;
+}
+.cpanel--images .dashboard-list-item:hover { box-shadow: 0 2px 8px rgba(42, 95, 214, 0.18); }
+
+.cpanel--sounds {
+	border-top-color: #7c3aed;
+}
+.cpanel--sounds .dashboard-list-item {
+	background: #f8f5ff;
+	border: 1px solid #d4b8ee;
+	border-left: 4px solid #7c3aed;
+	border-radius: 6px;
+	transition: box-shadow 0.15s;
+}
+.cpanel--sounds .dashboard-list-item:hover { box-shadow: 0 2px 8px rgba(124, 58, 237, 0.18); }
+
+.cpanel--spells {
+	border-top-color: #0d9488;
+}
+.cpanel--spells .dashboard-list-item {
+	background: #f2fbfb;
+	border: 1px solid #a4d8d4;
+	border-left: 4px solid #0d9488;
+	border-radius: 6px;
+	transition: box-shadow 0.15s;
+}
+.cpanel--spells .dashboard-list-item:hover { box-shadow: 0 2px 8px rgba(13, 148, 136, 0.18); }
 
 .creator-panel-form {
 	background: rgba(90, 55, 20, 0.28);
@@ -979,6 +1098,7 @@
 	}
 	.creator-panel-list {
 		max-height: 40vh;
+		border-top-width: 4px;
 	}
 }
 
@@ -1032,5 +1152,16 @@
 	.tresher-list-row {
 		flex-direction: column;
 	}
+}
+
+.form-section-title {
+	font-size: 0.8rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: #aaa;
+	margin: 0.9rem 0 0.2rem;
+	border-top: 1px solid #333;
+	padding-top: 0.6rem;
 }
 

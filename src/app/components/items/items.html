@@ -1,6 +1,6 @@
 <div class="it-section" aria-label="My items">
 	<div class="it-section-header">
-		<h3 class="it-title">My Items</h3>
+		<h3 class="it-title">ITEMS LIBRARY</h3>
 		<button type="button" class="it-toggle-btn" (click)="toggleSectionVisibility()">
 			{{ isItemSectionVisible() ? 'Hide' : 'Show' }}
 		</button>
@@ -15,7 +15,6 @@
 
 			<!-- 1/3 LEFT: list -->
 			<aside class="it-list-panel">
-				<h4 class="it-panel-title">Your Item Library</h4>
 				@if (isLoading()) {
 					<p class="it-message">Loading your items...</p>
 				} @else if (error()) {
@@ -59,7 +58,9 @@
 					@if (showRange()) {
 						<label class="it-field"><span>Range</span><input type="number" formControlName="range" min="0" /></label>
 					}
-					<label class="it-field"><span>{{ effectValueLabel() }}</span><input type="number" formControlName="effectValue" /></label>
+					@if (showEffectValue()) {
+						<label class="it-field"><span>{{ effectValueLabel() }}</span><input type="number" formControlName="effectValue" /></label>
+					}
 					@if (showDamage()) {
 						<label class="it-field"><span>Damage</span>
 							<select formControlName="damage">

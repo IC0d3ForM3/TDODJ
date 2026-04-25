@@ -33,6 +33,15 @@ export interface MonsterRecord {
   magic: number;
   magicResistance: number;
   callsReinforcements: boolean;
+  toHitPlusNeeded: number;
+  npcGreeting: string | null;
+  npcInfo1: string | null;
+  npcInfo2: string | null;
+  npcInfo3: string | null;
+  npcOnlyAttackWhenAttacked: boolean;
+  npcGivesInfoAfterDamaged: boolean;
+  npcAttacksAfterInfo: boolean;
+  npcCanTrade: boolean;
 }
 
 export interface UpsertMonsterPayload {
@@ -54,6 +63,15 @@ export interface UpsertMonsterPayload {
   magic: number;
   magicResistance: number;
   callsReinforcements: boolean;
+  toHitPlusNeeded: number;
+  npcGreeting: string | null;
+  npcInfo1: string | null;
+  npcInfo2: string | null;
+  npcInfo3: string | null;
+  npcOnlyAttackWhenAttacked: boolean;
+  npcGivesInfoAfterDamaged: boolean;
+  npcAttacksAfterInfo: boolean;
+  npcCanTrade: boolean;
 }
 
 export const isAdminUserByGuid = async (userguid: string): Promise<boolean> => {
@@ -91,7 +109,16 @@ const SELECT_MONSTER_FIELDS = `
   COALESCE(spreward, 0) AS "spReward",
   COALESCE(magic, 0) AS magic,
   COALESCE(magicresistance, 0) AS "magicResistance",
-  COALESCE(callsreinforcements, FALSE) AS "callsReinforcements"
+  COALESCE(callsreinforcements, FALSE) AS "callsReinforcements",
+  COALESCE(tohitplusneeded, 0) AS "toHitPlusNeeded",
+  npc_greeting AS "npcGreeting",
+  npc_info_1 AS "npcInfo1",
+  npc_info_2 AS "npcInfo2",
+  npc_info_3 AS "npcInfo3",
+  COALESCE(npc_only_attack_when_attacked, FALSE) AS "npcOnlyAttackWhenAttacked",
+  COALESCE(npc_gives_info_after_damaged, FALSE) AS "npcGivesInfoAfterDamaged",
+  COALESCE(npc_attacks_after_info, FALSE) AS "npcAttacksAfterInfo",
+  COALESCE(npc_can_trade, FALSE) AS "npcCanTrade"
 `;
 
 export const getMonstersByUserGuid = async (userguid: string): Promise<MonsterRecord[]> => {
@@ -99,7 +126,7 @@ export const getMonstersByUserGuid = async (userguid: string): Promise<MonsterRe
     `SELECT ${SELECT_MONSTER_FIELDS}
      FROM monsters
      WHERE userguid = $1
-     ORDER BY updatedat DESC, id DESC`,
+     ORDER BY LOWER(name) ASC, id ASC`,
     [userguid]
   );
 
@@ -148,12 +175,22 @@ export const insertMonsterForUser = async (
        magic,
        magicresistance,
        callsreinforcements,
+       tohitplusneeded,
+       npc_greeting,
+       npc_info_1,
+       npc_info_2,
+       npc_info_3,
+       npc_only_attack_when_attacked,
+       npc_gives_info_after_damaged,
+       npc_attacks_after_info,
+       npc_can_trade,
        updatedat
      )
      VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
        $11::jsonb, $12::jsonb, $13::jsonb,
-       $14, $15, $16, $17, $18, $19,
+       $14, $15, $16, $17, $18, $19, $20,
+       $21, $22, $23, $24, $25, $26, $27, $28,
        NOW()
      )
      RETURNING ${SELECT_MONSTER_FIELDS}`,
@@ -177,6 +214,15 @@ export const insertMonsterForUser = async (
       payload.magic,
       payload.magicResistance,
       payload.callsReinforcements,
+      payload.toHitPlusNeeded,
+      payload.npcGreeting,
+      payload.npcInfo1,
+      payload.npcInfo2,
+      payload.npcInfo3,
+      payload.npcOnlyAttackWhenAttacked,
+      payload.npcGivesInfoAfterDamaged,
+      payload.npcAttacksAfterInfo,
+      payload.npcCanTrade,
     ]
   );
 
@@ -209,6 +255,15 @@ export const updateMonsterForUser = async (
        magic = $18,
        magicresistance = $19,
        callsreinforcements = $20,
+       tohitplusneeded = $21,
+       npc_greeting = $22,
+       npc_info_1 = $23,
+       npc_info_2 = $24,
+       npc_info_3 = $25,
+       npc_only_attack_when_attacked = $26,
+       npc_gives_info_after_damaged = $27,
+       npc_attacks_after_info = $28,
+       npc_can_trade = $29,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_MONSTER_FIELDS}`,
@@ -233,6 +288,15 @@ export const updateMonsterForUser = async (
       payload.magic,
       payload.magicResistance,
       payload.callsReinforcements,
+      payload.toHitPlusNeeded,
+      payload.npcGreeting,
+      payload.npcInfo1,
+      payload.npcInfo2,
+      payload.npcInfo3,
+      payload.npcOnlyAttackWhenAttacked,
+      payload.npcGivesInfoAfterDamaged,
+      payload.npcAttacksAfterInfo,
+      payload.npcCanTrade,
     ]
   );
 

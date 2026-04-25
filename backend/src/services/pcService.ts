@@ -3,17 +3,26 @@ import {
   UpsertPcPayload,
   SamplePcRecord,
   AdminPcRecord,
+  UpgradeStatName,
   getPcByIdForUser,
   getPcByIdPublic,
   getPcsByUserGuid,
   insertPcForUser,
   updatePcForUser,
   addSpToPc,
+  addTresherIdToPcInDb,
   upgradeNoa as upgradeNoaInDb,
+  upgradeNod as upgradeNodInDb,
+  upgradeStat as upgradeStatInDb,
   getSamplePcsFromDb,
   setSamplePcInDb,
+  setIsMainGamePcInDb,
   getAllPcsForAdmin,
 } from '../repositories/pcRepository';
+import { tavernTurnInQuestItems as tavernTurnInQuestItemsInDb, insertTresherForUser } from '../repositories/tresherRepository';
+import { getPublicItemsByNames } from '../repositories/itemRepository';
+import { getPublicSpellsByNames } from '../repositories/spellRepository';
+import { getPublicPotionsByNames } from '../repositories/potionRepository';
 
 export const fetchPcsByUserGuid = async (userguid: string): Promise<PcRecord[]> => {
   return await getPcsByUserGuid(userguid);
@@ -37,16 +46,106 @@ export const awardSpToPc = async (
 export const upgradeNoa = async (
   id: number,
   userguid: string,
-  spCost: number
-): Promise<{ sp: number; numberOfAttacks: number } | null> => {
-  return await upgradeNoaInDb(id, userguid, spCost);
+  spCost: number,
+  goldCost: number,
+  tresherId: number | null
+): Promise<{ sp: number; numberOfAttacks: number; newGold: number | null } | null> => {
+  return await upgradeNoaInDb(id, userguid, spCost, goldCost, tresherId);
+};
+
+export const upgradeNod = async (
+  id: number,
+  userguid: string,
+  spCost: number,
+  goldCost: number,
+  tresherId: number | null
+): Promise<{ sp: number; numberOfDefends: number; newGold: number | null } | null> => {
+  return await upgradeNodInDb(id, userguid, spCost, goldCost, tresherId);
 };
 
 export const createPcForUser = async (
   userguid: string,
   payload: UpsertPcPayload
 ): Promise<PcRecord> => {
-  return await insertPcForUser(userguid, payload);
+  const pc = await insertPcForUser(userguid, payload);
+  try {
+    await assignStarterGear(pc.id, userguid, payload.type);
+  } catch (err) {
+    // Starter gear is best-effort — don't fail the whole PC creation
+    console.error('Failed to assign starter gear to new PC:', err);
+  }
+  return pc;
+};
+
+/** Gear table keyed by normalised PC type (lowercase). */
+const STARTER_GEAR: Record<string, {
+  items: string[];
+  spells: string[];
+  potions: string[];
+  label: string;
+}> = {
+  fighter: { label: 'Fighter Starting Kit', items: ['Short Sword', 'Shield'], spells: [],              potions: [] },
+  mage:    { label: 'Mage Starting Kit',    items: ['Magic Wand'],            spells: ['Lightning Arc'], potions: [] },
+  thieph:  { label: 'Thief Starting Kit',   items: ['Dagger', 'Lock picks'],  spells: [],              potions: [] },
+  healer:  { label: 'Healer Starting Kit',  items: ['Quarter Staff'],         spells: [],              potions: ['Minor Healing Potion'] },
+};
+
+async function assignStarterGear(pcId: number, userguid: string, pcType: string): Promise<void> {
+  const key = (pcType ?? '').toLowerCase();
+  const gear = STARTER_GEAR[key];
+  if (!gear) return;
+
+  const [itemRows, spellRows, potionRows] = await Promise.all([
+    getPublicItemsByNames(gear.items),
+    getPublicSpellsByNames(gear.spells),
+    getPublicPotionsByNames(gear.potions),
+  ]);
+
+  // Build a name→id map for each category
+  const itemId = (name: string) => itemRows.find((r) => r.name === name)?.id ?? null;
+  const spellId = (name: string) => spellRows.find((r) => r.name === name)?.id ?? null;
+  const potionId = (name: string) => potionRows.find((r) => r.name === name)?.id ?? null;
+
+  // Skip if none of the expected IDs resolved (migration not yet run)
+  const hasContent =
+    gear.items.some((n) => itemId(n) !== null) ||
+    gear.spells.some((n) => spellId(n) !== null) ||
+    gear.potions.some((n) => potionId(n) !== null);
+  if (!hasContent) return;
+
+  const tresher = await insertTresherForUser(userguid, {
+    type: 'OtherTresher',
+    name: gear.label,
+    description: 'Your starting equipment.',
+    gold: 0, silver: 0, copper: 0, zinc: 0,
+    item1Id:   gear.items[0]  ? itemId(gear.items[0])   : null,
+    item2Id:   gear.items[1]  ? itemId(gear.items[1])   : null,
+    item3Id:   gear.items[2]  ? itemId(gear.items[2])   : null,
+    item4Id:   gear.items[3]  ? itemId(gear.items[3])   : null,
+    spell1Id:  gear.spells[0] ? spellId(gear.spells[0]) : null,
+    spell2Id:  gear.spells[1] ? spellId(gear.spells[1]) : null,
+    spell3Id:  gear.spells[2] ? spellId(gear.spells[2]) : null,
+    spell4Id:  gear.spells[3] ? spellId(gear.spells[3]) : null,
+    curse1Id: null, curse2Id: null,
+    potion1Id: gear.potions[0] ? potionId(gear.potions[0]) : null,
+    potion2Id: gear.potions[1] ? potionId(gear.potions[1]) : null,
+    potion3Id: gear.potions[2] ? potionId(gear.potions[2]) : null,
+    isPublic: false,
+    isquest: false,
+    spReward: 0,
+    imageId: null,
+    soundId: null,
+  });
+
+  await addTresherIdToPcInDb(pcId, tresher.id);
+}
+
+export const upgradeStat = async (
+  id: number,
+  userguid: string,
+  stat: UpgradeStatName
+): Promise<{ sp: number; newValue: number } | null> => {
+  return await upgradeStatInDb(id, userguid, stat);
 };
 
 export const savePcForUser = async (
@@ -65,10 +164,22 @@ export const setSamplePc = async (id: number, issample: boolean): Promise<boolea
   return await setSamplePcInDb(id, issample);
 };
 
+export const setMainGamePc = async (id: number, ismaingame: boolean): Promise<boolean> => {
+  return await setIsMainGamePcInDb(id, ismaingame);
+};
+
 export const fetchAllPcsForAdmin = async (): Promise<AdminPcRecord[]> => {
   return await getAllPcsForAdmin();
 };
 
 export const fetchSamplePcById = async (id: number): Promise<PcRecord | null> => {
   return await getPcByIdPublic(id);
+};
+
+export const tavernTurnIn = async (
+  pcId: number,
+  userguid: string,
+  tresherIds: number[]
+): Promise<{ spAwarded: number; newSp: number } | null> => {
+  return await tavernTurnInQuestItemsInDb(pcId, userguid, tresherIds);
 };

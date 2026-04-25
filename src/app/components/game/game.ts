@@ -5,15 +5,17 @@ import {
   HostListener,
   OnInit,
   ViewChild,
+  computed,
   inject,
   signal,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Account } from '../../services/account';
 import { DungeonFirstPersonComponent } from '../dungeon-first-person/dungeon-first-person';
 import { DungeonPreviewGridComponent } from '../dungeon-preview-grid/dungeon-preview-grid';
+import { TavernModalComponent, TavernStat } from '../tavern-modal/tavern-modal';
 import { Door } from '../../interfaces/door';
 import { Square } from '../../interfaces/square';
 import { Wall } from '../../interfaces/wall';
@@ -45,6 +47,9 @@ import {
   TresherPlacement,
   Trap,
   FloorTrapPlacement,
+  ItemPlacement,
+  PotionPlacement,
+  ObstaclePlacement,
 } from '../../interfaces/game';
 
 interface GameSessionPayload {
@@ -65,7 +70,13 @@ interface GameSessionPayload {
   pcStrength?: number | null;
   pcMagicPower?: number | null;
   pcNumberOfAttacks?: number | null;
+  pcNumberOfDefends?: number | null;
+  pcType?: string | null;
+  pcSpecies?: string | null;
+  pcName?: string | null;
   currentPcId?: number | null;
+  isMainGame?: boolean;
+  resettablePerPc?: boolean;
   dungonSpReward?: number;
   monsterImages?: { id: number; path: string }[];
 }
@@ -97,7 +108,16 @@ interface GameMonsterInstance {
   isDormant: boolean;
   guardRow: number | null;
   guardColumn: number | null;
+  isStationary: boolean;
+  stationaryTriggerRow: number | null;
+  stationaryTriggerCol: number | null;
+  noAttackUnlessAttacked: boolean;
   hasCalledReinforcements: boolean;
+  // NPC state
+  hasGreeted: boolean;
+  hasSharedInfo: boolean;
+  isSpared: boolean;
+  npcIsHostile: boolean;
 }
 
 interface CombatLogEntry {
@@ -134,6 +154,7 @@ interface NearbyDoorInfo {
   canUnlock: boolean;
   canPick: boolean;
   matchingKeyIndex: number | null;
+  canPassWithItem: boolean;
 }
 
 interface DirectionPadButton {
@@ -142,10 +163,25 @@ interface DirectionPadButton {
   ariaLabel: string;
 }
 
+interface StashItem {
+  id: number;
+  name: string;
+  description: string;
+  type: string;
+  gold: number;
+  silver: number;
+  copper: number;
+  zinc: number;
+  spReward: number;
+  imageId: number | null;
+  soundId: number | null;
+  isquest: boolean;
+}
+
 @Component({
   selector: 'app-game',
   standalone: true,
-  imports: [DungeonFirstPersonComponent, DungeonPreviewGridComponent],
+  imports: [DungeonFirstPersonComponent, DungeonPreviewGridComponent, TavernModalComponent],
   templateUrl: './game.html',
   styleUrl: './game.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -153,6 +189,7 @@ interface DirectionPadButton {
 export class Game implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly account = inject(Account);
 
   private previewGridCanvasRef: ElementRef<HTMLCanvasElement> | null = null;
@@ -175,6 +212,13 @@ export class Game implements OnInit {
   readonly gameName = signal('Game');
   readonly gameLastUpdated = signal<string | null>(null);
   readonly previewActionMessage = signal<string | null>(null);
+
+  readonly playerDeadName = computed(() => {
+    if (this.turnPhase() !== 'gameover') return null;
+    const preview = this.gridPreviewContext();
+    if (!preview) return null;
+    return this.cheaterByDungon()[preview.dungonId]?.name ?? null;
+  });
   readonly visualFacingByDungon = signal<Record<number, DisplayFacingDirection>>({});
   readonly activeInfoPanelTab = signal<InfoPanelTab>('nearby');
   readonly equippedTresherIndexesByDungon = signal<Record<number, number[]>>({});
@@ -193,6 +237,8 @@ export class Game implements OnInit {
 
   private readonly monsterImageCache = new Map<number, HTMLImageElement>();
   private readonly monsterImageCacheVersion = signal(0);
+  private readonly obstacleImageCache = new Map<number, HTMLImageElement>();
+  private readonly obstacleImageCacheVersion = signal(0);
   private readonly doorImageCache = new Map<string, HTMLImageElement>();
 
   readonly turnPhase = signal<TurnPhase>('player');
@@ -200,7 +246,14 @@ export class Game implements OnInit {
   readonly playerMaxAE = 5;
   readonly playerNOA = signal(1);
   readonly playerAttacksThisTurn = signal(0);
+  readonly playerNOD = signal(1);
+  readonly playerDefendsThisTurn = signal(0);
   readonly playerDefendStacks = signal(0);
+  readonly playerBoostAttackACPenalty = signal(0);
+  readonly playerType = signal<string | null>(null);
+  readonly playerSpecies = signal<string | null>(null);
+  readonly playerName = signal<string | null>(null);
+  readonly playerSearchesThisTurn = signal(0);
   readonly playerHp = signal(20);
   readonly playerMaxHp = signal(20);
   readonly playerBaseAC = 10;
@@ -217,18 +270,91 @@ export class Game implements OnInit {
   readonly playerStamina = signal<number>(0);
   readonly playerStrength = signal<number>(0);
   readonly playerMagicPower = signal<number>(0);
+
+  readonly playerLevel = computed(() => {
+    const wStr = this.playerStrength() * 2;
+    const wSta = this.playerStamina() * 2;
+    const wMind = this.playerMind() * 2;
+
+    // Count Magic Source gems in all inventory treshers
+    const itemsMap = this.pcTresherItemsById();
+    let magicSourceCount = 0;
+    for (const t of this.inventoryTreshersForPreview()) {
+      for (const itemId of [t.item1Id, t.item2Id, t.item3Id, t.item4Id]) {
+        if (itemId != null) {
+          const item = itemsMap.get(itemId);
+          if (item && item.type === 'gem' && item.name.includes('Magic Source')) {
+            magicSourceCount++;
+          }
+        }
+      }
+    }
+    const wMP = this.playerMagicPower() * 2.5 + magicSourceCount;
+    return this.computePlayerLevel([wStr, wSta, wMind, wMP]);
+  });
+
+  private computePlayerLevel(weightedStats: number[]): number {
+    let level = 0;
+    const above10 = weightedStats.filter(s => s > 10).length;
+    if (above10 >= 2) level = 1;
+    if (above10 >= 4) level = 2;
+    if (weightedStats.filter(s => s >= 15).length >= 2) level = Math.max(level, 3);
+    for (let n = 4; n <= 50; n++) {
+      const t4 = 15 + (n - 4) * 5;
+      const t2 = 15 + (n - 3) * 5;
+      const c4 = weightedStats.filter(s => s >= t4).length;
+      const c2 = weightedStats.filter(s => s >= t2).length;
+      if (c4 >= 4 || c2 >= 2) {
+        level = Math.max(level, n);
+      } else {
+        break;
+      }
+    }
+    return level;
+  }
   readonly pcTresherSpellsById = signal<Map<number, PcTresherSpellData>>(new Map());
   readonly selectedSpellId = signal<number | null>(null);
   readonly selectedCombatTarget = signal<{ row: number; column: number } | null>(null);
+  readonly outOfRangeTarget = signal<{ row: number; column: number } | null>(null);
   private readonly comboTracker = signal<{ placementIndex: number; count: number } | null>(null);
   readonly playerActiveEffects = signal<ActiveEffect[]>([]);
   readonly floorTrapPlacementsByDungon = signal<Record<number, FloorTrapPlacement[]>>({});
+  readonly floorItemPlacementsByDungon = signal<Record<number, ItemPlacement[]>>({});
+  readonly floorPotionPlacementsByDungon = signal<Record<number, PotionPlacement[]>>({});
+  readonly obstaclePlacementsByDungon = signal<Record<number, ObstaclePlacement[]>>({});
+  readonly floorItemListByDungon = signal<Record<number, Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }>>>({});
+  readonly floorPotionListByDungon = signal<Record<number, Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>>>({});
+  readonly collectedFloorItemsByDungon = signal<Record<number, Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }>>>({});
+  readonly collectedFloorPotionsByDungon = signal<Record<number, Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>>>({});
   readonly foundTrap = signal<{ trap: Trap; source: 'door' | 'tresher' | 'floor'; doorInfo?: NearbyDoorInfo; tresherIndex?: number; floorTrapId?: number; adjacentRow?: number; adjacentColumn?: number } | null>(null);
   readonly bloodSplatter = signal<{ x: number; y: number; r: number }[]>([]);
   readonly playerHitFlash = signal(false);
   readonly currentPcId_ = signal<number | null>(null);
   readonly dungonSpReward = signal<number>(0);
   readonly dungonWon = signal<boolean>(false);
+  readonly showTavernModal = signal<boolean>(false);
+  readonly soundMuted = signal<boolean>(localStorage.getItem('soundMuted') === 'true');
+  private tavernMusicCtx: AudioContext | null = null;
+
+  get questItemsForTavern(): Tresher[] {
+    const result: Tresher[] = [];
+    for (const cheater of Object.values(this.cheaterByDungon())) {
+      for (const t of cheater.inventory.treshers) {
+        if (t.isquest) result.push(t);
+      }
+    }
+    return result;
+  }
+  readonly npcDialog = signal<{ instance: GameMonsterInstance; template: Monster; creativeGreeting?: string } | null>(null);
+  readonly npcTradesPurchased = signal<number[]>([]);
+  readonly isMainGame = signal<boolean>(false);
+  readonly resettablePerPc = signal<boolean>(false);
+  readonly stashItems = signal<StashItem[]>([]);
+  readonly cheaterByPcId_ = signal<Record<number, Cheater>>({});
+  readonly saveStatus = signal<'saving' | 'saved' | 'error' | 'lost' | null>(null);
+  private saveStatusTimer: ReturnType<typeof setTimeout> | null = null;
+  private isSaveInFlight = false;
+  private pendingSavePayload: { gameId: number; dungonId: number; userKey: string } | null = null;
   readonly winStairsImageIndex = signal<1 | 2 | 3 | null>(null);
   readonly pendingExitTransitionType = signal<ExitTransitionType | null>(null);
 
@@ -289,6 +415,35 @@ export class Game implements OnInit {
 
     if (event.key.toLowerCase() === 'd') {
       this.tryPlayerDefend();
+      event.preventDefault();
+      return;
+    }
+
+    if (event.key.toLowerCase() === 'e') {
+      this.endPlayerTurnEarly();
+      event.preventDefault();
+      return;
+    }
+
+    if (event.key.toLowerCase() === 's') {
+      this.lookForTrapsAtCurrentSquare();
+      event.preventDefault();
+      return;
+    }
+
+    if (event.key.toLowerCase() === 'o') {
+      const doors = this.nearbyDoorsForPreview();
+      const openable = doors.find((d) => d.canOpen);
+      const closeable = doors.find((d) => d.door.state === 'open');
+      if (openable) this.openAdjacentDoor(openable);
+      else if (closeable) this.closeAdjacentDoor(closeable);
+      event.preventDefault();
+      return;
+    }
+
+    if (event.key.toLowerCase() === 'k') {
+      const door = this.nearbyDoorsForPreview().find((d) => d.canUnlock);
+      if (door) this.unlockAdjacentDoor(door);
       event.preventDefault();
       return;
     }
@@ -398,11 +553,47 @@ export class Game implements OnInit {
     return this.tresherPlacementsByDungon()[preview.dungonId] ?? [];
   }
 
+  previewItemPlacementsForView(): ItemPlacement[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return [];
+    }
+
+    return this.floorItemPlacementsByDungon()[preview.dungonId] ?? [];
+  }
+
+  previewPotionPlacementsForView(): PotionPlacement[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return [];
+    }
+
+    return this.floorPotionPlacementsByDungon()[preview.dungonId] ?? [];
+  }
+
+  collectedFloorItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }> {
+    const preview = this.gridPreviewContext();
+    if (!preview) return [];
+    return this.collectedFloorItemsByDungon()[preview.dungonId] ?? [];
+  }
+
+  collectedFloorPotionsForPreview(): Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }> {
+    const preview = this.gridPreviewContext();
+    if (!preview) return [];
+    return this.collectedFloorPotionsByDungon()[preview.dungonId] ?? [];
+  }
+
   previewDetectedFloorTrapsForView(): FloorTrapPlacement[] {
     const preview = this.gridPreviewContext();
     if (!preview) return [];
     return (this.floorTrapPlacementsByDungon()[preview.dungonId] ?? [])
       .filter(p => p.isDetected && !p.isTriggered && !p.isDisarmed);
+  }
+
+  previewObstaclePlacementsForView(): ObstaclePlacement[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) return [];
+    return (this.obstaclePlacementsByDungon()[preview.dungonId] ?? []).filter(o => !o.isDestroyed);
   }
 
   previewLiveMonsterPlacementsForView(): MonsterPlacement[] {
@@ -466,6 +657,20 @@ export class Game implements OnInit {
     return imageBySquare;
   }
 
+  previewObstacleImagesBySquareForView(): Map<string, HTMLImageElement | null> {
+    const preview = this.gridPreviewContext();
+    if (!preview) return new Map<string, HTMLImageElement | null>();
+    this.obstacleImageCacheVersion();
+    const imageBySquare = new Map<string, HTMLImageElement | null>();
+    for (const obs of this.obstaclePlacementsByDungon()[preview.dungonId] ?? []) {
+      if (obs.isDestroyed) continue;
+      const squareKey = this.getSquareKey(obs.row, obs.column);
+      const image = obs.imageId !== null ? (this.obstacleImageCache.get(obs.imageId) ?? null) : null;
+      imageBySquare.set(squareKey, image);
+    }
+    return imageBySquare;
+  }
+
   inventoryKeysForPreview(): Key[] {
     return this.getInventoryContextForPreview()?.inventory.keys ?? [];
   }
@@ -482,7 +687,9 @@ export class Game implements OnInit {
 
     return (
       inventoryContext.inventory.keys.length > 0 ||
-      inventoryContext.inventory.treshers.length > 0
+      inventoryContext.inventory.treshers.length > 0 ||
+      (this.collectedFloorItemsByDungon()[inventoryContext.dungonId] ?? []).length > 0 ||
+      (this.collectedFloorPotionsByDungon()[inventoryContext.dungonId] ?? []).length > 0
     );
   }
 
@@ -533,19 +740,30 @@ export class Game implements OnInit {
   onMapCellClicked(cell: { row: number; column: number }): void {
     const preview = this.gridPreviewContext();
     if (!preview || this.turnPhase() !== 'player' || this.playerHp() <= 0) return;
-    const range = this.combatRangeForMap();
-    if (range === 0) return;
-    const dr = Math.abs(cell.row - preview.centerRow);
-    const dc = Math.abs(cell.column - preview.centerColumn);
-    if (dr > range || dc > range || (dr === 0 && dc === 0)) return;
     const monster = this.monsterInstances().find(
       m => !m.isDead && m.row === cell.row && m.column === cell.column
     );
     if (!monster) return;
     if (!this.hasLineOfSight(preview.dungonId, preview.centerRow, preview.centerColumn, cell.row, cell.column)) return;
-    this.selectedCombatTarget.set({ row: cell.row, column: cell.column });
+
     const name = this.getMonstersByIdForDungon(preview.dungonId).get(monster.monsterId)?.name ?? 'monster';
-    this.previewActionMessage.set(`Target: ${name}.`);
+    const range = this.combatRangeForMap();
+    const dr = Math.abs(cell.row - preview.centerRow);
+    const dc = Math.abs(cell.column - preview.centerColumn);
+    const chebyshevDist = Math.max(dr, dc);
+
+    if (chebyshevDist <= range) {
+      // In weapon range — normal target selection
+      this.outOfRangeTarget.set(null);
+      this.selectedCombatTarget.set({ row: cell.row, column: cell.column });
+      this.previewActionMessage.set(`Target: ${name}.`);
+    } else {
+      // Out of range — highlight green and report
+      this.outOfRangeTarget.set({ row: cell.row, column: cell.column });
+      this.previewActionMessage.set(`${name} is ${chebyshevDist} sq away — out of range (weapon range: ${range}).`);
+      this.addCombatLog(`${name} is ${chebyshevDist} sq away. Weapon range: ${range}. Move closer to attack.`);
+    }
+    this.drawPreviewGridCanvas();
   }
 
   canPickAny(): boolean {
@@ -717,13 +935,17 @@ export class Game implements OnInit {
       return sum + this.getHandsRequiredForEquip(equippedItem);
     }, 0);
 
-    // Only weapons (inner items) occupy hand slots — rings, necklaces, armor do not
+    // Weapons occupy 1 or 2 hand slots; shield-type armor (no body slot) occupies 1 hand slot
     const equippedItemIds = this.equippedItemIdsByDungon()[inventoryContext.dungonId] ?? [];
     const itemsMap = this.pcTresherItemsById();
+    const bodyArmorSlots = new Set(['head', 'body', 'left-arm', 'right-arm', 'left-leg', 'right-leg']);
     const itemHands = equippedItemIds.reduce((sum, id) => {
       const it = itemsMap.get(id);
-      if (!it || it.type !== 'weapon') return sum;
-      return sum + (it.isTwoHanded ? 2 : 1);
+      if (!it) return sum;
+      if (it.type === 'weapon') return sum + (it.isTwoHanded ? 2 : 1);
+      // Armor with no body slot (e.g. shield) occupies 1 hand
+      if (it.type === 'armor' && (!it.armorSlot || !bodyArmorSlots.has(it.armorSlot))) return sum + 1;
+      return sum;
     }, 0);
 
     return tresherHands + itemHands;
@@ -773,6 +995,141 @@ export class Game implements OnInit {
     const c = this.totalInventoryCurrency();
     return c.gold > 0 || c.silver > 0 || c.copper > 0 || c.zinc > 0;
   }
+
+  readonly bodyPanelBgColor = computed(() => {
+    const hp = this.playerHp();
+    const max = this.playerMaxHp();
+    const pct = max > 0 ? Math.max(0, Math.min(1, hp / max)) : 1;
+    // white at 100%, increasingly red as hp drops
+    const g = Math.round(pct * 255);
+    const b = Math.round(pct * 255);
+    return `rgb(255,${g},${b})`;
+  });
+
+  readonly equippedBodySlotsForView = computed(() => {
+    const empty = {
+      head: false, body: false, leftArm: false, rightArm: false,
+      leftLeg: false, rightLeg: false,
+      mainHand: null as { isTwoHanded: boolean } | null,
+      hasShield: false,
+      hasRing: false, hasNecklace: false,
+    };
+    const preview = this.gridPreviewContext();
+    if (!preview) return empty;
+    const cheater = this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER;
+    const treshers: Tresher[] = Array.isArray(cheater.inventory?.treshers) ? cheater.inventory.treshers : [];
+    const itemsMap = this.pcTresherItemsById();
+    const result = { ...empty };
+
+    const bodyArmorSlots = new Set(['head', 'body', 'left-arm', 'right-arm', 'left-leg', 'right-leg']);
+
+    const applyItemId = (itemId: number) => {
+      const item = itemsMap.get(itemId);
+      if (!item) return;
+      switch (item.type) {
+        case 'armor':
+          if (item.armorSlot === 'head') result.head = true;
+          else if (item.armorSlot === 'body') result.body = true;
+          else if (item.armorSlot === 'left-arm') result.leftArm = true;
+          else if (item.armorSlot === 'right-arm') result.rightArm = true;
+          else if (item.armorSlot === 'left-leg') result.leftLeg = true;
+          else if (item.armorSlot === 'right-leg') result.rightLeg = true;
+          else if (!item.armorSlot || !bodyArmorSlots.has(item.armorSlot ?? '')) {
+            // Armor with no body slot (e.g. Shield) — treat as off-hand shield
+            result.hasShield = true;
+          }
+          break;
+        case 'weapon':
+          if (item.name.toLowerCase().includes('shield')) {
+            result.hasShield = true;
+          } else if (!result.mainHand) {
+            result.mainHand = { isTwoHanded: item.isTwoHanded };
+          }
+          break;
+        case 'ring':
+          result.hasRing = true;
+          break;
+        case 'necklace':
+          result.hasNecklace = true;
+          break;
+      }
+    };
+
+    const equippedIndexes = this.getEquippedTresherIndexesForDungon(preview.dungonId, treshers.length);
+    for (const idx of equippedIndexes) {
+      const t = treshers[idx];
+      if (!t) continue;
+      for (const itemId of [t.item1Id, t.item2Id, t.item3Id, t.item4Id]) {
+        if (itemId != null) applyItemId(itemId);
+      }
+    }
+
+    const equippedItemIds = this.equippedItemIdsByDungon()[preview.dungonId] ?? [];
+    for (const itemId of equippedItemIds) applyItemId(itemId);
+
+    return result;
+  });
+
+  readonly allTresherItemsGrouped = computed(() => {
+    const treshers = this.inventoryTreshersForPreview();
+    const itemsMap = this.pcTresherItemsById();
+    type FlatItem = { id: number; name: string; description: string; type: string; effectValue: number | null; armorSlot: string | null; damage: number; range: number; tresherIdx: number };
+    const flat: FlatItem[] = [];
+    for (let i = 0; i < treshers.length; i++) {
+      const t = treshers[i];
+      for (const itemId of [t.item1Id, t.item2Id, t.item3Id, t.item4Id]) {
+        if (itemId != null) {
+          const item = itemsMap.get(itemId);
+          if (item) flat.push({ id: item.id, name: item.name, description: item.description, type: item.type, effectValue: item.effectValue, armorSlot: item.armorSlot, damage: item.damage, range: item.range, tresherIdx: i });
+        }
+      }
+    }
+    const seen = new Set<number>();
+    const deduped = flat.filter(item => { if (seen.has(item.id)) return false; seen.add(item.id); return true; });
+    deduped.sort((a, b) => a.name.localeCompare(b.name));
+    const groupMap = new Map<string, FlatItem[]>();
+    for (const item of deduped) {
+      const type = item.type || 'Other';
+      if (!groupMap.has(type)) groupMap.set(type, []);
+      groupMap.get(type)!.push(item);
+    }
+    return [...groupMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([type, items]) => ({ type, items }));
+  });
+
+  readonly allTresherPotionsFlat = computed(() => {
+    const treshers = this.inventoryTreshersForPreview();
+    const potionsMap = this.pcTresherPotionsById();
+    type FlatPotion = { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number; tresherIdx: number };
+    const flat: FlatPotion[] = [];
+    const seen = new Set<number>();
+    for (let i = 0; i < treshers.length; i++) {
+      const t = treshers[i];
+      for (const potionId of [t.potion1Id, t.potion2Id, t.potion3Id]) {
+        if (potionId != null && !seen.has(potionId)) {
+          const potion = potionsMap.get(potionId);
+          if (potion) { flat.push({ ...potion, tresherIdx: i }); seen.add(potionId); }
+        }
+      }
+    }
+    return flat.sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  readonly allTresherSpellsFlat = computed(() => {
+    const treshers = this.inventoryTreshersForPreview();
+    const spellsMap = this.pcTresherSpellsById();
+    const flat: PcTresherSpellData[] = [];
+    const seen = new Set<number>();
+    for (let i = 0; i < treshers.length; i++) {
+      const t = treshers[i];
+      for (const spellId of [t.spell1Id, t.spell2Id, t.spell3Id, t.spell4Id]) {
+        if (spellId != null && !seen.has(spellId)) {
+          const spell = spellsMap.get(spellId);
+          if (spell) { flat.push(spell); seen.add(spellId); }
+        }
+      }
+    }
+    return flat.sort((a, b) => a.name.localeCompare(b.name));
+  });
 
   getTresherInnerItems(tresher: Tresher): Array<{ id: number; name: string; description: string; type: string; effectValue: number | null; armorSlot: string | null; damage: number; range: number }> {
     const itemsMap = this.pcTresherItemsById();
@@ -1005,9 +1362,19 @@ export class Game implements OnInit {
         if (this.inventoryHandsUsedForPreview() + handsNeeded > this.maxEquippableHands) {
           const msg = item.isTwoHanded
             ? 'A two-handed weapon requires both hands free.'
-            : 'Both hands are full. Unequip a weapon first.';
+            : 'Both hands are full. Unequip a weapon or shield first.';
           this.previewActionMessage.set(msg);
           return;
+        }
+      }
+      // Shield-type armor (no body slot) also occupies 1 hand
+      if (item.type === 'armor') {
+        const bodyArmorSlots = new Set(['head', 'body', 'left-arm', 'right-arm', 'left-leg', 'right-leg']);
+        if (!item.armorSlot || !bodyArmorSlots.has(item.armorSlot)) {
+          if (this.inventoryHandsUsedForPreview() + 1 > this.maxEquippableHands) {
+            this.previewActionMessage.set('Both hands are full. Unequip a weapon or shield first.');
+            return;
+          }
         }
       }
       this.equippedItemIdsByDungon.update((all) => ({ ...all, [dungonId]: [...equippedIds, itemId] }));
@@ -1054,6 +1421,86 @@ export class Game implements OnInit {
 
     const itemName = this.pcTresherItemsById().get(itemId)?.name || 'Item';
     this.previewActionMessage.set(`${itemName} dropped.`);
+    this.saveGameState();
+  }
+
+  dropCollectedFloorItem(itemId: number): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const { dungonId } = preview;
+    const items = this.collectedFloorItemsByDungon()[dungonId] ?? [];
+    const item = items.find((it) => it.id === itemId);
+    if (!item) return;
+
+    // Remove from collected
+    this.collectedFloorItemsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: (all[dungonId] ?? []).filter((it) => it.id !== itemId),
+    }));
+
+    // Unequip if equipped
+    this.equippedItemIdsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: (all[dungonId] ?? []).filter((id) => id !== itemId),
+    }));
+
+    // Place back on current floor square
+    this.floorItemPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: [...(all[dungonId] ?? []), { itemId, row: preview.centerRow, column: preview.centerColumn }],
+    }));
+
+    this.previewActionMessage.set(`${item.name || 'Item'} dropped on the floor.`);
+    this.drawPreviewGridCanvas();
+    this.saveGameState();
+  }
+
+  drinkCollectedFloorPotion(potionId: number): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const { dungonId } = preview;
+
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0) {
+      this.previewActionMessage.set('Potions can only be used during your turn.');
+      return;
+    }
+
+    const potions = this.collectedFloorPotionsByDungon()[dungonId] ?? [];
+    const potion = potions.find((p) => p.id === potionId);
+    if (!potion) return;
+
+    if (potion.effectTo !== 'HP') {
+      this.previewActionMessage.set(`${potion.name || 'Potion'} does not affect health.`);
+      return;
+    }
+
+    // Remove from collected (consume one)
+    const potionIdx = potions.findIndex((p) => p.id === potionId);
+    this.collectedFloorPotionsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: (all[dungonId] ?? []).filter((_, i) => i !== potionIdx),
+    }));
+
+    if (potion.lastFor > 1) {
+      this.playerActiveEffects.update((effects) => [
+        ...effects,
+        { effectOn: 'HP', effectAmount: potion.effectAmount, remainingAE: potion.lastFor, sourceName: potion.name },
+      ]);
+      this.addCombatLog(`You drink ${potion.name}. Regenerating +${potion.effectAmount} HP for ${potion.lastFor} AE.`);
+      this.previewActionMessage.set(`${potion.name}: +${potion.effectAmount} HP for ${potion.lastFor} AE.`);
+    } else {
+      const variance = Math.floor(Math.random() * 3) + 1;
+      const sign = Math.random() < 0.5 ? 1 : -1;
+      const delta = potion.effectAmount + sign * variance;
+      const currentHp = this.playerHp();
+      const maxHp = this.playerMaxHp();
+      const newHp = Math.max(0, Math.min(currentHp + delta, maxHp));
+      const change = newHp - currentHp;
+      this.playerHp.set(newHp);
+      const changeText = change >= 0 ? `restored ${change} HP` : `lost ${Math.abs(change)} HP`;
+      this.previewActionMessage.set(`${potion.name}: ${changeText}.`);
+      this.addCombatLog(`You drink ${potion.name} and ${changeText}.`);
+    }
     this.saveGameState();
   }
 
@@ -1121,8 +1568,17 @@ export class Game implements OnInit {
 
     const monstersById = this.getMonstersByIdForDungon(preview.dungonId);
     const liveInstances = this.monsterInstances().filter((m) => !m.isDead);
+    const frontSquareBlocked = hasValidTargetSquare &&
+      (() => {
+        const conn = this.getMovementConnectionInfoBetweenAdjacentSquares(
+          preview.dungonId, currentRow, currentColumn, targetRow, targetColumn
+        );
+        return conn.type === 'closedDoor' || conn.type === 'wall';
+      })();
     for (const inst of liveInstances) {
-      if (!isRelevantSquare(inst.row, inst.column)) {
+      const isInCurrentSquare = inst.row === currentRow && inst.column === currentColumn;
+      const isInFrontSquare = hasValidTargetSquare && inst.row === targetRow && inst.column === targetColumn;
+      if (!isInCurrentSquare && (!isInFrontSquare || frontSquareBlocked)) {
         continue;
       }
 
@@ -1180,6 +1636,52 @@ export class Game implements OnInit {
           });
         }
       }
+    }
+
+    const floorItemsById = new Map(
+      (this.floorItemListByDungon()[preview.dungonId] ?? []).map((it) => [it.id, it])
+    );
+    for (const placement of this.floorItemPlacementsByDungon()[preview.dungonId] ?? []) {
+      if (!isRelevantSquare(placement.row, placement.column)) continue;
+      const item = floorItemsById.get(placement.itemId);
+      if (!item) continue;
+      items.push({
+        kind: 'Item',
+        name: item.name.trim() || 'Unnamed Item',
+        description: item.description.trim() || 'No description.',
+        row: placement.row,
+        column: placement.column,
+      });
+    }
+
+    const floorPotionsById = new Map(
+      (this.floorPotionListByDungon()[preview.dungonId] ?? []).map((p) => [p.id, p])
+    );
+    for (const placement of this.floorPotionPlacementsByDungon()[preview.dungonId] ?? []) {
+      if (!isRelevantSquare(placement.row, placement.column)) continue;
+      const potion = floorPotionsById.get(placement.potionId);
+      if (!potion) continue;
+      items.push({
+        kind: 'Potion',
+        name: potion.name.trim() || 'Unnamed Potion',
+        description: potion.description.trim() || 'No description.',
+        row: placement.row,
+        column: placement.column,
+      });
+    }
+
+    for (const obs of this.obstaclePlacementsByDungon()[preview.dungonId] ?? []) {
+      if (obs.isDestroyed) continue;
+      if (!isRelevantSquare(obs.row, obs.column)) continue;
+      const itemNote = obs.containsItemId !== null && !obs.itemTaken ? ' [Contains an item]' : '';
+      const hpNote = obs.isIndestructible ? ' (Indestructible)' : ` (HP: ${obs.currentHp ?? obs.hp}/${obs.hp})`;
+      items.push({
+        kind: 'Obstacle',
+        name: obs.name || 'Obstacle',
+        description: (obs.note ? obs.note : 'No description.') + hpNote + itemNote,
+        row: obs.row,
+        column: obs.column,
+      });
     }
 
     return items.sort((left, right) => {
@@ -1269,6 +1771,9 @@ export class Game implements OnInit {
         canPick = true;
       }
 
+      const itemReq = connection.itemRequirement ?? null;
+      const canPassWithItem = !!(itemReq && connection.state === 'closed' && this.playerHasItem(itemReq.itemId));
+
       doors.push({
         door: connection,
         squareKey,
@@ -1280,6 +1785,7 @@ export class Game implements OnInit {
         canUnlock,
         canPick,
         matchingKeyIndex,
+        canPassWithItem,
       });
     }
 
@@ -1298,6 +1804,64 @@ export class Game implements OnInit {
     this.previewActionMessage.set(`You open the ${doorInfo.door.name || 'door'} to the ${doorInfo.direction}.`);
     this.drawPreviewGridCanvas();
     this.drawFirstPersonViewCanvas();
+  }
+
+  closeAdjacentDoor(doorInfo: NearbyDoorInfo): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return;
+    }
+    this.setDoorState(preview.dungonId, doorInfo, 'closed');
+    this.previewActionMessage.set(`You close the ${doorInfo.door.name || 'door'} to the ${doorInfo.direction}.`);
+    this.drawPreviewGridCanvas();
+    this.drawFirstPersonViewCanvas();
+  }
+
+  useItemToOpenDoor(doorInfo: NearbyDoorInfo): void {
+    if (!doorInfo.canPassWithItem) return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const req = doorInfo.door.itemRequirement;
+    if (!req) return;
+    if (req.consume) {
+      this.removeItemFromInventory(preview.dungonId, req.itemId);
+    }
+    this.setDoorState(preview.dungonId, doorInfo, 'open');
+    const doorName = doorInfo.door.name || 'door';
+    const consumed = req.consume ? ` You gave up the ${req.itemName}.` : '';
+    this.previewActionMessage.set(`You use the ${req.itemName} to open the ${doorName}.${consumed}`);
+    this.drawPreviewGridCanvas();
+    this.drawFirstPersonViewCanvas();
+  }
+
+  private playerHasItem(itemId: number): boolean {
+    const inv = this.getInventoryContextForPreview()?.inventory;
+    if (!inv) return false;
+    return inv.treshers.some(
+      (t) => t.item1Id === itemId || t.item2Id === itemId || t.item3Id === itemId || t.item4Id === itemId
+    );
+  }
+
+  private removeItemFromInventory(dungonId: number, itemId: number): void {
+    const existingCheater = this.cheaterByDungon()[dungonId];
+    if (!existingCheater) return;
+    const inv = this.normalizeCheaterInventory(existingCheater.inventory);
+    let removed = false;
+    const updatedTreshers = inv.treshers.map((t) => {
+      if (removed) return t;
+      const slot = t.item1Id === itemId ? 'item1Id'
+        : t.item2Id === itemId ? 'item2Id'
+        : t.item3Id === itemId ? 'item3Id'
+        : t.item4Id === itemId ? 'item4Id'
+        : null;
+      if (!slot) return t;
+      removed = true;
+      return { ...t, [slot]: null };
+    });
+    this.cheaterByDungon.update((all) => ({
+      ...all,
+      [dungonId]: { ...existingCheater, inventory: { keys: inv.keys, treshers: updatedTreshers } },
+    }));
   }
 
   unlockAdjacentDoor(doorInfo: NearbyDoorInfo): void {
@@ -1434,9 +1998,15 @@ export class Game implements OnInit {
   }
 
   searchForTraps(): void {
+    if (!this.canSearch()) return;
     const current = this.getCurrentPreviewSquareContext();
     if (!current) return;
+
+    this.consumePlayerAE(1, current.dungonId);
+    this.playerSearchesThisTurn.update((n) => n + 1);
+
     const mindRoll = this.randomInt(1, 12) + this.playerMind();
+    this.addCombatLog(`Search — rolled ${mindRoll} (1d12+${this.playerMind()}).`);
 
     // Check floor traps at current square
     const floorTraps = (this.floorTrapPlacementsByDungon()[current.dungonId] ?? [])
@@ -1453,6 +2023,7 @@ export class Game implements OnInit {
           )
         }));
         this.saveGameState();
+        if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
         return;
       }
     }
@@ -1489,6 +2060,7 @@ export class Game implements OnInit {
             )
           }));
           this.saveGameState();
+          if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
           return;
         }
       }
@@ -1501,7 +2073,32 @@ export class Game implements OnInit {
       if (t.trap && mindRoll >= t.trap.toDetect) {
         this.foundTrap.set({ trap: t.trap, source: 'tresher', tresherIndex: i });
         this.previewActionMessage.set(`You find a trap on ${t.name || 'tresher'}: ${t.trap.name || 'Trap'} (rolled ${mindRoll} vs DC ${t.trap.toDetect}).`);
+        this.saveGameState();
+        if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
         return;
+      }
+    }
+
+    // Check tresher traps at adjacent squares (one cell away through open/door connections)
+    for (const adj of adjacentChecks) {
+      const adjRow = current.row + adj.dr;
+      const adjCol = current.column + adj.dc;
+      const adjKey = this.getSquareKey(adjRow, adjCol);
+      if (!filledSquares[adjKey]) continue;
+      const blockType = this.getMovementBlockTypeBetweenAdjacentSquares(
+        current.dungonId, current.row, current.column, adjRow, adjCol
+      );
+      if (blockType === 'wall') continue;
+      const adjTreshers = this.getTreshersAtSquare(current.dungonId, adjRow, adjCol);
+      for (let i = 0; i < adjTreshers.length; i++) {
+        const t = adjTreshers[i];
+        if (t.trap && mindRoll >= t.trap.toDetect) {
+          this.foundTrap.set({ trap: t.trap, source: 'tresher', tresherIndex: i, adjacentRow: adjRow, adjacentColumn: adjCol });
+          this.previewActionMessage.set(`You find a trap on ${t.name || 'tresher'} to the ${adj.label}: ${t.trap.name || 'Trap'} (rolled ${mindRoll} vs DC ${t.trap.toDetect}).`);
+          this.saveGameState();
+          if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
+          return;
+        }
       }
     }
 
@@ -1510,6 +2107,8 @@ export class Game implements OnInit {
       if (doorInfo.door.trap && mindRoll >= doorInfo.door.trap.toDetect) {
         this.foundTrap.set({ trap: doorInfo.door.trap, source: 'door', doorInfo });
         this.previewActionMessage.set(`You find a trap on the ${doorInfo.door.name || 'door'} (rolled ${mindRoll} vs DC ${doorInfo.door.trap.toDetect}).`);
+        this.saveGameState();
+        if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
         return;
       }
     }
@@ -1540,6 +2139,7 @@ export class Game implements OnInit {
             this.saveGameState();
             this.drawPreviewGridCanvas();
             this.drawFirstPersonViewCanvas();
+            if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
             return;
           }
         }
@@ -1548,6 +2148,82 @@ export class Game implements OnInit {
 
     this.foundTrap.set(null);
     this.previewActionMessage.set(`No traps found (rolled ${mindRoll}).`);
+    if (this.playerAE() <= 0) {
+      this.startMonsterTurns();
+    }
+  }
+
+  currentSquareObstacles(): ObstaclePlacement[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) return [];
+    return (this.obstaclePlacementsByDungon()[preview.dungonId] ?? []).filter(
+      (obs) => !obs.isDestroyed && obs.row === preview.centerRow && obs.column === preview.centerColumn
+    );
+  }
+
+  smashObstacle(obstacleId: number): void {
+    if (this.turnPhase() !== 'player') return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    if (this.playerAE() <= 0) return;
+
+    const obstacles = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
+    const obs = obstacles.find((o) => o.id === obstacleId);
+    if (!obs || obs.isDestroyed || obs.isIndestructible) return;
+
+    // Deal player strength + 1d6 damage
+    const damage = this.randomInt(1, 6) + this.playerStrength();
+    const newHp = Math.max(0, (obs.currentHp ?? obs.hp) - damage);
+    const destroyed = newHp <= 0;
+
+    this.addCombatLog(`You smash ${obs.name || 'the obstacle'} for ${damage} damage!${destroyed ? ' It is destroyed!' : ` (HP: ${newHp}/${obs.hp})`}`);
+    this.previewActionMessage.set(destroyed ? `${obs.name || 'Obstacle'} destroyed!` : `${obs.name || 'Obstacle'} HP: ${newHp}/${obs.hp}`);
+
+    this.obstaclePlacementsByDungon.update((all) => ({
+      ...all,
+      [preview.dungonId]: (all[preview.dungonId] ?? []).map((o) =>
+        o.id === obstacleId ? { ...o, currentHp: newHp, isDestroyed: destroyed } : o
+      ),
+    }));
+
+    // If destroyed and has item, drop it at this square
+    if (destroyed && obs.containsItemId !== null && !obs.itemTaken) {
+      this.floorItemPlacementsByDungon.update((all) => ({
+        ...all,
+        [preview.dungonId]: [...(all[preview.dungonId] ?? []), { itemId: obs.containsItemId!, row: obs.row, column: obs.column }],
+      }));
+      this.addCombatLog(`An item falls from the rubble of ${obs.name || 'the obstacle'}!`);
+    }
+
+    this.consumePlayerAE(1, preview.dungonId);
+    this.saveGameState();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
+  }
+
+  takeItemFromObstacle(obstacleId: number): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+
+    const obstacles = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
+    const obs = obstacles.find((o) => o.id === obstacleId);
+    if (!obs || obs.containsItemId === null || obs.itemTaken) return;
+
+    this.obstaclePlacementsByDungon.update((all) => ({
+      ...all,
+      [preview.dungonId]: (all[preview.dungonId] ?? []).map((o) =>
+        o.id === obstacleId ? { ...o, itemTaken: true } : o
+      ),
+    }));
+
+    this.floorItemPlacementsByDungon.update((all) => ({
+      ...all,
+      [preview.dungonId]: [...(all[preview.dungonId] ?? []), { itemId: obs.containsItemId!, row: obs.row, column: obs.column }],
+    }));
+
+    const itemName = (this.floorItemListByDungon()[preview.dungonId] ?? []).find((i) => i.id === obs.containsItemId)?.name ?? 'an item';
+    this.addCombatLog(`You take ${itemName} from ${obs.name || 'the obstacle'}.`);
+    this.previewActionMessage.set(`Found ${itemName}!`);
+    this.saveGameState();
   }
 
   tryDisarmTrap(): void {
@@ -1591,11 +2267,29 @@ export class Game implements OnInit {
       this.addCombatLog(`Trap triggered! ${trap.name || 'Trap'} deals ${trap.damage} damage to HP.`);
       if (newHp <= 0) {
         this.turnPhase.set('gameover');
+        setTimeout(() => this.goHome(), 3500);
       }
     } else if (trap.damageTo === 'Stamina') {
       this.addCombatLog(`Trap triggered! ${trap.name || 'Trap'} deals ${trap.damage} damage to Stamina.`);
     } else if (trap.damageTo === 'Mind') {
       this.addCombatLog(`Trap triggered! ${trap.name || 'Trap'} deals ${trap.damage} damage to Mind.`);
+    } else if (trap.damageTo === 'AE') {
+      const newAE = Math.max(0, this.playerAE() - trap.damage);
+      this.playerAE.set(newAE);
+      this.addCombatLog(`Trap triggered! ${trap.name || 'Trap'} drains ${trap.damage} Action Economy (AE).`);
+    } else if (trap.damageTo === 'ROS') {
+      const dungonId = this.gridPreviewContext()?.dungonId;
+      if (dungonId !== undefined) {
+        const existingCheater = this.cheaterByDungon()[dungonId];
+        if (existingCheater) {
+          const newROS = Math.max(1, existingCheater.rangeOfSight - trap.damage);
+          this.cheaterByDungon.update((all) => ({
+            ...all,
+            [dungonId]: { ...existingCheater, rangeOfSight: newROS },
+          }));
+          this.addCombatLog(`Trap triggered! ${trap.name || 'Trap'} reduces Range of Sight by ${trap.damage} (now ${newROS}).`);
+        }
+      }
     }
   }
 
@@ -1617,7 +2311,14 @@ export class Game implements OnInit {
     );
     const treshersAtSquare = this.getTreshersAtSquare(current.dungonId, current.row, current.column);
 
-    if (keysAtSquare.length === 0 && tresherPlacements.length === 0) {
+    const floorItemsHere = (this.floorItemPlacementsByDungon()[current.dungonId] ?? []).filter(
+      (p) => p.row === current.row && p.column === current.column
+    );
+    const floorPotionsHere = (this.floorPotionPlacementsByDungon()[current.dungonId] ?? []).filter(
+      (p) => p.row === current.row && p.column === current.column
+    );
+
+    if (keysAtSquare.length === 0 && tresherPlacements.length === 0 && floorItemsHere.length === 0 && floorPotionsHere.length === 0) {
       this.previewActionMessage.set('Nothing to take on this square.');
       return;
     }
@@ -1641,7 +2342,64 @@ export class Game implements OnInit {
       this.activateTresherGuards(current.dungonId, current.row, current.column);
     }
 
-    const totalItemCount = keysAtSquare.length + tresherPlacements.length;
+    if (floorItemsHere.length > 0) {
+      const itemsById = new Map(
+        (this.floorItemListByDungon()[current.dungonId] ?? []).map((it) => [it.id, it])
+      );
+      const itemsToCollect = floorItemsHere
+        .map((p) => itemsById.get(p.itemId))
+        .filter((it): it is NonNullable<typeof it> => it !== undefined);
+
+      // Add to pcTresherItemsById so the equip system can resolve them
+      this.pcTresherItemsById.update((map) => {
+        const updated = new Map(map);
+        for (const it of itemsToCollect) {
+          updated.set(it.id, { ...it, effectValue: it.effectValue ?? 0 });
+        }
+        return updated;
+      });
+
+      // Store in collected signal
+      this.collectedFloorItemsByDungon.update((all) => ({
+        ...all,
+        [current.dungonId]: [...(all[current.dungonId] ?? []), ...itemsToCollect],
+      }));
+
+      // Remove placements from floor
+      const pickedItemIds = new Set(floorItemsHere.map((p) => p.itemId));
+      this.floorItemPlacementsByDungon.update((all) => ({
+        ...all,
+        [current.dungonId]: (all[current.dungonId] ?? []).filter(
+          (p) => !(p.row === current.row && p.column === current.column && pickedItemIds.has(p.itemId))
+        ),
+      }));
+    }
+
+    if (floorPotionsHere.length > 0) {
+      const potionsById = new Map(
+        (this.floorPotionListByDungon()[current.dungonId] ?? []).map((p) => [p.id, p])
+      );
+      const potionsToCollect = floorPotionsHere
+        .map((p) => potionsById.get(p.potionId))
+        .filter((p): p is NonNullable<typeof p> => p !== undefined);
+
+      // Store in collected signal
+      this.collectedFloorPotionsByDungon.update((all) => ({
+        ...all,
+        [current.dungonId]: [...(all[current.dungonId] ?? []), ...potionsToCollect],
+      }));
+
+      // Remove placements from floor
+      const pickedPotionIds = new Set(floorPotionsHere.map((p) => p.potionId));
+      this.floorPotionPlacementsByDungon.update((all) => ({
+        ...all,
+        [current.dungonId]: (all[current.dungonId] ?? []).filter(
+          (p) => !(p.row === current.row && p.column === current.column && pickedPotionIds.has(p.potionId))
+        ),
+      }));
+    }
+
+    const totalItemCount = keysAtSquare.length + tresherPlacements.length + floorItemsHere.length + floorPotionsHere.length;
     this.previewActionMessage.set(
       `Took ${totalItemCount} item${totalItemCount === 1 ? '' : 's'} into inventory.`
     );
@@ -1729,6 +2487,7 @@ export class Game implements OnInit {
             this.playerStrength.set(typeof game.pcStrength === 'number' ? Math.max(0, Math.floor(game.pcStrength)) : 0);
             this.playerMagicPower.set(typeof game.pcMagicPower === 'number' ? Math.max(0, Math.floor(game.pcMagicPower)) : 0);
             this.playerNOA.set(typeof game.pcNumberOfAttacks === 'number' ? Math.max(1, Math.floor(game.pcNumberOfAttacks)) : 1);
+            this.playerNOD.set(typeof game.pcNumberOfDefends === 'number' ? Math.max(1, Math.floor(game.pcNumberOfDefends)) : 1);
             this.currentPcId_.set(null);
             this.dungonSpReward.set(0);
             this.loadDungonJsonState(game.dungonid, game.dungenJson);
@@ -1794,10 +2553,11 @@ export class Game implements OnInit {
               }
             }
             this.loadMonsterImages(game.dungonid);
+            this.loadObstacleImages(game.dungonid);
+            this.playerType.set(typeof game.pcType === 'string' ? game.pcType : null);
+            this.playerSpecies.set(typeof game.pcSpecies === 'string' ? game.pcSpecies : null);
+            this.playerName.set(typeof game.pcName === 'string' ? game.pcName : null);
             this.initializeCombatState(game.dungonid);
-          },
-          error: () => {
-            this.gameLoadError.set('Failed to load sample game.');
           },
         });
       return;
@@ -1835,7 +2595,16 @@ export class Game implements OnInit {
           this.playerStrength.set(typeof game.pcStrength === 'number' ? Math.max(0, Math.floor(game.pcStrength)) : 0);
           this.playerMagicPower.set(typeof game.pcMagicPower === 'number' ? Math.max(0, Math.floor(game.pcMagicPower)) : 0);
           this.playerNOA.set(typeof game.pcNumberOfAttacks === 'number' ? Math.max(1, Math.floor(game.pcNumberOfAttacks)) : 1);
+          this.playerNOD.set(typeof game.pcNumberOfDefends === 'number' ? Math.max(1, Math.floor(game.pcNumberOfDefends)) : 1);
           this.currentPcId_.set(typeof game.currentPcId === 'number' ? game.currentPcId : null);
+          this.playerType.set(typeof game.pcType === 'string' ? game.pcType : null);
+          this.playerSpecies.set(typeof game.pcSpecies === 'string' ? game.pcSpecies : null);
+          this.playerName.set(typeof game.pcName === 'string' ? game.pcName : null);
+          this.isMainGame.set(game.isMainGame === true);
+          this.resettablePerPc.set(game.resettablePerPc === true);
+          if (game.isMainGame === true) {
+            this.loadStash();
+          }
           this.dungonSpReward.set(typeof game.dungonSpReward === 'number' ? Math.max(0, Math.floor(game.dungonSpReward)) : 0);
           this.loadDungonJsonState(game.dungonid, game.dungenJson);
           this.seedPcTreshersIntoInventory(game.dungonid, game.pcTreshers);
@@ -1881,7 +2650,10 @@ export class Game implements OnInit {
           }
           this.setInitialPreviewContext(game.dungonid);
           this.loadMonsterImages(game.dungonid);
+          this.loadObstacleImages(game.dungonid);
           this.initializeCombatState(game.dungonid);
+          this.showTavernModal.set(true);
+          this.startTavernMusic();
         },
         error: () => {
           this.gameLoadError.set('Failed to load game.');
@@ -1956,6 +2728,61 @@ export class Game implements OnInit {
               this.monsterImageCache.set(image.id, img);
               this.monsterImageCacheVersion.update((v) => v + 1);
               this.drawFirstPersonViewCanvas();
+            };
+            img.src = url;
+          }
+        },
+      });
+  }
+
+  private loadObstacleImages(dungonId: number): void {
+    const placements = this.obstaclePlacementsByDungon()[dungonId] ?? [];
+    const imageIds = new Set<number>();
+    for (const p of placements) {
+      if (p.imageId !== null && !this.obstacleImageCache.has(p.imageId)) {
+        imageIds.add(p.imageId);
+      }
+    }
+    if (imageIds.size === 0) return;
+    const userKey = this.account.getKey();
+    if (!userKey) {
+      this.http
+        .get<{ id: number; path: string }[]>(`${API_BASE_URL}/images/by-ids`, {
+          params: { ids: Array.from(imageIds).join(',') },
+        })
+        .subscribe({
+          next: (images) => {
+            for (const image of images) {
+              if (!imageIds.has(image.id) || !image.path) continue;
+              const url = this.resolveImageUrl(image.path);
+              if (!url) continue;
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.onload = () => {
+                this.obstacleImageCache.set(image.id, img);
+                this.obstacleImageCacheVersion.update((v) => v + 1);
+              };
+              img.src = url;
+            }
+          },
+        });
+      return;
+    }
+    this.http
+      .get<ImageRecordPayload[]>(`${API_BASE_URL}/images`, {
+        params: { userkey: userKey, scope: 'library' },
+      })
+      .subscribe({
+        next: (images) => {
+          for (const image of images) {
+            if (!imageIds.has(image.id) || !image.path) continue;
+            const url = this.resolveImageUrl(image.path);
+            if (!url) continue;
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              this.obstacleImageCache.set(image.id, img);
+              this.obstacleImageCacheVersion.update((v) => v + 1);
             };
             img.src = url;
           }
@@ -2595,6 +3422,52 @@ export class Game implements OnInit {
       this.drawTresherCoinMarker(context, centerX, centerY, 3.5);
     }
 
+    const floorItemPlacements = this.floorItemPlacementsByDungon()[preview.dungonId] ?? [];
+    for (const placement of floorItemPlacements) {
+      const placementSquareKey = this.getSquareKey(placement.row, placement.column);
+      if (!visibleSquareKeys.has(placementSquareKey)) {
+        continue;
+      }
+
+      const previewRow = placement.row - preview.startRow;
+      const previewColumn = placement.column - preview.startColumn;
+      if (
+        previewRow < 0 ||
+        previewColumn < 0 ||
+        previewRow >= this.previewGridDimension ||
+        previewColumn >= this.previewGridDimension
+      ) {
+        continue;
+      }
+
+      const centerX = previewColumn * this.previewGridCellSize + this.previewGridCellSize / 2;
+      const centerY = previewRow * this.previewGridCellSize + this.previewGridCellSize / 2;
+      this.drawFloorItemMarker(context, centerX, centerY, 3.5);
+    }
+
+    const floorPotionPlacements = this.floorPotionPlacementsByDungon()[preview.dungonId] ?? [];
+    for (const placement of floorPotionPlacements) {
+      const placementSquareKey = this.getSquareKey(placement.row, placement.column);
+      if (!visibleSquareKeys.has(placementSquareKey)) {
+        continue;
+      }
+
+      const previewRow = placement.row - preview.startRow;
+      const previewColumn = placement.column - preview.startColumn;
+      if (
+        previewRow < 0 ||
+        previewColumn < 0 ||
+        previewRow >= this.previewGridDimension ||
+        previewColumn >= this.previewGridDimension
+      ) {
+        continue;
+      }
+
+      const centerX = previewColumn * this.previewGridCellSize + this.previewGridCellSize / 2;
+      const centerY = previewRow * this.previewGridCellSize + this.previewGridCellSize / 2;
+      this.drawFloorItemMarker(context, centerX, centerY, 3.5);
+    }
+
     const liveMonsterInstancesForMap = this.monsterInstances().filter((m) => !m.isDead);
     for (const inst of liveMonsterInstancesForMap) {
       const placementSquareKey = this.getSquareKey(inst.row, inst.column);
@@ -2615,7 +3488,19 @@ export class Game implements OnInit {
 
       const centerX = previewColumn * this.previewGridCellSize + this.previewGridCellSize / 2;
       const centerY = previewRow * this.previewGridCellSize + this.previewGridCellSize / 2;
-      this.drawMonsterMarker(context, centerX, centerY, 3.5);
+
+      const sel = this.selectedCombatTarget();
+      const oor = this.outOfRangeTarget();
+      const isSelected = sel && sel.row === inst.row && sel.column === inst.column;
+      const isOutOfRange = oor && oor.row === inst.row && oor.column === inst.column;
+
+      if (isOutOfRange) {
+        this.drawMonsterMarkerGreen(context, centerX, centerY, 3.5);
+      } else if (isSelected) {
+        this.drawMonsterMarkerSelected(context, centerX, centerY, 3.5);
+      } else {
+        this.drawMonsterMarker(context, centerX, centerY, 3.5);
+      }
     }
 
     const startpoint = this.startPointByDungon()[preview.dungonId] ?? null;
@@ -2747,10 +3632,18 @@ export class Game implements OnInit {
     const firstPersonView = this.getFirstPersonView(preview, cheater);
     const tresherPlacements = this.tresherPlacementsByDungon()[preview.dungonId] ?? [];
     const tresherCountBySquare = new Map<string, number>();
+    const bagSquareKeys = new Set<string>();
     for (const placement of tresherPlacements) {
       const squareKey = this.getSquareKey(placement.row, placement.column);
       const existingCount = tresherCountBySquare.get(squareKey) ?? 0;
       tresherCountBySquare.set(squareKey, existingCount + 1);
+      bagSquareKeys.add(squareKey);
+    }
+    for (const placement of (this.floorItemPlacementsByDungon()[preview.dungonId] ?? [])) {
+      bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
+    }
+    for (const placement of (this.floorPotionPlacementsByDungon()[preview.dungonId] ?? [])) {
+      bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
     }
 
     const liveMonsterInstances = this.monsterInstances().filter((m) => !m.isDead);
@@ -2966,9 +3859,8 @@ export class Game implements OnInit {
     for (const segment of farToNearSegments) {
       const { step, nearFrame, farFrame } = segment;
       const squareKey = this.getSquareKey(step.row, step.column);
-      const tresherCount = tresherCountBySquare.get(squareKey) ?? 0;
-      if (tresherCount > 0) {
-        this.drawFirstPersonFloorCoinStack(context, nearFrame, farFrame, tresherCount);
+      if (bagSquareKeys.has(squareKey)) {
+        this.drawFirstPersonFloorBag(context, nearFrame, farFrame);
       }
 
       if (step.hasKey) {
@@ -2990,14 +3882,25 @@ export class Game implements OnInit {
             continue;
           }
 
-          this.drawFirstPersonMonster(
-            context,
-            nearFrame,
-            farFrame,
-            monsterImageBySquare.get(slot.squareKey) ?? null,
-            slot.lateralOffset,
-            lateralRange
-          );
+          if (slot.isPeek) {
+            this.drawFirstPersonPeekMonster(
+              context,
+              width,
+              nearFrame,
+              farFrame,
+              monsterImageBySquare.get(slot.squareKey) ?? null,
+              slot.lateralOffset < 0 ? 'left' : 'right'
+            );
+          } else {
+            this.drawFirstPersonMonster(
+              context,
+              nearFrame,
+              farFrame,
+              monsterImageBySquare.get(slot.squareKey) ?? null,
+              slot.lateralOffset,
+              lateralRange
+            );
+          }
         }
       }
     }
@@ -3408,6 +4311,65 @@ export class Game implements OnInit {
     context.stroke();
   }
 
+  private drawFirstPersonPeekMonster(
+    context: CanvasRenderingContext2D,
+    canvasWidth: number,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    image: HTMLImageElement | null,
+    side: 'left' | 'right'
+  ): void {
+    const midLeft = nearFrame.left * 0.65 + farFrame.left * 0.35;
+    const midRight = nearFrame.right * 0.65 + farFrame.right * 0.35;
+    const midTop = nearFrame.top * 0.65 + farFrame.top * 0.35;
+    const midBottom = nearFrame.bottom * 0.65 + farFrame.bottom * 0.35;
+    const tileWidth = midRight - midLeft;
+    const tileHeight = midBottom - midTop;
+    const edgeX = side === 'left' ? nearFrame.left : nearFrame.right;
+
+    context.save();
+    context.beginPath();
+    if (side === 'left') {
+      context.rect(nearFrame.left, 0, canvasWidth - nearFrame.left, context.canvas.height);
+    } else {
+      context.rect(0, 0, nearFrame.right, context.canvas.height);
+    }
+    context.clip();
+    context.globalAlpha = 0.8;
+
+    if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+      const maxWidth = tileWidth * 0.6;
+      const maxHeight = tileHeight * 0.75;
+      const aspectRatio = image.naturalWidth / image.naturalHeight;
+      let drawWidth = maxWidth;
+      let drawHeight = drawWidth / aspectRatio;
+      if (drawHeight > maxHeight) {
+        drawHeight = maxHeight;
+        drawWidth = drawHeight * aspectRatio;
+      }
+      drawWidth = Math.max(8, drawWidth);
+      drawHeight = Math.max(8, drawHeight);
+      context.drawImage(image, edgeX - drawWidth / 2, midBottom - drawHeight, drawWidth, drawHeight);
+    } else {
+      const centerY = midTop + tileHeight * 0.55;
+      const size = Math.max(4, Math.min(tileWidth, tileHeight) * 0.25);
+      context.fillStyle = '#d63031';
+      context.beginPath();
+      context.moveTo(edgeX, centerY - size);
+      context.lineTo(edgeX + size, centerY);
+      context.lineTo(edgeX, centerY + size);
+      context.lineTo(edgeX - size, centerY);
+      context.closePath();
+      context.fill();
+      context.strokeStyle = '#ff7675';
+      context.lineWidth = 1;
+      context.stroke();
+    }
+
+    context.globalAlpha = 1;
+    context.restore();
+  }
+
   private drawFirstPersonFloorKey(
     context: CanvasRenderingContext2D,
     nearFrame: { left: number; right: number; top: number; bottom: number },
@@ -3435,35 +4397,104 @@ export class Game implements OnInit {
     context.stroke();
   }
 
-  private drawFirstPersonFloorCoinStack(
+  private drawFirstPersonFloorBag(
     context: CanvasRenderingContext2D,
     nearFrame: { left: number; right: number; top: number; bottom: number },
-    farFrame: { left: number; right: number; top: number; bottom: number },
-    tresherCount: number
+    farFrame: { left: number; right: number; top: number; bottom: number }
   ): void {
     const midLeft = (nearFrame.left + farFrame.left) / 2;
     const midRight = (nearFrame.right + farFrame.right) / 2;
     const tileWidth = midRight - midLeft;
-    const centerX = (midLeft + midRight) / 2 + tileWidth * 0.14;
-    const floorY = (nearFrame.bottom + farFrame.bottom) / 2 + tileWidth * 0.04;
-    const baseSize = Math.max(2.2, Math.min(8, tileWidth * 0.1));
-    const stackSize = Math.max(1, Math.min(4, Math.floor(tresherCount)));
-    const offsets = [
-      { x: -baseSize * 0.78, y: baseSize * 0.22, radius: baseSize * 0.72 },
-      { x: baseSize * 0.7, y: baseSize * 0.22, radius: baseSize * 0.72 },
-      { x: 0, y: -baseSize * 0.18, radius: baseSize * 0.86 },
-      { x: 0, y: -baseSize * 0.82, radius: baseSize * 0.63 },
-    ];
+    const centerX = (midLeft + midRight) / 2;
+    const floorY = (nearFrame.bottom + farFrame.bottom) / 2;
+    const bagW = Math.max(12, Math.min(64, tileWidth * 0.45));
+    const bagH = bagW * 1.15;
+    const bagLeft = centerX - bagW / 2;
+    const bagBottom = floorY - 1;
+    const bagTop = bagBottom - bagH;
+    const r = bagW * 0.20;
 
-    for (let index = 0; index < stackSize; index += 1) {
-      const offset = offsets[index];
-      this.drawTresherCoinMarker(
-        context,
-        centerX + offset.x,
-        floorY + offset.y,
-        Math.max(2, offset.radius)
-      );
-    }
+    // Soft glow shadow under the bag so it reads against any floor
+    const glowRadius = bagW * 0.65;
+    const glowGrad = context.createRadialGradient(centerX, bagBottom, 0, centerX, bagBottom, glowRadius);
+    glowGrad.addColorStop(0, 'rgba(210, 140, 30, 0.45)');
+    glowGrad.addColorStop(1, 'rgba(210, 140, 30, 0)');
+    context.fillStyle = glowGrad;
+    context.beginPath();
+    context.ellipse(centerX, bagBottom, glowRadius, glowRadius * 0.35, 0, 0, Math.PI * 2);
+    context.fill();
+
+    // Bag body (rounded rectangle)
+    context.fillStyle = '#a06820';
+    context.beginPath();
+    context.moveTo(bagLeft + r, bagTop);
+    context.lineTo(bagLeft + bagW - r, bagTop);
+    context.quadraticCurveTo(bagLeft + bagW, bagTop, bagLeft + bagW, bagTop + r);
+    context.lineTo(bagLeft + bagW, bagBottom - r);
+    context.quadraticCurveTo(bagLeft + bagW, bagBottom, bagLeft + bagW - r, bagBottom);
+    context.lineTo(bagLeft + r, bagBottom);
+    context.quadraticCurveTo(bagLeft, bagBottom, bagLeft, bagBottom - r);
+    context.lineTo(bagLeft, bagTop + r);
+    context.quadraticCurveTo(bagLeft, bagTop, bagLeft + r, bagTop);
+    context.closePath();
+    context.fill();
+
+    // Neck / drawstring tie
+    const neckW = bagW * 0.38;
+    const neckH = bagH * 0.18;
+    context.fillStyle = '#6b430e';
+    context.fillRect(centerX - neckW / 2, bagTop - neckH, neckW, neckH);
+
+    // Knot at top
+    context.fillStyle = '#ffd700';
+    context.beginPath();
+    context.arc(centerX, bagTop - neckH * 0.4, bagW * 0.16, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = '#b8860b';
+    context.lineWidth = Math.max(0.5, bagW * 0.02);
+    context.stroke();
+
+    // Highlight
+    context.fillStyle = 'rgba(255, 210, 100, 0.28)';
+    context.beginPath();
+    context.ellipse(bagLeft + bagW * 0.28, bagTop + bagH * 0.27, bagW * 0.18, bagH * 0.20, -0.3, 0, Math.PI * 2);
+    context.fill();
+
+    // Outline
+    context.strokeStyle = '#3a1e04';
+    context.lineWidth = Math.max(1, bagW * 0.04);
+    context.beginPath();
+    context.moveTo(bagLeft + r, bagTop);
+    context.lineTo(bagLeft + bagW - r, bagTop);
+    context.quadraticCurveTo(bagLeft + bagW, bagTop, bagLeft + bagW, bagTop + r);
+    context.lineTo(bagLeft + bagW, bagBottom - r);
+    context.quadraticCurveTo(bagLeft + bagW, bagBottom, bagLeft + bagW - r, bagBottom);
+    context.lineTo(bagLeft + r, bagBottom);
+    context.quadraticCurveTo(bagLeft, bagBottom, bagLeft, bagBottom - r);
+    context.lineTo(bagLeft, bagTop + r);
+    context.quadraticCurveTo(bagLeft, bagTop, bagLeft + r, bagTop);
+    context.closePath();
+    context.stroke();
+  }
+
+  private drawFloorItemMarker(
+    context: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    size: number
+  ): void {
+    const s = Math.max(2, size);
+    context.fillStyle = '#4fc3f7';
+    context.beginPath();
+    context.moveTo(centerX, centerY - s);
+    context.lineTo(centerX + s, centerY);
+    context.lineTo(centerX, centerY + s);
+    context.lineTo(centerX - s, centerY);
+    context.closePath();
+    context.fill();
+    context.strokeStyle = '#e0f7fa';
+    context.lineWidth = 0.75;
+    context.stroke();
   }
 
   private drawTresherCoinMarker(
@@ -3502,6 +4533,46 @@ export class Game implements OnInit {
 
     context.strokeStyle = '#ff7675';
     context.lineWidth = 1;
+    context.stroke();
+  }
+
+  private drawMonsterMarkerSelected(
+    context: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    size: number
+  ): void {
+    const s = Math.max(2, size) + 1;
+    context.fillStyle = '#ff4444';
+    context.beginPath();
+    context.moveTo(centerX, centerY - s);
+    context.lineTo(centerX + s, centerY);
+    context.lineTo(centerX, centerY + s);
+    context.lineTo(centerX - s, centerY);
+    context.closePath();
+    context.fill();
+    context.strokeStyle = '#ffffff';
+    context.lineWidth = 1.5;
+    context.stroke();
+  }
+
+  private drawMonsterMarkerGreen(
+    context: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    size: number
+  ): void {
+    const s = Math.max(2, size) + 1;
+    context.fillStyle = '#00b300';
+    context.beginPath();
+    context.moveTo(centerX, centerY - s);
+    context.lineTo(centerX + s, centerY);
+    context.lineTo(centerX, centerY + s);
+    context.lineTo(centerX - s, centerY);
+    context.closePath();
+    context.fill();
+    context.strokeStyle = '#80ff80';
+    context.lineWidth = 1.5;
     context.stroke();
   }
 
@@ -3793,10 +4864,12 @@ export class Game implements OnInit {
     column: number,
     leftOffset: { rowOffset: number; columnOffset: number },
     rightOffset: { rowOffset: number; columnOffset: number }
-  ): Array<{ squareKey: string; lateralOffset: number }> {
+  ): Array<{ squareKey: string; lateralOffset: number; isPeek?: boolean }> {
     const squares = this.squaresByDungon()[dungonId] ?? {};
     const filledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
-    const visibleSlots = [{ squareKey: this.getSquareKey(row, column), lateralOffset: 0 }];
+    const visibleSlots: Array<{ squareKey: string; lateralOffset: number; isPeek?: boolean }> = [
+      { squareKey: this.getSquareKey(row, column), lateralOffset: 0 },
+    ];
 
     if (depth <= 0) {
       return visibleSlots;
@@ -3843,6 +4916,33 @@ export class Game implements OnInit {
 
     collectSideSlots('left', leftOffset, -1);
     collectSideSlots('right', rightOffset, 1);
+
+    // Corner-peek: side just opened at this depth (wall before, opening now)
+    if (depth >= 1) {
+      const addPeekIfMonsterPresent = (
+        side: 'left' | 'right',
+        offset: { rowOffset: number; columnOffset: number },
+        lateralDirection: number
+      ): void => {
+        const prevStep = steps[depth - 1];
+        const currStep = steps[depth];
+        if (!prevStep || !currStep) return;
+        const prevBlock = side === 'left' ? prevStep.leftBlock : prevStep.rightBlock;
+        const currBlock = side === 'left' ? currStep.leftBlock : currStep.rightBlock;
+        // Previous step must have been a wall, current step must be open
+        if (this.isSideSightTransparent(prevBlock)) return;
+        if (!this.isSideSightTransparent(currBlock)) return;
+        // Check the diagonal square (one ahead, one to the side)
+        const diagRow = row + offset.rowOffset;
+        const diagCol = column + offset.columnOffset;
+        const squareKey = this.getSquareKey(diagRow, diagCol);
+        if (!squares[squareKey] || !filledSquares[squareKey]) return;
+        if (visibleSlots.some((s) => s.squareKey === squareKey)) return;
+        visibleSlots.push({ squareKey, lateralOffset: lateralDirection, isPeek: true });
+      };
+      addPeekIfMonsterPresent('left', leftOffset, -1);
+      addPeekIfMonsterPresent('right', rightOffset, 1);
+    }
 
     return visibleSlots;
   }
@@ -4150,7 +5250,6 @@ export class Game implements OnInit {
 
     const tDeltaX = stepX === 0 ? Number.POSITIVE_INFINITY : 1 / absoluteDeltaX;
     const tDeltaY = stepY === 0 ? Number.POSITIVE_INFINITY : 1 / absoluteDeltaY;
-    const cornerPeekDistance = 1;
     const epsilon = 0.0000001;
     let guard = 0;
     const maxSteps = this.gridRowCount * this.gridColumnCount + 5;
@@ -4218,19 +5317,10 @@ export class Game implements OnInit {
           currentColumn
         );
 
+      // Both adjacent walls blocked = full cover, no LOS.
+      // One wall blocked = partial cover (LOS exists, -2 to hit via getAttackCoverPenalty).
       if (blockedToHorizontal && blockedToVertical) {
         return false;
-      }
-
-      if (blockedToHorizontal || blockedToVertical) {
-        const cornerDistanceFromSource = Math.max(
-          Math.abs(currentRow - fromRow),
-          Math.abs(currentColumn - fromColumn)
-        );
-
-        if (cornerDistanceFromSource > cornerPeekDistance) {
-          return false;
-        }
       }
 
       currentColumn = nextColumn;
@@ -4240,6 +5330,84 @@ export class Game implements OnInit {
     }
 
     return currentRow === toRow && currentColumn === toColumn;
+  }
+
+  /**
+   * Returns -2 if the target has partial cover (one wall clips the diagonal ray), or 0 otherwise.
+   * Used to apply a -2 to-hit penalty when attacking diagonally past a corner wall.
+   */
+  private getAttackCoverPenalty(
+    dungonId: number,
+    fromRow: number,
+    fromColumn: number,
+    toRow: number,
+    toColumn: number
+  ): number {
+    if (fromRow === toRow && fromColumn === toColumn) return 0;
+
+    const squares = this.squaresByDungon()[dungonId] ?? {};
+    if (!squares[this.getSquareKey(fromRow, fromColumn)]) return 0;
+    if (!squares[this.getSquareKey(toRow, toColumn)]) return 0;
+
+    const startX = fromColumn + 0.5;
+    const startY = fromRow + 0.5;
+    const endX = toColumn + 0.5;
+    const endY = toRow + 0.5;
+    const deltaX = endX - startX;
+    const deltaY = endY - startY;
+    const stepX = deltaX > 0 ? 1 : deltaX < 0 ? -1 : 0;
+    const stepY = deltaY > 0 ? 1 : deltaY < 0 ? -1 : 0;
+    const absoluteDeltaX = Math.abs(deltaX);
+    const absoluteDeltaY = Math.abs(deltaY);
+
+    let currentRow = fromRow;
+    let currentColumn = fromColumn;
+
+    let tMaxX = stepX === 0 ? Number.POSITIVE_INFINITY
+      : (stepX > 0 ? currentColumn + 1 - startX : startX - currentColumn) / absoluteDeltaX;
+    let tMaxY = stepY === 0 ? Number.POSITIVE_INFINITY
+      : (stepY > 0 ? currentRow + 1 - startY : startY - currentRow) / absoluteDeltaY;
+
+    const tDeltaX = stepX === 0 ? Number.POSITIVE_INFINITY : 1 / absoluteDeltaX;
+    const tDeltaY = stepY === 0 ? Number.POSITIVE_INFINITY : 1 / absoluteDeltaY;
+    const epsilon = 0.0000001;
+    let guard = 0;
+    const maxSteps = this.gridRowCount * this.gridColumnCount + 5;
+
+    while ((currentRow !== toRow || currentColumn !== toColumn) && guard < maxSteps) {
+      guard += 1;
+
+      if (tMaxX < tMaxY - epsilon) {
+        currentColumn += stepX;
+        tMaxX += tDeltaX;
+        continue;
+      }
+
+      if (tMaxY < tMaxX - epsilon) {
+        currentRow += stepY;
+        tMaxY += tDeltaY;
+        continue;
+      }
+
+      // Exact diagonal corner — exactly one wall blocked = partial cover
+      const nextColumn = currentColumn + stepX;
+      const nextRow = currentRow + stepY;
+      const blockedH = stepX !== 0 && this.isSightBlockedBetweenAdjacentSquares(
+        dungonId, currentRow, currentColumn, currentRow, nextColumn);
+      const blockedV = stepY !== 0 && this.isSightBlockedBetweenAdjacentSquares(
+        dungonId, currentRow, currentColumn, nextRow, currentColumn);
+
+      if (blockedH !== blockedV) {
+        return -2; // partial cover
+      }
+
+      currentColumn = nextColumn;
+      currentRow = nextRow;
+      tMaxX += tDeltaX;
+      tMaxY += tDeltaY;
+    }
+
+    return 0;
   }
 
   private isSightBlockedBetweenAdjacentSquares(
@@ -4405,6 +5573,15 @@ export class Game implements OnInit {
       return;
     }
 
+    // Block movement into squares that have a non-destroyed obstacle
+    const obstaclesForDungon = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
+    const hasObstacleAtDest = obstaclesForDungon.some(
+      (obs) => obs.row === nextRow && obs.column === nextColumn && !obs.isDestroyed
+    );
+    if (hasObstacleAtDest) {
+      return;
+    }
+
     const moveCost = isDiagonalStep ? 2 : 1;
     if (this.turnPhase() === 'player' && this.playerAE() < moveCost) {
       return;
@@ -4424,6 +5601,7 @@ export class Game implements OnInit {
     });
 
     this.logNearbyAfterMove();
+    this.triggerNpcGreetings();
 
     this.playStepSound(0.22);
 
@@ -4431,7 +5609,15 @@ export class Game implements OnInit {
     const exits = this.exitsByDungon()[preview.dungonId] ?? [];
     const landedExit = exits.find((e) => e.row === nextRow && e.column === nextColumn);
     if (landedExit && landedExit.destinationType === 'outside' && !this.dungonWon() && !this.pendingExitTransitionType()) {
-      this.pendingExitTransitionType.set(landedExit.transitionType ?? 'open');
+      const exitReq = landedExit.itemRequirement ?? null;
+      if (exitReq && !this.playerHasItem(exitReq.itemId)) {
+        this.previewActionMessage.set(`You need the ${exitReq.itemName} to exit here.`);
+      } else {
+        if (exitReq?.consume) {
+          this.removeItemFromInventory(preview.dungonId, exitReq.itemId);
+        }
+        this.triggerDungonWin(landedExit.transitionType ?? 'open');
+      }
     }
 
     // Check if player stepped onto a floor trap
@@ -4709,6 +5895,14 @@ export class Game implements OnInit {
       };
     }
 
+    const obstacles = this.obstaclePlacementsByDungon()[dungonId] ?? [];
+    const hasObstacle = obstacles.some(
+      (obs) => obs.row === toRow && obs.column === toColumn && !obs.isDestroyed
+    );
+    if (hasObstacle) {
+      return { type: 'wall', door: null };
+    }
+
     return { type: 'none', door: null };
   }
 
@@ -4927,8 +6121,19 @@ export class Game implements OnInit {
 
     this.cheaterByDungon.update((allCheaters) => ({
       ...allCheaters,
-      [dungonId]: parsed.cheater,
+      [dungonId]: (() => {
+        // For main-game dungons, load the PC-specific cheater if one exists
+        if (this.isMainGame()) {
+          const pcId = this.currentPcId_();
+          if (pcId !== null && parsed.cheaterByPcId[pcId]) {
+            return parsed.cheaterByPcId[pcId];
+          }
+        }
+        return parsed.cheater;
+      })(),
     }));
+
+    this.cheaterByPcId_.set(parsed.cheaterByPcId);
 
     this.startPointByDungon.update((allStartPoints) => ({
       ...allStartPoints,
@@ -4972,6 +6177,52 @@ export class Game implements OnInit {
       [dungonId]: parsed.floorTrapPlacements,
     }));
 
+    this.obstaclePlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.obstaclePlacements,
+    }));
+
+    this.floorItemPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.itemPlacements,
+    }));
+
+    this.floorPotionPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.potionPlacements,
+    }));
+
+    this.floorItemListByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.floorItemList,
+    }));
+
+    this.floorPotionListByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.floorPotionList,
+    }));
+
+    this.collectedFloorItemsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.collectedFloorItems,
+    }));
+
+    this.collectedFloorPotionsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.collectedFloorPotions,
+    }));
+
+    // Ensure collected floor items are in the item lookup map so the equip system can resolve them
+    if (parsed.collectedFloorItems.length > 0) {
+      this.pcTresherItemsById.update((map) => {
+        const updated = new Map(map);
+        for (const it of parsed.collectedFloorItems) {
+          updated.set(it.id, { ...it, effectValue: it.effectValue ?? 0 });
+        }
+        return updated;
+      });
+    }
+
     this.keyList = parsed.keyList;
 
     const monsterHeldKeyIds = new Set(
@@ -4995,6 +6246,8 @@ export class Game implements OnInit {
       );
     }
 
+    this.npcTradesPurchased.set(parsed.npcTradesPurchased);
+
     this.savedCombatState = {
       playerHp: parsed.savedPlayerHp,
       playerAE: parsed.savedPlayerAE,
@@ -5017,12 +6270,21 @@ export class Game implements OnInit {
     squareTexts: SquareText[];
     exits: DungonExit[];
     floorTrapPlacements: FloorTrapPlacement[];
+    obstaclePlacements: ObstaclePlacement[];
+    itemPlacements: ItemPlacement[];
+    potionPlacements: PotionPlacement[];
+    floorItemList: Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }>;
+    floorPotionList: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>;
+    collectedFloorItems: Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }>;
+    collectedFloorPotions: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>;
     pcInventoryInitialized: boolean;
     savedPlayerHp: number | null;
     savedPlayerAE: number | null;
     savedTurnPhase: TurnPhase | null;
     savedPlayerRow: number | null;
     savedPlayerColumn: number | null;
+    npcTradesPurchased: number[];
+    cheaterByPcId: Record<number, Cheater>;
   } {
     if (!rawDungonJson || typeof rawDungonJson !== 'object') {
       return {
@@ -5038,12 +6300,21 @@ export class Game implements OnInit {
         squareTexts: [],
         exits: [],
         floorTrapPlacements: [],
+        obstaclePlacements: [],
+        itemPlacements: [],
+        potionPlacements: [],
+        floorItemList: [],
+        floorPotionList: [],
+        collectedFloorItems: [],
+        collectedFloorPotions: [],
         pcInventoryInitialized: false,
         savedPlayerHp: null,
         savedPlayerAE: null,
         savedTurnPhase: null,
         savedPlayerRow: null,
         savedPlayerColumn: null,
+        npcTradesPurchased: [],
+        cheaterByPcId: {},
       };
     }
 
@@ -5074,6 +6345,15 @@ export class Game implements OnInit {
       exits?: unknown[];
       exitList?: unknown[];
       floorTrapPlacements?: unknown[];
+      obstaclePlacements?: unknown[];
+      itemPlacements?: unknown[];
+      potionPlacements?: unknown[];
+      floorItemList?: unknown[];
+      floorPotionList?: unknown[];
+      collectedFloorItems?: unknown[];
+      collectedFloorPotions?: unknown[];
+      npcTradesPurchased?: unknown[];
+      cheaterByPcId?: unknown;
     };
 
     const filledSquaresSource =
@@ -5275,6 +6555,135 @@ export class Game implements OnInit {
       .filter((item): item is DungonExit => item !== null);
 
     const floorTrapPlacements = this.parseFloorTrapPlacements(source.floorTrapPlacements);
+    const obstaclePlacements = this.parseObstaclePlacementsGame(source.obstaclePlacements);
+
+    const itemPlacements: ItemPlacement[] = Array.isArray(source.itemPlacements)
+      ? source.itemPlacements
+          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+          .map((x) => {
+            const itemId = typeof x['itemId'] === 'number' ? x['itemId'] : null;
+            const row = typeof x['row'] === 'number' ? Math.floor(x['row']) : null;
+            const column = typeof x['column'] === 'number' ? Math.floor(x['column']) : null;
+            if (itemId === null || row === null || column === null) return null;
+            return { itemId, row, column } as ItemPlacement;
+          })
+          .filter((x): x is ItemPlacement => x !== null)
+      : [];
+
+    const potionPlacements: PotionPlacement[] = Array.isArray(source.potionPlacements)
+      ? source.potionPlacements
+          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+          .map((x) => {
+            const potionId = typeof x['potionId'] === 'number' ? x['potionId'] : null;
+            const row = typeof x['row'] === 'number' ? Math.floor(x['row']) : null;
+            const column = typeof x['column'] === 'number' ? Math.floor(x['column']) : null;
+            if (potionId === null || row === null || column === null) return null;
+            return { potionId, row, column } as PotionPlacement;
+          })
+          .filter((x): x is PotionPlacement => x !== null)
+      : [];
+
+    const floorItemList: Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }> =
+      Array.isArray(source.floorItemList)
+        ? source.floorItemList
+            .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+            .map((x) => {
+              const id = typeof x['id'] === 'number' ? x['id'] : null;
+              if (id === null) return null;
+              return {
+                id,
+                name: typeof x['name'] === 'string' ? x['name'] : '',
+                description: typeof x['description'] === 'string' ? x['description'] : '',
+                type: typeof x['type'] === 'string' ? x['type'] : 'other',
+                effectValue: typeof x['effectValue'] === 'number' ? x['effectValue'] : 0,
+                damage: typeof x['damage'] === 'number' ? x['damage'] : 6,
+                range: typeof x['range'] === 'number' ? Math.max(1, x['range']) : 1,
+                armorSlot: typeof x['armorSlot'] === 'string' ? x['armorSlot'] : null,
+                effectOn: typeof x['effectOn'] === 'string' ? x['effectOn'] : null,
+                isTwoHanded: x['isTwoHanded'] === true,
+              };
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null)
+        : [];
+
+    const floorPotionList: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }> =
+      Array.isArray(source.floorPotionList)
+        ? source.floorPotionList
+            .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+            .map((x) => {
+              const id = typeof x['id'] === 'number' ? x['id'] : null;
+              if (id === null) return null;
+              return {
+                id,
+                name: typeof x['name'] === 'string' ? x['name'] : '',
+                description: typeof x['description'] === 'string' ? x['description'] : '',
+                effectTo: typeof x['effectTo'] === 'string' ? x['effectTo'] : 'HP',
+                effectAmount: typeof x['effectAmount'] === 'number' ? x['effectAmount'] : 0,
+                lastFor: typeof x['lastFor'] === 'number' ? Math.max(0, x['lastFor']) : 0,
+              };
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null)
+        : [];
+
+    const npcTradesPurchased: number[] = Array.isArray(source.npcTradesPurchased)
+      ? source.npcTradesPurchased.filter((x): x is number => typeof x === 'number')
+      : [];
+
+    const parseItemArray = (raw: unknown[]): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }> =>
+      raw
+        .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+        .map((x) => {
+          const id = typeof x['id'] === 'number' ? x['id'] : null;
+          if (id === null) return null;
+          return {
+            id,
+            name: typeof x['name'] === 'string' ? x['name'] : '',
+            description: typeof x['description'] === 'string' ? x['description'] : '',
+            type: typeof x['type'] === 'string' ? x['type'] : 'other',
+            effectValue: typeof x['effectValue'] === 'number' ? x['effectValue'] : 0,
+            damage: typeof x['damage'] === 'number' ? x['damage'] : 6,
+            range: typeof x['range'] === 'number' ? Math.max(1, x['range']) : 1,
+            armorSlot: typeof x['armorSlot'] === 'string' ? x['armorSlot'] : null,
+            effectOn: typeof x['effectOn'] === 'string' ? x['effectOn'] : null,
+            isTwoHanded: x['isTwoHanded'] === true,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    const parsePotionArray = (raw: unknown[]): Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }> =>
+      raw
+        .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+        .map((x) => {
+          const id = typeof x['id'] === 'number' ? x['id'] : null;
+          if (id === null) return null;
+          return {
+            id,
+            name: typeof x['name'] === 'string' ? x['name'] : '',
+            description: typeof x['description'] === 'string' ? x['description'] : '',
+            effectTo: typeof x['effectTo'] === 'string' ? x['effectTo'] : 'HP',
+            effectAmount: typeof x['effectAmount'] === 'number' ? x['effectAmount'] : 0,
+            lastFor: typeof x['lastFor'] === 'number' ? Math.max(0, x['lastFor']) : 0,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    const collectedFloorItems = Array.isArray(source.collectedFloorItems) ? parseItemArray(source.collectedFloorItems) : [];
+    const collectedFloorPotions = Array.isArray(source.collectedFloorPotions) ? parsePotionArray(source.collectedFloorPotions) : [];
+
+    const cheaterByPcId: Record<number, Cheater> = {};
+    if (source.cheaterByPcId && typeof source.cheaterByPcId === 'object') {
+      for (const [key, val] of Object.entries(source.cheaterByPcId as Record<string, unknown>)) {
+        const pcId = Number(key);
+        if (!Number.isInteger(pcId) || pcId <= 0 || !val || typeof val !== 'object') continue;
+        const raw = val as Partial<Cheater> & { inventory?: unknown };
+        cheaterByPcId[pcId] = {
+          name: typeof raw.name === 'string' && raw.name.trim() ? raw.name : DEFAULT_CHEATER.name,
+          rangeOfSight: typeof raw.rangeOfSight === 'number' && Number.isFinite(raw.rangeOfSight) ? raw.rangeOfSight : DEFAULT_CHEATER.rangeOfSight,
+          facingDir: this.normalizeFacingDirection(raw.facingDir),
+          inventory: this.parseCheaterInventory(raw),
+        };
+      }
+    }
 
     return {
       filledSquares,
@@ -5289,12 +6698,21 @@ export class Game implements OnInit {
       squareTexts,
       exits,
       floorTrapPlacements,
+      obstaclePlacements,
+      itemPlacements,
+      potionPlacements,
+      floorItemList,
+      floorPotionList,
+      collectedFloorItems,
+      collectedFloorPotions,
       pcInventoryInitialized,
       savedPlayerHp: savedPlayerHpRaw,
       savedPlayerAE: savedPlayerAERaw,
       savedTurnPhase: savedTurnPhase,
       savedPlayerRow: savedPlayerRow !== null ? Math.floor(savedPlayerRow) : null,
       savedPlayerColumn: savedPlayerColumn !== null ? Math.floor(savedPlayerColumn) : null,
+      npcTradesPurchased,
+      cheaterByPcId,
     };
   }
 
@@ -5341,12 +6759,16 @@ export class Game implements OnInit {
   private parseTrapObject(raw: unknown): Trap | null {
     if (!raw || typeof raw !== 'object') return null;
     const src = raw as Partial<Record<string, unknown>>;
-    const damageTo = src['damageTo'] === 'Stamina' ? 'Stamina' : src['damageTo'] === 'Mind' ? 'Mind' : 'HP';
+    const damageTo = src['damageTo'] === 'Stamina' ? 'Stamina'
+      : src['damageTo'] === 'Mind' ? 'Mind'
+      : src['damageTo'] === 'AE' ? 'AE'
+      : src['damageTo'] === 'ROS' ? 'ROS'
+      : 'HP';
     return {
       name: typeof src['name'] === 'string' ? src['name'] : '',
       description: typeof src['description'] === 'string' ? src['description'] : '',
       damage: typeof src['damage'] === 'number' ? Math.max(0, src['damage']) : 0,
-      damageTo: damageTo as 'HP' | 'Stamina' | 'Mind',
+      damageTo: damageTo as 'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS',
       curseId: typeof src['curseId'] === 'number' ? src['curseId'] : null,
       toDetect: typeof src['toDetect'] === 'number' ? Math.max(0, src['toDetect']) : 10,
       toDisarm: typeof src['toDisarm'] === 'number' ? Math.max(0, src['toDisarm']) : 10,
@@ -5373,6 +6795,50 @@ export class Game implements OnInit {
         isTriggered: src['isTriggered'] === true,
         isDisarmed: src['isDisarmed'] === true,
         isDetected: src['isDetected'] === true,
+      });
+    }
+    return result;
+  }
+
+  private parseObstaclePlacementsGame(raw: unknown[] | undefined): ObstaclePlacement[] {
+    if (!Array.isArray(raw)) return [];
+    const result: ObstaclePlacement[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const src = item as Partial<Record<string, unknown>>;
+      const id = typeof src['id'] === 'number' ? src['id'] : 0;
+      const row = typeof src['row'] === 'number' ? src['row'] : -1;
+      const column = typeof src['column'] === 'number' ? src['column'] : -1;
+      if (row < 0 || column < 0) continue;
+      const hp = typeof src['hp'] === 'number' ? Math.max(1, src['hp']) : 10;
+      const currentHp = typeof src['currentHp'] === 'number' ? Math.max(0, src['currentHp']) : hp;
+      const heightPercent = typeof src['heightPercent'] === 'number' ? Math.max(1, Math.min(100, src['heightPercent'])) : 100;
+      const heightAnchor: 'floor' | 'ceiling' = src['heightAnchor'] === 'ceiling' ? 'ceiling' : 'floor';
+      const widthPercent = typeof src['widthPercent'] === 'number' ? Math.max(1, Math.min(100, src['widthPercent'])) : 100;
+      const widthAnchor: 'center' | 'east' | 'west' = src['widthAnchor'] === 'east' ? 'east' : src['widthAnchor'] === 'west' ? 'west' : 'center';
+      const color = typeof src['color'] === 'string' && src['color'] ? src['color'] : null;
+      result.push({
+        id,
+        row,
+        column,
+        name: typeof src['name'] === 'string' ? src['name'] : 'Obstacle',
+        note: typeof src['note'] === 'string' ? src['note'] : '',
+        imageId: typeof src['imageId'] === 'number'
+        ? src['imageId']
+        : typeof src['imageId'] === 'string' && src['imageId']
+          ? (parseInt(src['imageId'], 10) || null)
+          : null,
+        hp,
+        isIndestructible: src['isIndestructible'] === true,
+        containsItemId: typeof src['containsItemId'] === 'number' ? src['containsItemId'] : null,
+        heightPercent,
+        heightAnchor,
+        widthPercent,
+        widthAnchor,
+        color,
+        currentHp,
+        isDestroyed: src['isDestroyed'] === true,
+        itemTaken: src['itemTaken'] === true,
       });
     }
     return result;
@@ -5477,6 +6943,15 @@ export class Game implements OnInit {
       magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magic), 0)),
       magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magicResistance), 0)),
       callsReinforcements: (source as Record<string, unknown>)['callsReinforcements'] === true,
+      toHitPlusNeeded: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.toHitPlusNeeded), 0)),
+      npcGreeting: typeof source.npcGreeting === 'string' && source.npcGreeting.trim() ? source.npcGreeting : null,
+      npcInfo1: typeof source.npcInfo1 === 'string' && source.npcInfo1.trim() ? source.npcInfo1 : null,
+      npcInfo2: typeof source.npcInfo2 === 'string' && source.npcInfo2.trim() ? source.npcInfo2 : null,
+      npcInfo3: typeof source.npcInfo3 === 'string' && source.npcInfo3.trim() ? source.npcInfo3 : null,
+      npcOnlyAttackWhenAttacked: (source as Record<string, unknown>)['npcOnlyAttackWhenAttacked'] === true,
+      npcGivesInfoAfterDamaged: (source as Record<string, unknown>)['npcGivesInfoAfterDamaged'] === true,
+      npcAttacksAfterInfo: (source as Record<string, unknown>)['npcAttacksAfterInfo'] === true,
+      npcCanTrade: (source as Record<string, unknown>)['npcCanTrade'] === true,
     };
   }
 
@@ -5561,6 +7036,20 @@ export class Game implements OnInit {
     const guardColRaw = this.toFiniteNumber((source as Record<string, unknown>)['guardColumn']);
     if (guardColRaw !== null) {
       result.guardColumn = Math.floor(guardColRaw);
+    }
+    if ((source as Record<string, unknown>)['isStationary'] === true) {
+      result.isStationary = true;
+    }
+    const stationaryTriggerRow = this.toFiniteNumber((source as Record<string, unknown>)['stationaryTriggerRow']);
+    if (stationaryTriggerRow !== null) {
+      result.stationaryTriggerRow = Math.floor(stationaryTriggerRow);
+    }
+    const stationaryTriggerCol = this.toFiniteNumber((source as Record<string, unknown>)['stationaryTriggerCol']);
+    if (stationaryTriggerCol !== null) {
+      result.stationaryTriggerCol = Math.floor(stationaryTriggerCol);
+    }
+    if ((source as Record<string, unknown>)['noAttackUnlessAttacked'] === true) {
+      result.noAttackUnlessAttacked = true;
     }
 
     return result;
@@ -5762,7 +7251,291 @@ export class Game implements OnInit {
       destinationType,
       destinationDungonId: destinationType === 'dungon' ? parsedDestination : null,
       transitionType,
+      itemRequirement: this.parseExitItemRequirement((source as unknown as Record<string, unknown>)['itemRequirement']),
     };
+  }
+
+  private parseExitItemRequirement(raw: unknown): { itemId: number; itemName: string; consume: boolean } | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const src = raw as Partial<Record<string, unknown>>;
+    const itemId = typeof src['itemId'] === 'number' ? src['itemId'] : null;
+    if (itemId === null) return null;
+    return {
+      itemId,
+      itemName: typeof src['itemName'] === 'string' ? src['itemName'] : '',
+      consume: src['consume'] === true,
+    };
+  }
+
+  closeTavernModal(): void {
+    this.showTavernModal.set(false);
+    this.stopTavernMusic();
+  }
+
+  toggleMute(): void {
+    const muted = !this.soundMuted();
+    this.soundMuted.set(muted);
+    localStorage.setItem('soundMuted', muted ? 'true' : 'false');
+    if (muted) {
+      this.stopTavernMusic();
+    } else if (this.showTavernModal()) {
+      this.startTavernMusic();
+    }
+  }
+
+  private startTavernMusic(): void {
+    if (this.soundMuted() || this.tavernMusicCtx) return;
+    try {
+      const ctx = new AudioContext();
+      this.tavernMusicCtx = ctx;
+      const masterGain = ctx.createGain();
+      masterGain.gain.setValueAtTime(0.18, ctx.currentTime);
+      masterGain.connect(ctx.destination);
+
+      // Simple medieval tavern melody: pentatonic loop
+      const bpm = 112;
+      const beat = 60 / bpm;
+      // Notes as frequencies: D4, F4, G4, A4, C5, D5
+      const notes = [293.66, 349.23, 392.0, 440.0, 523.25, 587.33, 392.0, 440.0,
+                      349.23, 392.0, 329.63, 293.66, 349.23, 392.0, 440.0, 523.25];
+      const durations = [1, 0.5, 0.5, 1, 0.5, 0.5, 0.5, 0.5, 1, 0.5, 0.5, 1, 0.5, 0.5, 0.5, 1];
+
+      const schedule = (loopOffset: number): void => {
+        if (!this.tavernMusicCtx || this.soundMuted()) return;
+        let t = ctx.currentTime + loopOffset;
+        let totalDuration = 0;
+        for (let i = 0; i < notes.length; i++) {
+          const dur = durations[i] * beat;
+          const osc = ctx.createOscillator();
+          const env = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(notes[i], t);
+          env.gain.setValueAtTime(0.001, t);
+          env.gain.linearRampToValueAtTime(1, t + 0.02);
+          env.gain.setValueAtTime(1, t + dur * 0.75);
+          env.gain.linearRampToValueAtTime(0.001, t + dur * 0.98);
+          osc.connect(env);
+          env.connect(masterGain);
+          osc.start(t);
+          osc.stop(t + dur);
+          t += dur;
+          totalDuration += dur;
+        }
+        // Also add a simple drum/thump pulse on beats 1 & 3
+        t = ctx.currentTime + loopOffset;
+        for (let beat2 = 0; beat2 < totalDuration; beat2 += beat * 2) {
+          const drum = ctx.createOscillator();
+          const drumGain = ctx.createGain();
+          drum.type = 'sine';
+          drum.frequency.setValueAtTime(120, t + beat2);
+          drum.frequency.exponentialRampToValueAtTime(40, t + beat2 + 0.08);
+          drumGain.gain.setValueAtTime(0.6, t + beat2);
+          drumGain.gain.exponentialRampToValueAtTime(0.001, t + beat2 + 0.12);
+          drum.connect(drumGain);
+          drumGain.connect(masterGain);
+          drum.start(t + beat2);
+          drum.stop(t + beat2 + 0.12);
+        }
+        // Schedule next loop
+        setTimeout(() => schedule(0), totalDuration * 1000 - 100);
+      };
+      schedule(0);
+    } catch { /* audio not supported */ }
+  }
+
+  private stopTavernMusic(): void {
+    if (this.tavernMusicCtx) {
+      try { this.tavernMusicCtx.close(); } catch { /* ignore */ }
+      this.tavernMusicCtx = null;
+    }
+  }
+
+  get currentUserKey(): string {
+    return this.account.getKey() ?? '';
+  }
+
+  onTavernSpChanged(newSp: number): void {
+    this.playerSp.set(newSp);
+  }
+
+  onTavernStatChanged(event: { stat: TavernStat; newValue: number }): void {
+    if (event.stat === 'strength') this.playerStrength.set(event.newValue);
+    if (event.stat === 'stamina') this.playerStamina.set(event.newValue);
+    if (event.stat === 'mind') this.playerMind.set(event.newValue);
+    if (event.stat === 'magicPower') this.playerMagicPower.set(event.newValue);
+    if (event.stat === 'numberOfAttacks') this.playerNOA.set(event.newValue);
+    if (event.stat === 'numberOfDefends') this.playerNOD.set(event.newValue);
+  }
+
+  onQuestItemsTurnedIn(tresherIds: number[]): void {
+    const idSet = new Set(tresherIds);
+    this.cheaterByDungon.update((allCheaters) => {
+      const updated: Record<number, Cheater> = {};
+      for (const [key, cheater] of Object.entries(allCheaters)) {
+        const n = Number(key);
+        updated[n] = {
+          ...cheater,
+          inventory: {
+            ...cheater.inventory,
+            treshers: cheater.inventory.treshers.filter((t) => !(t.isquest && idSet.has(t.id))),
+          },
+        };
+      }
+      return updated;
+    });
+    this.saveGameState();
+  }
+
+  onTavernTresherGoldChanged(event: { tresherId: number; newGold: number }): void {
+    this.cheaterByDungon.update((allCheaters) => {
+      const updated: Record<number, Cheater> = {};
+      for (const [key, cheater] of Object.entries(allCheaters)) {
+        const n = Number(key);
+        updated[n] = {
+          ...cheater,
+          inventory: {
+            ...cheater.inventory,
+            treshers: cheater.inventory.treshers.map((t) =>
+              t.id === event.tresherId ? { ...t, gold: event.newGold } : t
+            ),
+          },
+        };
+      }
+      return updated;
+    });
+  }
+
+  loadStash(): void {
+    const userKey = this.account.getKey();
+    if (!userKey) return;
+    this.http
+      .get<{ result: number; items: StashItem[] }>(`${API_BASE_URL}/tavern-stash`, { params: { userkey: userKey } })
+      .subscribe({
+        next: (res) => {
+          if (res.result === 1 && Array.isArray(res.items)) {
+            this.stashItems.set(res.items);
+          }
+        },
+        error: () => { /* stash load failure is non-critical */ },
+      });
+  }
+
+  onDepositToStash(items: Tresher[]): void {
+    const userKey = this.account.getKey();
+    if (!userKey || items.length === 0) return;
+
+    // Optimistically remove items from cheater inventories
+    const depositIds = new Set(items.map((t) => t.id));
+    this.cheaterByDungon.update((allCheaters) => {
+      const updated: Record<number, Cheater> = {};
+      for (const [key, cheater] of Object.entries(allCheaters)) {
+        const n = Number(key);
+        const remaining: Tresher[] = [];
+        const toRemoveCount: Record<number, number> = {};
+        for (const id of depositIds) { toRemoveCount[id] = (toRemoveCount[id] ?? 0) + 1; }
+        for (const t of cheater.inventory.treshers) {
+          if (depositIds.has(t.id) && (toRemoveCount[t.id] ?? 0) > 0) {
+            toRemoveCount[t.id]--;
+          } else {
+            remaining.push(t);
+          }
+        }
+        updated[n] = { ...cheater, inventory: { ...cheater.inventory, treshers: remaining } };
+      }
+      return updated;
+    });
+    this.saveGameState();
+
+    const stashItems = items.map((t) => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      type: t.type ?? 'OtherTresher',
+      gold: t.gold,
+      silver: t.silver,
+      copper: t.copper,
+      zinc: t.zinc,
+      spReward: t.spReward,
+      imageId: t.imageId,
+      soundId: t.soundId,
+      isquest: t.isquest ?? false,
+    }));
+
+    this.http
+      .post<{ result: number; items: StashItem[] }>(`${API_BASE_URL}/tavern-stash/deposit`, { userkey: userKey, items: stashItems })
+      .subscribe({
+        next: (res) => {
+          if (res.result === 1 && Array.isArray(res.items)) {
+            this.stashItems.set(res.items);
+          }
+        },
+        error: () => { /* deposit failure — stash may be out of sync until next load */ },
+      });
+  }
+
+  onResetMyProgress(): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const dungonId = preview.dungonId;
+    this.cheaterByDungon.update((all) => {
+      const next = { ...all };
+      delete next[dungonId];
+      return next;
+    });
+    this.saveGameState();
+  }
+
+  onWithdrawFromStash(itemIndexes: number[]): void {
+    const userKey = this.account.getKey();
+    if (!userKey || itemIndexes.length === 0) return;
+
+    this.http
+      .post<{ result: number; remaining: StashItem[]; withdrawn: StashItem[] }>(`${API_BASE_URL}/tavern-stash/withdraw`, { userkey: userKey, itemIndexes })
+      .subscribe({
+        next: (res) => {
+          if (res.result === 1) {
+            this.stashItems.set(res.remaining ?? []);
+            // Add withdrawn items to the current dungeon's cheater inventory
+            const preview = this.gridPreviewContext();
+            if (!preview) return;
+            const withdrawn: StashItem[] = res.withdrawn ?? [];
+            if (withdrawn.length === 0) return;
+            const newTreshers: Tresher[] = withdrawn.map((s) => ({
+              id: s.id,
+              name: s.name,
+              description: s.description,
+              type: s.type,
+              gold: s.gold,
+              silver: s.silver,
+              copper: s.copper,
+              zinc: s.zinc,
+              spReward: s.spReward,
+              imageId: s.imageId,
+              soundId: s.soundId,
+              isquest: s.isquest,
+              item1Id: null, item2Id: null, item3Id: null, item4Id: null,
+              spell1Id: null, spell2Id: null, spell3Id: null, spell4Id: null,
+              curse1Id: null, curse2Id: null,
+              potion1Id: null, potion2Id: null, potion3Id: null,
+              trap: null,
+            }));
+            const dungonId = preview.dungonId;
+            const existingCheater = this.cheaterByDungon()[dungonId] ?? { ...DEFAULT_CHEATER };
+            this.cheaterByDungon.update((allCheaters) => ({
+              ...allCheaters,
+              [dungonId]: {
+                ...existingCheater,
+                inventory: {
+                  ...existingCheater.inventory,
+                  treshers: [...existingCheater.inventory.treshers, ...newTreshers],
+                },
+              },
+            }));
+            this.saveGameState();
+          }
+        },
+        error: () => { /* withdraw failure is non-critical */ },
+      });
   }
 
   confirmExit(): void {
@@ -5776,6 +7549,165 @@ export class Game implements OnInit {
     this.pendingExitTransitionType.set(null);
   }
 
+  // ─── NPC dialog ───────────────────────────────────────────────────────────
+
+  dismissNpcDialog(): void {
+    this.npcDialog.set(null);
+  }
+
+  canTalkToNpc(): boolean {
+    if (this.turnPhase() !== 'player') return false;
+    const preview = this.gridPreviewContext();
+    if (!preview) return false;
+    const monstersById = this.getMonstersByIdForDungon(preview.dungonId);
+    return this.monsterInstances().some((m) => {
+      if (m.isDead || m.npcIsHostile) return false;
+      const template = monstersById.get(m.monsterId);
+      if (!template) return false;
+      const isNpc =
+        template.npcGreeting ||
+        template.npcInfo1 ||
+        template.npcInfo2 ||
+        template.npcInfo3 ||
+        template.npcCanTrade;
+      if (!isNpc) return false;
+      const dist = Math.max(
+        Math.abs(m.row - preview.centerRow),
+        Math.abs(m.column - preview.centerColumn)
+      );
+      return dist <= 1;
+    });
+  }
+
+  talkToNpc(): void {
+    if (!this.canTalkToNpc()) return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const monstersById = this.getMonstersByIdForDungon(preview.dungonId);
+    const target = this.monsterInstances().find((m) => {
+      if (m.isDead || m.npcIsHostile) return false;
+      const template = monstersById.get(m.monsterId);
+      if (!template) return false;
+      const isNpc =
+        template.npcGreeting ||
+        template.npcInfo1 ||
+        template.npcInfo2 ||
+        template.npcInfo3 ||
+        template.npcCanTrade;
+      if (!isNpc) return false;
+      const dist = Math.max(
+        Math.abs(m.row - preview.centerRow),
+        Math.abs(m.column - preview.centerColumn)
+      );
+      return dist <= 1;
+    });
+    if (!target) return;
+    const template = monstersById.get(target.monsterId);
+    if (!template) return;
+    this.addCombatLog(this.npcApproachLine(template.name, template.type));
+    const creativeGreeting = template.npcGreeting
+      ? this.npcWrapSpeech(template.name, template.type, template.npcGreeting)
+      : undefined;
+    this.npcDialog.set({ instance: target, template, creativeGreeting });
+  }
+
+  npcShareInfo(): void {
+    const dialog = this.npcDialog();
+    if (!dialog) return;
+    const { instance: inst, template } = dialog;
+
+    // Check if info is gated behind being attacked+spared
+    if (template.npcGivesInfoAfterDamaged && !inst.isSpared) {
+      this.addCombatLog(this.npcRefusalLine(template.name, template.type));
+      return;
+    }
+
+    if (inst.hasSharedInfo) {
+      this.addCombatLog(`${template.name} has nothing more to tell you.`);
+      return;
+    }
+
+    const infoParts = [template.npcInfo1, template.npcInfo2, template.npcInfo3].filter((x): x is string => Boolean(x));
+    if (infoParts.length === 0) {
+      this.addCombatLog(`${template.name} shrugs. "I know nothing of use."`);
+      return;
+    }
+
+    inst.hasSharedInfo = true;
+    for (const info of infoParts) {
+      this.addCombatLog(this.npcWrapSpeech(template.name, template.type, info));
+    }
+
+    if (template.npcAttacksAfterInfo) {
+      inst.npcIsHostile = true;
+      this.addCombatLog(this.pickRandom([
+        `${template.name} snarls — "Now you know too much!" and attacks!`,
+        `${template.name}'s eyes go cold. "A pity. You leave me no choice." They lunge!`,
+        `"Now you'll have to die," ${template.name} hisses, drawing a weapon!`,
+      ]));
+    }
+
+    this.monsterInstances.update((arr) => [...arr]);
+    this.npcDialog.set({ ...dialog, instance: inst });
+  }
+
+  spareNpc(): void {
+    const dialog = this.npcDialog();
+    if (!dialog) return;
+    const { instance: inst, template } = dialog;
+    if (inst.isSpared) {
+      this.addCombatLog(`${template.name} is already spared.`);
+      return;
+    }
+    inst.isSpared = true;
+    this.addCombatLog(`You lower your weapon. ${template.name} looks relieved.`);
+    this.monsterInstances.update((arr) => [...arr]);
+    this.npcDialog.set({ ...dialog, instance: inst });
+  }
+
+  getNpcShopItems(): { tresher: Tresher; price: number; purchased: boolean }[] {
+    const dialog = this.npcDialog();
+    if (!dialog || !dialog.template.npcCanTrade) return [];
+    const preview = this.gridPreviewContext();
+    if (!preview) return [];
+    const treshersById = this.getTreshersByIdForDungon(preview.dungonId);
+    const purchased = new Set(this.npcTradesPurchased());
+    return dialog.template.tresherIds
+      .map((id) => {
+        const tresher = treshersById.get(id);
+        if (!tresher) return null;
+        return { tresher, price: Math.max(5, tresher.spReward), purchased: purchased.has(id) };
+      })
+      .filter((item): item is { tresher: Tresher; price: number; purchased: boolean } => item !== null);
+  }
+
+  npcBuyTresher(tresherId: number): void {
+    const dialog = this.npcDialog();
+    if (!dialog) return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+
+    if (this.npcTradesPurchased().includes(tresherId)) {
+      this.addCombatLog(`You already purchased that item.`);
+      return;
+    }
+
+    const treshersById = this.getTreshersByIdForDungon(preview.dungonId);
+    const tresher = treshersById.get(tresherId);
+    if (!tresher) return;
+
+    const price = Math.max(5, tresher.spReward);
+    if (this.playerSp() < price) {
+      this.addCombatLog(`Not enough SP — ${tresher.name} costs ${price} SP and you only have ${this.playerSp()}.`);
+      return;
+    }
+
+    this.playerSp.update((s) => s - price);
+    this.npcTradesPurchased.update((ids) => [...ids, tresherId]);
+    this.addItemsToCheaterInventory(preview.dungonId, [], [tresher]);
+    this.addCombatLog(`You paid ${price} SP for ${tresher.name}. It's now in your inventory.`);
+  }
+
   private triggerDungonWin(transitionType?: ExitTransitionType): void {
     this.dungonWon.set(true);
     if (transitionType === 'stairsUp' && this.winStairsImageIndex() === null) {
@@ -5787,6 +7719,8 @@ export class Game implements OnInit {
       this.playerSp.update((s) => s + spReward);
       this.awardSpToPC(spReward);
     }
+    this.showTavernModal.set(true);
+    this.startTavernMusic();
   }
 
   private awardSpToPC(amount: number): void {
@@ -5839,7 +7773,15 @@ export class Game implements OnInit {
         isDormant: placement.isDormant === true,
         guardRow: typeof placement.guardRow === 'number' ? placement.guardRow : null,
         guardColumn: typeof placement.guardColumn === 'number' ? placement.guardColumn : null,
+        isStationary: placement.isStationary === true,
+        stationaryTriggerRow: typeof placement.stationaryTriggerRow === 'number' ? placement.stationaryTriggerRow : null,
+        stationaryTriggerCol: typeof placement.stationaryTriggerCol === 'number' ? placement.stationaryTriggerCol : null,
+        noAttackUnlessAttacked: placement.noAttackUnlessAttacked === true,
         hasCalledReinforcements: false,
+        hasGreeted: false,
+        hasSharedInfo: false,
+        isSpared: false,
+        npcIsHostile: false,
       };
     });
     this.monsterInstances.set(instances);
@@ -5857,6 +7799,7 @@ export class Game implements OnInit {
       this.playerHp.set(this.playerStartingHp);
       this.playerAE.set(this.playerMaxAE);
       this.playerAttacksThisTurn.set(0);
+      this.playerSearchesThisTurn.set(0);
       this.turnPhase.set('player');
     }
 
@@ -5882,6 +7825,40 @@ export class Game implements OnInit {
       parts.push(`${item.kind}: ${item.name}`);
     }
     this.addCombatLog(`Nearby — ${parts.join(', ')}`);
+  }
+
+  private triggerNpcGreetings(): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+
+    const monstersById = this.getMonstersByIdForDungon(preview.dungonId);
+    const instances = this.monsterInstances().filter(
+      (m) => !m.isDead && !m.isDormant
+    );
+
+    for (const inst of instances) {
+      const template = monstersById.get(inst.monsterId);
+      if (!template?.npcGreeting) continue;
+      if (inst.hasGreeted) continue;
+
+      const dist = Math.max(
+        Math.abs(inst.row - preview.centerRow),
+        Math.abs(inst.column - preview.centerColumn)
+      );
+      if (dist > 1) continue;
+
+      const hasLOS = this.hasLineOfSight(
+        preview.dungonId, preview.centerRow, preview.centerColumn, inst.row, inst.column
+      );
+      if (!hasLOS) continue;
+
+      inst.hasGreeted = true;
+      const creativeGreeting = this.npcWrapSpeech(template.name, template.type, template.npcGreeting);
+      this.addCombatLog(creativeGreeting);
+      this.npcDialog.set({ instance: inst, template, creativeGreeting });
+      this.monsterInstances.update((arr) => [...arr]);
+      break; // one greeting per move
+    }
   }
 
   private addCombatLog(text: string): void {
@@ -5917,7 +7894,7 @@ export class Game implements OnInit {
         }
       }
     }
-    return this.playerBaseAC + armorCount + armorItemBonus;
+    return this.playerBaseAC + armorCount + armorItemBonus - this.playerBoostAttackACPenalty();
   }
 
   endPlayerTurnEarly(): void {
@@ -5929,8 +7906,25 @@ export class Game implements OnInit {
     this.startMonsterTurns();
   }
 
+  canAde(): boolean {
+    return this.turnPhase() === 'player' && this.playerAE() >= 2 && this.canPlayerAttack() && this.canPlayerDefend();
+  }
+
+  tryAde(): void {
+    if (!this.canAde()) return;
+    this.tryPlayerAttack();
+    // Re-check defend is still possible after the attack consumed 1 AE
+    if (this.canPlayerDefend()) {
+      this.tryPlayerDefend();
+    }
+    // End turn regardless
+    if (this.turnPhase() === 'player') {
+      this.endPlayerTurnEarly();
+    }
+  }
+
   canPlayerDefend(): boolean {
-    return this.turnPhase() === 'player' && this.playerAE() >= 1;
+    return this.turnPhase() === 'player' && this.playerAE() >= 1 && this.playerDefendsThisTurn() < this.playerNOD();
   }
 
   tryPlayerDefend(): void {
@@ -5938,11 +7932,27 @@ export class Game implements OnInit {
     const preview = this.gridPreviewContext();
     if (!preview) return;
     this.consumePlayerAE(1, preview.dungonId);
+    this.playerDefendsThisTurn.update((n) => n + 1);
     this.playerDefendStacks.update((s) => s + 1);
     this.addCombatLog(`You defend! +2 AC for the next attack against you. (${this.playerDefendStacks()} stack${this.playerDefendStacks() !== 1 ? 's' : ''} active)`);
     if (this.playerAE() <= 0) {
       this.startMonsterTurns();
     }
+  }
+
+  goHome(): void {
+    const dest = this.account.getKey() ? '/dashboard' : '/';
+    void this.router.navigate([dest]);
+  }
+
+  canSearch(): boolean {    if (this.turnPhase() !== 'player' || this.playerAE() < 1) return false;
+    const searches = this.playerSearchesThisTurn();
+    const type = (this.playerType() ?? '').toLowerCase();
+    const isThiephOrShorties = type === 'thieph' || type === 'shorties';
+    // Thieph and Shorties can search twice per round; everyone else only once
+    if (isThiephOrShorties && searches >= 2) return false;
+    if (!isThiephOrShorties && searches >= 1) return false;
+    return true;
   }
 
   canPlayerAttack(): boolean {
@@ -5956,8 +7966,129 @@ export class Game implements OnInit {
       const item = itemsMap.get(itemId);
       if (item?.type === 'weapon' && item.range > bestRange) bestRange = item.range;
     }
-    if (bestRange === 0) return false;
-    return this.findAdjacentLiveMonster(preview.centerRow, preview.centerColumn, bestRange, preview.dungonId) !== null;
+    const effectiveRange = bestRange === 0 ? 1 : bestRange; // unarmed = melee range 1
+    return this.findAdjacentLiveMonster(preview.centerRow, preview.centerColumn, effectiveRange, preview.dungonId) !== null;
+  }
+
+  canBoostAttack(): boolean {
+    return this.isFighterClass() && this.canPlayerAttack() && this.playerAttacksThisTurn() === 0;
+  }
+
+  isFighterClass(): boolean {
+    const t = (this.playerType() ?? '').toLowerCase();
+    return t === 'fighter' || t === 'figher';
+  }
+
+  tryBoostAttack(): void {
+    if (this.turnPhase() !== 'player') { this.addCombatLog('Boost: not your turn.'); return; }
+    if (!this.isFighterClass()) { this.addCombatLog('Boost: only Fighters can use Boost Attack.'); return; }
+    if (this.playerAttacksThisTurn() > 0) { this.addCombatLog('Boost: must be used before any other attack this turn.'); return; }
+    if (this.playerAE() < 1) { this.addCombatLog('Boost: no AE remaining.'); return; }
+
+    const preview = this.gridPreviewContext();
+    if (!preview) { this.addCombatLog('Boost: no active dungeon context.'); return; }
+
+    const equippedItemIds = this.equippedItemIdsByDungon()[preview.dungonId] ?? [];
+    const itemsMap = this.pcTresherItemsById();
+    let bestRange = 0;
+    let weaponToHit = 0;
+    let weaponDamageDivisor = 6;
+    for (const itemId of equippedItemIds) {
+      const item = itemsMap.get(itemId);
+      if (item?.type === 'weapon') {
+        if (item.range > bestRange) bestRange = item.range;
+        if ((item.effectValue ?? 0) > weaponToHit) {
+          weaponToHit = item.effectValue ?? 0;
+          weaponDamageDivisor = item.damage > 0 ? item.damage : 6;
+        }
+      }
+    }
+
+    const isUnarmed = bestRange === 0;
+    if (isUnarmed) {
+      bestRange = 1;
+    }
+
+    const adjacentMonster = this.getTargetMonster(preview.dungonId, preview.centerRow, preview.centerColumn, bestRange);
+    if (!adjacentMonster) {
+      this.addCombatLog('No monster in weapon range.');
+      return;
+    }
+
+    const template = this.getMonstersByIdForDungon(preview.dungonId).get(adjacentMonster.monsterId);
+    const toHitRequired = template?.toHitPlusNeeded ?? 0;
+    if (isUnarmed && toHitRequired > 0) {
+      this.addCombatLog(`Your bare hands cannot hit ${template?.name ?? 'this monster'}! Need a +${toHitRequired} weapon.`);
+      return;
+    }
+    if (!isUnarmed && weaponToHit < toHitRequired) {
+      this.addCombatLog(`Your +${weaponToHit} weapon cannot hit ${template?.name ?? 'this monster'}! Need +${toHitRequired} or better.`);
+      return;
+    }
+
+    const aeToConsume = this.playerAE();
+    this.consumePlayerAE(aeToConsume, preview.dungonId);
+    if (this.turnPhase() === 'gameover') return;
+    this.playerAttacksThisTurn.update(n => n + 1);
+    this.playClangSound();
+    const monsterAC = template?.ac ?? 10;
+
+    const prevCombo = this.comboTracker();
+    const isSameTarget = prevCombo?.placementIndex === adjacentMonster.placementIndex;
+    const comboCount = isSameTarget ? prevCombo!.count : 0;
+    const comboBonus = Math.min(comboCount, 4);
+    this.comboTracker.set({ placementIndex: adjacentMonster.placementIndex, count: comboCount + 1 });
+    if (comboBonus > 0) {
+      this.addCombatLog(`Combo ×${comboCount + 1}! +${comboBonus} to hit!`);
+    }
+
+    const level = this.playerLevel();
+    const boostDieSize = level >= 6 ? 6 : level >= 3 ? 4 : 3;
+    const boostDieRoll = this.randomInt(1, boostDieSize);
+
+    const rollBonus = isUnarmed ? -1 : weaponToHit;
+    const hitRoll = this.rollD12(rollBonus + this.playerStamina() + comboBonus) + boostDieRoll;
+    this.addCombatLog(`Boost Attack! +${boostDieRoll} (1d${boostDieSize}) to hit. Your AC is -4 until your next turn!`);
+
+    if (hitRoll >= monsterAC) {
+      const damage = isUnarmed
+        ? Math.max(1, 1 + Math.floor(this.playerStrength() / 2))
+        : Math.max(1, this.randomInt(1, Math.max(1, Math.ceil(12 / Math.max(1, weaponDamageDivisor)))) + this.playerStrength());
+      adjacentMonster.currentHp -= damage;
+      if (!adjacentMonster.npcIsHostile) {
+        adjacentMonster.npcIsHostile = true;
+      }
+      this.triggerBloodSplatter();
+      this.addCombatLog(
+        `You ${isUnarmed ? 'punch' : 'hit'} ${template?.name ?? 'monster'} for ${damage} dmg! (rolled ${hitRoll} vs AC ${monsterAC})`
+      );
+      if (adjacentMonster.currentHp <= 0) {
+        adjacentMonster.isDead = true;
+        adjacentMonster.currentHp = 0;
+        this.addCombatLog(`${template?.name ?? 'Monster'} is dead!`);
+        this.selectedCombatTarget.set(null);
+        this.comboTracker.set(null);
+        this.dropMonsterLoot(preview.dungonId, adjacentMonster, template ?? null);
+        const spGain = template?.spReward ?? 0;
+        if (spGain > 0) {
+          this.playerSp.update((s) => s + spGain);
+          this.addCombatLog(`+${spGain} SP!`);
+          this.awardSpToPC(spGain);
+        }
+      } else if (template?.npcGivesInfoAfterDamaged && !adjacentMonster.isSpared) {
+        this.addCombatLog(`${template.name} staggers — you can spare it and ask for information.`);
+        this.npcDialog.set({ instance: adjacentMonster, template });
+      }
+      this.monsterInstances.update((arr) => [...arr]);
+    } else {
+      this.addCombatLog(
+        `You miss ${template?.name ?? 'monster'}. (rolled ${hitRoll} vs AC ${monsterAC})`
+      );
+    }
+
+    this.playerBoostAttackACPenalty.set(4);
+    this.drawPreviewGridCanvas();
+    this.startMonsterTurns();
   }
 
   tryPlayerAttack(): void {
@@ -5989,9 +8120,9 @@ export class Game implements OnInit {
       }
     }
 
-    if (bestRange === 0) {
-      this.addCombatLog('No weapon equipped.');
-      return;
+    const isUnarmed = bestRange === 0;
+    if (isUnarmed) {
+      bestRange = 1; // unarmed melee range
     }
 
     const adjacentMonster = this.getTargetMonster(preview.dungonId, preview.centerRow, preview.centerColumn, bestRange);
@@ -6000,9 +8131,20 @@ export class Game implements OnInit {
       return;
     }
 
+    const template = this.getMonstersByIdForDungon(preview.dungonId).get(adjacentMonster.monsterId);
+    const toHitRequired = template?.toHitPlusNeeded ?? 0;
+    if (isUnarmed && toHitRequired > 0) {
+      this.addCombatLog(`Your bare hands cannot hit ${template?.name ?? 'this monster'}! Need a +${toHitRequired} weapon.`);
+      return;
+    }
+    if (!isUnarmed && weaponToHit < toHitRequired) {
+      this.addCombatLog(`Your +${weaponToHit} weapon cannot hit ${template?.name ?? 'this monster'}! Need +${toHitRequired} or better.`);
+      return;
+    }
+
     this.consumePlayerAE(1, preview.dungonId);
     this.playerAttacksThisTurn.update(n => n + 1);
-    const template = this.getMonstersByIdForDungon(preview.dungonId).get(adjacentMonster.monsterId);
+    this.playClangSound();
     const monsterAC = template?.ac ?? 10;
 
     const prevCombo = this.comboTracker();
@@ -6014,14 +8156,27 @@ export class Game implements OnInit {
       this.addCombatLog(`Combo ×${comboCount + 1}! +${comboBonus} to hit!`);
     }
 
-    const hitRoll = this.rollD12(weaponToHit + this.playerStamina() + comboBonus);
+    const coverPenalty = this.getAttackCoverPenalty(
+      preview.dungonId, preview.centerRow, preview.centerColumn,
+      adjacentMonster.row, adjacentMonster.column
+    );
+    if (coverPenalty !== 0) {
+      this.addCombatLog(`Partial cover! ${coverPenalty} to hit.`);
+    }
+    const rollBonus = (isUnarmed ? -1 : weaponToHit) + coverPenalty;
+    const hitRoll = this.rollD12(rollBonus + this.playerStamina() + comboBonus);
     if (hitRoll >= monsterAC) {
-      const dieFaces = Math.max(1, Math.ceil(12 / Math.max(1, weaponDamageDivisor)));
-      const damage = Math.max(1, this.randomInt(1, dieFaces) + this.playerStrength());
+      const damage = isUnarmed
+        ? Math.max(1, 1 + Math.floor(this.playerStrength() / 2))
+        : Math.max(1, this.randomInt(1, Math.max(1, Math.ceil(12 / Math.max(1, weaponDamageDivisor)))) + this.playerStrength());
       adjacentMonster.currentHp -= damage;
+      // If this is an NPC that only attacks when attacked, mark it hostile now
+      if (!adjacentMonster.npcIsHostile) {
+        adjacentMonster.npcIsHostile = true;
+      }
       this.triggerBloodSplatter();
       this.addCombatLog(
-        `You hit ${template?.name ?? 'monster'} for ${damage} dmg! (rolled ${hitRoll} vs AC ${monsterAC})`
+        `You ${isUnarmed ? 'punch' : 'hit'} ${template?.name ?? 'monster'} for ${damage} dmg! (rolled ${hitRoll} vs AC ${monsterAC})`
       );
       if (adjacentMonster.currentHp <= 0) {
         adjacentMonster.isDead = true;
@@ -6036,6 +8191,9 @@ export class Game implements OnInit {
           this.addCombatLog(`+${spGain} SP!`);
           this.awardSpToPC(spGain);
         }
+      } else if (template?.npcGivesInfoAfterDamaged && !adjacentMonster.isSpared) {
+        this.addCombatLog(`${template.name} staggers — you can spare it and ask for information.`);
+        this.npcDialog.set({ instance: adjacentMonster, template });
       }
       this.monsterInstances.update((arr) => [...arr]);
     } else {
@@ -6064,6 +8222,7 @@ export class Game implements OnInit {
           this.addCombatLog(`${eff.sourceName}: ${sign}${eff.effectAmount} HP (${eff.remainingAE - 1} AE left).`);
           if (newHp <= 0) {
             this.turnPhase.set('gameover');
+            setTimeout(() => this.goHome(), 3500);
           }
         } else {
           this.addCombatLog(`${eff.sourceName}: ${eff.effectOn} ${eff.effectAmount} (${eff.remainingAE - 1} AE left).`);
@@ -6144,6 +8303,90 @@ export class Game implements OnInit {
 
   private randomInt(min: number, max: number): number {
     return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  private pickRandom<T>(arr: T[]): T {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  private npcWrapSpeech(name: string, type: string, line: string): string {
+    const t = type.toLowerCase();
+    const humanAesthetic = [
+      `${name} leans in and murmurs, "${line}"`,
+      `${name} clears their throat. "${line}"`,
+      `"${line}" ${name} says, arms folded.`,
+      `${name} pauses, then speaks. "${line}"`,
+      `${name} glances about before saying, "${line}"`,
+      `${name} looks you in the eye. "${line}"`,
+    ];
+    const goblinAesthetic = [
+      `"HEH! ${line}" ${name} cackles.`,
+      `${name} scratches its head. "Uhhhh... ${line}. Yeah, that's it!"`,
+      `"You didn't hear this from me — ${line}" ${name} squeaks.`,
+      `${name} taps its nose knowingly. "${line}"`,
+    ];
+    const undeadAesthetic = [
+      `${name}'s hollow voice intones: "${line}"`,
+      `"${line}" — the spirit of ${name} echoes.`,
+      `${name} rasps from beyond the veil: "${line}"`,
+      `The whisper of ${name} chills the air: "${line}"`,
+    ];
+    const demonicAesthetic = [
+      `${name}'s voice reverberates with dark amusement: "${line}"`,
+      `"${line}," ${name} hisses through a twisted grin.`,
+      `${name} regards you with contempt before conceding: "${line}"`,
+      `Smoke curls from ${name}'s lips: "${line}"`,
+    ];
+    const beastAesthetic = [
+      `${name} growls something that roughly translates to: "${line}"`,
+      `With a rumbling breath, ${name} communicates: "${line}"`,
+      `${name} grunts and stamps a foot. "${line}"`,
+    ];
+    const arcaneAesthetic = [
+      `${name} traces a sigil in the air. "${line}"`,
+      `${name} speaks with measured precision: "${line}"`,
+      `"${line}" — ${name} intones, as if reciting from memory.`,
+    ];
+    if (t.includes('goblin') || t.includes('kobold') || t.includes('gremlin') || t.includes('boggart')) return this.pickRandom(goblinAesthetic);
+    if (t.includes('undead') || t.includes('ghost') || t.includes('zombie') || t.includes('lich') || t.includes('skeleton') || t.includes('wraith') || t.includes('specter')) return this.pickRandom(undeadAesthetic);
+    if (t.includes('demon') || t.includes('devil') || t.includes('fiend') || t.includes('infernal')) return this.pickRandom(demonicAesthetic);
+    if (t.includes('beast') || t.includes('animal') || t.includes('troll') || t.includes('ogre')) return this.pickRandom(beastAesthetic);
+    if (t.includes('mage') || t.includes('wizard') || t.includes('scholar') || t.includes('celestial') || t.includes('arcane')) return this.pickRandom(arcaneAesthetic);
+    return this.pickRandom(humanAesthetic);
+  }
+
+  private npcRefusalLine(name: string, type: string): string {
+    const t = type.toLowerCase();
+    const generic = [
+      `${name} eyes you warily. "Prove you can show mercy, and then we'll talk."`,
+      `"Earn my trust first," ${name} says flatly.`,
+      `${name} folds their arms. "Show me mercy, then maybe I'll speak."`,
+    ];
+    const goblin = [
+      `"NUH-UH! Not tellin'!" ${name} folds its arms smugly.`,
+      `${name} blows a raspberry. "Fight me an' spare me FIRST, then maybe!"`,
+    ];
+    const undead = [
+      `${name}'s hollow voice drifts: "Prove your resolve, then the dead may speak."`,
+    ];
+    if (t.includes('goblin') || t.includes('kobold') || t.includes('gremlin')) return this.pickRandom(goblin);
+    if (t.includes('undead') || t.includes('ghost') || t.includes('skeleton')) return this.pickRandom(undead);
+    return this.pickRandom(generic);
+  }
+
+  private npcApproachLine(name: string, type: string): string {
+    const t = type.toLowerCase();
+    const generic = [
+      `You approach ${name} cautiously.`,
+      `You step forward to speak with ${name}.`,
+      `You address ${name} with a nod of acknowledgment.`,
+    ];
+    const goblin = [
+      `You cautiously approach the jittery ${name}.`,
+      `You try to look non-threatening as you approach ${name}.`,
+    ];
+    if (t.includes('goblin') || t.includes('kobold') || t.includes('gremlin')) return this.pickRandom(goblin);
+    return this.pickRandom(generic);
   }
 
   private triggerBloodSplatter(): void {
@@ -6333,20 +8576,106 @@ export class Game implements OnInit {
   }
 
   private playStepSound(volume = 0.2): void {
+    if (this.soundMuted()) return;
     try {
       const ctx = new AudioContext();
+      const now = ctx.currentTime;
+
+      // Short noise burst — stone scuff texture
+      const bufSize = Math.ceil(ctx.sampleRate * 0.04);
+      const noiseBuffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      const noiseData = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) noiseData[i] = Math.random() * 2 - 1;
+      const noiseSource = ctx.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.value = 800;
+      noiseFilter.Q.value = 0.8;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(volume * 0.9, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+      noiseSource.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+      noiseSource.start(now);
+      noiseSource.stop(now + 0.04);
+
+      // Low thud — heel impact body
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(110, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.08);
-      gain.gain.setValueAtTime(volume, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(55, now + 0.07);
+      gain.gain.setValueAtTime(volume * 2.0, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.12);
+      osc.start(now);
+      osc.stop(now + 0.1);
       osc.onended = () => ctx.close();
+    } catch { /* audio not supported */ }
+  }
+
+  private playClangSound(): void {
+    if (this.soundMuted()) return;
+    try {
+      const ctx = new AudioContext();
+      const now = ctx.currentTime;
+
+      // Very short high-freq noise burst for the sharp metallic transient
+      const bufSize = Math.ceil(ctx.sampleRate * 0.016);
+      const noiseBuffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      const noiseData = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) noiseData[i] = Math.random() * 2 - 1;
+      const noiseSource = ctx.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.value = 9000;
+      noiseFilter.Q.value = 1.8;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.85, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.016);
+      noiseSource.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+      noiseSource.start(now);
+      noiseSource.stop(now + 0.016);
+
+      // Inharmonic square-wave partials — very short decay for sharpness
+      for (const [freq, vol, decay] of [
+        [2400, 0.22, 0.07],
+        [3700, 0.16, 0.05],
+        [5500, 0.09, 0.04],
+        [1200, 0.14, 0.09],
+      ] as [number, number, number][]) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + decay);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + decay);
+      }
+
+      // Hard snap thump — fast frequency drop, very short
+      const thump = ctx.createOscillator();
+      const thumpGain = ctx.createGain();
+      thump.type = 'sine';
+      thump.frequency.setValueAtTime(300, now);
+      thump.frequency.exponentialRampToValueAtTime(90, now + 0.022);
+      thumpGain.gain.setValueAtTime(0.72, now);
+      thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+      thump.connect(thumpGain);
+      thumpGain.connect(ctx.destination);
+      thump.start(now);
+      thump.stop(now + 0.035);
+
+      setTimeout(() => ctx.close(), 300);
     } catch { /* audio not supported */ }
   }
 
@@ -6371,6 +8700,7 @@ export class Game implements OnInit {
     this.turnPhase.set('monsters');
     this.addCombatLog('--- Monster turns ---');
     this.comboTracker.set(null);
+    this.outOfRangeTarget.set(null);
 
     const preview = this.gridPreviewContext();
     if (!preview) {
@@ -6424,6 +8754,13 @@ export class Game implements OnInit {
           m.remainingAE = (tpl?.movementEconomy ?? 0) + (tpl?.numberOfAttacks ?? 0);
         }
       }
+      if (!m.isDead && m.isStationary && m.stationaryTriggerRow !== null && m.stationaryTriggerCol !== null) {
+        if (playerRow === m.stationaryTriggerRow && playerCol === m.stationaryTriggerCol) {
+          m.isStationary = false;
+          const t = monstersById.get(m.monsterId);
+          this.addCombatLog(`${t?.name ?? 'Monster'} starts moving!`);
+        }
+      }
     }
 
     for (const monster of instances) {
@@ -6442,6 +8779,7 @@ export class Game implements OnInit {
         && this.hasLineOfSight(dungonId, monster.row, monster.column, playerRow, playerCol);
       const canDetectPlayer = isAdjacent || this.isMonsterWithinRangeOfPlayer(monster, playerRow, playerCol, 5, dungonId);
       const shouldFlee = monster.currentHp <= template.runAt && template.runAt > 0;
+      const isPassive = (template.npcOnlyAttackWhenAttacked || monster.noAttackUnlessAttacked) && !monster.npcIsHostile;
 
       // Call for reinforcements before acting (first time only, costs full turn)
       if (template.callsReinforcements && !monster.hasCalledReinforcements && canDetectPlayer) {
@@ -6461,10 +8799,20 @@ export class Game implements OnInit {
       if (shouldFlee) {
         this.monsterTryFlee(monster, dungonId, playerRow, playerCol);
       } else if (isAdjacent && monster.attacksUsedThisTurn < maxAttacks) {
-        this.monsterAttackPlayer(monster, template, dungonId);
-      } else if (!isAdjacent && canDetectPlayer) {
-        this.monsterMoveToward(monster, dungonId, playerRow, playerCol);
-      } else if (monster.roam) {
+        // Won't attack unless attacked first (template or per-placement flag)
+        if (isPassive) {
+          monster.remainingAE = 0;
+        } else {
+          this.monsterAttackPlayer(monster, template, dungonId, playerRow, playerCol);
+        }
+      } else if (!isAdjacent && canDetectPlayer && !monster.isStationary) {
+        // Peaceful or stationary NPCs don't move toward the player
+        if (isPassive) {
+          monster.remainingAE = 0;
+        } else {
+          this.monsterMoveToward(monster, dungonId, playerRow, playerCol);
+        }
+      } else if (monster.roam && !monster.isStationary) {
         this.monsterMoveRandom(monster, dungonId);
       } else {
         monster.remainingAE = 0;
@@ -6485,7 +8833,9 @@ export class Game implements OnInit {
   private monsterAttackPlayer(
     monster: GameMonsterInstance,
     template: Monster,
-    dungonId: number
+    dungonId: number,
+    playerRow: number,
+    playerCol: number
   ): void {
     this.consumeMonsterAE(monster, 1, dungonId);
     if (monster.isDead) return;
@@ -6495,7 +8845,12 @@ export class Game implements OnInit {
     const plusToHit = attack?.plusToHit ?? 0;
     const maxDamage = attack?.damage ?? 1;
 
-    const hitRoll = this.rollD12(plusToHit);
+    if (attack?.type === 'Weapon') {
+      this.playClangSound();
+    }
+
+    const coverPenalty = this.getAttackCoverPenalty(dungonId, monster.row, monster.column, playerRow, playerCol);
+    const hitRoll = this.rollD12(plusToHit + coverPenalty);
     let playerAC = this.getPlayerAC() + this.playerStamina();
     if (this.playerDefendStacks() > 0) {
       playerAC += 2;
@@ -6513,6 +8868,7 @@ export class Game implements OnInit {
       if (this.playerHp() <= 0) {
         this.turnPhase.set('gameover');
         this.addCombatLog('You have been slain. Game Over!');
+        setTimeout(() => this.goHome(), 3500);
       }
     } else {
       this.addCombatLog(
@@ -6740,8 +9096,11 @@ export class Game implements OnInit {
 
     if (this.turnPhase() !== 'gameover') {
       this.playerDefendStacks.set(0);
+      this.playerBoostAttackACPenalty.set(0);
       this.playerAE.set(this.playerMaxAE);
       this.playerAttacksThisTurn.set(0);
+      this.playerDefendsThisTurn.set(0);
+      this.playerSearchesThisTurn.set(0);
       this.turnPhase.set('player');
       this.addCombatLog('Your turn. AE: ' + this.playerMaxAE);
     }
@@ -6773,17 +9132,66 @@ export class Game implements OnInit {
     const gameId = this.currentGameId();
     const preview = this.gridPreviewContext();
     const userKey = this.account.getKey();
-    if (!gameId || !preview || !userKey) {
-      return;
+    if (!gameId || !preview || !userKey) return;
+
+    // Always update the pending payload to the latest state snapshot
+    this.pendingSavePayload = { gameId, dungonId: preview.dungonId, userKey };
+
+    // If already saving, just leave the pending payload — it will be sent when the current one finishes
+    if (this.isSaveInFlight) return;
+
+    this.flushSave();
+  }
+
+  private flushSave(retryPayload?: { gameId: number; dungonId: number; userKey: string; dungenJson: Record<string, unknown> }): void {
+    // If caller passed an explicit retry payload, use it; otherwise consume the pending queue
+    let payload: { gameId: number; userKey: string; dungenJson: Record<string, unknown> };
+    if (retryPayload) {
+      payload = retryPayload;
+    } else {
+      const pending = this.pendingSavePayload;
+      if (!pending) return;
+      this.pendingSavePayload = null;
+      payload = { gameId: pending.gameId, userKey: pending.userKey, dungenJson: this.buildDungenJsonForSave(pending.dungonId) };
     }
 
-    const dungenJson = this.buildDungenJsonForSave(preview.dungonId);
+    this.isSaveInFlight = true;
+    this.saveStatus.set('saving');
+    if (this.saveStatusTimer !== null) { clearTimeout(this.saveStatusTimer); this.saveStatusTimer = null; }
+
     this.http
-      .put(`${API_BASE_URL}/games/${gameId}/save`, {
-        userkey: userKey,
-        dungenJson,
-      })
-      .subscribe();
+      .put(`${API_BASE_URL}/games/${payload.gameId}/save`, { userkey: payload.userKey, dungenJson: payload.dungenJson })
+      .subscribe({
+        next: () => {
+          this.isSaveInFlight = false;
+          this.saveStatus.set('saved');
+          this.saveStatusTimer = setTimeout(() => this.saveStatus.set(null), 3000);
+          // If another save was queued while we were in-flight, send it now
+          if (this.pendingSavePayload) this.flushSave();
+        },
+        error: () => {
+          // Retry once with the same serialized snapshot (the DB still has the last good state)
+          this.addCombatLog('[Warning] Save failed — retrying...');
+          setTimeout(() => {
+            this.http
+              .put(`${API_BASE_URL}/games/${payload.gameId}/save`, { userkey: payload.userKey, dungenJson: payload.dungenJson })
+              .subscribe({
+                next: () => {
+                  this.isSaveInFlight = false;
+                  this.saveStatus.set('saved');
+                  this.saveStatusTimer = setTimeout(() => this.saveStatus.set(null), 3000);
+                  if (this.pendingSavePayload) this.flushSave();
+                },
+                error: () => {
+                  // Both attempts failed — DB is out of sync with UI
+                  this.isSaveInFlight = false;
+                  this.saveStatus.set('lost');
+                  this.addCombatLog('[ERROR] Progress could not be saved. Reload the page to restore from last save.');
+                },
+              });
+          }, 2500);
+        },
+      });
   }
 
   private buildDungenJsonForSave(dungonId: number): Record<string, unknown> {
@@ -6815,6 +9223,12 @@ export class Game implements OnInit {
       squares: this.squaresByDungon()[dungonId] ?? {},
       keyList: this.keyList,
       cheater: this.cheaterByDungon()[dungonId] ?? DEFAULT_CHEATER,
+      cheaterByPcId: (() => {
+        if (!this.isMainGame()) return {};
+        const pcId = this.currentPcId_();
+        if (pcId === null) return this.cheaterByPcId_();
+        return { ...this.cheaterByPcId_(), [pcId]: this.cheaterByDungon()[dungonId] ?? DEFAULT_CHEATER };
+      })(),
       pcInventoryInitialized: this.pcInventoryInitializedByDungon()[dungonId] ?? false,
       startpoint: this.startPointByDungon()[dungonId] ?? null,
       tresherList: this.tresherListByDungon()[dungonId] ?? [],
@@ -6823,11 +9237,19 @@ export class Game implements OnInit {
       monsterPlacements,
       squareTexts: this.squareTextsByDungon()[dungonId] ?? [],
       floorTrapPlacements: this.floorTrapPlacementsByDungon()[dungonId] ?? [],
+      obstaclePlacements: this.obstaclePlacementsByDungon()[dungonId] ?? [],
       playerHp: this.playerHp(),
       playerAE: this.playerAE(),
       turnPhase: this.turnPhase(),
       playerRow: preview?.centerRow ?? 0,
       playerColumn: preview?.centerColumn ?? 0,
+      npcTradesPurchased: this.npcTradesPurchased(),
+      itemPlacements: this.floorItemPlacementsByDungon()[dungonId] ?? [],
+      potionPlacements: this.floorPotionPlacementsByDungon()[dungonId] ?? [],
+      floorItemList: this.floorItemListByDungon()[dungonId] ?? [],
+      floorPotionList: this.floorPotionListByDungon()[dungonId] ?? [],
+      collectedFloorItems: this.collectedFloorItemsByDungon()[dungonId] ?? [],
+      collectedFloorPotions: this.collectedFloorPotionsByDungon()[dungonId] ?? [],
     };
   }
 }

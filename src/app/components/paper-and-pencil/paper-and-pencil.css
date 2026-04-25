@@ -1,0 +1,186 @@
+/* ── Page wrapper ─────────────────────────────────────────────── */
+.pnp-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  color: #dce8ff;
+  font-size: 0.97rem;
+  line-height: 1.65;
+}
+
+/* ── Hero header ─────────────────────────────────────────────── */
+.pnp-hero {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.pnp-hero h2 {
+  font-size: 2rem;
+  color: #e8d5ff;
+  margin: 0 0 0.6rem;
+}
+
+.pnp-hero p {
+  color: #a8bcd8;
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+/* ── Sections ────────────────────────────────────────────────── */
+.pnp-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.4rem;
+}
+
+.pnp-section h3 {
+  font-size: 1.1rem;
+  color: #c8dfff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0.4rem;
+  margin: 0 0 0.85rem;
+}
+
+.pnp-section ul,
+.pnp-section ol {
+  margin: 0.3rem 0 0.6rem 1.2rem;
+  padding: 0;
+}
+
+.pnp-section li {
+  margin-bottom: 0.35rem;
+}
+
+/* ── Subsection titles ───────────────────────────────────────── */
+.pnp-subsection-title {
+  font-weight: 600;
+  color: #9ec4f0;
+  margin: 1rem 0 0.3rem;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Tables ──────────────────────────────────────────────────── */
+.pnp-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.pnp-table th {
+  background: rgba(80, 120, 200, 0.18);
+  color: #a8c8ff;
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pnp-table td {
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #dce8ff;
+}
+
+.pnp-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Character sheet section ─────────────────────────────────── */
+.pnp-section-sheet {
+  border-color: rgba(180, 140, 255, 0.35);
+  background: rgba(30, 15, 55, 0.6);
+}
+
+.pnp-section-sheet h3 {
+  color: #cdb3ff;
+}
+
+.pnp-sheet {
+  margin-top: 0.75rem;
+}
+
+.pnp-sheet-section-title {
+  font-weight: 600;
+  color: #9ec4f0;
+  margin: 1.1rem 0 0.45rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pnp-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 0.55rem 1rem;
+}
+
+.pnp-field {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+}
+
+.pnp-field-wide {
+  grid-column: span 2;
+}
+
+.pnp-field-label {
+  color: #9ec4f0;
+  white-space: nowrap;
+  font-weight: 600;
+  min-width: 90px;
+}
+
+.pnp-field-line {
+  flex: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  min-width: 40px;
+}
+
+.pnp-field-slash {
+  color: #7a96b8;
+  margin: 0 0.1rem;
+}
+
+.pnp-field-max {
+  color: #7a96b8;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.pnp-inventory-box {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  min-height: 80px;
+  margin: 0.35rem 0 0.75rem;
+}
+
+.pnp-spell-table {
+  margin-top: 0.35rem;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .pnp-page {
+    padding: 1.2rem 0.8rem 2rem;
+  }
+
+  .pnp-table {
+    font-size: 0.78rem;
+  }
+
+  .pnp-table th,
+  .pnp-table td {
+    padding: 0.25rem 0.4rem;
+  }
+
+  .pnp-field-wide {
+    grid-column: span 1;
+  }
+}

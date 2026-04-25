@@ -1,6 +1,6 @@
 ﻿<div class="mn-section">
   <div class="mn-section-header">
-    <h3 class="mn-title">My Monsters</h3>
+    <h3 class="mn-title">MONSTERS LIBRARY</h3>
     <button type="button" class="mn-toggle-btn" (click)="toggleSectionVisibility()">
       {{ isSectionVisible() ? 'Hide' : 'Show' }}
     </button>
@@ -15,7 +15,6 @@
 
       <!-- â”€â”€ 1/3 LEFT: Current library â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
       <aside class="mn-list-panel">
-        <h4 class="mn-panel-title">Your Monster Library</h4>
         @if (isLoading()) {
           <p class="mn-message">Loading your monsters...</p>
         } @else if (error()) {
@@ -36,7 +35,7 @@
                   </div>
                 </div>
                 <small class="mn-item-meta">ID {{ item.id }} Â· HP {{ item.hp }} Â· AC {{ item.ac }} Â· Move {{ item.movementEconomy }} Â· Run&#64; {{ item.runAt }}</small>
-                <small class="mn-item-meta">Attacks {{ item.numberOfAttacks }} Â· Magic {{ item.magic }} Â· SP {{ item.spReward }} Â· {{ item.isPublic ? 'Public' : 'Private' }}</small>
+                <small class="mn-item-meta">Attacks {{ item.numberOfAttacks }} · Magic {{ item.magic }} · SP {{ item.spReward }} · +Hit Req {{ item.toHitPlusNeeded }} · {{ item.isPublic ? 'Public' : 'Private' }}</small>
                 @if (item.description) {
                   <small class="mn-item-desc">{{ item.description }}</small>
                 }
@@ -103,6 +102,10 @@
             <span>SP Reward</span>
             <input type="number" formControlName="spReward" min="0" />
           </label>
+          <label class="mn-field">
+            <span>+To Hit Required</span>
+            <input type="number" formControlName="toHitPlusNeeded" min="0" title="Minimum weapon + bonus needed to hit this monster (0 = any weapon)" />
+          </label>
 
           <label class="mn-field mn-field-wide">
             <span>Image</span>
@@ -115,7 +118,7 @@
               </select>
               <app-upload-popup mediaType="image" (mediaUploaded)="onImageUploaded($event)" />
               @if (selectedImageUrl()) {
-                <img class="mn-thumb" [src]="selectedImageUrl()" [alt]="selectedImageName() || 'image'" />
+                <img class="mn-thumb mn-thumb--preview" [src]="selectedImageUrl()" [alt]="selectedImageName() || 'image'" />
               }
             </div>
           </label>
@@ -229,6 +232,50 @@
           <input type="checkbox" id="monsterCallsReinforcements" formControlName="callsReinforcements" />
           <label for="monsterCallsReinforcements">Calls Reinforcements</label>
           <small class="mn-hint">Uses first combat turn to wake dormant monsters nearby.</small>
+        </div>
+
+        <div class="mn-npc-section">
+          <h4 class="mn-npc-title">NPC / Interactive</h4>
+          <p class="mn-npc-desc">Configure this monster to act as an NPC that the player can talk to, trade with, or that has special combat conditions.</p>
+
+          <label class="mn-field mn-field-wide">
+            <span>Greeting (shown when player gets within 1 square)</span>
+            <textarea formControlName="npcGreeting" rows="2" placeholder="e.g. A hooded figure raises a hand. 'Halt, traveller...'"></textarea>
+          </label>
+
+          <label class="mn-field mn-field-wide">
+            <span>Info Line 1 (what the NPC can tell the player)</span>
+            <input type="text" formControlName="npcInfo1" placeholder="e.g. The dragon sleeps in the east chamber." />
+          </label>
+          <label class="mn-field mn-field-wide">
+            <span>Info Line 2</span>
+            <input type="text" formControlName="npcInfo2" placeholder="Optional second piece of info." />
+          </label>
+          <label class="mn-field mn-field-wide">
+            <span>Info Line 3</span>
+            <input type="text" formControlName="npcInfo3" placeholder="Optional third piece of info." />
+          </label>
+
+          <div class="mn-check-row">
+            <input type="checkbox" id="npcOnlyAttackWhenAttacked" formControlName="npcOnlyAttackWhenAttacked" />
+            <label for="npcOnlyAttackWhenAttacked">Only attacks when attacked</label>
+            <small class="mn-hint">This NPC will not initiate combat unless struck first.</small>
+          </div>
+          <div class="mn-check-row">
+            <input type="checkbox" id="npcGivesInfoAfterDamaged" formControlName="npcGivesInfoAfterDamaged" />
+            <label for="npcGivesInfoAfterDamaged">Gives info only after being attacked &amp; spared</label>
+            <small class="mn-hint">Player must attack this NPC, then choose to spare it to unlock information.</small>
+          </div>
+          <div class="mn-check-row">
+            <input type="checkbox" id="npcAttacksAfterInfo" formControlName="npcAttacksAfterInfo" />
+            <label for="npcAttacksAfterInfo">Attacks after giving info</label>
+            <small class="mn-hint">Once the NPC has shared its information, it turns hostile.</small>
+          </div>
+          <div class="mn-check-row">
+            <input type="checkbox" id="npcCanTrade" formControlName="npcCanTrade" />
+            <label for="npcCanTrade">Can trade / sell items</label>
+            <small class="mn-hint">Player can browse and buy treshers from this NPC's inventory.</small>
+          </div>
         </div>
 
         <div class="mn-check-row">

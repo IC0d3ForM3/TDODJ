@@ -44,6 +44,15 @@ interface MonsterWriteInput {
   magic?: unknown;
   magicResistance?: unknown;
   callsReinforcements?: unknown;
+  toHitPlusNeeded?: unknown;
+  npcGreeting?: unknown;
+  npcInfo1?: unknown;
+  npcInfo2?: unknown;
+  npcInfo3?: unknown;
+  npcOnlyAttackWhenAttacked?: unknown;
+  npcGivesInfoAfterDamaged?: unknown;
+  npcAttacksAfterInfo?: unknown;
+  npcCanTrade?: unknown;
 }
 
 interface MonsterAttackWriteInput {
@@ -237,6 +246,15 @@ const normalizeMonsterPayload = (value: unknown): UpsertMonsterPayload | null =>
     magic: Math.max(0, normalizeNumber(input.magic, 0)),
     magicResistance: Math.max(0, normalizeNumber(input.magicResistance, 0)),
     callsReinforcements: normalizeBoolean(input.callsReinforcements),
+    toHitPlusNeeded: Math.max(0, normalizeNumber(input.toHitPlusNeeded, 0)),
+    npcGreeting: normalizeNullableText(input.npcGreeting),
+    npcInfo1: normalizeNullableText(input.npcInfo1),
+    npcInfo2: normalizeNullableText(input.npcInfo2),
+    npcInfo3: normalizeNullableText(input.npcInfo3),
+    npcOnlyAttackWhenAttacked: normalizeBoolean(input.npcOnlyAttackWhenAttacked),
+    npcGivesInfoAfterDamaged: normalizeBoolean(input.npcGivesInfoAfterDamaged),
+    npcAttacksAfterInfo: normalizeBoolean(input.npcAttacksAfterInfo),
+    npcCanTrade: normalizeBoolean(input.npcCanTrade),
   };
 };
 
@@ -329,3 +347,9 @@ const findFirstInvalidTresherIdForUser = async (
 };
 
 const normalizeBoolean = (value: unknown): boolean => value === true;
+
+const normalizeNullableText = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+};

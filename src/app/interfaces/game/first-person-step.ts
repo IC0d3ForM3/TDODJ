@@ -12,6 +12,7 @@ export interface FirstPersonStep {
   visibleMonsterSlots: Array<{
     squareKey: string;
     lateralOffset: number;
+    isPeek?: boolean;
   }>;
   hasKey: boolean;
   exitTransitionType?: ExitTransitionType | null;

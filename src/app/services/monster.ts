@@ -32,6 +32,15 @@ export interface UserMonsterListItem {
   spReward: number;
   isPublic: boolean;
   callsReinforcements: boolean;
+  toHitPlusNeeded: number;
+  npcGreeting: string | null;
+  npcInfo1: string | null;
+  npcInfo2: string | null;
+  npcInfo3: string | null;
+  npcOnlyAttackWhenAttacked: boolean;
+  npcGivesInfoAfterDamaged: boolean;
+  npcAttacksAfterInfo: boolean;
+  npcCanTrade: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,6 +72,15 @@ export interface UserMonsterWritePayload {
   spReward: number;
   isPublic: boolean;
   callsReinforcements: boolean;
+  toHitPlusNeeded: number;
+  npcGreeting: string | null;
+  npcInfo1: string | null;
+  npcInfo2: string | null;
+  npcInfo3: string | null;
+  npcOnlyAttackWhenAttacked: boolean;
+  npcGivesInfoAfterDamaged: boolean;
+  npcAttacksAfterInfo: boolean;
+  npcCanTrade: boolean;
 }
 
 export interface MonsterResponse {
@@ -96,6 +114,15 @@ export class MonsterService {
               magic: this.normalizeNumber(item.magic, 0),
               spReward: this.normalizeNumber(item.spReward, 0),
               callsReinforcements: item.callsReinforcements === true,
+              toHitPlusNeeded: this.normalizeNumber(item.toHitPlusNeeded, 0),
+              npcGreeting: typeof item.npcGreeting === 'string' ? item.npcGreeting : null,
+              npcInfo1: typeof item.npcInfo1 === 'string' ? item.npcInfo1 : null,
+              npcInfo2: typeof item.npcInfo2 === 'string' ? item.npcInfo2 : null,
+              npcInfo3: typeof item.npcInfo3 === 'string' ? item.npcInfo3 : null,
+              npcOnlyAttackWhenAttacked: item.npcOnlyAttackWhenAttacked === true,
+              npcGivesInfoAfterDamaged: item.npcGivesInfoAfterDamaged === true,
+              npcAttacksAfterInfo: item.npcAttacksAfterInfo === true,
+              npcCanTrade: item.npcCanTrade === true,
               attacks: Array.isArray(item.attacks)
                 ? item.attacks.map((attack) => ({
                     type: attack.type || 'Bite',

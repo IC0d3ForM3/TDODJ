@@ -1,9 +1,3 @@
-export const fetchMainGame = async () => {
-  const { rows } = await (await import('../db')).default.query(
-    'SELECT * FROM dungons WHERE ismaingame = TRUE LIMIT 1'
-  );
-  return rows[0] || null;
-};
 import {
   ActiveGameListItemRecord,
   GameRecord,
@@ -13,6 +7,7 @@ import {
   getPublishedDungons,
   getDungonsByUserKey,
   getDungonSpRewardById,
+  getDungonIsMainGameStatusById,
   insertDungon,
   NewDungon,
   PublishDungonOptions,
@@ -22,12 +17,27 @@ import {
   updateDungonMetadataForUser,
   updateGameDungenJson,
   deleteGameForUser,
+  deleteDungonForUser,
   approveDungon as approveDungonInRepo,
   getSampleDungonFromDb,
   getSampleDungonFullFromDb,
   setSampleDungonInDb,
   getAllPublishedDungonsForAdmin,
 } from '../repositories/dungonRepository';
+
+export const fetchMainGameDungons = async () => {
+  const { rows } = await (await import('../db')).default.query(
+    'SELECT id, name, description, intro FROM dungons WHERE ismaingame = TRUE AND status = $1 ORDER BY id ASC',
+    ['published']
+  );
+  return rows;
+};
+
+export const fetchDungonIsMainGameStatus = async (
+  id: number
+): Promise<{ ismaingame: boolean; resettable_per_pc: boolean } | null> => {
+  return await getDungonIsMainGameStatusById(id);
+};
 
 export const fetchPublishedDungons = async (userkey: string | null = null) => {
   return await getPublishedDungons(userkey);
@@ -103,6 +113,13 @@ export const removeGameForUser = async (
   userkey: string
 ): Promise<boolean> => {
   return await deleteGameForUser(id, userkey);
+};
+
+export const removeDungonForUser = async (
+  id: number,
+  userkey: string
+): Promise<boolean> => {
+  return await deleteDungonForUser(id, userkey);
 };
 
 export const approvePendingDungon = async (

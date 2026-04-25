@@ -46,7 +46,7 @@ const SELECT_ITEM_FIELDS = `
   name,
   description,
   type,
-  range,
+  COALESCE(NULLIF(range, '')::int, 0) AS range,
   value,
   weight,
   curseid AS "curseId",
@@ -75,7 +75,7 @@ export const getItemsByUserGuid = async (userguid: string): Promise<ItemRecord[]
     `SELECT ${SELECT_ITEM_FIELDS}
      FROM items
      WHERE userguid = $1
-     ORDER BY updatedat DESC, id DESC`,
+     ORDER BY LOWER(name) ASC, id ASC`,
     [userguid]
   );
   return rows;
@@ -174,5 +174,16 @@ export const getItemsByIds = async (ids: number[]): Promise<ItemRecord[]> => {
     ids
   );
 
+  return rows;
+};
+
+/** Look up public items by exact name and return their id + name. */
+export const getPublicItemsByNames = async (names: string[]): Promise<Array<{ id: number; name: string }>> => {
+  if (names.length === 0) return [];
+  const placeholders = names.map((_, i) => `$${i + 1}`).join(', ');
+  const { rows } = await pool.query<{ id: number; name: string }>(
+    `SELECT id, name FROM items WHERE ispublic = TRUE AND name IN (${placeholders})`,
+    names
+  );
   return rows;
 };

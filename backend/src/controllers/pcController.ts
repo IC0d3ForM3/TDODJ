@@ -9,7 +9,7 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const VALID_SPECIES = ['Human', 'Elph', 'DwarPh', 'Shorties'] as const;
-const VALID_TYPES = ['Figher', 'Mage', 'thieph', 'Healer'] as const;
+const VALID_TYPES = ['Fighter', 'Mage', 'thieph', 'Healer'] as const;
 
 type PcSpecies = (typeof VALID_SPECIES)[number];
 type PcType = (typeof VALID_TYPES)[number];
@@ -89,6 +89,8 @@ interface PcWriteInput {
   hand2itemid?: unknown;
   numberOfAttacks?: unknown;
   numberofattacks?: unknown;
+  numberOfDefends?: unknown;
+  ismaingame?: unknown;
 }
 
 export const getPcs = async (req: Request, res: Response) => {
@@ -282,6 +284,8 @@ const normalizePcPayload = (value: unknown): UpsertPcPayload | null => {
     hand1ItemId: normalizeNullableNumber(input.hand1ItemId ?? input.hand1itemid),
     hand2ItemId: normalizeNullableNumber(input.hand2ItemId ?? input.hand2itemid),
     numberOfAttacks: Math.max(1, normalizeNumber(input.numberOfAttacks ?? input.numberofattacks, 1)),
+    numberOfDefends: Math.max(1, normalizeNumber(input.numberOfDefends, 1)),
+    ismaingame: input.ismaingame === true,
   };
 };
 
@@ -356,8 +360,8 @@ const normalizePcType = (value: unknown): PcType | null => {
   }
 
   const lower = value.trim().toLowerCase();
-  if (lower === 'figher') {
-    return 'Figher';
+  if (lower === 'figher' || lower === 'fighter') {
+    return 'Fighter';
   }
 
   if (lower === 'mage') {
@@ -442,6 +446,40 @@ export const getSamplePcs = async (_req: Request, res: Response) => {
   }
 };
 
+export const setIsMainGamePc = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const { userkey, ismaingame } = req.body as Partial<{ userkey: string; ismaingame: boolean }>;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
+  }
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+
+  if (typeof ismaingame !== 'boolean') {
+    return res.status(400).json({ result: -1, error: 'ismaingame must be a boolean' });
+  }
+
+  const trimmedKey = userkey.trim();
+  const user = await getUserByKey(trimmedKey);
+  if (!user || (!user.isadmin && !user.ismasteradmin)) {
+    return res.status(403).json({ result: -1, error: 'Only admins can set main game pcs' });
+  }
+
+  try {
+    const wasSet = await pcService.setMainGamePc(id, ismaingame);
+    if (!wasSet) {
+      return res.status(404).json({ result: -1, error: 'PC not found' });
+    }
+    return res.json({ result: 1 });
+  } catch (error) {
+    console.error('Error setting ismaingame on pc:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to set ismaingame on pc' });
+  }
+};
+
 export const setSamplePc = async (req: Request, res: Response) => {
   const id = Number.parseInt(req.params['id'], 10);
   const { userkey, issample } = req.body as Partial<{ userkey: string; issample: boolean }>;
@@ -498,9 +536,99 @@ export const getAdminPcs = async (req: Request, res: Response) => {
   }
 };
 
+export const upgradeStatController = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const { userkey, stat } = req.body as Partial<{ userkey: string; stat: string }>;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
+  }
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+  const allowed = ['strength', 'stamina', 'mind', 'magicPower'] as const;
+  type AllowedStat = typeof allowed[number];
+  if (typeof stat !== 'string' || !(allowed as readonly string[]).includes(stat)) {
+    return res.status(400).json({ result: -1, error: 'Valid stat name is required' });
+  }
+
+  try {
+    const result = await pcService.upgradeStat(id, userkey.trim(), stat as AllowedStat);
+    if (!result) {
+      return res.status(400).json({ result: -1, error: 'Not enough SP or PC not found' });
+    }
+    return res.json({ result: 1, sp: result.sp, newValue: result.newValue });
+  } catch (error) {
+    console.error('Error upgrading stat:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to upgrade stat' });
+  }
+};
+
 export const upgradeNoa = async (req: Request, res: Response) => {
   const id = Number.parseInt(req.params['id'], 10);
-  const { userkey } = req.body as Partial<{ userkey: string }>;
+  const { userkey, spCost, goldCost, tresherId } = req.body as Partial<{
+    userkey: string;
+    spCost: number;
+    goldCost: number;
+    tresherId: number | null;
+  }>;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
+  }
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+  const resolvedSpCost = typeof spCost === 'number' && spCost >= 0 ? Math.floor(spCost) : 0;
+  const resolvedGoldCost = typeof goldCost === 'number' && goldCost >= 0 ? Math.floor(goldCost) : 0;
+  const resolvedTresherId = typeof tresherId === 'number' && tresherId > 0 ? tresherId : null;
+
+  try {
+    const result = await pcService.upgradeNoa(id, userkey.trim(), resolvedSpCost, resolvedGoldCost, resolvedTresherId);
+    if (!result) {
+      return res.status(400).json({ result: -1, error: 'Not enough SP or gold, or PC not found' });
+    }
+    return res.json({ result: 1, sp: result.sp, numberOfAttacks: result.numberOfAttacks, tresherId: resolvedTresherId, newGold: result.newGold });
+  } catch (error) {
+    console.error('Error upgrading NOA:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to upgrade NOA' });
+  }
+};
+
+export const upgradeNod = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const { userkey, spCost, goldCost, tresherId } = req.body as Partial<{
+    userkey: string;
+    spCost: number;
+    goldCost: number;
+    tresherId: number | null;
+  }>;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
+  }
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+  const resolvedSpCost = typeof spCost === 'number' && spCost >= 0 ? Math.floor(spCost) : 0;
+  const resolvedGoldCost = typeof goldCost === 'number' && goldCost >= 0 ? Math.floor(goldCost) : 0;
+  const resolvedTresherId = typeof tresherId === 'number' && tresherId > 0 ? tresherId : null;
+
+  try {
+    const result = await pcService.upgradeNod(id, userkey.trim(), resolvedSpCost, resolvedGoldCost, resolvedTresherId);
+    if (!result) {
+      return res.status(400).json({ result: -1, error: 'Not enough SP or gold, or PC not found' });
+    }
+    return res.json({ result: 1, sp: result.sp, numberOfDefends: result.numberOfDefends, tresherId: resolvedTresherId, newGold: result.newGold });
+  } catch (error) {
+    console.error('Error upgrading NOD:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to upgrade NOD' });
+  }
+};
+
+export const tavernTurnIn = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const { userkey, tresherIds } = req.body as Partial<{ userkey: string; tresherIds: unknown[] }>;
 
   if (!Number.isInteger(id) || id <= 0) {
     return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
@@ -510,17 +638,23 @@ export const upgradeNoa = async (req: Request, res: Response) => {
     return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
   }
 
-  const SP_COST = 5;
+  if (!Array.isArray(tresherIds) || tresherIds.length === 0) {
+    return res.status(400).json({ result: -1, error: 'tresherIds must be a non-empty array' });
+  }
+
+  const ids = tresherIds.map((v) => Number.parseInt(String(v), 10)).filter(Number.isInteger);
+  if (ids.length === 0) {
+    return res.status(400).json({ result: -1, error: 'No valid tresher ids provided' });
+  }
 
   try {
-    const result = await pcService.upgradeNoa(id, userkey.trim(), SP_COST);
+    const result = await pcService.tavernTurnIn(id, userkey.trim(), ids);
     if (!result) {
-      return res.status(400).json({ result: -1, error: 'Not enough SP or PC not found' });
+      return res.status(404).json({ result: -1, error: 'PC not found or not authorized' });
     }
-
-    return res.json({ result: 1, sp: result.sp, numberOfAttacks: result.numberOfAttacks });
+    return res.json({ result: 1, spAwarded: result.spAwarded, newSp: result.newSp });
   } catch (error) {
-    console.error('Error upgrading NOA:', error);
-    return res.status(500).json({ result: -1, error: 'Failed to upgrade NOA' });
+    console.error('Error during tavern turn-in:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to complete tavern turn-in' });
   }
 };

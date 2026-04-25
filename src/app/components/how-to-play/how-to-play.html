@@ -36,7 +36,7 @@
         <tr><th>Class</th><th>Max HP</th><th>AC Bonus</th><th>Magic Power</th><th>Role</th></tr>
       </thead>
       <tbody>
-        <tr><td>Figher</td><td>d12 + 4</td><td>+4</td><td>0</td><td>Front-line brawler</td></tr>
+        <tr><td>Fighter</td><td>d12 + 4</td><td>+4</td><td>0</td><td>Front-line brawler</td></tr>
         <tr><td>Thieph</td><td>d12 + 2</td><td>+2</td><td>2</td><td>Stealth, picking locks</td></tr>
         <tr><td>Mage</td><td>d12÷2 + 2</td><td>+2</td><td>8 +</td><td>Spell power, fragile</td></tr>
         <tr><td>Healer</td><td>d12÷2 + 2</td><td>+2</td><td>6 +</td><td>Support, recovery</td></tr>
@@ -142,14 +142,36 @@
     <ul>
       <li>
         <strong>Hit roll:</strong> d12 + weapon bonus + Stamina vs monster AC.
-        Roll equal to or above AC to hit.
+        Roll equal to or above the monster's AC to hit.
       </li>
       <li>
         <strong>Damage:</strong> d(12 ÷ weapon tier) + Strength. Better weapons roll bigger dice.
+        Without a weapon you punch for 1 + Strength ÷ 2 (min 1) but take a −1 to-hit penalty.
       </li>
       <li>
         You can equip up to <strong>2 hands</strong> worth of weapons from your inventory.
-        Weapons have a range stat — longer range lets you hit from further away.
+        Weapons have a range stat — a range above 1 lets you hit from further away.
+      </li>
+      <li>
+        <strong>Combo bonus:</strong> Hit the same monster repeatedly and each consecutive strike
+        adds up to +4 to your hit roll, making sustained pressure increasingly accurate.
+      </li>
+    </ul>
+    <p class="htp-subsection-title">Boost Attack (Fighter only)</p>
+    <ul>
+      <li>
+        Fighters can choose <strong>Boost Attack</strong> as their first action of the turn instead
+        of a normal attack.
+      </li>
+      <li>
+        <strong>Cost:</strong> all remaining AE for that turn — the turn ends immediately after the attack.
+      </li>
+      <li>
+        <strong>Bonus to hit:</strong> +1d3 (lower levels), increasing to +1d6 at higher levels.
+      </li>
+      <li>
+        <strong>Trade-off:</strong> your AC is reduced by −4 until your next turn, leaving you
+        vulnerable to counter-attacks.
       </li>
     </ul>
     <p class="htp-subsection-title">Defending</p>
@@ -160,35 +182,84 @@
       <li>
         Your base AC is 10. Equipping armor treshers and armor items raises it.
       </li>
+      <li>
+        Use the <strong>Defend</strong> action (costs 1 AE) to add +2 AC until your next turn.
+        You can defend multiple times — each use stacks, up to your <em>Number of Defends</em> (NOD) stat.
+      </li>
       <li>When HP reaches 0 it's game over — <em>"You have fallen. Your adventure ends here."</em></li>
+    </ul>
+    <p class="htp-subsection-title">Number of Attacks &amp; Defends</p>
+    <ul>
+      <li>
+        <strong>NOA (Number of Attacks)</strong> — how many attacks you can make per turn.
+        Most PCs start at 1; this can be raised at the Tavern.
+      </li>
+      <li>
+        <strong>NOD (Number of Defends)</strong> — how many times you can Defend per turn.
+        Extra defends stack their +2 AC bonus, creating a powerful defensive stance.
+      </li>
     </ul>
     <p class="htp-subsection-title">Monster behaviour</p>
     <ul>
-      <li>Monsters move toward you when you are within 5 squares and they have line of sight.</li>
+      <li>Monsters detect you when you are within <strong>5 squares</strong> and they have line of sight.</li>
       <li>Some monsters <strong>flee</strong> when they drop below a certain HP threshold.</li>
-      <li>Monsters that have the roam flag will wander even when you are far away.</li>
+      <li>Monsters with the <strong>roam</strong> flag wander the dungeon even when you are far away.</li>
+      <li>Some monsters <strong>call reinforcements</strong> — when they spot you, nearby allies join the fight.</li>
       <li>Killing a monster can drop treshers and keys — and earns you <strong>SP</strong>.</li>
     </ul>
+  </section>
+
+  <!-- ── Leveling ───────────────────────────────────────────────── -->
+  <section class="how-to-play-section">
+    <h3>Leveling Up &amp; the Tavern</h3>
+    <p>
+      Your PC's <strong>level</strong> is calculated automatically from your stats — the stronger
+      your Strength, Stamina, Mind, and Magic Power, the higher your level. Higher levels increase
+      the Boost Attack bonus and may unlock other bonuses.
+    </p>
+    <p class="htp-subsection-title">Spending SP at the Tavern</p>
+    <p>
+      Between runs you can visit the <strong>Tavern</strong> on the Dashboard to spend your
+      accumulated <strong>SP</strong> on permanent stat upgrades for your PC:
+    </p>
+    <ul>
+      <li>Strength — deals more damage</li>
+      <li>Stamina — improves attack rolls and AC when defending</li>
+      <li>Mind — better spell accuracy, trap detection, and magic resistance</li>
+      <li>Magic Power — more MP for spellcasting</li>
+      <li>Number of Attacks (NOA) — attack more times per turn</li>
+      <li>Number of Defends (NOD) — defend more times per turn</li>
+    </ul>
+    <p>Each upgrade costs <strong>1 SP</strong> and permanently improves that stat by 1.</p>
   </section>
 
   <!-- ── The Nearby Panel ───────────────────────────────────────── -->
   <section class="how-to-play-section">
     <h3>The Info Panel</h3>
     <p>
-      The right-hand panel has two tabs: <strong>Nearby</strong> and <strong>Inventory</strong>.
+      The right-hand side of the screen holds your <strong>Combat Log</strong>, an
+      <strong>Inventory</strong> panel, and a <strong>Nearby</strong> panel showing what is around you.
     </p>
+    <p class="htp-subsection-title">Combat Log</p>
+    <ul>
+      <li>A scrolling log of every attack, spell, trap, and event this run — great for reviewing what just happened.</li>
+    </ul>
     <p class="htp-subsection-title">Nearby</p>
     <ul>
       <li>Lists every <strong>door</strong> adjacent to you with its state (open, closed, locked) and action buttons — Open Door, Use Key, Pick Lock.</li>
       <li>Shows <strong>treshers</strong> and <strong>keys</strong> on your current or front square.</li>
-      <li>Has a <strong>Search for Traps</strong> button. If a trap is found a <strong>Disarm Trap</strong> button appears.</li>
+      <li>Has a <strong>Search for Traps</strong> button. Thieph and Shorties can search <strong>twice per turn</strong>; other classes once. If a trap is found a <strong>Disarm Trap</strong> button appears.</li>
       <li>Shows a <strong>Take All</strong> button (and <strong>Take Some</strong> if there are multiple treshers).</li>
+      <li>Shows <strong>Defend</strong> and <strong>Boost Attack</strong> (Fighter only) buttons for spending AE defensively or offensively mid-turn.</li>
     </ul>
     <p class="htp-subsection-title">Inventory</p>
     <ul>
       <li>Lists all keys and tresher items you are carrying.</li>
-      <li>Weapons and armor have <strong>Equip / Unequip</strong> buttons. You have 2 hand slots.</li>
-      <li>Healing potions show a <strong>Drink</strong> button (costs 1 AE, cannot be used on monster turns).</li>
+      <li>Weapons have <strong>Equip / Unequip</strong> buttons. You have 2 hand slots; two-handed weapons use both.</li>
+      <li>Armor equips to your body slot and raises your AC.</li>
+      <li>Rings and necklaces equip to their own slots and provide passive bonuses.</li>
+      <li>Magic gems equip and add to your Magic Power.</li>
+      <li>Potions show a <strong>Drink</strong> button (costs 1 AE, cannot be used on monster turns). Some potions have a lasting effect that ticks over multiple turns.</li>
       <li>Spells show a <strong>Cast (N AE)</strong> button that lights up when a valid target is in range.</li>
     </ul>
   </section>
@@ -213,13 +284,32 @@
     </p>
     <ul>
       <li>Coin (gold, silver, copper, zinc)</li>
-      <li>Weapons and armor — equip them from your Inventory tab</li>
-      <li>Potions — drink healing potions to recover HP (costs 1 AE)</li>
-      <li>Spells — cast them from your Inventory tab (see Magic below)</li>
-      <li>Other items</li>
+      <li>Weapons — equip from Inventory; have a to-hit bonus, damage tier, range, and optionally two-handed</li>
+      <li>Armor — equip from Inventory; raises your AC</li>
+      <li>Rings and necklaces — passive effect items</li>
+      <li>Magic gems — equip to boost Magic Power</li>
+      <li>Potions — drink healing potions (1 AE) to recover HP; lasting potions tick over turns</li>
+      <li>Spells — cast from Inventory tab (see Magic below)</li>
     </ul>
     <p>
       Some treshers are trapped. Always search before grabbing a pile of loot in a suspicious spot.
+    </p>
+    <p class="htp-subsection-title">Traps</p>
+    <p>
+      Traps are hidden hazards on the floor, inside treshers, on doors, or behind hidden passages.
+      When triggered they can cause:
+    </p>
+    <ul>
+      <li><strong>HP damage</strong> — the most common trap effect</li>
+      <li><strong>Stamina drain</strong> — lowers your attack rolls and AC</li>
+      <li><strong>Mind drain</strong> — weakens spells and lock-picking</li>
+      <li><strong>AE drain</strong> — steals action points from your current turn</li>
+      <li><strong>Range of Sight reduction</strong> — narrows how far you can see</li>
+    </ul>
+    <p>
+      Use <strong>Search</strong> (👁) to detect traps. On success a <strong>Disarm Trap</strong>
+      button appears — use it before triggering the trap. Lock-picking a trapped door can also
+      set off the trap if your pick roll fails.
     </p>
   </section>
 
@@ -265,7 +355,11 @@
     <h3>Skill Points and the Exit</h3>
     <p>
       <strong>SP (Skill Points)</strong> are earned by killing monsters and completing dungeons.
-      They appear in the status bar at the bottom and carry over to your PC.
+      They appear in the status bar at the bottom and carry over to your PC permanently.
+    </p>
+    <p>
+      Spend SP at the <strong>Tavern</strong> (on the Dashboard) to permanently raise one of your
+      PC's stats by 1 per SP — growing stronger between runs.
     </p>
     <p>
       When you step onto the <strong>Exit</strong> square a prompt appears — confirm to leave the

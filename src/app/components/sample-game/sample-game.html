@@ -1,10 +1,62 @@
+<!-- ── Tavern tutorial overlay ─────────────────────────────────── -->
+@if (showTutorial()) {
+  <div class="tut-backdrop">
+    <div class="tut-modal">
+
+      <!-- Keeper image -->
+      <div class="tut-keeper-wrap">
+        <img
+          [src]="currentTutorialPage.image"
+          [alt]="currentTutorialPage.speaker"
+          class="tut-keeper-img"
+        />
+      </div>
+
+      <!-- Content -->
+      <div class="tut-content">
+        <div class="tut-header">
+          <span class="tut-speaker">{{ currentTutorialPage.speaker }}:</span>
+          <h2 class="tut-title">{{ currentTutorialPage.title }}</h2>
+        </div>
+
+        <p class="tut-text">{{ currentTutorialPage.text }}</p>
+
+        <div class="tut-progress">
+          @for (i of tutorialPages; track $index) {
+            <span class="tut-dot" [class.tut-dot-active]="$index === tutorialPageIndex()"></span>
+          }
+        </div>
+
+        <!-- Navigation buttons -->
+        <div class="tut-nav">
+          <!-- Back (hidden on page 1) -->
+          @if (tutorialPageIndex() > 0) {
+            <button type="button" class="tut-btn tut-btn-back" (click)="prevTutorialPage()">← Back</button>
+          } @else {
+            <span class="tut-btn-spacer"></span>
+          }
+
+          <button type="button" class="tut-btn tut-btn-skip" (click)="skipTutorial()">Skip to Game</button>
+
+          @if (!isLastTutorialPage) {
+            <button type="button" class="tut-btn tut-btn-next" (click)="nextTutorialPage()">Next →</button>
+          } @else {
+            <button type="button" class="tut-btn tut-btn-play" (click)="playFromTutorial()">▶ Play Game</button>
+          }
+        </div>
+      </div>
+
+    </div>
+  </div>
+}
+
 <section class="sg-page">
 
   <!-- ── Mini how-to ────────────────────────────────────────────── -->
   <header class="sg-hero">
     <h2>Try a Sample Game</h2>
     <p>
-      See what DandDanny is all about before you sign up. Below is a published sample dungeon and
+      See what TDODJ is all about before you sign up. Below is a published sample dungeon and
       the pre-built character you would take into it. When you're ready to play for real — create
       an account, pick your own character, and dive in.
     </p>

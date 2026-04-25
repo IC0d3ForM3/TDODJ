@@ -12,5 +12,7 @@ export interface DungonDetails {
   spreward: number;
   ismaingame: boolean;
   issample: boolean;
+  resettable_per_pc: boolean;
   ispublic: boolean;
+  imageid?: number | null;
 }

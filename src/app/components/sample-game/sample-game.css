@@ -374,3 +374,207 @@
 .sg-change-pc:hover {
   color: #d2b8ff;
 }
+
+/* ── Tavern Tutorial Overlay ───────────────────────────────────── */
+.tut-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.tut-modal {
+  background: linear-gradient(160deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+  border: 1px solid rgba(160, 184, 220, 0.3);
+  border-radius: 14px;
+  max-width: 760px;
+  width: 100%;
+  display: flex;
+  gap: 0;
+  overflow: hidden;
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.7);
+}
+
+/* Keeper image column */
+.tut-keeper-wrap {
+  flex: 0 0 220px;
+  background: linear-gradient(180deg, #0a0f1e, #1a1228);
+  border-right: 1px solid rgba(160, 184, 220, 0.15);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.tut-keeper-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+
+/* Content column */
+.tut-content {
+  flex: 1;
+  padding: 1.6rem 1.5rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.tut-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.tut-speaker {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #c8a84e;
+}
+
+.tut-title {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #e8f0ff;
+  line-height: 1.25;
+}
+
+.tut-text {
+  margin: 0;
+  line-height: 1.65;
+  color: #b8cce8;
+  font-size: 0.97rem;
+  flex: 1;
+}
+
+/* Progress dots */
+.tut-progress {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.tut-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(160, 184, 220, 0.25);
+  border: 1px solid rgba(160, 184, 220, 0.4);
+  transition: background 0.2s, border-color 0.2s;
+  display: inline-block;
+}
+
+.tut-dot-active {
+  background: #c8a84e;
+  border-color: #e0c870;
+}
+
+/* Navigation row */
+.tut-nav {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tut-btn-spacer {
+  flex: 0 0 90px;
+}
+
+.tut-btn {
+  padding: 0.5rem 1.1rem;
+  border-radius: 7px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.tut-btn-back {
+  flex: 0 0 90px;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(160, 184, 220, 0.3);
+  color: #a8c4e8;
+}
+
+.tut-btn-back:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tut-btn-skip {
+  background: transparent;
+  border-color: rgba(160, 184, 220, 0.2);
+  color: #7a98b8;
+  font-size: 0.83rem;
+  font-weight: 400;
+}
+
+.tut-btn-skip:hover {
+  color: #a8c4e8;
+  border-color: rgba(160, 184, 220, 0.4);
+}
+
+.tut-btn-next {
+  flex: 0 0 90px;
+  background: linear-gradient(135deg, #2060a0, #1040780);
+  background: linear-gradient(135deg, #1a5fa8, #0e3d72);
+  border-color: rgba(80, 160, 255, 0.5);
+  color: #d6eaff;
+}
+
+.tut-btn-next:hover {
+  background: linear-gradient(135deg, #2070c0, #1050a0);
+}
+
+.tut-btn-play {
+  flex: 0 0 120px;
+  background: linear-gradient(135deg, #2a6e2a, #1a4e1a);
+  border-color: rgba(80, 200, 100, 0.5);
+  color: #d0f5d0;
+  font-size: 0.95rem;
+}
+
+.tut-btn-play:hover {
+  background: linear-gradient(135deg, #358035, #245a24);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .tut-modal {
+    flex-direction: column;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .tut-keeper-wrap {
+    flex: 0 0 160px;
+    border-right: none;
+    border-bottom: 1px solid rgba(160, 184, 220, 0.15);
+  }
+
+  .tut-keeper-img {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    object-position: top;
+  }
+
+  .tut-btn-spacer {
+    flex: 0 0 60px;
+  }
+
+  .tut-btn-back,
+  .tut-btn-next {
+    flex: 0 0 70px;
+  }
+}

@@ -24,7 +24,7 @@ import { UploadPopup, UploadedMediaItem } from '../upload-popup/upload-popup';
 import { ItemService } from '../../services/item';
 import { CurseService } from '../../services/curse';
 import { PotionService } from '../../services/potion';
-import { Door } from '../../interfaces/door';
+import { Door, DoorItemRequirement } from '../../interfaces/door';
 import { Square } from '../../interfaces/square';
 import { Wall } from '../../interfaces/wall';
 import { Key } from '../../interfaces/key';
@@ -69,6 +69,11 @@ import {
   FloorTrapPlacement,
   PortalPlacement,
   PortalLook,
+  ItemPlacement,
+  PendingItemPlacement,
+  PotionPlacement,
+  SpellPlacement,
+  ObstaclePlacement,
 } from '../../interfaces/game';
 
 const EMPTY_OPEN_BLOCK_SELECTIONS: Record<OpenBlockOptionKey, boolean> = {
@@ -143,16 +148,16 @@ interface MonsterLibraryItem extends Monster {
 
 interface LibImageItem { id: number; name: string; path: string; isPublic: boolean; isActive: boolean; createdAt: string; updatedAt: string; userguid: string; }
 interface LibSoundItem { id: number; name: string; path: string; isPublic: boolean; isActive: boolean; createdAt: string; updatedAt: string; userguid: string; }
-interface LibSpellItem { id: number; name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; imageId: number | null; soundId: number | null; isPublic: boolean; createdAt: string; updatedAt: string; }
+interface LibSpellItem { id: number; name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; costToLearn: number; imageId: number | null; soundId: number | null; isPublic: boolean; createdAt: string; updatedAt: string; }
 interface LibImageWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
 interface LibSoundWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
-interface LibSpellWritePayload { name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; imageId: number | null; soundId: number | null; isPublic: boolean; }
+interface LibSpellWritePayload { name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; costToLearn: number; imageId: number | null; soundId: number | null; isPublic: boolean; }
 
 type CreatorTabId = 'dungons' | 'treshers' | 'monsters' | 'images' | 'sounds' | 'spells' | 'potions' | 'items' | 'curses';
 
 interface GridPlacedItem {
   key: string;
-  type: 'monster' | 'tresher' | 'door' | 'trap';
+  type: 'monster' | 'tresher' | 'door' | 'trap' | 'item' | 'obstacle';
   label: string;
   row: number;
   column: number;
@@ -181,6 +186,8 @@ export class Creator implements OnInit {
   private readonly doorImageCache = new Map<string, HTMLImageElement>();
   private readonly stairsUpImageCache = new Map<string, HTMLImageElement>();
   private readonly stairsUpSquareAssignment = new Map<string, 1 | 2 | 3>();
+  private readonly obstacleImageCache = new Map<number, HTMLImageElement>();
+  private readonly obstacleImageCacheVersion = signal(0);
   readonly account = inject(Account);
   readonly creatorLayout = inject(CreatorLayout);
   private readonly itemService = inject(ItemService);
@@ -210,6 +217,8 @@ export class Creator implements OnInit {
   readonly isSaving = signal(false);
   readonly saveError = signal<string | null>(null);
   readonly isLoadingDungons = signal(false);
+  readonly isDeletingDungonId = signal<number | null>(null);
+  readonly deleteDungonError = signal<string | null>(null);
   readonly isLoadingSelectedDungon = signal(false);
   readonly isSelectedDungonExpanded = signal(false);
   readonly isMoveMode = signal(false);
@@ -259,6 +268,7 @@ export class Creator implements OnInit {
   readonly selectedKeyIdForPlacement = signal<number | null>(null);
   readonly selectedDungon = signal<DungonDetails | null>(null);
   readonly pendingDoorPlacement = signal<PendingDoorPlacement | null>(null);
+  readonly editingDoorId = signal<number | null>(null);
   readonly pendingStartPointPlacement = signal<PendingStartPointPlacement | null>(null);
   readonly pendingExitPlacement = signal<PendingExitPlacement | null>(null);
   readonly pendingTresherPlacement = signal<PendingTresherPlacement | null>(null);
@@ -280,6 +290,14 @@ export class Creator implements OnInit {
   readonly placeMonsterGuardRow = signal<number | null>(null);
   readonly placeMonsterGuardCol = signal<number | null>(null);
   readonly isSelectingGuardSquare = signal(false);
+  readonly placeMonsterIsStationary = signal(false);
+  readonly placeMonsterStationaryTriggerRow = signal<number | null>(null);
+  readonly placeMonsterStationaryTriggerCol = signal<number | null>(null);
+  readonly isSelectingStationaryTriggerSquare = signal(false);
+  readonly placeMonsterNoAttackUnlessAttacked = signal(false);
+  readonly editingMonsterPlacementPos = signal<{ dungonId: number; row: number; column: number } | null>(null);
+  readonly isCopyMonsterMode = signal(false);
+  readonly copyMonsterSource = signal<MonsterPlacement | null>(null);
   readonly gridPreviewContext = signal<GridPreviewContext | null>(null);
   readonly cheaterByDungon = signal<Record<number, Cheater>>({});
   readonly startPointByDungon = signal<Record<number, StartPoint | null>>({});
@@ -297,7 +315,18 @@ export class Creator implements OnInit {
   readonly isPlaceFloorTrapMode = signal(false);
   readonly isFloorTrapDialogVisible = signal(false);
   readonly pendingFloorTrapPlacement = signal<{ dungonId: number; row: number; column: number } | null>(null);
+  readonly editingFloorTrapId = signal<number | null>(null);
+  readonly isCopyFloorTrapMode = signal(false);
+  readonly copyFloorTrapSource = signal<FloorTrapPlacement | null>(null);
   private nextFloorTrapId = 1;
+  readonly obstaclePlacementsByDungon = signal<Record<number, ObstaclePlacement[]>>({});
+  readonly isPlaceObstacleMode = signal(false);
+  readonly isObstacleDialogVisible = signal(false);
+  readonly pendingObstaclePlacement = signal<{ dungonId: number; row: number; column: number } | null>(null);
+  readonly editingObstacleId = signal<number | null>(null);
+  readonly isCopyObstacleMode = signal(false);
+  readonly copyObstacleSource = signal<ObstaclePlacement | null>(null);
+  private nextObstacleId = 1;
   readonly selectedPlacedItemKey = signal<string | null>(null);
 
   readonly portalPlacementsByDungon = signal<Record<number, PortalPlacement[]>>({});
@@ -307,6 +336,25 @@ export class Creator implements OnInit {
   readonly portalPickMode = signal<'start' | 'end' | null>(null);
   readonly portalPickingId = signal<number | null>(null);
   private nextPortalId = 1;
+
+  // ── Item placement ────────────────────────────────────────────────────────
+  readonly isPlaceItemMode = signal(false);
+  readonly isPlaceItemDialogVisible = signal(false);
+  readonly pendingItemPlacement = signal<PendingItemPlacement | null>(null);
+  readonly itemPlacementsByDungon = signal<Record<number, ItemPlacement[]>>({});
+  readonly placeMonsterDropItemIds = signal<number[]>([]);
+
+  // ── Potion placement ──────────────────────────────────────────────────────
+  readonly isPlacePotionMode = signal(false);
+  readonly isPlacePotionDialogVisible = signal(false);
+  readonly pendingPotionPlacement = signal<PendingItemPlacement | null>(null);
+  readonly potionPlacementsByDungon = signal<Record<number, PotionPlacement[]>>({});
+
+  // ── Spell placement ───────────────────────────────────────────────────────
+  readonly isPlaceSpellMode = signal(false);
+  readonly isPlaceSpellDialogVisible = signal(false);
+  readonly pendingSpellPlacement = signal<PendingItemPlacement | null>(null);
+  readonly spellPlacementsByDungon = signal<Record<number, SpellPlacement[]>>({});
 
   // ── Library tabs ──────────────────────────────────────────────────────────
   readonly activeCreatorTab = signal<CreatorTabId>('dungons');
@@ -357,7 +405,7 @@ export class Creator implements OnInit {
   readonly isLibSpellSectionVisible = signal(true);
 
   readonly libSpellEffectToOptions = [
-    'HP', 'Defense', 'Stamina', 'Mind', 'Sneak', 'Magic', 'Sight', 'Action Economy',
+    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'Action Economy',
   ] as const;
 
   readonly libImageForm = new FormGroup({
@@ -387,19 +435,20 @@ export class Creator implements OnInit {
     sp: new FormControl<number>(0, { nonNullable: true }),
     successTestValue: new FormControl<number>(0, { nonNullable: true }),
     magicCost: new FormControl<number>(1, { nonNullable: true }),
+    costToLearn: new FormControl<number>(0, { nonNullable: true }),
     imageId: new FormControl<number | null>(null),
     soundId: new FormControl<number | null>(null),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
   });
   readonly openBlockOptions: OpenBlockOption[] = [
-     { key: 'wallTop', label: 'Wall T' },
-     { key: 'wallBottom', label: 'Wall B' },
-     { key: 'wallLeft', label: 'Wall L' },
-     { key: 'wallRight', label: 'Wall R' },
-     { key: 'doorTop', label: 'Door T' },
-     { key: 'doorBottom', label: 'Door B' },
-     { key: 'doorLeft', label: 'Door L' },
-     { key: 'doorRight', label: 'Door R' },
+     { key: 'wallTop', label: 'WT' },
+     { key: 'wallBottom', label: 'WB' },
+     { key: 'wallLeft', label: 'WL' },
+     { key: 'wallRight', label: 'WR' },
+     { key: 'doorTop', label: 'DT' },
+     { key: 'doorBottom', label: 'DB' },
+     { key: 'doorLeft', label: 'DL' },
+     { key: 'doorRight', label: 'DR' },
   ];
   readonly openBlockSelections = signal<Record<OpenBlockOptionKey, boolean>>({
     ...EMPTY_OPEN_BLOCK_SELECTIONS,
@@ -438,11 +487,15 @@ export class Creator implements OnInit {
     }),
     ismaingame: new FormControl<boolean>(false, { nonNullable: true }),
     issample: new FormControl<boolean>(false, { nonNullable: true }),
+    resettablePerPc: new FormControl<boolean>(false, { nonNullable: true }),
+    imageId: new FormControl<number | null>(null),
   });
 
   readonly isEditMetadataFormVisible = signal(false);
   readonly isSavingMetadata = signal(false);
   readonly metadataSaveError = signal<string | null>(null);
+  readonly createDungonImagePreviewUrl = signal<string>('');
+  readonly editDungonImagePreviewUrl = signal<string>('');
 
   readonly editMetadataForm = new FormGroup<CreateDungonForm>({
     name: new FormControl('', {
@@ -465,6 +518,8 @@ export class Creator implements OnInit {
     }),
     ismaingame: new FormControl<boolean>(false, { nonNullable: true }),
     issample: new FormControl<boolean>(false, { nonNullable: true }),
+    resettablePerPc: new FormControl<boolean>(false, { nonNullable: true }),
+    imageId: new FormControl<number | null>(null),
   });
 
   readonly doorForm = new FormGroup({
@@ -491,10 +546,12 @@ export class Creator implements OnInit {
     trapName: new FormControl<string>('', { nonNullable: true }),
     trapDescription: new FormControl<string>('', { nonNullable: true }),
     trapDamage: new FormControl<number>(0, { nonNullable: true }),
-    trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind'>('HP', { nonNullable: true }),
+    trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS'>('HP', { nonNullable: true }),
     trapCurseId: new FormControl<number | null>(null),
     trapToDetect: new FormControl<number>(10, { nonNullable: true }),
     trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
+    itemRequirementItemId: new FormControl<number | null>(null),
+    itemRequirementConsume: new FormControl<boolean>(false, { nonNullable: true }),
   });
 
   readonly startPointForm = new FormGroup({
@@ -506,6 +563,8 @@ export class Creator implements OnInit {
     destinationType: new FormControl<ExitDestinationType>('outside', { nonNullable: true }),
     destinationDungonId: new FormControl<number | null>(null),
     transitionType: new FormControl<ExitTransitionType>('open', { nonNullable: true }),
+    itemRequirementItemId: new FormControl<number | null>(null),
+    itemRequirementConsume: new FormControl<boolean>(false, { nonNullable: true }),
   });
 
   readonly tresherForm = new FormGroup({
@@ -533,7 +592,7 @@ export class Creator implements OnInit {
     trapName: new FormControl<string>('', { nonNullable: true }),
     trapDescription: new FormControl<string>('', { nonNullable: true }),
     trapDamage: new FormControl<number>(0, { nonNullable: true }),
-    trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind'>('HP', { nonNullable: true }),
+    trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS'>('HP', { nonNullable: true }),
     trapCurseId: new FormControl<number | null>(null),
     trapToDetect: new FormControl<number>(10, { nonNullable: true }),
     trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
@@ -554,16 +613,31 @@ export class Creator implements OnInit {
       nonNullable: true,
       validators: [Validators.min(0)],
     }),
+    toHitPlusNeeded: new FormControl<number>(0, { nonNullable: true }),
   });
 
   readonly floorTrapForm = new FormGroup({
     trapName: new FormControl<string>('', { nonNullable: true }),
     trapDescription: new FormControl<string>('', { nonNullable: true }),
     trapDamage: new FormControl<number>(0, { nonNullable: true }),
-    trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind'>('HP', { nonNullable: true }),
+    trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS'>('HP', { nonNullable: true }),
     trapCurseId: new FormControl<number | null>(null),
     trapToDetect: new FormControl<number>(10, { nonNullable: true }),
     trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
+  });
+
+  readonly obstacleForm = new FormGroup({
+    name: new FormControl<string>('', { nonNullable: true }),
+    note: new FormControl<string>('', { nonNullable: true }),
+    imageId: new FormControl<number | null>(null),
+    hp: new FormControl<number>(10, { nonNullable: true }),
+    isIndestructible: new FormControl<boolean>(false, { nonNullable: true }),
+    containsItemId: new FormControl<number | null>(null),
+    heightPercent: new FormControl<number>(100, { nonNullable: true }),
+    heightAnchor: new FormControl<'floor' | 'ceiling'>('floor', { nonNullable: true }),
+    widthPercent: new FormControl<number>(100, { nonNullable: true }),
+    widthAnchor: new FormControl<'center' | 'east' | 'west'>('center', { nonNullable: true }),
+    color: new FormControl<string | null>(null),
   });
 
   readonly portalForm = new FormGroup({
@@ -671,6 +745,15 @@ export class Creator implements OnInit {
     this.isPlaceFloorTrapMode.set(false);
     this.isFloorTrapDialogVisible.set(false);
     this.pendingFloorTrapPlacement.set(null);
+    this.editingFloorTrapId.set(null);
+    this.isCopyFloorTrapMode.set(false);
+    this.copyFloorTrapSource.set(null);
+    this.isPlaceObstacleMode.set(false);
+    this.isObstacleDialogVisible.set(false);
+    this.pendingObstaclePlacement.set(null);
+    this.editingObstacleId.set(null);
+    this.isCopyObstacleMode.set(false);
+    this.copyObstacleSource.set(null);
     this.isPortalDialogVisible.set(false);
     this.editingPortalId.set(null);
     this.selectedPortalId.set(null);
@@ -684,6 +767,7 @@ export class Creator implements OnInit {
     this.isPlaceMonsterDialogVisible.set(false);
     this.selectedKeyIdForPlacement.set(null);
     this.pendingDoorPlacement.set(null);
+    this.editingDoorId.set(null);
     this.pendingStartPointPlacement.set(null);
     this.pendingExitPlacement.set(null);
     this.pendingTresherPlacement.set(null);
@@ -692,10 +776,28 @@ export class Creator implements OnInit {
     this.placeMonsterRoam.set(false);
     this.placeMonsterDropTresherIds.set([]);
     this.placeMonsterDropKeyIds.set([]);
+    this.placeMonsterDropItemIds.set([]);
     this.placeMonsterIsDormant.set(false);
     this.placeMonsterGuardRow.set(null);
     this.placeMonsterGuardCol.set(null);
     this.isSelectingGuardSquare.set(false);
+    this.placeMonsterIsStationary.set(false);
+    this.placeMonsterStationaryTriggerRow.set(null);
+    this.placeMonsterStationaryTriggerCol.set(null);
+    this.isSelectingStationaryTriggerSquare.set(false);
+    this.placeMonsterNoAttackUnlessAttacked.set(false);
+    this.editingMonsterPlacementPos.set(null);
+    this.isCopyMonsterMode.set(false);
+    this.copyMonsterSource.set(null);
+    this.isPlaceItemMode.set(false);
+    this.isPlaceItemDialogVisible.set(false);
+    this.pendingItemPlacement.set(null);
+    this.isPlacePotionMode.set(false);
+    this.isPlacePotionDialogVisible.set(false);
+    this.pendingPotionPlacement.set(null);
+    this.isPlaceSpellMode.set(false);
+    this.isPlaceSpellDialogVisible.set(false);
+    this.pendingSpellPlacement.set(null);
     this.exitForm.reset({
       destinationType: 'outside',
       destinationDungonId: null,
@@ -763,6 +865,7 @@ export class Creator implements OnInit {
       spreward: 0,
       ismaingame: false,
       issample: false,
+      resettablePerPc: false,
     });
   }
 
@@ -840,6 +943,11 @@ export class Creator implements OnInit {
           toDisarm: Math.max(0, this.doorForm.controls.trapToDisarm.value),
         }
       : null;
+    const itemReqId = this.doorForm.controls.itemRequirementItemId.value;
+    const itemReqItem = itemReqId != null ? this.libItems().find((i) => i.id === itemReqId) : null;
+    const itemRequirement: DoorItemRequirement | null = itemReqItem
+      ? { itemId: itemReqItem.id, itemName: itemReqItem.name, consume: this.doorForm.controls.itemRequirementConsume.value }
+      : null;
     const settings: DoorPromptResult = {
       state,
       hp,
@@ -853,10 +961,19 @@ export class Creator implements OnInit {
       toPick,
       trap,
       spReward: this.doorForm.controls.spReward.value ?? null,
+      itemRequirement,
     };
 
     const dungonId = pending.dungonId;
-    if (pending.isNewSquare) {
+    const editingId = this.editingDoorId();
+
+    if (editingId !== null) {
+      this.squaresByDungon.update((allSquares) => ({
+        ...allSquares,
+        [dungonId]: this.updateDoorPropertiesInPlace(allSquares[dungonId] ?? {}, editingId, settings),
+      }));
+      this.editingDoorId.set(null);
+    } else if (pending.isNewSquare) {
       this.filledSquaresByDungon.update((allSquares) => ({
         ...allSquares,
         [dungonId]: {
@@ -898,6 +1015,64 @@ export class Creator implements OnInit {
     this.closeDoorPlacementDialog();
   }
 
+  openDoorEditDialog(doorId: number): void {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) return;
+
+    const squares = this.squaresByDungon()[dungonId] ?? {};
+    let door: Door | null = null;
+    let foundRow = 0;
+    let foundColumn = 0;
+
+    for (const square of Object.values(squares)) {
+      for (const side of ['toTop', 'toRight', 'toBottom', 'toLeft'] as SquareSide[]) {
+        const conn = square[side];
+        if (this.isDoorConnection(conn) && conn.id === doorId) {
+          door = conn as Door;
+          foundRow = square.row;
+          foundColumn = square.column;
+          break;
+        }
+      }
+      if (door) break;
+    }
+
+    if (!door) return;
+
+    this.editingDoorId.set(doorId);
+    this.pendingDoorPlacement.set({
+      dungonId,
+      row: foundRow,
+      column: foundColumn,
+      squareKey: this.getSquareKey(foundRow, foundColumn),
+      isNewSquare: false,
+      selections: { ...EMPTY_OPEN_BLOCK_SELECTIONS },
+    });
+    this.doorDialogError.set(null);
+    this.doorForm.reset({
+      state: door.state === 'destroyed' ? 'closed' : door.state,
+      hp: door.HP,
+      isLocked: door.isLocked,
+      toPick: door.toPick,
+      isHidden: door.isHidden,
+      toFind: door.toFind || 3,
+      name: door.name,
+      description: door.description,
+      spReward: door.spReward,
+      hasTrap: door.trap !== null,
+      trapName: door.trap?.name ?? '',
+      trapDescription: door.trap?.description ?? '',
+      trapDamage: door.trap?.damage ?? 0,
+      trapDamageTo: door.trap?.damageTo ?? 'HP',
+      trapCurseId: door.trap?.curseId ?? null,
+      trapToDetect: door.trap?.toDetect ?? 10,
+      trapToDisarm: door.trap?.toDisarm ?? 10,
+      itemRequirementItemId: door.itemRequirement?.itemId ?? null,
+      itemRequirementConsume: door.itemRequirement?.consume ?? false,
+    });
+    this.isDoorDialogVisible.set(true);
+  }
+
   openKaysDialog(): void {
     this.isKaysDialogVisible.set(true);
     this.isTresherDialogVisible.set(false);
@@ -911,6 +1086,7 @@ export class Creator implements OnInit {
     this.isPlaceMonsterMode.set(false);
     this.isAddTextMode.set(false);
     this.isPlaceFloorTrapMode.set(false);
+    this.isPlaceObstacleMode.set(false);
   }
 
   closeKaysDialog(): void {
@@ -936,12 +1112,12 @@ export class Creator implements OnInit {
       this.startSetExitMode();
     } else if (action === 'createMonseter') {
       this.openMonsterDialog();
-    } else if (action === 'placeMonster') {
-      this.startPlaceMonsterMode();
     } else if (action === 'addCellWallText') {
       this.startAddTextMode();
     } else if (action === 'placeFloorTrap') {
       this.startPlaceFloorTrapMode();
+    } else if (action === 'placeObstacle') {
+      this.startPlaceObstacleMode();
     } else if (action === 'placePortal') {
       this.openPortalDialog(null);
     }
@@ -951,6 +1127,7 @@ export class Creator implements OnInit {
 
   startPlaceFloorTrapMode(): void {
     this.isPlaceFloorTrapMode.set(true);
+    this.isPlaceObstacleMode.set(false);
     this.isPlaceTresherMode.set(false);
     this.isPlaceMonsterMode.set(false);
     this.isStartPointMode.set(false);
@@ -969,6 +1146,7 @@ export class Creator implements OnInit {
   }
 
   openFloorTrapDialog(dungonId: number, row: number, column: number): void {
+    this.editingFloorTrapId.set(null);
     this.pendingFloorTrapPlacement.set({ dungonId, row, column });
     this.floorTrapForm.reset({
       trapName: '',
@@ -978,6 +1156,23 @@ export class Creator implements OnInit {
       trapCurseId: null,
       trapToDetect: 10,
       trapToDisarm: 10,
+    });
+    this.isFloorTrapDialogVisible.set(true);
+  }
+
+  openFloorTrapEditDialog(dungonId: number, trapId: number): void {
+    const trap = (this.floorTrapPlacementsByDungon()[dungonId] ?? []).find((t) => t.id === trapId);
+    if (!trap) return;
+    this.editingFloorTrapId.set(trapId);
+    this.pendingFloorTrapPlacement.set({ dungonId, row: trap.row, column: trap.column });
+    this.floorTrapForm.reset({
+      trapName: trap.trap.name,
+      trapDescription: trap.trap.description,
+      trapDamage: trap.trap.damage,
+      trapDamageTo: trap.trap.damageTo,
+      trapCurseId: trap.trap.curseId,
+      trapToDetect: trap.trap.toDetect,
+      trapToDisarm: trap.trap.toDisarm,
     });
     this.isFloorTrapDialogVisible.set(true);
   }
@@ -997,21 +1192,31 @@ export class Creator implements OnInit {
       toDisarm: Math.max(0, controls.trapToDisarm.value),
     };
 
-    const placement: FloorTrapPlacement = {
-      id: this.nextFloorTrapId,
-      row: pending.row,
-      column: pending.column,
-      trap,
-      isTriggered: false,
-      isDisarmed: false,
-      isDetected: false,
-    };
-    this.nextFloorTrapId += 1;
-
-    this.floorTrapPlacementsByDungon.update((all) => ({
-      ...all,
-      [pending.dungonId]: [...(all[pending.dungonId] ?? []), placement],
-    }));
+    const editingId = this.editingFloorTrapId();
+    if (editingId !== null) {
+      this.floorTrapPlacementsByDungon.update((all) => ({
+        ...all,
+        [pending.dungonId]: (all[pending.dungonId] ?? []).map((t) =>
+          t.id === editingId ? { ...t, trap } : t
+        ),
+      }));
+      this.editingFloorTrapId.set(null);
+    } else {
+      const placement: FloorTrapPlacement = {
+        id: this.nextFloorTrapId,
+        row: pending.row,
+        column: pending.column,
+        trap,
+        isTriggered: false,
+        isDisarmed: false,
+        isDetected: false,
+      };
+      this.nextFloorTrapId += 1;
+      this.floorTrapPlacementsByDungon.update((all) => ({
+        ...all,
+        [pending.dungonId]: [...(all[pending.dungonId] ?? []), placement],
+      }));
+    }
 
     this.markDungonJsonChanged();
     this.isFloorTrapDialogVisible.set(false);
@@ -1021,12 +1226,244 @@ export class Creator implements OnInit {
   cancelFloorTrap(): void {
     this.isFloorTrapDialogVisible.set(false);
     this.pendingFloorTrapPlacement.set(null);
+    this.editingFloorTrapId.set(null);
+  }
+
+  copyFloorTrapFromSelection(): void {
+    const item = this.selectedPlacedItem();
+    const dungonId = this.selectedDungonId();
+    if (!item || item.type !== 'trap' || dungonId === null) return;
+    const placement = (this.floorTrapPlacementsByDungon()[dungonId] ?? []).find((t) => t.id === item.refId);
+    if (!placement) return;
+    this.copyFloorTrapSource.set({ ...placement });
+    this.isCopyFloorTrapMode.set(true);
+    this.selectedPlacedItemKey.set(null);
+    this.drawGridCanvas();
+  }
+
+  cancelCopyFloorTrapMode(): void {
+    this.isCopyFloorTrapMode.set(false);
+    this.copyFloorTrapSource.set(null);
   }
 
   removeFloorTrap(dungonId: number, trapId: number): void {
     this.floorTrapPlacementsByDungon.update((all) => ({
       ...all,
       [dungonId]: (all[dungonId] ?? []).filter((p) => p.id !== trapId),
+    }));
+    this.markDungonJsonChanged();
+  }
+
+  // ── Obstacles ─────────────────────────────────────────────────────────────
+
+  startPlaceObstacleMode(): void {
+    this.isPlaceObstacleMode.set(true);
+    this.isPlaceFloorTrapMode.set(false);
+    this.isPlaceTresherMode.set(false);
+    this.isPlaceMonsterMode.set(false);
+    this.isStartPointMode.set(false);
+    this.isExitMode.set(false);
+    this.isAddTextMode.set(false);
+    this.isObstacleDialogVisible.set(false);
+    this.pendingObstaclePlacement.set(null);
+    this.portalPickMode.set(null);
+    this.portalPickingId.set(null);
+  }
+
+  stopPlaceObstacleMode(): void {
+    this.isPlaceObstacleMode.set(false);
+    this.isObstacleDialogVisible.set(false);
+    this.pendingObstaclePlacement.set(null);
+    this.editingObstacleId.set(null);
+    this.isCopyObstacleMode.set(false);
+  }
+
+  openObstacleDialog(dungonId: number, row: number, column: number): void {
+    this.pendingObstaclePlacement.set({ dungonId, row, column });
+    this.obstacleForm.reset({
+      name: '',
+      note: '',
+      imageId: null,
+      hp: 10,
+      isIndestructible: false,
+      containsItemId: null,
+      heightPercent: 100,
+      heightAnchor: 'floor',
+      widthPercent: 100,
+      widthAnchor: 'center',
+      color: null,
+    });
+    this.isObstacleDialogVisible.set(true);
+  }
+
+  saveObstacle(): void {
+    const pending = this.pendingObstaclePlacement();
+    if (!pending) return;
+
+    const controls = this.obstacleForm.controls;
+    const rawImageId = controls.imageId.value;
+    const editingId = this.editingObstacleId();
+
+    if (editingId !== null) {
+      this.obstaclePlacementsByDungon.update((all) => ({
+        ...all,
+        [pending.dungonId]: (all[pending.dungonId] ?? []).map((obs) =>
+          obs.id === editingId
+            ? {
+                ...obs,
+                name: controls.name.value.trim() || 'Obstacle',
+                note: controls.note.value.trim(),
+                imageId: rawImageId !== null ? (Number(rawImageId) || null) : null,
+                hp: Math.max(1, controls.hp.value),
+                isIndestructible: controls.isIndestructible.value,
+                containsItemId: controls.containsItemId.value ?? null,
+                heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
+                heightAnchor: controls.heightAnchor.value,
+                widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
+                widthAnchor: controls.widthAnchor.value,
+                color: controls.color.value || null,
+              }
+            : obs
+        ),
+      }));
+      this.editingObstacleId.set(null);
+    } else {
+      const placement: ObstaclePlacement = {
+        id: this.nextObstacleId,
+        row: pending.row,
+        column: pending.column,
+        name: controls.name.value.trim() || 'Obstacle',
+        note: controls.note.value.trim(),
+        imageId: rawImageId !== null ? (Number(rawImageId) || null) : null,
+        hp: Math.max(1, controls.hp.value),
+        isIndestructible: controls.isIndestructible.value,
+        containsItemId: controls.containsItemId.value ?? null,
+        heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
+        heightAnchor: controls.heightAnchor.value,
+        widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
+        widthAnchor: controls.widthAnchor.value,
+        color: controls.color.value || null,
+        currentHp: Math.max(1, controls.hp.value),
+        isDestroyed: false,
+        itemTaken: false,
+      };
+      this.nextObstacleId += 1;
+      this.obstaclePlacementsByDungon.update((all) => ({
+        ...all,
+        [pending.dungonId]: [...(all[pending.dungonId] ?? []), placement],
+      }));
+    }
+
+    this.loadObstacleImagesForCreator(pending.dungonId);
+    this.markDungonJsonChanged();
+    this.isObstacleDialogVisible.set(false);
+    this.pendingObstaclePlacement.set(null);
+  }
+
+  cancelObstacle(): void {
+    this.isObstacleDialogVisible.set(false);
+    this.pendingObstaclePlacement.set(null);
+    this.editingObstacleId.set(null);
+  }
+
+  openObstacleEditDialog(dungonId: number, obstacleId: number): void {
+    const obstacle = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find((o) => o.id === obstacleId);
+    if (!obstacle) return;
+    this.editingObstacleId.set(obstacleId);
+    this.pendingObstaclePlacement.set({ dungonId, row: obstacle.row, column: obstacle.column });
+    this.obstacleForm.reset({
+      name: obstacle.name,
+      note: obstacle.note,
+      imageId: obstacle.imageId,
+      hp: obstacle.hp,
+      isIndestructible: obstacle.isIndestructible,
+      containsItemId: obstacle.containsItemId,
+      heightPercent: obstacle.heightPercent ?? 100,
+      heightAnchor: obstacle.heightAnchor ?? 'floor',
+      widthPercent: obstacle.widthPercent ?? 100,
+      widthAnchor: obstacle.widthAnchor ?? 'center',
+      color: obstacle.color ?? null,
+    });
+    this.isObstacleDialogVisible.set(true);
+  }
+
+  copyObstacle(): void {
+    const pending = this.pendingObstaclePlacement();
+    if (!pending) return;
+    const controls = this.obstacleForm.controls;
+    const rawImageId = controls.imageId.value;
+    this.copyObstacleSource.set({
+      id: -1,
+      row: pending.row,
+      column: pending.column,
+      name: controls.name.value.trim() || 'Obstacle',
+      note: controls.note.value.trim(),
+      imageId: rawImageId !== null ? (Number(rawImageId) || null) : null,
+      hp: Math.max(1, controls.hp.value),
+      isIndestructible: controls.isIndestructible.value,
+      containsItemId: controls.containsItemId.value ?? null,
+      heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
+      heightAnchor: controls.heightAnchor.value,
+      widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
+      widthAnchor: controls.widthAnchor.value,
+      color: controls.color.value || null,
+      currentHp: Math.max(1, controls.hp.value),
+      isDestroyed: false,
+      itemTaken: false,
+    });
+    this.isCopyObstacleMode.set(true);
+    this.isObstacleDialogVisible.set(false);
+    this.pendingObstaclePlacement.set(null);
+    this.editingObstacleId.set(null);
+  }
+
+  cancelCopyObstacleMode(): void {
+    this.isCopyObstacleMode.set(false);
+    this.copyObstacleSource.set(null);
+  }
+
+  copyObstacleFromSelection(): void {
+    const item = this.selectedPlacedItem();
+    const dungonId = this.selectedDungonId();
+    if (!item || item.type !== 'obstacle' || dungonId === null) return;
+    const placement = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find((o) => o.id === item.refId);
+    if (!placement) return;
+    this.copyObstacleSource.set({ ...placement });
+    this.isCopyObstacleMode.set(true);
+    this.selectedPlacedItemKey.set(null);
+    this.drawGridCanvas();
+  }
+
+  copyMonsterFromSelection(): void {
+    const item = this.selectedPlacedItem();
+    const dungonId = this.selectedDungonId();
+    if (!item || item.type !== 'monster' || dungonId === null) return;
+    const placement = (this.monsterPlacementsByDungon()[dungonId] ?? []).find(
+      (mp) => mp.row === item.row && mp.column === item.column
+    );
+    if (!placement) return;
+    this.copyMonsterSource.set({ ...placement });
+    this.isCopyMonsterMode.set(true);
+    this.selectedPlacedItemKey.set(null);
+    this.drawGridCanvas();
+  }
+
+  removeEditingObstacle(): void {
+    const pending = this.pendingObstaclePlacement();
+    const id = this.editingObstacleId();
+    if (!pending || id === null) return;
+    this.removeObstacle(pending.dungonId, id);
+    this.isObstacleDialogVisible.set(false);
+    this.pendingObstaclePlacement.set(null);
+    this.editingObstacleId.set(null);
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+  }
+
+  removeObstacle(dungonId: number, obstacleId: number): void {
+    this.obstaclePlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: (all[dungonId] ?? []).filter((p) => p.id !== obstacleId),
     }));
     this.markDungonJsonChanged();
   }
@@ -1133,6 +1570,7 @@ export class Creator implements OnInit {
     this.portalPickMode.set(step);
     this.portalPickingId.set(portalId);
     this.isPlaceFloorTrapMode.set(false);
+    this.isPlaceObstacleMode.set(false);
     this.isPlaceTresherMode.set(false);
     this.isPlaceMonsterMode.set(false);
     this.isStartPointMode.set(false);
@@ -1246,6 +1684,32 @@ export class Creator implements OnInit {
       });
     }
 
+    // Obstacles
+    for (const p of this.obstaclePlacementsByDungon()[dungonId] ?? []) {
+      items.push({
+        key: `obstacle-${p.id}-${p.row}-${p.column}`,
+        type: 'obstacle',
+        label: `Obstacle: ${p.name || 'Unnamed'} (r${p.row},c${p.column})`,
+        row: p.row,
+        column: p.column,
+        refId: p.id,
+      });
+    }
+
+    // Items
+    const libItems = this.libItems();
+    for (const p of this.itemPlacementsByDungon()[dungonId] ?? []) {
+      const name = libItems.find((i) => i.id === p.itemId)?.name ?? `Item #${p.itemId}`;
+      items.push({
+        key: `item-${p.itemId}-${p.row}-${p.column}`,
+        type: 'item',
+        label: `Item: ${name} (r${p.row},c${p.column})`,
+        row: p.row,
+        column: p.column,
+        refId: p.itemId,
+      });
+    }
+
     return items;
   }
 
@@ -1281,6 +1745,15 @@ export class Creator implements OnInit {
       this.removeFloorTrap(dungonId, item.refId);
       this.drawGridCanvas();
       this.startPlaceFloorTrapMode();
+    } else if (item.type === 'obstacle') {
+      this.removeObstacle(dungonId, item.refId);
+      this.drawGridCanvas();
+      this.startPlaceObstacleMode();
+    } else if (item.type === 'item') {
+      this.removeItemPlacementsAtSquare(dungonId, item.row, item.column);
+      this.markDungonJsonChanged();
+      this.drawGridCanvas();
+      this.startPlaceItemMode();
     }
   }
 
@@ -1293,12 +1766,49 @@ export class Creator implements OnInit {
       this.editSelectedMonster(item.refId);
     } else if (item.type === 'tresher') {
       this.openTresherDialog();
+    } else if (item.type === 'obstacle') {
+      const dungonId = this.selectedDungonId();
+      if (dungonId !== null) {
+        this.selectedPlacedItemKey.set(null);
+        this.openObstacleEditDialog(dungonId, item.refId);
+      }
+    } else if (item.type === 'trap') {
+      const dungonId = this.selectedDungonId();
+      if (dungonId !== null) {
+        this.selectedPlacedItemKey.set(null);
+        this.openFloorTrapEditDialog(dungonId, item.refId);
+      }
+    } else if (item.type === 'door') {
+      this.selectedPlacedItemKey.set(null);
+      this.openDoorEditDialog(item.refId);
     }
   }
 
   clearSelectedPlacement(): void {
     this.selectedPlacedItemKey.set(null);
     this.drawGridCanvas();
+  }
+
+  removeSelectedItemPlacement(): void {
+    const item = this.selectedPlacedItem();
+    const dungonId = this.selectedDungonId();
+    if (!item || dungonId === null || item.type !== 'item') return;
+    this.selectedPlacedItemKey.set(null);
+    this.removeItemPlacementsAtSquare(dungonId, item.row, item.column);
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+  }
+
+  changeSelectedItemPlacement(): void {
+    const item = this.selectedPlacedItem();
+    const dungonId = this.selectedDungonId();
+    if (!item || dungonId === null || item.type !== 'item') return;
+    this.selectedPlacedItemKey.set(null);
+    this.removeItemPlacementsAtSquare(dungonId, item.row, item.column);
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.openPlaceItemDialog(dungonId, item.row, item.column);
   }
 
   floorTrapsForPreview(): FloorTrapPlacement[] {
@@ -1548,6 +2058,9 @@ export class Creator implements OnInit {
     this.isStartPointMode.set(false);
     this.isExitMode.set(false);
     this.isWhiteSpacePreviewPickMode.set(false);
+    this.isPlaceItemMode.set(false);
+    this.isPlacePotionMode.set(false);
+    this.isPlaceSpellMode.set(false);
     this.isTresherDialogVisible.set(false);
     this.isMonsterDialogVisible.set(false);
     this.isPlaceTresherDialogVisible.set(false);
@@ -1597,7 +2110,7 @@ export class Creator implements OnInit {
     if (nextDestinationType === 'dungon' && !this.hasAnyOtherDungonsForExit()) {
       this.exitForm.controls.destinationType.setValue('outside');
       this.exitForm.controls.destinationDungonId.setValue(null);
-      this.exitDialogError.set('No other dungons available for this user.');
+      this.exitDialogError.set('No other dungeons available for this user.');
       return;
     }
 
@@ -1633,7 +2146,7 @@ export class Creator implements OnInit {
     let destinationDungonId: number | null = null;
     if (destinationType === 'dungon') {
       if (destinationOptions.length === 0) {
-        this.exitDialogError.set('No other dungons available for this user.');
+        this.exitDialogError.set('No other dungeons available for this user.');
         return;
       }
 
@@ -1644,12 +2157,18 @@ export class Creator implements OnInit {
         selectedDestinationId === null ||
         !destinationOptions.some((item) => item.id === selectedDestinationId)
       ) {
-        this.exitDialogError.set('Pick a valid destination dungon.');
+        this.exitDialogError.set('Pick a valid destination dungeon.');
         return;
       }
 
       destinationDungonId = selectedDestinationId;
     }
+
+    const exitItemReqId = this.exitForm.controls.itemRequirementItemId.value;
+    const exitItemReqItem = exitItemReqId != null ? this.libItems().find((i) => i.id === exitItemReqId) : null;
+    const exitItemRequirement = exitItemReqItem
+      ? { itemId: exitItemReqItem.id, itemName: exitItemReqItem.name, consume: this.exitForm.controls.itemRequirementConsume.value }
+      : null;
 
     this.exitsByDungon.update((allExits) => {
       const existingExits = allExits[pending.dungonId] ?? [];
@@ -1663,6 +2182,7 @@ export class Creator implements OnInit {
           destinationType,
           destinationDungonId,
           transitionType,
+          itemRequirement: exitItemRequirement,
         };
 
         return {
@@ -1680,6 +2200,7 @@ export class Creator implements OnInit {
         destinationType,
         destinationDungonId,
         transitionType,
+        itemRequirement: exitItemRequirement,
       };
       this.nextExitId += 1;
 
@@ -1752,6 +2273,9 @@ export class Creator implements OnInit {
 
     this.isPlaceMonsterMode.set(true);
     this.isPlaceTresherMode.set(false);
+    this.isPlaceItemMode.set(false);
+    this.isPlacePotionMode.set(false);
+    this.isPlaceSpellMode.set(false);
     this.isAddTextMode.set(false);
     this.isStartPointMode.set(false);
     this.isExitMode.set(false);
@@ -1899,6 +2423,31 @@ export class Creator implements OnInit {
     this.placeMonsterGuardCol.set(null);
   }
 
+  onPlaceMonsterIsStationaryChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.placeMonsterIsStationary.set(Boolean(target?.checked));
+    if (!target?.checked) {
+      this.placeMonsterStationaryTriggerRow.set(null);
+      this.placeMonsterStationaryTriggerCol.set(null);
+      this.isSelectingStationaryTriggerSquare.set(false);
+    }
+  }
+
+  startSelectingStationaryTriggerSquare(): void {
+    this.isSelectingStationaryTriggerSquare.set(true);
+    this.isPlaceMonsterDialogVisible.set(false);
+  }
+
+  clearMonsterStationaryTriggerSquare(): void {
+    this.placeMonsterStationaryTriggerRow.set(null);
+    this.placeMonsterStationaryTriggerCol.set(null);
+  }
+
+  onPlaceMonsterNoAttackUnlessAttackedChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.placeMonsterNoAttackUnlessAttacked.set(Boolean(target?.checked));
+  }
+
   isMonsterDropTresherSelected(id: number): boolean {
     return this.placeMonsterDropTresherIds().includes(id);
   }
@@ -1930,16 +2479,387 @@ export class Creator implements OnInit {
     this.pendingTresherPlacement.set(null);
   }
 
+  // ── Item placement methods ─────────────────────────────────────────────────
+
+  startPlaceItemMode(): void {
+    if (!this.hasAnyWhiteSpace()) {
+      return;
+    }
+
+    this.isPlaceItemMode.set(true);
+    this.isPlaceItemDialogVisible.set(false);
+    this.isPlacePotionMode.set(false);
+    this.isPlaceSpellMode.set(false);
+    this.isPlaceTresherMode.set(false);
+    this.isPlaceMonsterMode.set(false);
+    this.isAddTextMode.set(false);
+    this.isStartPointMode.set(false);
+    this.isExitMode.set(false);
+    this.isWhiteSpacePreviewPickMode.set(false);
+    this.isTresherDialogVisible.set(false);
+    this.isMonsterDialogVisible.set(false);
+    this.isPlaceTresherDialogVisible.set(false);
+    this.isPlaceMonsterDialogVisible.set(false);
+    this.selectedKeyIdForPlacement.set(null);
+    this.isKaysDialogVisible.set(false);
+  }
+
+  cancelPlaceItemMode(): void {
+    this.isPlaceItemMode.set(false);
+    this.isPlaceItemDialogVisible.set(false);
+    this.pendingItemPlacement.set(null);
+  }
+
+  private openPlaceItemDialog(dungonId: number, row: number, column: number): void {
+    this.pendingItemPlacement.set({ dungonId, row, column });
+    this.isPlaceItemDialogVisible.set(true);
+  }
+
+  closePlaceItemDialog(): void {
+    this.isPlaceItemDialogVisible.set(false);
+    this.pendingItemPlacement.set(null);
+  }
+
+  placeItemAtPendingPlacement(itemId: number): void {
+    const pending = this.pendingItemPlacement();
+    if (!pending) {
+      return;
+    }
+
+    let didPlace = false;
+    this.itemPlacementsByDungon.update((allPlacements) => {
+      const existing = allPlacements[pending.dungonId] ?? [];
+      const alreadyPlaced = existing.some(
+        (p) => p.itemId === itemId && p.row === pending.row && p.column === pending.column
+      );
+
+      if (alreadyPlaced) {
+        return allPlacements;
+      }
+
+      didPlace = true;
+      return {
+        ...allPlacements,
+        [pending.dungonId]: [
+          ...existing,
+          { itemId, row: pending.row, column: pending.column },
+        ],
+      };
+    });
+
+    this.closePlaceItemDialog();
+
+    if (!didPlace) {
+      return;
+    }
+
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+  }
+
+  private removeItemPlacementsAtSquare(dungonId: number, row: number, column: number): void {
+    this.itemPlacementsByDungon.update((allPlacements) => {
+      const existing = allPlacements[dungonId] ?? [];
+      const filtered = existing.filter((p) => p.row !== row || p.column !== column);
+      if (filtered.length === existing.length) {
+        return allPlacements;
+      }
+      return { ...allPlacements, [dungonId]: filtered };
+    });
+  }
+
+  startPlacePotionMode(): void {
+    if (!this.hasAnyWhiteSpace()) {
+      return;
+    }
+
+    this.isPlacePotionMode.set(true);
+    this.isPlacePotionDialogVisible.set(false);
+    this.isPlaceSpellMode.set(false);
+    this.isPlaceItemMode.set(false);
+    this.isPlaceTresherMode.set(false);
+    this.isPlaceMonsterMode.set(false);
+    this.isAddTextMode.set(false);
+    this.isStartPointMode.set(false);
+    this.isExitMode.set(false);
+    this.isWhiteSpacePreviewPickMode.set(false);
+    this.isTresherDialogVisible.set(false);
+    this.isMonsterDialogVisible.set(false);
+    this.isPlaceTresherDialogVisible.set(false);
+    this.isPlaceMonsterDialogVisible.set(false);
+    this.selectedKeyIdForPlacement.set(null);
+    this.isKaysDialogVisible.set(false);
+  }
+
+  cancelPlacePotionMode(): void {
+    this.isPlacePotionMode.set(false);
+    this.isPlacePotionDialogVisible.set(false);
+    this.pendingPotionPlacement.set(null);
+  }
+
+  private openPlacePotionDialog(dungonId: number, row: number, column: number): void {
+    this.pendingPotionPlacement.set({ dungonId, row, column });
+    this.isPlacePotionDialogVisible.set(true);
+  }
+
+  closePlacePotionDialog(): void {
+    this.isPlacePotionDialogVisible.set(false);
+    this.pendingPotionPlacement.set(null);
+  }
+
+  placePotionAtPendingPlacement(potionId: number): void {
+    const pending = this.pendingPotionPlacement();
+    if (!pending) {
+      return;
+    }
+
+    let didPlace = false;
+    this.potionPlacementsByDungon.update((allPlacements) => {
+      const existing = allPlacements[pending.dungonId] ?? [];
+      const alreadyPlaced = existing.some(
+        (p) => p.potionId === potionId && p.row === pending.row && p.column === pending.column
+      );
+
+      if (alreadyPlaced) {
+        return allPlacements;
+      }
+
+      didPlace = true;
+      return {
+        ...allPlacements,
+        [pending.dungonId]: [
+          ...existing,
+          { potionId, row: pending.row, column: pending.column },
+        ],
+      };
+    });
+
+    this.closePlacePotionDialog();
+
+    if (!didPlace) {
+      return;
+    }
+
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+  }
+
+  private removePotionPlacementsAtSquare(dungonId: number, row: number, column: number): void {
+    this.potionPlacementsByDungon.update((allPlacements) => {
+      const existing = allPlacements[dungonId] ?? [];
+      const filtered = existing.filter((p) => p.row !== row || p.column !== column);
+      if (filtered.length === existing.length) {
+        return allPlacements;
+      }
+      return { ...allPlacements, [dungonId]: filtered };
+    });
+  }
+
+  startPlaceSpellMode(): void {
+    if (!this.hasAnyWhiteSpace()) {
+      return;
+    }
+
+    this.isPlaceSpellMode.set(true);
+    this.isPlaceSpellDialogVisible.set(false);
+    this.isPlacePotionMode.set(false);
+    this.isPlaceItemMode.set(false);
+    this.isPlaceTresherMode.set(false);
+    this.isPlaceMonsterMode.set(false);
+    this.isAddTextMode.set(false);
+    this.isStartPointMode.set(false);
+    this.isExitMode.set(false);
+    this.isWhiteSpacePreviewPickMode.set(false);
+    this.isTresherDialogVisible.set(false);
+    this.isMonsterDialogVisible.set(false);
+    this.isPlaceTresherDialogVisible.set(false);
+    this.isPlaceMonsterDialogVisible.set(false);
+    this.selectedKeyIdForPlacement.set(null);
+    this.isKaysDialogVisible.set(false);
+  }
+
+  cancelPlaceSpellMode(): void {
+    this.isPlaceSpellMode.set(false);
+    this.isPlaceSpellDialogVisible.set(false);
+    this.pendingSpellPlacement.set(null);
+  }
+
+  private openPlaceSpellDialog(dungonId: number, row: number, column: number): void {
+    this.pendingSpellPlacement.set({ dungonId, row, column });
+    this.isPlaceSpellDialogVisible.set(true);
+  }
+
+  closePlaceSpellDialog(): void {
+    this.isPlaceSpellDialogVisible.set(false);
+    this.pendingSpellPlacement.set(null);
+  }
+
+  placeSpellAtPendingPlacement(spellId: number): void {
+    const pending = this.pendingSpellPlacement();
+    if (!pending) {
+      return;
+    }
+
+    let didPlace = false;
+    this.spellPlacementsByDungon.update((allPlacements) => {
+      const existing = allPlacements[pending.dungonId] ?? [];
+      const alreadyPlaced = existing.some(
+        (p) => p.spellId === spellId && p.row === pending.row && p.column === pending.column
+      );
+
+      if (alreadyPlaced) {
+        return allPlacements;
+      }
+
+      didPlace = true;
+      return {
+        ...allPlacements,
+        [pending.dungonId]: [
+          ...existing,
+          { spellId, row: pending.row, column: pending.column },
+        ],
+      };
+    });
+
+    this.closePlaceSpellDialog();
+
+    if (!didPlace) {
+      return;
+    }
+
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+  }
+
+  private removeSpellPlacementsAtSquare(dungonId: number, row: number, column: number): void {
+    this.spellPlacementsByDungon.update((allPlacements) => {
+      const existing = allPlacements[dungonId] ?? [];
+      const filtered = existing.filter((p) => p.row !== row || p.column !== column);
+      if (filtered.length === existing.length) {
+        return allPlacements;
+      }
+      return { ...allPlacements, [dungonId]: filtered };
+    });
+  }
+
+  isMonsterDropItemSelected(id: number): boolean {
+    return this.placeMonsterDropItemIds().includes(id);
+  }
+
+  toggleMonsterDropItem(id: number): void {
+    const current = this.placeMonsterDropItemIds();
+    if (current.includes(id)) {
+      this.placeMonsterDropItemIds.set(current.filter((v) => v !== id));
+    } else {
+      this.placeMonsterDropItemIds.set([...current, id]);
+    }
+  }
+
   closePlaceMonsterDialog(): void {
     this.isPlaceMonsterDialogVisible.set(false);
     this.pendingMonsterPlacement.set(null);
     this.placeMonsterRoam.set(false);
     this.placeMonsterDropTresherIds.set([]);
     this.placeMonsterDropKeyIds.set([]);
+    this.placeMonsterDropItemIds.set([]);
     this.placeMonsterIsDormant.set(false);
     this.placeMonsterGuardRow.set(null);
     this.placeMonsterGuardCol.set(null);
     this.isSelectingGuardSquare.set(false);
+    this.placeMonsterIsStationary.set(false);
+    this.placeMonsterStationaryTriggerRow.set(null);
+    this.placeMonsterStationaryTriggerCol.set(null);
+    this.isSelectingStationaryTriggerSquare.set(false);
+    this.placeMonsterNoAttackUnlessAttacked.set(false);
+    this.editingMonsterPlacementPos.set(null);
+  }
+
+  openMonsterPlacementEditDialog(dungonId: number, row: number, column: number): void {
+    const placement = (this.monsterPlacementsByDungon()[dungonId] ?? []).find(
+      (mp) => mp.row === row && mp.column === column
+    );
+    if (!placement) return;
+    this.editingMonsterPlacementPos.set({ dungonId, row, column });
+    this.pendingMonsterPlacement.set({ dungonId, row, column });
+    this.placeMonsterRoam.set(placement.roam ?? false);
+    this.placeMonsterDropTresherIds.set([...(placement.tresherIds ?? [])]);
+    this.placeMonsterDropKeyIds.set([...(placement.keyIds ?? [])]);
+    this.placeMonsterDropItemIds.set([...(placement.itemIds ?? [])]);
+    this.placeMonsterIsDormant.set(placement.isDormant ?? false);
+    this.placeMonsterGuardRow.set(placement.guardRow ?? null);
+    this.placeMonsterGuardCol.set(placement.guardColumn ?? null);
+    this.isSelectingGuardSquare.set(false);
+    this.placeMonsterIsStationary.set(placement.isStationary ?? false);
+    this.placeMonsterStationaryTriggerRow.set(placement.stationaryTriggerRow ?? null);
+    this.placeMonsterStationaryTriggerCol.set(placement.stationaryTriggerCol ?? null);
+    this.isSelectingStationaryTriggerSquare.set(false);
+    this.placeMonsterNoAttackUnlessAttacked.set(placement.noAttackUnlessAttacked ?? false);
+    this.isKaysDialogVisible.set(false);
+    this.isTresherDialogVisible.set(false);
+    this.isMonsterDialogVisible.set(false);
+    this.isPlaceTresherDialogVisible.set(false);
+    this.loadMonsterLibrary();
+    this.isPlaceMonsterDialogVisible.set(true);
+  }
+
+  saveMonsterPlacementSettings(): void {
+    const pos = this.editingMonsterPlacementPos();
+    if (!pos) return;
+    this.monsterPlacementsByDungon.update((all) => ({
+      ...all,
+      [pos.dungonId]: (all[pos.dungonId] ?? []).map((mp) =>
+        mp.row === pos.row && mp.column === pos.column
+          ? {
+              ...mp,
+              roam: this.placeMonsterRoam(),
+              tresherIds: this.placeMonsterDropTresherIds().length > 0 ? [...this.placeMonsterDropTresherIds()] : undefined,
+              keyIds: this.placeMonsterDropKeyIds().length > 0 ? [...this.placeMonsterDropKeyIds()] : undefined,
+              itemIds: this.placeMonsterDropItemIds().length > 0 ? [...this.placeMonsterDropItemIds()] : undefined,
+              isDormant: this.placeMonsterIsDormant() || undefined,
+              guardRow: this.placeMonsterIsDormant() && this.placeMonsterGuardRow() !== null ? this.placeMonsterGuardRow() : undefined,
+              guardColumn: this.placeMonsterIsDormant() && this.placeMonsterGuardCol() !== null ? this.placeMonsterGuardCol() : undefined,
+              isStationary: this.placeMonsterIsStationary() || undefined,
+              stationaryTriggerRow: this.placeMonsterIsStationary() && this.placeMonsterStationaryTriggerRow() !== null ? this.placeMonsterStationaryTriggerRow() : undefined,
+              stationaryTriggerCol: this.placeMonsterIsStationary() && this.placeMonsterStationaryTriggerCol() !== null ? this.placeMonsterStationaryTriggerCol() : undefined,
+              noAttackUnlessAttacked: this.placeMonsterNoAttackUnlessAttacked() || undefined,
+            }
+          : mp
+      ),
+    }));
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+    this.closePlaceMonsterDialog();
+  }
+
+  copyMonsterPlacement(): void {
+    const pos = this.editingMonsterPlacementPos();
+    if (!pos) return;
+    const placement = (this.monsterPlacementsByDungon()[pos.dungonId] ?? []).find(
+      (mp) => mp.row === pos.row && mp.column === pos.column
+    );
+    if (!placement) return;
+    this.copyMonsterSource.set({ ...placement });
+    this.isCopyMonsterMode.set(true);
+    this.closePlaceMonsterDialog();
+  }
+
+  cancelCopyMonsterMode(): void {
+    this.isCopyMonsterMode.set(false);
+    this.copyMonsterSource.set(null);
+  }
+
+  removeMonsterAtEditPos(): void {
+    const pos = this.editingMonsterPlacementPos();
+    if (!pos) return;
+    this.removeMonsterPlacementsAtSquare(pos.dungonId, pos.row, pos.column);
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+    this.closePlaceMonsterDialog();
   }
 
   placeSelectedTresherAtPendingPlacement(tresherId: number): void {
@@ -2061,10 +2981,19 @@ export class Creator implements OnInit {
       return;
     }
 
+    const editPos = this.editingMonsterPlacementPos();
+
     let didPlace = false;
     this.monsterPlacementsByDungon.update((allPlacements) => {
-      const existingPlacements = allPlacements[pending.dungonId] ?? [];
-      const alreadyPlaced = existingPlacements.some(
+      let existingPlacements = allPlacements[pending.dungonId] ?? [];
+
+      if (editPos) {
+        existingPlacements = existingPlacements.filter(
+          (mp) => !(mp.row === editPos.row && mp.column === editPos.column)
+        );
+      }
+
+      const alreadyPlaced = !editPos && existingPlacements.some(
         (placement) =>
           placement.monsterId === monsterId &&
           placement.row === pending.row &&
@@ -2087,9 +3016,14 @@ export class Creator implements OnInit {
             roam: this.placeMonsterRoam(),
             tresherIds: this.placeMonsterDropTresherIds().length > 0 ? [...this.placeMonsterDropTresherIds()] : undefined,
             keyIds: this.placeMonsterDropKeyIds().length > 0 ? [...this.placeMonsterDropKeyIds()] : undefined,
+            itemIds: this.placeMonsterDropItemIds().length > 0 ? [...this.placeMonsterDropItemIds()] : undefined,
             isDormant: this.placeMonsterIsDormant() || undefined,
             guardRow: this.placeMonsterIsDormant() && this.placeMonsterGuardRow() !== null ? this.placeMonsterGuardRow() : undefined,
             guardColumn: this.placeMonsterIsDormant() && this.placeMonsterGuardCol() !== null ? this.placeMonsterGuardCol() : undefined,
+            isStationary: this.placeMonsterIsStationary() || undefined,
+            stationaryTriggerRow: this.placeMonsterIsStationary() && this.placeMonsterStationaryTriggerRow() !== null ? this.placeMonsterStationaryTriggerRow() : undefined,
+            stationaryTriggerCol: this.placeMonsterIsStationary() && this.placeMonsterStationaryTriggerCol() !== null ? this.placeMonsterStationaryTriggerCol() : undefined,
+            noAttackUnlessAttacked: this.placeMonsterNoAttackUnlessAttacked() || undefined,
           },
         ],
       };
@@ -2197,6 +3131,15 @@ export class Creator implements OnInit {
       magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.magicResistance), 0)),
       spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.spReward), 0)),
       callsReinforcements: libraryMonster.callsReinforcements === true,
+      toHitPlusNeeded: Math.max(0, libraryMonster.toHitPlusNeeded ?? 0),
+      npcGreeting: libraryMonster.npcGreeting ?? null,
+      npcInfo1: libraryMonster.npcInfo1 ?? null,
+      npcInfo2: libraryMonster.npcInfo2 ?? null,
+      npcInfo3: libraryMonster.npcInfo3 ?? null,
+      npcOnlyAttackWhenAttacked: libraryMonster.npcOnlyAttackWhenAttacked === true,
+      npcGivesInfoAfterDamaged: libraryMonster.npcGivesInfoAfterDamaged === true,
+      npcAttacksAfterInfo: libraryMonster.npcAttacksAfterInfo === true,
+      npcCanTrade: libraryMonster.npcCanTrade === true,
     };
     this.nextMonsterId += 1;
     this.monsterListByDungon.update((allMonsters) => ({
@@ -2321,6 +3264,15 @@ export class Creator implements OnInit {
       magicResistance: 0,
       spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.spReward?.value), 0)),
       callsReinforcements: false,
+      toHitPlusNeeded: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.toHitPlusNeeded?.value), 0)),
+      npcGreeting: null,
+      npcInfo1: null,
+      npcInfo2: null,
+      npcInfo3: null,
+      npcOnlyAttackWhenAttacked: false,
+      npcGivesInfoAfterDamaged: false,
+      npcAttacksAfterInfo: false,
+      npcCanTrade: false,
     };
 
     if (editingId !== null) {
@@ -2362,6 +3314,7 @@ export class Creator implements OnInit {
       ac: 10,
       runAt: 0,
       numberOfAttacks: 1,
+      toHitPlusNeeded: 0,
     });
   }
 
@@ -2393,6 +3346,7 @@ export class Creator implements OnInit {
       ac: selectedMonster.ac,
       runAt: selectedMonster.runAt,
       numberOfAttacks: selectedMonster.numberOfAttacks,
+      toHitPlusNeeded: selectedMonster.toHitPlusNeeded ?? 0,
     });
   }
 
@@ -2426,6 +3380,18 @@ export class Creator implements OnInit {
       }
     }
     return false;
+  }
+
+  isKeyPlacedOnGrid(keyId: number): boolean {
+    const key = this.keyList.find((k) => k.id === keyId);
+    return key !== undefined && key.rownId !== null && key.columnId !== null;
+  }
+
+  isKeyHeldByMonster(keyId: number): boolean {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) return false;
+    const monsterPlacements = this.monsterPlacementsByDungon()[dungonId] ?? [];
+    return monsterPlacements.some((p) => p.keyIds?.includes(keyId));
   }
 
   getDoorKeyLocation(doorRefId: number): { row: number; column: number } | null {
@@ -3116,6 +4082,44 @@ export class Creator implements OnInit {
     return this.filledSquaresByDungon()[preview.dungonId] ?? {};
   }
 
+  previewObstaclePlacementsForModal(): ObstaclePlacement[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) return [];
+    return this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
+  }
+
+  previewObstacleImagesBySquareForModal(): Map<string, HTMLImageElement | null> {
+    const preview = this.gridPreviewContext();
+    if (!preview) return new Map<string, HTMLImageElement | null>();
+    this.obstacleImageCacheVersion();
+    const imageBySquare = new Map<string, HTMLImageElement | null>();
+    for (const obs of this.obstaclePlacementsByDungon()[preview.dungonId] ?? []) {
+      const squareKey = this.getSquareKey(obs.row, obs.column);
+      const image = obs.imageId !== null ? (this.obstacleImageCache.get(obs.imageId) ?? null) : null;
+      imageBySquare.set(squareKey, image);
+    }
+    return imageBySquare;
+  }
+
+  private loadObstacleImagesForCreator(dungonId: number): void {
+    const placements = this.obstaclePlacementsByDungon()[dungonId] ?? [];
+    for (const p of placements) {
+      if (p.imageId === null || this.obstacleImageCache.has(p.imageId)) continue;
+      const libImg = this.libImageOptions().find(i => i.id === p.imageId);
+      if (!libImg?.path) continue;
+      const url = this.libResolveImageUrl(libImg.path);
+      if (!url) continue;
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      const imageId = p.imageId;
+      img.onload = () => {
+        this.obstacleImageCache.set(imageId, img);
+        this.obstacleImageCacheVersion.update((v) => v + 1);
+      };
+      img.src = url;
+    }
+  }
+
   previewTresherPlacementsForModal(): TresherPlacement[] {
     const preview = this.gridPreviewContext();
     if (!preview) {
@@ -3161,6 +4165,24 @@ export class Creator implements OnInit {
     return this.squareTextsByDungon()[preview.dungonId] ?? [];
   }
 
+  previewItemPlacementsForModal(): ItemPlacement[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return [];
+    }
+
+    return this.itemPlacementsByDungon()[preview.dungonId] ?? [];
+  }
+
+  previewPotionPlacementsForModal(): PotionPlacement[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return [];
+    }
+
+    return this.potionPlacementsByDungon()[preview.dungonId] ?? [];
+  }
+
   saveDungonJson(): void {
     if (this.isSavingDungonJson()) {
       return;
@@ -3173,7 +4195,7 @@ export class Creator implements OnInit {
 
     const userKey = this.account.getKey();
     if (!userKey) {
-      this.dungonJsonSaveError.set('You must be logged in to save dungon changes.');
+      this.dungonJsonSaveError.set('You must be logged in to save dungeon changes.');
       return;
     }
 
@@ -3193,7 +4215,7 @@ export class Creator implements OnInit {
       .subscribe({
         next: (response) => {
           if (response.result !== 1) {
-            this.dungonJsonSaveError.set(response.error || 'Failed to save dungon json.');
+            this.dungonJsonSaveError.set(response.error || 'Failed to save dungeon json.');
             return;
           }
 
@@ -3204,7 +4226,7 @@ export class Creator implements OnInit {
           }));
         },
         error: () => {
-          this.dungonJsonSaveError.set('Failed to save dungon json.');
+          this.dungonJsonSaveError.set('Failed to save dungeon json.');
         },
       });
   }
@@ -3221,7 +4243,7 @@ export class Creator implements OnInit {
 
     const userKey = this.account.getKey();
     if (!userKey) {
-      this.publishDungonError.set('You must be logged in to publish a dungon.');
+      this.publishDungonError.set('You must be logged in to publish a dungeon.');
       return;
     }
 
@@ -3253,7 +4275,7 @@ export class Creator implements OnInit {
       .subscribe({
         next: (response) => {
           if (response.result !== 1) {
-            this.publishDungonError.set(response.error || 'Failed to publish dungon.');
+            this.publishDungonError.set(response.error || 'Failed to publish dungeon.');
             return;
           }
 
@@ -3286,7 +4308,7 @@ export class Creator implements OnInit {
           }));
         },
         error: () => {
-          this.publishDungonError.set('Failed to publish dungon.');
+          this.publishDungonError.set('Failed to publish dungeon.');
         },
       });
   }
@@ -3340,6 +4362,75 @@ export class Creator implements OnInit {
     const filledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
     const isFilledSquare = Boolean(filledSquares[squareKey]);
     const selections = this.openBlockSelections();
+
+    if (this.isCopyObstacleMode()) {
+      if (isFilledSquare) {
+        const src = this.copyObstacleSource();
+        if (src) {
+          const copy: ObstaclePlacement = {
+            ...src,
+            id: this.nextObstacleId,
+            row,
+            column,
+            currentHp: src.hp,
+            isDestroyed: false,
+            itemTaken: false,
+          };
+          this.nextObstacleId += 1;
+          this.obstaclePlacementsByDungon.update((all) => ({
+            ...all,
+            [dungonId]: [...(all[dungonId] ?? []), copy],
+          }));
+          this.loadObstacleImagesForCreator(dungonId);
+          this.markDungonJsonChanged();
+          this.drawGridCanvas();
+          this.drawPreviewGridCanvas();
+        }
+      }
+      return;
+    }
+
+    if (this.isCopyMonsterMode()) {
+      if (isFilledSquare) {
+        const src = this.copyMonsterSource();
+        if (src) {
+          this.monsterPlacementsByDungon.update((all) => ({
+            ...all,
+            [dungonId]: [...(all[dungonId] ?? []), { ...src, row, column }],
+          }));
+          this.markDungonJsonChanged();
+          this.drawGridCanvas();
+          this.drawPreviewGridCanvas();
+        }
+      }
+      return;
+    }
+
+    if (this.isCopyFloorTrapMode()) {
+      if (isFilledSquare) {
+        const src = this.copyFloorTrapSource();
+        if (src) {
+          const copy: FloorTrapPlacement = {
+            ...src,
+            id: this.nextFloorTrapId,
+            row,
+            column,
+            isTriggered: false,
+            isDisarmed: false,
+            isDetected: false,
+          };
+          this.nextFloorTrapId += 1;
+          this.floorTrapPlacementsByDungon.update((all) => ({
+            ...all,
+            [dungonId]: [...(all[dungonId] ?? []), copy],
+          }));
+          this.markDungonJsonChanged();
+          this.drawGridCanvas();
+          this.drawPreviewGridCanvas();
+        }
+      }
+      return;
+    }
 
     if (this.isWhiteSpacePreviewPickMode()) {
       if (isFilledSquare) {
@@ -3397,6 +4488,17 @@ export class Creator implements OnInit {
       return;
     }
 
+    if (this.isSelectingStationaryTriggerSquare()) {
+      if (isFilledSquare) {
+        this.placeMonsterStationaryTriggerRow.set(row);
+        this.placeMonsterStationaryTriggerCol.set(column);
+        this.isSelectingStationaryTriggerSquare.set(false);
+        this.isPlaceMonsterDialogVisible.set(true);
+      }
+
+      return;
+    }
+
     if (this.isAddTextMode()) {
       if (isFilledSquare) {
         this.openTextDialog(dungonId, row, column);
@@ -3410,6 +4512,42 @@ export class Creator implements OnInit {
       if (isFilledSquare) {
         this.openFloorTrapDialog(dungonId, row, column);
         this.isPlaceFloorTrapMode.set(false);
+      }
+
+      return;
+    }
+
+    if (this.isPlaceObstacleMode()) {
+      if (isFilledSquare) {
+        this.openObstacleDialog(dungonId, row, column);
+        this.isPlaceObstacleMode.set(false);
+      }
+
+      return;
+    }
+
+    if (this.isPlaceItemMode()) {
+      if (isFilledSquare) {
+        this.openPlaceItemDialog(dungonId, row, column);
+        this.isPlaceItemMode.set(false);
+      }
+
+      return;
+    }
+
+    if (this.isPlacePotionMode()) {
+      if (isFilledSquare) {
+        this.openPlacePotionDialog(dungonId, row, column);
+        this.isPlacePotionMode.set(false);
+      }
+
+      return;
+    }
+
+    if (this.isPlaceSpellMode()) {
+      if (isFilledSquare) {
+        this.openPlaceSpellDialog(dungonId, row, column);
+        this.isPlaceSpellMode.set(false);
       }
 
       return;
@@ -3474,6 +4612,9 @@ export class Creator implements OnInit {
 
       this.removeTresherPlacementsAtSquare(dungonId, row, column);
       this.removeMonsterPlacementsAtSquare(dungonId, row, column);
+      this.removeItemPlacementsAtSquare(dungonId, row, column);
+      this.removePotionPlacementsAtSquare(dungonId, row, column);
+      this.removeSpellPlacementsAtSquare(dungonId, row, column);
       this.removeExitsAtSquare(dungonId, row, column);
 
       this.markDungonJsonChanged();
@@ -3506,13 +4647,35 @@ export class Creator implements OnInit {
           null
         ),
       }));
-      this.openBlockSelections.set({ ...EMPTY_OPEN_BLOCK_SELECTIONS });
+      this.openBlockSelections.update((sel) => ({
+        ...EMPTY_OPEN_BLOCK_SELECTIONS,
+        wallTop: sel.wallTop,
+        wallBottom: sel.wallBottom,
+        wallLeft: sel.wallLeft,
+        wallRight: sel.wallRight,
+      }));
       this.markDungonJsonChanged();
       this.drawGridCanvas();
       return;
     }
 
     if (isFilledSquare) {
+      const existingObstacle = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find(
+        (obs) => obs.row === row && obs.column === column && !obs.isDestroyed
+      );
+      if (existingObstacle) {
+        this.openObstacleEditDialog(dungonId, existingObstacle.id);
+        return;
+      }
+
+      const existingMonsterPlacement = (this.monsterPlacementsByDungon()[dungonId] ?? []).find(
+        (mp) => mp.row === row && mp.column === column
+      );
+      if (existingMonsterPlacement) {
+        this.openMonsterPlacementEditDialog(dungonId, row, column);
+        return;
+      }
+
       return;
     }
 
@@ -3535,7 +4698,13 @@ export class Creator implements OnInit {
       ),
     }));
 
-    this.openBlockSelections.set({ ...EMPTY_OPEN_BLOCK_SELECTIONS });
+    this.openBlockSelections.update((sel) => ({
+      ...EMPTY_OPEN_BLOCK_SELECTIONS,
+      wallTop: sel.wallTop,
+      wallBottom: sel.wallBottom,
+      wallLeft: sel.wallLeft,
+      wallRight: sel.wallRight,
+    }));
     this.markDungonJsonChanged();
     this.drawGridCanvas();
   }
@@ -3548,7 +4717,7 @@ export class Creator implements OnInit {
       this.publishVisibility.set('public');
       this.publishFriendUserKeys.set([]);
       this.isPublishDialogVisible.set(false);
-      this.selectedDungonError.set('Please log in to view dungon details.');
+      this.selectedDungonError.set('Please log in to view dungeon details.');
       return;
     }
 
@@ -3571,26 +4740,43 @@ export class Creator implements OnInit {
     this.isPlaceTresherMode.set(false);
     this.isPlaceMonsterMode.set(false);
     this.isAddTextMode.set(false);
+    this.isPlaceItemMode.set(false);
+    this.isPlacePotionMode.set(false);
+    this.isPlaceSpellMode.set(false);
     this.isStartPointDialogVisible.set(false);
     this.isExitDialogVisible.set(false);
     this.isTresherDialogVisible.set(false);
     this.isMonsterDialogVisible.set(false);
     this.isPlaceTresherDialogVisible.set(false);
     this.isPlaceMonsterDialogVisible.set(false);
+    this.isPlaceItemDialogVisible.set(false);
     this.isPublishingDungon.set(false);
     this.selectedKeyIdForPlacement.set(null);
     this.pendingStartPointPlacement.set(null);
     this.pendingExitPlacement.set(null);
     this.pendingTresherPlacement.set(null);
     this.pendingMonsterPlacement.set(null);
+    this.pendingItemPlacement.set(null);
+    this.isPlacePotionMode.set(false);
+    this.isPlacePotionDialogVisible.set(false);
+    this.pendingPotionPlacement.set(null);
+    this.isPlaceSpellMode.set(false);
+    this.isPlaceSpellDialogVisible.set(false);
+    this.pendingSpellPlacement.set(null);
     this.editingMonsterId.set(null);
     this.placeMonsterRoam.set(false);
     this.placeMonsterDropTresherIds.set([]);
     this.placeMonsterDropKeyIds.set([]);
+    this.placeMonsterDropItemIds.set([]);
     this.placeMonsterIsDormant.set(false);
     this.placeMonsterGuardRow.set(null);
     this.placeMonsterGuardCol.set(null);
     this.isSelectingGuardSquare.set(false);
+    this.placeMonsterIsStationary.set(false);
+    this.placeMonsterStationaryTriggerRow.set(null);
+    this.placeMonsterStationaryTriggerCol.set(null);
+    this.isSelectingStationaryTriggerSquare.set(false);
+    this.placeMonsterNoAttackUnlessAttacked.set(false);
     this.gridPreviewContext.set(null);
     this.selectedDungonId.set(dungonId);
     this.selectedDungon.set(null);
@@ -3614,9 +4800,31 @@ export class Creator implements OnInit {
         },
         error: () => {
           this.selectedDungon.set(null);
-          this.selectedDungonError.set('Failed to load dungon details.');
+          this.selectedDungonError.set('Failed to load dungeon details.');
         },
       });
+  }
+
+  onCreateDungonImageUploaded(item: UploadedMediaItem): void {
+    this.libImageOptions.update((opts) => [...opts, item]);
+    this.createDungonForm.controls.imageId.setValue(item.id);
+    this.createDungonImagePreviewUrl.set(this.libResolveImageUrl(item.path));
+  }
+
+  onEditDungonImageUploaded(item: UploadedMediaItem): void {
+    this.libImageOptions.update((opts) => [...opts, item]);
+    this.editMetadataForm.controls.imageId.setValue(item.id);
+    this.editDungonImagePreviewUrl.set(this.libResolveImageUrl(item.path));
+  }
+
+  clearCreateDungonImage(): void {
+    this.createDungonForm.controls.imageId.setValue(null);
+    this.createDungonImagePreviewUrl.set('');
+  }
+
+  clearEditDungonImage(): void {
+    this.editMetadataForm.controls.imageId.setValue(null);
+    this.editDungonImagePreviewUrl.set('');
   }
 
   saveCreateForm(): void {
@@ -3646,7 +4854,7 @@ export class Creator implements OnInit {
 
     const userKey = this.account.getKey();
     if (!userKey) {
-      this.saveError.set('You must be logged in to save a dungon.');
+      this.saveError.set('You must be logged in to save a dungeon.');
       return;
     }
 
@@ -3659,6 +4867,7 @@ export class Creator implements OnInit {
     const spreward = this.createDungonForm.controls.spreward.value;
     const ismaingame = this.account.isAdmin() ? this.createDungonForm.controls.ismaingame.value : false;
     const issample = this.account.isAdmin() ? this.createDungonForm.controls.issample.value : false;
+    const resettable_per_pc = this.account.isAdmin() ? this.createDungonForm.controls.resettablePerPc.value : false;
 
     this.http
       .post<{ result: number; dungon?: { name: string; id: number } }>(`${API_BASE_URL}/dungons`, {
@@ -3671,13 +4880,14 @@ export class Creator implements OnInit {
         spreward,
         ismaingame,
         issample,
+        resettable_per_pc,
       })
       .pipe(finalize(() => this.isSaving.set(false)))
       .subscribe({
         next: (response) => {
           const savedDungon = response.dungon;
           if (response.result !== 1 || !savedDungon) {
-            this.saveError.set('Failed to save dungon.');
+            this.saveError.set('Failed to save dungeon.');
             return;
           }
 
@@ -3685,7 +4895,7 @@ export class Creator implements OnInit {
           this.cancelCreateForm();
         },
         error: () => {
-          this.saveError.set('Failed to save dungon.');
+          this.saveError.set('Failed to save dungeon.');
         },
       });
   }
@@ -3693,6 +4903,7 @@ export class Creator implements OnInit {
   cancelCreateForm(): void {
     this.isCreateFormVisible.set(false);
     this.saveError.set(null);
+    this.createDungonImagePreviewUrl.set('');
     this.createDungonForm.reset({
       name: '',
       description: '',
@@ -3700,6 +4911,7 @@ export class Creator implements OnInit {
       minsplifetime: 0,
       maxsplifetime: 1000000,
       spreward: 0,
+      imageId: null,
     });
   }
 
@@ -3716,7 +4928,18 @@ export class Creator implements OnInit {
       minsplifetime: selected.minsplifetime,
       maxsplifetime: selected.maxsplifetime,
       spreward: selected.spreward,
+      ismaingame: selected.ismaingame,
+      issample: selected.issample,
+      resettablePerPc: selected.resettable_per_pc,
+      imageId: selected.imageid ?? null,
     });
+
+    if (selected.imageid) {
+      const img = this.libImageOptions().find(o => o.id === selected.imageid);
+      this.editDungonImagePreviewUrl.set(img ? this.libResolveImageUrl(img.path) : '');
+    } else {
+      this.editDungonImagePreviewUrl.set('');
+    }
 
     this.isEditMetadataFormVisible.set(true);
     this.metadataSaveError.set(null);
@@ -3725,6 +4948,7 @@ export class Creator implements OnInit {
   cancelEditMetadataForm(): void {
     this.isEditMetadataFormVisible.set(false);
     this.metadataSaveError.set(null);
+    this.editDungonImagePreviewUrl.set('');
     this.editMetadataForm.reset();
   }
 
@@ -3740,7 +4964,7 @@ export class Creator implements OnInit {
 
     const selected = this.selectedDungon();
     if (!selected) {
-      this.metadataSaveError.set('No dungon selected.');
+      this.metadataSaveError.set('No dungeon selected.');
       return;
     }
 
@@ -3781,6 +5005,8 @@ export class Creator implements OnInit {
           intro,
           minsplifetime,
           maxsplifetime,
+          ...(this.account.isAdmin() && { resettable_per_pc: this.editMetadataForm.controls.resettablePerPc.value }),
+          imageid: this.editMetadataForm.controls.imageId.value ?? null,
         }
       )
       .pipe(finalize(() => this.isSavingMetadata.set(false)))
@@ -3801,11 +5027,38 @@ export class Creator implements OnInit {
       });
   }
 
+  deleteDungon(dungon: DungonListItem): void {
+    if (this.isDeletingDungonId() !== null) return;
+    if (!confirm(`Delete "${dungon.name}"? This cannot be undone.`)) return;
+    const userKey = this.account.getKey();
+    if (!userKey) { this.deleteDungonError.set('Please log in.'); return; }
+    this.deleteDungonError.set(null);
+    this.isDeletingDungonId.set(dungon.id);
+    this.http
+      .delete<{ result: number; error?: string }>(`${API_BASE_URL}/dungons/${dungon.id}`, {
+        body: { userkey: userKey },
+      })
+      .pipe(finalize(() => this.isDeletingDungonId.set(null)))
+      .subscribe({
+        next: (res) => {
+          if (res.result !== 1) {
+            this.deleteDungonError.set(res.error ?? 'Failed to delete dungeon.');
+            return;
+          }
+          this.dungons.update((list) => list.filter((d) => d.id !== dungon.id));
+          if (this.selectedDungonId() === dungon.id) {
+            this.selectedDungonId.set(null);
+          }
+        },
+        error: () => this.deleteDungonError.set('Failed to delete dungeon.'),
+      });
+  }
+
   private loadDungons(): void {
     const userKey = this.account.getKey();
     if (!userKey) {
       this.dungons.set([]);
-      this.loadError.set('Please log in to view your dungons.');
+      this.loadError.set('Please log in to view your dungeons.');
       return;
     }
 
@@ -3823,7 +5076,7 @@ export class Creator implements OnInit {
         },
         error: () => {
           this.dungons.set([]);
-          this.loadError.set('Failed to load dungons.');
+          this.loadError.set('Failed to load dungeons.');
         },
       });
   }
@@ -4071,6 +5324,8 @@ export class Creator implements OnInit {
       trapCurseId: null,
       trapToDetect: 10,
       trapToDisarm: 10,
+      itemRequirementItemId: null,
+      itemRequirementConsume: false,
     });
     this.isDoorDialogVisible.set(true);
   }
@@ -4078,6 +5333,7 @@ export class Creator implements OnInit {
   private closeDoorPlacementDialog(): void {
     this.isDoorDialogVisible.set(false);
     this.pendingDoorPlacement.set(null);
+    this.editingDoorId.set(null);
     this.doorDialogError.set(null);
   }
 
@@ -4129,6 +5385,8 @@ export class Creator implements OnInit {
       destinationType,
       destinationDungonId,
       transitionType: existingExit?.transitionType ?? 'open',
+      itemRequirementItemId: existingExit?.itemRequirement?.itemId ?? null,
+      itemRequirementConsume: existingExit?.itemRequirement?.consume ?? false,
     });
     this.exitDialogError.set(null);
     this.isExitDialogVisible.set(true);
@@ -4165,10 +5423,16 @@ export class Creator implements OnInit {
     this.placeMonsterRoam.set(false);
     this.placeMonsterDropTresherIds.set([]);
     this.placeMonsterDropKeyIds.set([]);
+    this.placeMonsterDropItemIds.set([]);
     this.placeMonsterIsDormant.set(false);
     this.placeMonsterGuardRow.set(null);
     this.placeMonsterGuardCol.set(null);
     this.isSelectingGuardSquare.set(false);
+    this.placeMonsterIsStationary.set(false);
+    this.placeMonsterStationaryTriggerRow.set(null);
+    this.placeMonsterStationaryTriggerCol.set(null);
+    this.isSelectingStationaryTriggerSquare.set(false);
+    this.placeMonsterNoAttackUnlessAttacked.set(false);
     this.isKaysDialogVisible.set(false);
     this.isTresherDialogVisible.set(false);
     this.isMonsterDialogVisible.set(false);
@@ -4254,7 +5518,44 @@ export class Creator implements OnInit {
     const monsterPlacements = this.monsterPlacementsByDungon()[dungonId] ?? [];
     const exits = this.exitsByDungon()[dungonId] ?? [];
     const floorTrapPlacements = this.floorTrapPlacementsByDungon()[dungonId] ?? [];
+    const obstaclePlacements = this.obstaclePlacementsByDungon()[dungonId] ?? [];
     const portalPlacements = this.portalPlacementsByDungon()[dungonId] ?? [];
+    const itemPlacements = this.itemPlacementsByDungon()[dungonId] ?? [];
+    const potionPlacements = this.potionPlacementsByDungon()[dungonId] ?? [];
+    const spellPlacements = this.spellPlacementsByDungon()[dungonId] ?? [];
+
+    const allLibItems = this.libItems();
+    const allLibPotions = this.libPotions();
+    const placedItemIds = new Set(itemPlacements.map((p) => p.itemId));
+    // Include items referenced by obstacles in floorItemList so the game can find them
+    for (const obs of obstaclePlacements) {
+      if (obs.containsItemId !== null) placedItemIds.add(obs.containsItemId);
+    }
+    const placedPotionIds = new Set(potionPlacements.map((p) => p.potionId));
+    const floorItemList = allLibItems
+      .filter((i) => placedItemIds.has(i.id))
+      .map((i) => ({
+        id: i.id,
+        name: i.name,
+        description: i.description,
+        type: i.type as string,
+        effectValue: i.effectValue,
+        damage: i.damage,
+        range: i.range,
+        armorSlot: i.armorSlot,
+        effectOn: i.effectOn,
+        isTwoHanded: i.isTwoHanded,
+      }));
+    const floorPotionList = allLibPotions
+      .filter((p) => placedPotionIds.has(p.id))
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        effectTo: p.effectTo,
+        effectAmount: p.effectAmount,
+        lastFor: p.lastFor,
+      }));
 
     return {
       filledSquares: this.filledSquaresByDungon()[dungonId] ?? {},
@@ -4276,6 +5577,12 @@ export class Creator implements OnInit {
       squareTexts: this.squareTextsByDungon()[dungonId] ?? [],
       floorTrapPlacements,
       portalPlacements,
+      itemPlacements,
+      potionPlacements,
+      spellPlacements,
+      obstaclePlacements,
+      floorItemList,
+      floorPotionList,
     };
   }
 
@@ -4337,9 +5644,30 @@ export class Creator implements OnInit {
       [dungonId]: parsed.floorTrapPlacements ?? [],
     }));
 
+    this.obstaclePlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.obstaclePlacements ?? [],
+    }));
+    this.loadObstacleImagesForCreator(dungonId);
+
     this.portalPlacementsByDungon.update((all) => ({
       ...all,
       [dungonId]: parsed.portalPlacements ?? [],
+    }));
+
+    this.itemPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.itemPlacements ?? [],
+    }));
+
+    this.potionPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.potionPlacements ?? [],
+    }));
+
+    this.spellPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.spellPlacements ?? [],
     }));
 
     this.keyList = parsed.keyList;
@@ -4578,7 +5906,56 @@ export class Creator implements OnInit {
       squareTexts,
       floorTrapPlacements: this.parseFloorTrapPlacements((source as Record<string, unknown>)['floorTrapPlacements']),
       portalPlacements: this.parsePortalPlacements((source as Record<string, unknown>)['portalPlacements']),
+      itemPlacements: this.parseItemPlacements((source as Record<string, unknown>)['itemPlacements']),
+      potionPlacements: this.parsePotionPlacements((source as Record<string, unknown>)['potionPlacements']),
+      spellPlacements: this.parseSpellPlacements((source as Record<string, unknown>)['spellPlacements']),
+      obstaclePlacements: this.parseObstaclePlacements((source as Record<string, unknown>)['obstaclePlacements']),
     };
+  }
+
+  private parseItemPlacements(raw: unknown): ItemPlacement[] {
+    if (!Array.isArray(raw)) return [];
+    const result: ItemPlacement[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const src = item as Partial<Record<string, unknown>>;
+      const itemId = typeof src['itemId'] === 'number' ? Math.floor(src['itemId']) : null;
+      const row = typeof src['row'] === 'number' ? Math.floor(src['row']) : null;
+      const column = typeof src['column'] === 'number' ? Math.floor(src['column']) : null;
+      if (itemId === null || row === null || column === null) continue;
+      result.push({ itemId, row, column });
+    }
+    return result;
+  }
+
+  private parsePotionPlacements(raw: unknown): PotionPlacement[] {
+    if (!Array.isArray(raw)) return [];
+    const result: PotionPlacement[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const src = item as Partial<Record<string, unknown>>;
+      const potionId = typeof src['potionId'] === 'number' ? Math.floor(src['potionId']) : null;
+      const row = typeof src['row'] === 'number' ? Math.floor(src['row']) : null;
+      const column = typeof src['column'] === 'number' ? Math.floor(src['column']) : null;
+      if (potionId === null || row === null || column === null) continue;
+      result.push({ potionId, row, column });
+    }
+    return result;
+  }
+
+  private parseSpellPlacements(raw: unknown): SpellPlacement[] {
+    if (!Array.isArray(raw)) return [];
+    const result: SpellPlacement[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const src = item as Partial<Record<string, unknown>>;
+      const spellId = typeof src['spellId'] === 'number' ? Math.floor(src['spellId']) : null;
+      const row = typeof src['row'] === 'number' ? Math.floor(src['row']) : null;
+      const column = typeof src['column'] === 'number' ? Math.floor(src['column']) : null;
+      if (spellId === null || row === null || column === null) continue;
+      result.push({ spellId, row, column });
+    }
+    return result;
   }
 
   private parseFloorTrapPlacements(raw: unknown): FloorTrapPlacement[] {
@@ -4607,6 +5984,51 @@ export class Creator implements OnInit {
     }
     if (maxId >= this.nextFloorTrapId) {
       this.nextFloorTrapId = maxId + 1;
+    }
+    return result;
+  }
+
+  private parseObstaclePlacements(raw: unknown): ObstaclePlacement[] {
+    if (!Array.isArray(raw)) return [];
+    let maxId = 0;
+    const result: ObstaclePlacement[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const src = item as Partial<Record<string, unknown>>;
+      const id = typeof src['id'] === 'number' ? Math.floor(src['id']) : 0;
+      const row = typeof src['row'] === 'number' ? Math.floor(src['row']) : null;
+      const column = typeof src['column'] === 'number' ? Math.floor(src['column']) : null;
+      if (row === null || column === null) continue;
+      const hp = typeof src['hp'] === 'number' ? Math.max(1, Math.floor(src['hp'])) : 10;
+      const currentHp = typeof src['currentHp'] === 'number' ? Math.max(0, Math.floor(src['currentHp'])) : hp;
+      const heightPercent = typeof src['heightPercent'] === 'number' ? Math.max(1, Math.min(100, src['heightPercent'])) : 100;
+      const heightAnchor = src['heightAnchor'] === 'ceiling' ? 'ceiling' : 'floor';
+      const widthPercent = typeof src['widthPercent'] === 'number' ? Math.max(1, Math.min(100, src['widthPercent'])) : 100;
+      const widthAnchor = src['widthAnchor'] === 'east' ? 'east' : src['widthAnchor'] === 'west' ? 'west' : 'center';
+      const color = typeof src['color'] === 'string' && src['color'] ? src['color'] : null;
+      result.push({
+        id,
+        row,
+        column,
+        name: typeof src['name'] === 'string' ? src['name'] : 'Obstacle',
+        note: typeof src['note'] === 'string' ? src['note'] : '',
+        imageId: typeof src['imageId'] === 'number' ? src['imageId'] : null,
+        hp,
+        isIndestructible: src['isIndestructible'] === true,
+        containsItemId: typeof src['containsItemId'] === 'number' ? src['containsItemId'] : null,
+        heightPercent,
+        heightAnchor,
+        widthPercent,
+        widthAnchor,
+        color,
+        currentHp,
+        isDestroyed: src['isDestroyed'] === true,
+        itemTaken: src['itemTaken'] === true,
+      });
+      if (id > maxId) maxId = id;
+    }
+    if (maxId >= this.nextObstacleId) {
+      this.nextObstacleId = maxId + 1;
     }
     return result;
   }
@@ -4798,6 +6220,15 @@ export class Creator implements OnInit {
       magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magicResistance), 0)),
       spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.spReward), 0)),
       callsReinforcements: (source as Record<string, unknown>)['callsReinforcements'] === true,
+      toHitPlusNeeded: Math.max(0, this.normalizeNumber(this.toFiniteNumber((source as Record<string, unknown>)['toHitPlusNeeded']), 0)),
+      npcGreeting: typeof (source as Record<string, unknown>)['npcGreeting'] === 'string' && (source as Record<string, unknown>)['npcGreeting'] ? (source as Record<string, unknown>)['npcGreeting'] as string : null,
+      npcInfo1: typeof (source as Record<string, unknown>)['npcInfo1'] === 'string' && (source as Record<string, unknown>)['npcInfo1'] ? (source as Record<string, unknown>)['npcInfo1'] as string : null,
+      npcInfo2: typeof (source as Record<string, unknown>)['npcInfo2'] === 'string' && (source as Record<string, unknown>)['npcInfo2'] ? (source as Record<string, unknown>)['npcInfo2'] as string : null,
+      npcInfo3: typeof (source as Record<string, unknown>)['npcInfo3'] === 'string' && (source as Record<string, unknown>)['npcInfo3'] ? (source as Record<string, unknown>)['npcInfo3'] as string : null,
+      npcOnlyAttackWhenAttacked: (source as Record<string, unknown>)['npcOnlyAttackWhenAttacked'] === true,
+      npcGivesInfoAfterDamaged: (source as Record<string, unknown>)['npcGivesInfoAfterDamaged'] === true,
+      npcAttacksAfterInfo: (source as Record<string, unknown>)['npcAttacksAfterInfo'] === true,
+      npcCanTrade: (source as Record<string, unknown>)['npcCanTrade'] === true,
     };
   }
 
@@ -4876,6 +6307,9 @@ export class Creator implements OnInit {
       isDormant: source.isDormant === true || undefined,
       guardRow: typeof (source as Record<string, unknown>)['guardRow'] === 'number' ? Math.floor((source as Record<string, unknown>)['guardRow'] as number) : undefined,
       guardColumn: typeof (source as Record<string, unknown>)['guardColumn'] === 'number' ? Math.floor((source as Record<string, unknown>)['guardColumn'] as number) : undefined,
+      itemIds: Array.isArray((source as Record<string, unknown>)['itemIds'])
+        ? ((source as Record<string, unknown>)['itemIds'] as unknown[]).filter((v): v is number => typeof v === 'number')
+        : undefined,
     };
   }
 
@@ -4931,6 +6365,19 @@ export class Creator implements OnInit {
       destinationType,
       destinationDungonId: destinationType === 'dungon' ? parsedDestination : null,
       transitionType,
+      itemRequirement: this.parseItemRequirement((source as unknown as Record<string, unknown>)['itemRequirement']),
+    };
+  }
+
+  private parseItemRequirement(raw: unknown): { itemId: number; itemName: string; consume: boolean } | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const src = raw as Partial<Record<string, unknown>>;
+    const itemId = typeof src['itemId'] === 'number' ? src['itemId'] : null;
+    if (itemId === null) return null;
+    return {
+      itemId,
+      itemName: typeof src['itemName'] === 'string' ? src['itemName'] : '',
+      consume: src['consume'] === true,
     };
   }
 
@@ -5246,6 +6693,38 @@ export class Creator implements OnInit {
         }
 
         context.stroke();
+
+        // Highlight the selected key's associated door and grid position
+        const selectedKeyId = this.selectedKeyIdForPlacement();
+        if (selectedKeyId !== null) {
+          const selKey = this.keyList.find((k) => k.id === selectedKeyId);
+          if (selKey?.doorId !== null && selKey?.doorId !== undefined) {
+            context.strokeStyle = '#ffcc00';
+            context.lineWidth = 4;
+            context.setLineDash([5, 3]);
+            context.beginPath();
+            for (const sq of squares) {
+              const sl = sq.column * this.gridCellSize;
+              const st = sq.row * this.gridCellSize;
+              const sr = sl + this.gridCellSize;
+              const sb = st + this.gridCellSize;
+              if (this.isDoorConnection(sq.toTop) && sq.toTop.id === selKey.doorId) {
+                context.moveTo(sl, st); context.lineTo(sr, st);
+              }
+              if (this.isDoorConnection(sq.toRight) && sq.toRight.id === selKey.doorId) {
+                context.moveTo(sr, st); context.lineTo(sr, sb);
+              }
+              if (this.isDoorConnection(sq.toBottom) && sq.toBottom.id === selKey.doorId) {
+                context.moveTo(sl, sb); context.lineTo(sr, sb);
+              }
+              if (this.isDoorConnection(sq.toLeft) && sq.toLeft.id === selKey.doorId) {
+                context.moveTo(sl, st); context.lineTo(sl, sb);
+              }
+            }
+            context.stroke();
+            context.setLineDash([]);
+          }
+        }
       }
 
       context.fillStyle = '#2e84ff';
@@ -5263,15 +6742,17 @@ export class Creator implements OnInit {
           continue;
         }
 
+        const isSelected = key.id === this.selectedKeyIdForPlacement();
         const centerX = key.columnId * this.gridCellSize + this.gridCellSize / 2;
         const centerY = key.rownId * this.gridCellSize + this.gridCellSize / 2;
 
+        context.fillStyle = isSelected ? '#ffe04d' : '#2e84ff';
         context.beginPath();
-        context.arc(centerX, centerY, 3, 0, Math.PI * 2);
+        context.arc(centerX, centerY, isSelected ? 6 : 3, 0, Math.PI * 2);
         context.fill();
 
-        context.strokeStyle = '#dbe8ff';
-        context.lineWidth = 1;
+        context.strokeStyle = isSelected ? '#ff9500' : '#dbe8ff';
+        context.lineWidth = isSelected ? 2 : 1;
         context.stroke();
       }
 
@@ -5316,6 +6797,69 @@ export class Creator implements OnInit {
         const centerX = placement.column * this.gridCellSize + this.gridCellSize / 2;
         const centerY = placement.row * this.gridCellSize + this.gridCellSize / 2;
         this.drawMonsterMarker(context, centerX, centerY, 4);
+      }
+
+      const itemPlacements = this.itemPlacementsByDungon()[dungonId] ?? [];
+      for (const placement of itemPlacements) {
+        if (
+          placement.row < 0 ||
+          placement.column < 0 ||
+          placement.row >= this.gridRowCount ||
+          placement.column >= this.gridColumnCount
+        ) {
+          continue;
+        }
+
+        const placementSquareKey = this.getSquareKey(placement.row, placement.column);
+        if (!filledSquares[placementSquareKey]) {
+          continue;
+        }
+
+        const centerX = placement.column * this.gridCellSize + this.gridCellSize / 2;
+        const centerY = placement.row * this.gridCellSize + this.gridCellSize / 2;
+        this.drawItemSquareMarker(context, centerX, centerY, 4);
+      }
+
+      const potionPlacements = this.potionPlacementsByDungon()[dungonId] ?? [];
+      for (const placement of potionPlacements) {
+        if (
+          placement.row < 0 ||
+          placement.column < 0 ||
+          placement.row >= this.gridRowCount ||
+          placement.column >= this.gridColumnCount
+        ) {
+          continue;
+        }
+
+        const placementSquareKey = this.getSquareKey(placement.row, placement.column);
+        if (!filledSquares[placementSquareKey]) {
+          continue;
+        }
+
+        const centerX = placement.column * this.gridCellSize + this.gridCellSize / 2;
+        const centerY = placement.row * this.gridCellSize + this.gridCellSize / 2;
+        this.drawPotionSquareMarker(context, centerX, centerY, 4);
+      }
+
+      const spellPlacements = this.spellPlacementsByDungon()[dungonId] ?? [];
+      for (const placement of spellPlacements) {
+        if (
+          placement.row < 0 ||
+          placement.column < 0 ||
+          placement.row >= this.gridRowCount ||
+          placement.column >= this.gridColumnCount
+        ) {
+          continue;
+        }
+
+        const placementSquareKey = this.getSquareKey(placement.row, placement.column);
+        if (!filledSquares[placementSquareKey]) {
+          continue;
+        }
+
+        const centerX = placement.column * this.gridCellSize + this.gridCellSize / 2;
+        const centerY = placement.row * this.gridCellSize + this.gridCellSize / 2;
+        this.drawSpellSquareMarker(context, centerX, centerY, 4);
       }
 
       const exits = this.exitsByDungon()[dungonId] ?? [];
@@ -5421,6 +6965,35 @@ export class Creator implements OnInit {
         context.textAlign = 'center';
         context.textBaseline = 'middle';
         context.fillText('!', centerX, centerY);
+      }
+    }
+
+    // Draw obstacle markers (unfilled circle)
+    if (dungonId !== null) {
+      const obFilledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
+      for (const obs of this.obstaclePlacementsByDungon()[dungonId] ?? []) {
+        if (
+          obs.row < 0 ||
+          obs.column < 0 ||
+          obs.row >= this.gridRowCount ||
+          obs.column >= this.gridColumnCount
+        ) {
+          continue;
+        }
+
+        const obKey = this.getSquareKey(obs.row, obs.column);
+        if (!obFilledSquares[obKey]) {
+          continue;
+        }
+
+        const centerX = obs.column * this.gridCellSize + this.gridCellSize / 2;
+        const centerY = obs.row * this.gridCellSize + this.gridCellSize / 2;
+        const radius = this.gridCellSize * 0.32;
+        context.strokeStyle = '#a0856a';
+        context.lineWidth = 2;
+        context.beginPath();
+        context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        context.stroke();
       }
     }
 
@@ -5768,6 +7341,75 @@ export class Creator implements OnInit {
       this.drawMonsterMarker(context, centerX, centerY, 3.5);
     }
 
+    const itemPlacementsPreview = this.itemPlacementsByDungon()[preview.dungonId] ?? [];
+    for (const placement of itemPlacementsPreview) {
+      const placementSquareKey = this.getSquareKey(placement.row, placement.column);
+      if (!visibleSquareKeys.has(placementSquareKey)) {
+        continue;
+      }
+
+      const previewRow = placement.row - preview.startRow;
+      const previewColumn = placement.column - preview.startColumn;
+      if (
+        previewRow < 0 ||
+        previewColumn < 0 ||
+        previewRow >= this.previewGridDimension ||
+        previewColumn >= this.previewGridDimension
+      ) {
+        continue;
+      }
+
+      const centerX = previewColumn * this.previewGridCellSize + this.previewGridCellSize / 2;
+      const centerY = previewRow * this.previewGridCellSize + this.previewGridCellSize / 2;
+      this.drawItemSquareMarker(context, centerX, centerY, 3.5);
+    }
+
+    const potionPlacementsPreview = this.potionPlacementsByDungon()[preview.dungonId] ?? [];
+    for (const placement of potionPlacementsPreview) {
+      const placementSquareKey = this.getSquareKey(placement.row, placement.column);
+      if (!visibleSquareKeys.has(placementSquareKey)) {
+        continue;
+      }
+
+      const previewRow = placement.row - preview.startRow;
+      const previewColumn = placement.column - preview.startColumn;
+      if (
+        previewRow < 0 ||
+        previewColumn < 0 ||
+        previewRow >= this.previewGridDimension ||
+        previewColumn >= this.previewGridDimension
+      ) {
+        continue;
+      }
+
+      const centerX = previewColumn * this.previewGridCellSize + this.previewGridCellSize / 2;
+      const centerY = previewRow * this.previewGridCellSize + this.previewGridCellSize / 2;
+      this.drawPotionSquareMarker(context, centerX, centerY, 3.5);
+    }
+
+    const spellPlacementsPreview = this.spellPlacementsByDungon()[preview.dungonId] ?? [];
+    for (const placement of spellPlacementsPreview) {
+      const placementSquareKey = this.getSquareKey(placement.row, placement.column);
+      if (!visibleSquareKeys.has(placementSquareKey)) {
+        continue;
+      }
+
+      const previewRow = placement.row - preview.startRow;
+      const previewColumn = placement.column - preview.startColumn;
+      if (
+        previewRow < 0 ||
+        previewColumn < 0 ||
+        previewRow >= this.previewGridDimension ||
+        previewColumn >= this.previewGridDimension
+      ) {
+        continue;
+      }
+
+      const centerX = previewColumn * this.previewGridCellSize + this.previewGridCellSize / 2;
+      const centerY = previewRow * this.previewGridCellSize + this.previewGridCellSize / 2;
+      this.drawSpellSquareMarker(context, centerX, centerY, 3.5);
+    }
+
     const exits = this.exitsByDungon()[preview.dungonId] ?? [];
     for (const exit of exits) {
       const exitSquareKey = this.getSquareKey(exit.row, exit.column);
@@ -5909,10 +7551,18 @@ export class Creator implements OnInit {
     const firstPersonView = this.getFirstPersonView(preview, cheater);
     const tresherPlacements = this.tresherPlacementsByDungon()[preview.dungonId] ?? [];
     const tresherCountBySquare = new Map<string, number>();
+    const bagSquareKeys = new Set<string>();
     for (const placement of tresherPlacements) {
       const squareKey = this.getSquareKey(placement.row, placement.column);
       const existingCount = tresherCountBySquare.get(squareKey) ?? 0;
       tresherCountBySquare.set(squareKey, existingCount + 1);
+      bagSquareKeys.add(squareKey);
+    }
+    for (const placement of (this.itemPlacementsByDungon()[preview.dungonId] ?? [])) {
+      bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
+    }
+    for (const placement of (this.potionPlacementsByDungon()[preview.dungonId] ?? [])) {
+      bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
     }
 
     const monsterPlacementsFP = this.monsterPlacementsByDungon()[preview.dungonId] ?? [];
@@ -6137,6 +7787,10 @@ export class Creator implements OnInit {
       const tresherCount = tresherCountBySquare.get(squareKey) ?? 0;
       if (tresherCount > 0) {
         this.drawFirstPersonFloorCoinStack(context, nearFrame, farFrame, tresherCount);
+      }
+
+      if (bagSquareKeys.has(squareKey) && tresherCount === 0) {
+        this.drawFirstPersonFloorBag(context, nearFrame, farFrame);
       }
 
       if (step.hasKey) {
@@ -6618,6 +8272,80 @@ export class Creator implements OnInit {
     context.stroke();
   }
 
+  private drawFirstPersonFloorBag(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number }
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const tileWidth = midRight - midLeft;
+    const centerX = (midLeft + midRight) / 2;
+    const floorY = (nearFrame.bottom + farFrame.bottom) / 2;
+    const bagW = Math.max(12, Math.min(64, tileWidth * 0.45));
+    const bagH = bagW * 1.15;
+    const bagLeft = centerX - bagW / 2;
+    const bagBottom = floorY - 1;
+    const bagTop = bagBottom - bagH;
+    const r = bagW * 0.20;
+
+    const glowRadius = bagW * 0.65;
+    const glowGrad = context.createRadialGradient(centerX, bagBottom, 0, centerX, bagBottom, glowRadius);
+    glowGrad.addColorStop(0, 'rgba(210, 140, 30, 0.45)');
+    glowGrad.addColorStop(1, 'rgba(210, 140, 30, 0)');
+    context.fillStyle = glowGrad;
+    context.beginPath();
+    context.ellipse(centerX, bagBottom, glowRadius, glowRadius * 0.35, 0, 0, Math.PI * 2);
+    context.fill();
+
+    context.fillStyle = '#a06820';
+    context.beginPath();
+    context.moveTo(bagLeft + r, bagTop);
+    context.lineTo(bagLeft + bagW - r, bagTop);
+    context.quadraticCurveTo(bagLeft + bagW, bagTop, bagLeft + bagW, bagTop + r);
+    context.lineTo(bagLeft + bagW, bagBottom - r);
+    context.quadraticCurveTo(bagLeft + bagW, bagBottom, bagLeft + bagW - r, bagBottom);
+    context.lineTo(bagLeft + r, bagBottom);
+    context.quadraticCurveTo(bagLeft, bagBottom, bagLeft, bagBottom - r);
+    context.lineTo(bagLeft, bagTop + r);
+    context.quadraticCurveTo(bagLeft, bagTop, bagLeft + r, bagTop);
+    context.closePath();
+    context.fill();
+
+    const neckW = bagW * 0.38;
+    const neckH = bagH * 0.18;
+    context.fillStyle = '#6b430e';
+    context.fillRect(centerX - neckW / 2, bagTop - neckH, neckW, neckH);
+
+    context.fillStyle = '#ffd700';
+    context.beginPath();
+    context.arc(centerX, bagTop - neckH * 0.4, bagW * 0.16, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = '#b8860b';
+    context.lineWidth = Math.max(0.5, bagW * 0.02);
+    context.stroke();
+
+    context.fillStyle = 'rgba(255, 210, 100, 0.28)';
+    context.beginPath();
+    context.ellipse(bagLeft + bagW * 0.28, bagTop + bagH * 0.27, bagW * 0.18, bagH * 0.20, -0.3, 0, Math.PI * 2);
+    context.fill();
+
+    context.strokeStyle = '#3a1e04';
+    context.lineWidth = Math.max(1, bagW * 0.04);
+    context.beginPath();
+    context.moveTo(bagLeft + r, bagTop);
+    context.lineTo(bagLeft + bagW - r, bagTop);
+    context.quadraticCurveTo(bagLeft + bagW, bagTop, bagLeft + bagW, bagTop + r);
+    context.lineTo(bagLeft + bagW, bagBottom - r);
+    context.quadraticCurveTo(bagLeft + bagW, bagBottom, bagLeft + bagW - r, bagBottom);
+    context.lineTo(bagLeft + r, bagBottom);
+    context.quadraticCurveTo(bagLeft, bagBottom, bagLeft, bagBottom - r);
+    context.lineTo(bagLeft, bagTop + r);
+    context.quadraticCurveTo(bagLeft, bagTop, bagLeft + r, bagTop);
+    context.closePath();
+    context.stroke();
+  }
+
   private drawFirstPersonFloorCoinStack(
     context: CanvasRenderingContext2D,
     nearFrame: { left: number; right: number; top: number; bottom: number },
@@ -6836,6 +8564,50 @@ export class Creator implements OnInit {
       Math.PI * 2
     );
     context.fill();
+  }
+
+  private drawItemSquareMarker(
+    context: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    halfSize: number
+  ): void {
+    const s = Math.max(2, halfSize);
+    context.fillStyle = '#cc2222';
+    context.fillRect(centerX - s, centerY - s, s * 2, s * 2);
+    context.strokeStyle = '#ff6b6b';
+    context.lineWidth = 1;
+    context.strokeRect(centerX - s, centerY - s, s * 2, s * 2);
+  }
+
+  private drawPotionSquareMarker(
+    context: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    halfSize: number
+  ): void {
+    const s = Math.max(2, halfSize);
+    context.fillStyle = '#2271cc';
+    context.fillRect(centerX - s, centerY - s, s * 2, s * 2);
+    context.strokeStyle = '#6bb3ff';
+    context.lineWidth = 1;
+    context.strokeRect(centerX - s, centerY - s, s * 2, s * 2);
+  }
+
+  private drawSpellSquareMarker(
+    context: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    halfSize: number
+  ): void {
+    const s = Math.max(2, halfSize);
+    context.fillStyle = '#7b22cc';
+    context.beginPath();
+    context.arc(centerX, centerY, s, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = '#c46bff';
+    context.lineWidth = 1;
+    context.stroke();
   }
 
   private drawMonsterMarker(
@@ -7828,7 +9600,28 @@ export class Creator implements OnInit {
           currentColumn
         );
 
-      if (blockedToHorizontal && blockedToVertical) {
+      // Also check walls approaching the destination from the two intermediate cells.
+      const blockedDestFromH =
+        stepX !== 0 && stepY !== 0 &&
+        this.isSightBlockedBetweenAdjacentSquares(
+          dungonId,
+          currentRow,
+          nextColumn,
+          nextRow,
+          nextColumn
+        );
+
+      const blockedDestFromV =
+        stepX !== 0 && stepY !== 0 &&
+        this.isSightBlockedBetweenAdjacentSquares(
+          dungonId,
+          nextRow,
+          currentColumn,
+          nextRow,
+          nextColumn
+        );
+
+      if ((blockedToHorizontal && blockedToVertical) || blockedDestFromH || blockedDestFromV) {
         return false;
       }
 
@@ -8153,6 +9946,14 @@ export class Creator implements OnInit {
       };
     }
 
+    const obstacles = this.obstaclePlacementsByDungon()[dungonId] ?? [];
+    const hasObstacle = obstacles.some(
+      (obs) => obs.row === toRow && obs.column === toColumn && !obs.isDestroyed
+    );
+    if (hasObstacle) {
+      return { type: 'wall', door: null };
+    }
+
     return { type: 'none', door: null };
   }
 
@@ -8397,6 +10198,43 @@ export class Creator implements OnInit {
     return this.synchronizeDoorConnections(nextSquares);
   }
 
+  private updateDoorPropertiesInPlace(
+    existingSquares: Record<string, Square>,
+    doorId: number,
+    settings: DoorPromptResult
+  ): Record<string, Square> {
+    const result: Record<string, Square> = { ...existingSquares };
+    const sides: SquareSide[] = ['toTop', 'toRight', 'toBottom', 'toLeft'];
+    for (const [key, square] of Object.entries(result)) {
+      let updatedSquare = square;
+      let changed = false;
+      for (const side of sides) {
+        const conn = square[side];
+        if (this.isDoorConnection(conn) && conn.id === doorId) {
+          const updated: Door = {
+            ...conn,
+            name: settings.name,
+            description: settings.description,
+            state: settings.state,
+            HP: settings.hp,
+            isLocked: settings.isLocked,
+            toPick: settings.toPick,
+            isHidden: settings.isHidden,
+            toFind: settings.toFind,
+            isTrapped: settings.trap !== null,
+            trap: settings.trap,
+            spReward: settings.spReward,
+            itemRequirement: settings.itemRequirement,
+          };
+          updatedSquare = this.withSquareSide(updatedSquare, side, updated);
+          changed = true;
+        }
+      }
+      if (changed) result[key] = updatedSquare;
+    }
+    return result;
+  }
+
   private applyDoorToExistingSquare(
     row: number,
     column: number,
@@ -8478,7 +10316,13 @@ export class Creator implements OnInit {
         return;
       }
 
-      if (this.isWallConnection(neighborSquare[neighborSide])) {
+      const conn = neighborSquare[neighborSide];
+      // Already has a wall — keep it
+      if (this.isWallConnection(conn)) {
+        return;
+      }
+      // Already has a door — preserve it, don't destroy doors when erasing adjacent squares
+      if (this.isDoorConnection(conn)) {
         return;
       }
 
@@ -8560,6 +10404,7 @@ export class Creator implements OnInit {
       toFind: settings.toFind,
       isFound: false,
       spReward: settings.spReward ?? null,
+      itemRequirement: settings.itemRequirement ?? null,
     };
   }
 
@@ -8730,7 +10575,7 @@ export class Creator implements OnInit {
       effectOn: item.effectOn || 'HP', effectOn2: item.effectOn2 || '',
       lastFor: item.lastFor ?? 0, effectAmount: item.effectAmount ?? 0, effectAmount2: item.effectAmount2 ?? 0,
       value: item.value ?? 0, sp: item.sp ?? 0, successTestValue: item.successTestValue ?? 0,
-      magicCost: item.magicCost ?? 1, imageId: item.imageId ?? null, soundId: item.soundId ?? null, isPublic: item.isPublic,
+      magicCost: item.magicCost ?? 1, costToLearn: item.costToLearn ?? 0, imageId: item.imageId ?? null, soundId: item.soundId ?? null, isPublic: item.isPublic,
     });
   }
   cancelEditLibSpell(): void { this.editingLibSpellId.set(null); this.libSpellSaveMessage.set(null); this.resetLibSpellForm(); }
@@ -8748,6 +10593,12 @@ export class Creator implements OnInit {
   libSelectedSpellImageUrl(): string {
     const id = this.libSpellForm.controls.imageId.value;
     const img = id !== null ? this.libImageOptions().find((i) => i.id === id) : null;
+    return img ? this.libResolveImageUrl(img.path) : '';
+  }
+
+  imageUrlById(imageId: number | null): string {
+    if (!imageId) return '';
+    const img = this.libImageOptions().find((i) => i.id === imageId);
     return img ? this.libResolveImageUrl(img.path) : '';
   }
 
@@ -8851,6 +10702,7 @@ export class Creator implements OnInit {
       sp: Math.max(0, c.sp.value ?? 0),
       successTestValue: Math.max(0, c.successTestValue.value ?? 0),
       magicCost: Math.max(1, c.magicCost.value ?? 1),
+      costToLearn: Math.max(0, c.costToLearn.value ?? 0),
       imageId: c.imageId.value ?? null,
       soundId: c.soundId.value ?? null,
       isPublic: this.isAdminUser() ? c.isPublic.value : false,
@@ -8876,7 +10728,7 @@ export class Creator implements OnInit {
 
   private resetLibSpellForm(): void {
     this.libSpellForm.reset({ name: '', description: '', range: 0, effectOn: 'HP', effectOn2: '',
-      lastFor: 0, effectAmount: 0, effectAmount2: 0, value: 0, sp: 0, successTestValue: 0, magicCost: 1, imageId: null, soundId: null, isPublic: false });
+      lastFor: 0, effectAmount: 0, effectAmount2: 0, value: 0, sp: 0, successTestValue: 0, magicCost: 1, costToLearn: 0, imageId: null, soundId: null, isPublic: false });
   }
 
   private libFileBaseName(fileName: string): string {

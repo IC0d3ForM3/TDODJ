@@ -14,10 +14,11 @@
 
 .cu-title {
   margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 800;
   color: #f0f6ff;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .cu-toggle-btn {
@@ -40,8 +41,9 @@
 }
 
 .cu-list-panel {
-  background: rgba(10, 18, 40, 0.75);
-  border: 1px solid rgba(160, 184, 220, 0.15);
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-top: 4px solid #7e22ce;
   border-radius: 10px;
   padding: 1rem;
   max-height: 78vh;
@@ -50,11 +52,11 @@
 
 .cu-panel-title {
   margin: 0 0 0.75rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #c5d9f8;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #7e22ce;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
 }
 
 .cu-list {
@@ -63,39 +65,41 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .cu-list-item {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(160, 184, 220, 0.12);
-  border-radius: 8px;
-  padding: 0.6rem 0.75rem;
-  transition: border-color 0.15s;
+  background: #fbf5ff;
+  border: 1px solid #d4b8f0;
+  border-left: 4px solid #7e22ce;
+  border-radius: 6px;
+  padding: 0.55rem 0.75rem;
+  transition: box-shadow 0.15s;
 }
-.cu-list-item:hover { border-color: rgba(42, 95, 214, 0.4); }
+.cu-list-item:hover { box-shadow: 0 2px 8px rgba(126, 34, 206, 0.2); }
 
 .cu-item-info { display: flex; flex-direction: column; gap: 0.15rem; }
-.cu-item-name { font-weight: 600; color: #f0f6ff; font-size: 0.9rem; }
-.cu-item-meta { color: #8aaaca; font-size: 0.75rem; }
-.cu-item-desc { color: #6a90b8; font-size: 0.72rem; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cu-item-name { font-weight: 700; color: #111; font-size: 0.9rem; }
+.cu-item-meta { color: #555; font-size: 0.75rem; }
+.cu-item-desc { color: #777; font-size: 0.72rem; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .cu-edit-btn {
   align-self: flex-start;
-  margin-top: 0.3rem;
-  padding: 0.2rem 0.6rem;
+  margin-top: 0.35rem;
+  padding: 0.2rem 0.65rem;
   font-size: 0.78rem;
-  background: rgba(42, 95, 214, 0.15);
-  border: 1px solid rgba(100, 160, 255, 0.3);
-  color: #7eb8ff;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid #7e22ce;
+  color: #7e22ce;
   border-radius: 5px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
-.cu-edit-btn:hover { background: rgba(42, 95, 214, 0.35); }
+.cu-edit-btn:hover { background: #7e22ce; color: #fff; }
 
 .cu-form {
   background: rgba(90, 55, 20, 0.28);
@@ -165,10 +169,13 @@
 }
 
 .cu-thumb {
-  max-height: 80px;
-  width: auto;
-  border-radius: 4px;
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  border-radius: 6px;
   border: 1px solid rgba(160,184,220,0.2);
+  background: rgba(0,0,0,0.15);
+  display: block;
 }
 
 .cu-check-row {

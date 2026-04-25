@@ -1,0 +1,242 @@
+<div class="tavern-overlay" (click)="close()"></div>
+
+<div class="tavern-modal" role="dialog" aria-modal="true" aria-label="Tavern">
+
+  <div class="tavern-img-wrap">
+    <img
+      [src]="'images/' + tavernImage() + '.jpg'"
+      [alt]="keeperName()"
+      class="tavern-keeper-img"
+    />
+  </div>
+
+  <div class="tavern-body">
+
+    <button class="tavern-close-btn" type="button" (click)="close()" aria-label="Close">✕</button>
+
+    @if (view() === 'main') {
+      <p class="tavern-greeting">
+        <strong>{{ keeperName() }}:</strong>
+        Welcome{{ pcName() ? ', ' + pcName() : '' }}! What can I do for you, Adventurer?
+      </p>
+      <div class="tavern-nav">
+        <button type="button" class="tavern-nav-btn tavern-nav-btn-adventure" (click)="close()">⚔️ Enter the Dungeon</button>
+        <button type="button" class="tavern-nav-btn" (click)="setView('buy')">Buy</button>
+        <button type="button" class="tavern-nav-btn" (click)="setView('sell')">Sell</button>
+        <button type="button" class="tavern-nav-btn" (click)="setView('learn')">Learn</button>
+        @if (questInventory().length > 0) {
+          <button type="button" class="tavern-nav-btn tavern-nav-btn-quest" (click)="setView('quests')">Quests ({{ questInventory().length }})</button>
+        }
+        @if (isMainGame()) {
+          <button type="button" class="tavern-nav-btn tavern-nav-btn-stash" (click)="setView('stash')">Stash ({{ stashItems().length }})</button>
+        }
+        @if (resettablePerPc()) {
+          <button type="button" class="tavern-nav-btn tavern-nav-btn-reset" (click)="onResetProgress()">Reset Progress</button>
+        }
+      </div>
+    }
+
+    @if (view() === 'buy') {
+      <div class="tavern-view">
+        <button type="button" class="tavern-back-btn" (click)="setView('main')">← Back</button>
+        <h3>Buy Items</h3>
+        <p class="tavern-soon">The shop keeper is still taking inventory — check back soon!</p>
+      </div>
+    }
+
+    @if (view() === 'sell') {
+      <div class="tavern-view">
+        <button type="button" class="tavern-back-btn" (click)="setView('main')">← Back</button>
+        <h3>Sell Items</h3>
+        <p class="tavern-soon">I'm not buying today — check back soon!</p>
+      </div>
+    }
+
+    @if (view() === 'learn') {
+      <div class="tavern-view">
+        <button type="button" class="tavern-back-btn" (click)="setView('main')">← Back</button>
+        <h3>Train &amp; Learn</h3>
+        <p class="tavern-sp-display">Available SP: <strong>{{ localSp() }}</strong> &nbsp;|&nbsp; Gold: <strong>{{ totalInventoryGold() }}</strong> &nbsp;|&nbsp; Level: <strong>{{ level() }}</strong></p>
+
+        <table class="tavern-learn-table">
+          <thead>
+            <tr>
+              <th>Ability</th>
+              <th>Current</th>
+              <th>Cost</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of learnEntries; track entry.stat) {
+              <tr>
+                <td>{{ entry.label }}</td>
+                <td>{{ localValueFor(entry.stat) }}</td>
+                <td>{{ entry.cost }} SP</td>
+                <td>
+                  <button
+                    type="button"
+                    class="tavern-upgrade-btn"
+                    [disabled]="!canAfford(entry.cost) || isUpgrading()"
+                    (click)="upgradeStat(entry.stat)"
+                  >+1</button>
+                </td>
+              </tr>
+            }
+
+            <!-- # of Attacks — Level 4 required -->
+            <tr>
+              <td># of Attacks <span class="tavern-lv-req">(Lv 4+)</span></td>
+              <td>{{ localNoa() }}</td>
+              <td>
+                {{ noaSpCost() }} SP + {{ noaGoldCost() }} Gold
+                @if (level() < 4) {
+                  <br><span class="tavern-locked">🔒 Level 4 required</span>
+                }
+              </td>
+              <td>
+                <button
+                  type="button"
+                  class="tavern-upgrade-btn"
+                  [disabled]="!canUpgradeNoa()"
+                  (click)="upgradeNoaLv4()"
+                >+1</button>
+              </td>
+            </tr>
+
+            <!-- # of Defends — Level 4 required -->
+            <tr>
+              <td># of Defends <span class="tavern-lv-req">(Lv 4+)</span></td>
+              <td>{{ localNod() }}</td>
+              <td>
+                {{ nodSpCost() }} SP + {{ nodGoldCost() }} Gold
+                @if (level() < 4) {
+                  <br><span class="tavern-locked">🔒 Level 4 required</span>
+                }
+              </td>
+              <td>
+                <button
+                  type="button"
+                  class="tavern-upgrade-btn"
+                  [disabled]="!canUpgradeNod()"
+                  (click)="upgradeNodLv4()"
+                >+1</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        @if (upgradeError()) {
+          <p class="tavern-error">{{ upgradeError() }}</p>
+        }
+        @if (isUpgrading()) {
+          <p class="tavern-upgrading">Upgrading…</p>
+        }
+      </div>
+    }
+
+    @if (view() === 'quests') {
+      <div class="tavern-view">
+        <button type="button" class="tavern-back-btn" (click)="setView('main')">← Back</button>
+        <h3>Quest Turn-In</h3>
+        <p class="tavern-sp-display">Available SP: <strong>{{ localSp() }}</strong></p>
+        @if (questInventory().length === 0) {
+          <p class="tavern-soon">You have no quest items to turn in.</p>
+        } @else {
+          <ul class="tavern-quest-list">
+            @for (item of questInventory(); track item.id) {
+              <li class="tavern-quest-item">
+                <span class="tavern-quest-item-name">{{ item.name }}</span>
+                @if (item.spReward > 0) {
+                  <span class="tavern-quest-sp">+{{ item.spReward }} SP</span>
+                }
+              </li>
+            }
+          </ul>
+          <button
+            type="button"
+            class="tavern-upgrade-btn tavern-turnin-btn"
+            [disabled]="isTurningIn()"
+            (click)="turnInQuestItems()"
+          >{{ isTurningIn() ? 'Turning in…' : 'Turn In All' }}</button>
+        }
+        @if (turnInMessage()) {
+          <p class="tavern-sp-display" style="margin-top:0.75rem">{{ turnInMessage() }}</p>
+        }
+      </div>
+    }
+
+    @if (view() === 'stash') {
+      <div class="tavern-view">
+        <button type="button" class="tavern-back-btn" (click)="setView('main')">← Back</button>
+        <h3>Party Stash</h3>
+        <p class="tavern-hint-text">Items deposited here are shared across all your Main Game characters.</p>
+
+        <div class="tavern-stash-columns">
+          <div class="tavern-stash-col">
+            <h4 class="tavern-stash-col-title">Your Inventory</h4>
+            @if (inventoryItems().length === 0) {
+              <p class="tavern-soon">Nothing in your inventory.</p>
+            } @else {
+              <ul class="tavern-quest-list">
+                @for (item of inventoryItems(); track $index) {
+                  <li
+                    class="tavern-quest-item"
+                    [class.tavern-stash-item-selected]="selectedInventoryIndexes().has($index)"
+                    (click)="toggleInventorySelection($index)"
+                    style="cursor:pointer"
+                  >
+                    <span class="tavern-quest-item-name">{{ item.name }}</span>
+                  </li>
+                }
+              </ul>
+              <button
+                type="button"
+                class="tavern-upgrade-btn tavern-turnin-btn"
+                [disabled]="selectedInventoryIndexes().size === 0 || isStashBusy()"
+                (click)="depositSelected()"
+              >Deposit Selected</button>
+            }
+          </div>
+
+          <div class="tavern-stash-col">
+            <h4 class="tavern-stash-col-title">Stash</h4>
+            @if (stashItems().length === 0) {
+              <p class="tavern-soon">The stash is empty.</p>
+            } @else {
+              <ul class="tavern-quest-list">
+                @for (item of stashItems(); track $index) {
+                  <li
+                    class="tavern-quest-item"
+                    [class.tavern-stash-item-selected]="selectedStashIndexes().has($index)"
+                    (click)="toggleStashSelection($index)"
+                    style="cursor:pointer"
+                  >
+                    <span class="tavern-quest-item-name">{{ item.name }}</span>
+                  </li>
+                }
+              </ul>
+              <button
+                type="button"
+                class="tavern-upgrade-btn tavern-turnin-btn"
+                [disabled]="selectedStashIndexes().size === 0 || isStashBusy()"
+                (click)="withdrawSelected()"
+              >Take Selected</button>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (showResetConfirm()) {
+      <div class="tavern-reset-confirm-overlay">
+        <div class="tavern-reset-confirm-box">
+          <p class="tavern-reset-confirm-text">Reset your progress in this dungeon? All items collected and doors unlocked here will be lost.</p>
+          <div class="tavern-reset-confirm-actions">
+            <button type="button" class="tavern-reset-confirm-btn tavern-reset-confirm-btn-yes" (click)="confirmResetProgress()">Yes, Reset</button>
+            <button type="button" class="tavern-reset-confirm-btn tavern-reset-confirm-btn-no" (click)="cancelResetProgress()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    }
+

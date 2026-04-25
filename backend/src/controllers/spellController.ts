@@ -6,7 +6,7 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const EFFECT_TO_OPTIONS = new Set([
-  'HP', 'Defense', 'Stamina', 'Mind', 'Sneak', 'Magic', 'Sight', 'Action Economy',
+  'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'Action Economy',
 ]);
 
 interface SpellWriteRequestBody {
@@ -32,6 +32,8 @@ interface SpellWriteInput {
   successtestvalue?: unknown;
   magicCost?: unknown;
   magiccost?: unknown;
+  costToLearn?: unknown;
+  costtolearn?: unknown;
   imageId?: unknown;
   imageid?: unknown;
   soundId?: unknown;
@@ -73,6 +75,7 @@ function buildSpellPayload(input: SpellWriteInput, isAdmin: boolean): UpsertSpel
     sp: Math.max(0, normalizeNumber(input.sp, 0)),
     successTestValue: Math.max(0, normalizeNumber(input.successTestValue ?? input.successtestvalue, 0)),
     magicCost: Math.max(1, normalizeNumber(input.magicCost ?? input.magiccost, 1)),
+    costToLearn: Math.max(0, normalizeNumber(input.costToLearn ?? input.costtolearn, 0)),
     imageId: normalizeNullableInt(input.imageId ?? input.imageid),
     soundId: normalizeNullableInt(input.soundId ?? input.soundid),
     isPublic: isAdmin ? input.isPublic === true || input.ispublic === true : false,

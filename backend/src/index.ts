@@ -2,11 +2,21 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'node:path';
+import rateLimit from 'express-rate-limit';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+// Protect login and register from brute force: max 20 attempts per 15 minutes per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts, please try again later.' },
+});
 
 
 import * as userController from './controllers/userController';
@@ -21,9 +31,10 @@ import * as potionController from './controllers/potionController';
 import * as curseController from './controllers/curseController';
 import * as itemController from './controllers/itemController';
 import * as soundController from './controllers/soundController';
+import * as tavernStashController from './controllers/tavernStashController';
 app.get('/users/:id', userController.getUser);
-app.post('/users', userController.createUser);
-app.post('/login', userController.loginUser);
+app.post('/users', authLimiter, userController.createUser);
+app.post('/login', authLimiter, userController.loginUser);
 app.get('/users', userController.getAllUsers);
 app.put('/users/:id', userController.updateUserFlags);
 app.get('/dungons', dungonController.getDungons);
@@ -37,6 +48,7 @@ app.put('/dungons/:id/dungonjson', dungonController.updateDungonJson);
 app.put('/dungons/:id/publish', dungonController.publishDungon);
 app.put('/dungons/:id/approve', dungonController.approveDungon);
 app.put('/dungons/:id/set-sample', dungonController.setSampleDungon);
+app.delete('/dungons/:id', dungonController.deleteDungon);
 app.post('/dungons/:id/start', dungonController.startGameFromPublishedDungon);
 app.get('/games', dungonController.getGamesForUser);
 app.get('/games/sample-session', dungonController.getSampleGameSession);
@@ -59,8 +71,15 @@ app.get('/pcs/sample', pcController.getSamplePcs);
 app.get('/pcs/admin-all', pcController.getAdminPcs);
 app.put('/pcs/:id', pcController.updatePc);
 app.put('/pcs/:id/set-sample', pcController.setSamplePc);
+app.put('/pcs/:id/set-maingame', pcController.setIsMainGamePc);
 app.patch('/pcs/:id/award-sp', pcController.awardSpToPc);
 app.patch('/pcs/:id/upgrade-noa', pcController.upgradeNoa);
+app.patch('/pcs/:id/upgrade-nod', pcController.upgradeNod);
+app.patch('/pcs/:id/upgrade-stat', pcController.upgradeStatController);
+app.post('/pcs/:id/tavern-turnin', pcController.tavernTurnIn);
+app.get('/tavern-stash', tavernStashController.getStash);
+app.post('/tavern-stash/deposit', tavernStashController.depositToStash);
+app.post('/tavern-stash/withdraw', tavernStashController.withdrawFromStash);
 app.get('/friends', friendController.getFriends);
 app.post('/friends/invite', friendController.createFriendInvite);
 app.post('/friends/accept', friendController.acceptFriendInvite);

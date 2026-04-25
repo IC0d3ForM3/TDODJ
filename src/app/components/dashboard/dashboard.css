@@ -169,6 +169,162 @@
 	opacity: 0.7;
 }
 
+.dashboard-game-button-maingame {
+	border-left: 3px solid #c4a24a;
+	padding-left: calc(0.7rem - 3px);
+}
+
+/* ── Available Games two-column layout ───────────────────────── */
+.avail-games-columns {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1.2rem;
+	align-items: start;
+}
+
+.avail-games-col {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.avail-item-selected {
+	background-color: rgba(80, 140, 255, 0.18);
+	border-color: rgba(100, 160, 255, 0.5);
+	box-shadow: inset 3px 0 0 #4a80ff;
+}
+
+.avail-item-selected .dashboard-game-name {
+	color: #c8deff;
+}
+
+.avail-maingame-note {
+	margin-bottom: 0.2rem;
+}
+
+/* Main game warning box */
+.maingame-warning {
+	background: rgba(196, 162, 74, 0.08);
+	border: 1px solid rgba(196, 162, 74, 0.35);
+	border-radius: 8px;
+	padding: 0.75rem 1rem;
+	margin-bottom: 1rem;
+	color: #c4a24a;
+	font-size: 0.88rem;
+	line-height: 1.5;
+}
+
+.maingame-warning p {
+	margin: 0 0 0.4rem;
+}
+
+.maingame-warning p:last-child {
+	margin-bottom: 0;
+	font-style: italic;
+	opacity: 0.85;
+}
+
+/* Main game choice buttons */
+.maingame-choice {
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	margin-top: 0.4rem;
+}
+
+.maingame-choice-btn {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.15rem;
+	width: 100%;
+	padding: 0.75rem 1rem;
+	background: rgba(100, 160, 255, 0.1);
+	border: 1px solid rgba(100, 160, 255, 0.35);
+	border-radius: 8px;
+	color: #c8deff;
+	font-size: 0.95rem;
+	font-weight: 600;
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s, border-color 0.15s;
+}
+
+.maingame-choice-btn:hover:not(:disabled) {
+	background: rgba(100, 160, 255, 0.18);
+	border-color: rgba(100, 160, 255, 0.6);
+}
+
+.maingame-choice-btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.maingame-choice-btn-secondary {
+	background: rgba(255, 255, 255, 0.04);
+	border-color: rgba(160, 184, 220, 0.25);
+	color: #a0b8dc;
+}
+
+.maingame-choice-btn-secondary:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.08);
+	border-color: rgba(160, 184, 220, 0.45);
+}
+
+/* Inline PC form inside available games */
+.maingame-pc-form {
+	margin-top: 0.75rem;
+}
+
+.avail-pc-hint {
+	font-style: italic;
+	opacity: 0.7;
+}
+
+.avail-actions {
+	margin-top: 0.8rem;
+}
+
+.avail-dungon-img {
+	width: 200px;
+	height: auto;
+	object-fit: cover;
+	border-radius: 6px;
+	border: 1px solid rgba(160, 184, 220, 0.2);
+	margin-top: 0.5rem;
+}
+
+@media (max-width: 600px) {
+	.avail-games-columns {
+		grid-template-columns: 1fr;
+	}
+}
+
+.dashboard-tag {
+	display: inline-block;
+	padding: 0.1rem 0.4rem;
+	border-radius: 4px;
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+}
+
+.dashboard-tag-maingame {
+	background-color: rgba(196, 162, 74, 0.2);
+	color: #c4a24a;
+	border: 1px solid rgba(196, 162, 74, 0.4);
+}
+
+.dashboard-message-maingame {
+	color: #c4a24a;
+	background: rgba(196, 162, 74, 0.08);
+	border: 1px solid rgba(196, 162, 74, 0.25);
+	border-radius: 6px;
+	padding: 0.5rem 0.75rem;
+	margin-bottom: 0.6rem;
+}
+
 .dashboard-game-name {
 	font-weight: 600;
 	color: #edf2ff;
@@ -601,6 +757,15 @@
 	padding: 0.75rem;
 }
 
+@media (max-width: 700px) {
+	.pc-two-panel {
+		grid-template-columns: 1fr;
+	}
+	.pc-list-panel {
+		max-height: 40vh;
+	}
+}
+
 @media (max-width: 920px) {
 	.tresher-form-grid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -667,4 +832,120 @@
 		width: 100%;
 		height: 160px;
 	}
+}
+
+/* ── PCs Library panel ───────────────────────────────────────── */
+.pc-two-panel {
+	display: grid;
+	grid-template-columns: 1fr 2fr;
+	gap: 1.1rem;
+	align-items: start;
+}
+
+.pc-form-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+}
+
+.pc-list-panel {
+	background: #fff;
+	border: 1px solid #e8e8e8;
+	border-top: 4px solid #0369a1;
+	border-radius: 10px;
+	padding: 1rem;
+	max-height: 78vh;
+	overflow-y: auto;
+}
+
+.pc-panel-title {
+	margin: 0 0 0.75rem !important;
+	font-size: 0.8rem !important;
+	font-weight: 800 !important;
+	color: #0369a1 !important;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+}
+
+.pc-list-item {
+	background: #f0f8ff !important;
+	border: 1px solid #bae0f8 !important;
+	border-left: 4px solid #0369a1 !important;
+	border-radius: 6px !important;
+	transition: box-shadow 0.15s !important;
+}
+.pc-list-item:hover {
+	background-color: #e8f4fd !important;
+	box-shadow: 0 2px 8px rgba(3, 105, 161, 0.18);
+}
+
+.pc-item-name {
+	font-weight: 700 !important;
+	color: #111 !important;
+}
+
+.pc-item-meta {
+	color: #555 !important;
+}
+
+.pc-item-desc {
+	color: #777 !important;
+}
+
+.pc-edit-btn {
+	background: #fff !important;
+	border: 1px solid #0369a1 !important;
+	color: #0369a1 !important;
+	font-weight: 600;
+	transition: background 0.15s, color 0.15s !important;
+}
+.pc-edit-btn:hover {
+	background: #0369a1 !important;
+	color: #fff !important;
+}
+
+/* accordion */
+.pc-accordion-header {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.55rem 0.75rem;
+	border: 0;
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+}
+
+.pc-accordion-header .pc-item-name {
+	font-weight: 700;
+	color: #111;
+	font-size: 0.9rem;
+	flex: 1;
+}
+
+.pc-accordion-header .pc-item-meta {
+	color: #555;
+	font-size: 0.75rem;
+}
+
+.pc-accordion-chevron {
+	color: #0369a1;
+	font-size: 0.72rem;
+	flex-shrink: 0;
+}
+
+.pc-accordion-body {
+	padding: 0 0.75rem 0.65rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	border-top: 1px solid #bae0f8;
+}
+
+.pc-accordion-actions {
+	display: flex;
+	gap: 0.5rem;
+	margin-top: 0.3rem;
+	flex-wrap: wrap;
 }

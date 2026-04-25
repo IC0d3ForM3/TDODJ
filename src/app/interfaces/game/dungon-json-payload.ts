@@ -10,6 +10,10 @@ import { MonsterPlacement } from './monster-placement';
 import { SquareText } from './square-text';
 import { FloorTrapPlacement } from './floor-trap-placement';
 import { PortalPlacement } from './portal-placement';
+import { ItemPlacement } from './item-placement';
+import { PotionPlacement } from './potion-placement';
+import { SpellPlacement } from './spell-placement';
+import { ObstaclePlacement } from './obstacle-placement';
 
 export interface DungonJsonPayload {
   filledSquares: Record<string, true>;
@@ -30,4 +34,10 @@ export interface DungonJsonPayload {
   squareTexts?: SquareText[];
   floorTrapPlacements?: FloorTrapPlacement[];
   portalPlacements?: PortalPlacement[];
+  itemPlacements?: ItemPlacement[];
+  potionPlacements?: PotionPlacement[];
+  spellPlacements?: SpellPlacement[];
+  floorItemList?: Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }>;
+  floorPotionList?: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>;
+  obstaclePlacements?: ObstaclePlacement[];
 }

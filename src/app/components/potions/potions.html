@@ -1,6 +1,6 @@
 <div class="pt-section" aria-label="My potions">
 	<div class="pt-section-header">
-		<h3 class="pt-title">My Potions</h3>
+		<h3 class="pt-title">POTIONS LIBRARY</h3>
 		<button type="button" class="pt-toggle-btn" (click)="toggleSectionVisibility()">
 			{{ isPotionSectionVisible() ? 'Hide' : 'Show' }}
 		</button>
@@ -15,7 +15,6 @@
 
 			<!-- 1/3 LEFT: list -->
 			<aside class="pt-list-panel">
-				<h4 class="pt-panel-title">Your Potion Library</h4>
 				@if (isLoading()) {
 					<p class="pt-message">Loading your potions...</p>
 				} @else if (error()) {

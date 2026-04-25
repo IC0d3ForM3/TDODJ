@@ -32,6 +32,7 @@ export interface UserTresherListItem {
   potion1Id: number | null;
   potion2Id: number | null;
   potion3Id: number | null;
+  isquest: boolean;
 }
 
 export interface UserTresherWritePayload {
@@ -59,6 +60,7 @@ export interface UserTresherWritePayload {
   potion1Id: number | null;
   potion2Id: number | null;
   potion3Id: number | null;
+  isquest: boolean;
 }
 
 export interface TresherResponse {

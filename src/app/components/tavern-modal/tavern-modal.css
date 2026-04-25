@@ -1,0 +1,366 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tavern-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  cursor: pointer;
+}
+
+.tavern-modal {
+  position: relative;
+  z-index: 1;
+  background: #1a120a;
+  border: 2px solid #7a5c34;
+  border-radius: 10px;
+  width: min(480px, 96vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  color: #f0e4c8;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+}
+
+.tavern-img-wrap {
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  border-radius: 8px 8px 0 0;
+  flex-shrink: 0;
+}
+
+.tavern-keeper-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+
+.tavern-body {
+  padding: 1.1rem 1.4rem 1.4rem;
+  position: relative;
+  flex: 1;
+}
+
+.tavern-close-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.6rem;
+  background: none;
+  border: none;
+  color: #c0a875;
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+.tavern-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tavern-greeting {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0 0 1rem;
+  color: #f0e4c8;
+}
+
+.tavern-nav {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tavern-nav-btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 0.6rem 1rem;
+  background: #4a3010;
+  border: 1px solid #7a5c34;
+  border-radius: 6px;
+  color: #f0d89a;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tavern-nav-btn:hover {
+  background: #6a4820;
+}
+
+.tavern-view h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: #c0a875;
+  border-bottom: 1px solid #4a3010;
+  padding-bottom: 0.4rem;
+}
+
+.tavern-back-btn {
+  background: none;
+  border: none;
+  color: #c0a875;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+  margin-bottom: 0.75rem;
+  display: inline-block;
+}
+.tavern-back-btn:hover {
+  text-decoration: underline;
+}
+
+.tavern-soon {
+  color: #a09070;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.tavern-sp-display {
+  font-size: 0.95rem;
+  margin: 0 0 0.9rem;
+  color: #f0d89a;
+}
+.tavern-sp-display strong {
+  color: #ffe066;
+}
+
+.tavern-learn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.tavern-learn-table th {
+  text-align: left;
+  color: #c0a875;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid #4a3010;
+  font-weight: 600;
+}
+.tavern-learn-table td {
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid #2e1e08;
+  color: #f0e4c8;
+}
+.tavern-learn-table tr:last-child td {
+  border-bottom: none;
+}
+
+.tavern-upgrade-btn {
+  background: #4a3010;
+  border: 1px solid #7a5c34;
+  border-radius: 4px;
+  color: #ffe066;
+  font-weight: 700;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.12s;
+}
+.tavern-upgrade-btn:hover:not(:disabled) {
+  background: #6a4820;
+}
+.tavern-upgrade-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tavern-error {
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.tavern-upgrading {
+  color: #c0a875;
+  font-size: 0.85rem;
+  font-style: italic;
+  margin-top: 0.3rem;
+}
+
+.tavern-lv-req {
+  font-size: 0.75rem;
+  color: #c8a84b;
+  font-style: italic;
+}
+
+.tavern-locked {
+  font-size: 0.78rem;
+  color: #888;
+  font-style: italic;
+}
+
+.tavern-nav-btn-adventure {
+  background: rgba(100, 200, 120, 0.15);
+  border-color: #64c878;
+  color: #64c878;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.tavern-nav-btn-adventure:hover {
+  background: rgba(100, 200, 120, 0.28);
+}
+
+.tavern-nav-btn-quest {
+  background: rgba(196, 162, 74, 0.15);
+  border-color: #c4a24a;
+  color: #c4a24a;
+}
+
+.tavern-nav-btn-quest:hover {
+  background: rgba(196, 162, 74, 0.3);
+}
+
+.tavern-quest-list {
+  list-style: none;
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tavern-quest-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.6rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.tavern-quest-item-name {
+  color: #f0e4c8;
+}
+
+.tavern-quest-sp {
+  color: #c4a24a;
+  font-weight: bold;
+  font-size: 0.85rem;
+}
+
+.tavern-turnin-btn {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1.2rem;
+  font-size: 0.95rem;
+}
+
+.tavern-nav-btn-stash {
+  background: rgba(74, 162, 196, 0.15);
+  border-color: #4aa2c4;
+  color: #4aa2c4;
+}
+
+.tavern-nav-btn-stash:hover {
+  background: rgba(74, 162, 196, 0.3);
+}
+
+.tavern-stash-columns {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.tavern-stash-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.tavern-stash-col-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  color: #c0a875;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tavern-stash-item-selected {
+  background: rgba(74, 162, 196, 0.25) !important;
+  border: 1px solid #4aa2c4;
+}
+
+.tavern-hint-text {
+  font-size: 0.82rem;
+  color: #a08060;
+  margin: 0 0 0.5rem;
+  font-style: italic;
+}
+
+.tavern-nav-btn-reset {
+  background: #6b2020;
+  border-color: #8b2020;
+  color: #ffdcdc;
+}
+.tavern-nav-btn-reset:hover {
+  background: #8b2020;
+}
+
+.tavern-reset-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 5, 2, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 0.5rem;
+}
+
+.tavern-reset-confirm-box {
+  background: #1a0d00;
+  border: 1px solid #8b6914;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  max-width: 340px;
+  text-align: center;
+}
+
+.tavern-reset-confirm-text {
+  color: #e8d4a4;
+  font-size: 0.95rem;
+  margin: 0 0 1rem;
+}
+
+.tavern-reset-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.tavern-reset-confirm-btn {
+  padding: 0.45rem 1.1rem;
+  border-radius: 0.35rem;
+  border: 1px solid;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.tavern-reset-confirm-btn-yes {
+  background: #6b2020;
+  border-color: #8b2020;
+  color: #ffdcdc;
+}
+.tavern-reset-confirm-btn-yes:hover {
+  background: #8b2020;
+}
+
+.tavern-reset-confirm-btn-no {
+  background: #2a1a08;
+  border-color: #8b6914;
+  color: #e8d4a4;
+}
+.tavern-reset-confirm-btn-no:hover {
+  background: #3a2410;
+}

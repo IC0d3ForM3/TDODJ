@@ -28,6 +28,13 @@ interface SamplePc {
   rangeOfView: number;
 }
 
+interface TutorialPage {
+  image: string;
+  speaker: string;
+  title: string;
+  text: string;
+}
+
 @Component({
   selector: 'app-sample-game',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,6 +51,78 @@ export class SampleGame implements OnInit {
   readonly selectedPc = signal<SamplePc | null>(null);
   readonly isLoading = signal(true);
   readonly hasError = signal(false);
+
+  // ── Tavern tutorial ───────────────────────────────────────────
+  readonly showTutorial = signal(true);
+  readonly tutorialPageIndex = signal(0);
+
+  readonly tutorialPages: TutorialPage[] = [
+    {
+      image: 'images/taren1.jpg',
+      speaker: 'Cellen',
+      title: 'Welcome, Adventurer!',
+      text: "Pull up a stool and rest your boots! I'm Cellen, keeper of the Rusty Flagon. Word is you're thinking of braving the dungeons beneath our town. Smart move coming to me first — I've sent many brave souls down there, and most of them came back. Let me walk you through what you're in for.",
+    },
+    {
+      image: 'images/taren1.jpg',
+      speaker: 'Cellen',
+      title: 'Finding Your Way',
+      text: "You'll explore from a first-person view — stone corridors stretching out ahead of you — with a mini-map below to keep your bearings. Use the Arrow Keys to turn and face a new direction. Press Space or F to step forward, and B to step back. The dungeon isn't huge, but every corridor looks the same in the dark.",
+    },
+    {
+      image: 'images/taren1.jpg',
+      speaker: 'Cellen',
+      title: 'Action Economy',
+      text: "Every round you have a pool of Action Economy — AE for short. Moving costs 1 AE. Attacking costs 1 AE. Drinking a potion or casting a spell? Also 1 AE each. When your AE hits zero, it's the monsters' turn. Spend your points wisely — getting caught flat-footed is how adventurers end up as wall decorations.",
+    },
+    {
+      image: 'images/taren2.jpg',
+      speaker: 'Reanna',
+      title: 'Combat',
+      text: "Tap a monster on the mini-map to target it, then click Attack. You'll roll a d12 and add your weapon bonus and Stamina — beat the monster's Armor Class and you land a hit. Damage is your weapon dice plus Strength. Monsters hit back on their turn, so keep moving and keep that armor on. Oh — and watch your flanks.",
+    },
+    {
+      image: 'images/taren2.jpg',
+      speaker: 'Reanna',
+      title: 'Loot & the Exit',
+      text: "Treshers — those containers scattered through the dungeon — are stuffed with weapons, armor, potions, and coin. Check your Inventory tab to grab what you find before moving on. Your goal is the Exit square on the mini-map. Step onto it to finish the dungeon and earn your Skill Point reward. Now get in there — the first round's on the house when you return!",
+    },
+  ];
+
+  get currentTutorialPage(): TutorialPage {
+    return this.tutorialPages[this.tutorialPageIndex()];
+  }
+
+  get isLastTutorialPage(): boolean {
+    return this.tutorialPageIndex() === this.tutorialPages.length - 1;
+  }
+
+  get tutorialProgress(): string {
+    return `${this.tutorialPageIndex() + 1} / ${this.tutorialPages.length}`;
+  }
+
+  nextTutorialPage(): void {
+    if (!this.isLastTutorialPage) {
+      this.tutorialPageIndex.update(p => p + 1);
+    }
+  }
+
+  prevTutorialPage(): void {
+    if (this.tutorialPageIndex() > 0) {
+      this.tutorialPageIndex.update(p => p - 1);
+    }
+  }
+
+  skipTutorial(): void {
+    this.showTutorial.set(false);
+  }
+
+  playFromTutorial(): void {
+    this.showTutorial.set(false);
+    if (this.selectedPc()) {
+      this.playNow();
+    }
+  }
 
   ngOnInit(): void {
     forkJoin({

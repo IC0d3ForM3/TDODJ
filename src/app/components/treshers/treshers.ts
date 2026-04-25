@@ -73,6 +73,7 @@ export class Treshers implements OnInit {
     soundId: new FormControl<number | null>(null),
     spReward: new FormControl<number>(0, { nonNullable: true }),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
+    isquest: new FormControl<boolean>(false, { nonNullable: true }),
   });
 
   ngOnInit(): void {
@@ -149,6 +150,7 @@ export class Treshers implements OnInit {
       potion2Id: this.normalizeNullableNumber(item.potion2Id),
       potion3Id: this.normalizeNullableNumber(item.potion3Id),
       isPublic: item.isPublic,
+      isquest: item.isquest ?? false,
       imageId: this.normalizeNullableNumber(item.imageId),
       soundId: this.normalizeNullableNumber(item.soundId),
       spReward: this.normalizeNumber(item.spReward, 0),
@@ -222,6 +224,7 @@ export class Treshers implements OnInit {
       curse1Id: this.normalizeNullableNumber(v.curse1Id),
       curse2Id: this.normalizeNullableNumber(v.curse2Id),
       isPublic: this.isAdminUser() ? v.isPublic === true : false,
+      isquest: this.isAdminUser() ? v.isquest === true : false,
       imageId: this.normalizeNullableNumber(v.imageId),
       soundId: this.normalizeNullableNumber(v.soundId),
       spReward: Math.max(0, this.normalizeNumber(v.spReward, 0)),
@@ -254,6 +257,7 @@ export class Treshers implements OnInit {
       potion2Id: null,
       potion3Id: null,
       isPublic: false,
+      isquest: false,
       imageId: null,
       soundId: null,
       spReward: 0,

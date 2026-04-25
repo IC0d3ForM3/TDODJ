@@ -23,23 +23,26 @@
 			type="button"
 			class="sidebar-toggle"
 			(click)="toggleSidebar()"
-			[attr.aria-label]="isSidebarCollapsed() ? 'Show Your Dungons panel' : 'Hide Your Dungons panel'"
+			[attr.aria-label]="isSidebarCollapsed() ? 'Show Your Dungeons panel' : 'Hide Your Dungeons panel'"
 			[attr.aria-expanded]="!isSidebarCollapsed()"
 		>
 			{{ isSidebarCollapsed() ? '>' : '<' }}
 		</button>
 
 		@if (!isSidebarCollapsed()) {
-			<h4 class="sidebar-title">Your Dungons</h4>
+			<h4 class="sidebar-title">Your Dungeons</h4>
 			<button type="button" class="create-new-button" (click)="showCreateForm()">Create New</button>
 
 			@if (isLoadingDungons()) {
-				<p class="sidebar-message">Loading dungons...</p>
+				<p class="sidebar-message">Loading dungeons...</p>
 			} @else if (loadError()) {
 				<p class="sidebar-message sidebar-message-error">{{ loadError() }}</p>
 			} @else if (dungons().length === 0) {
-				<p class="sidebar-message">No dungons yet.</p>
+				<p class="sidebar-message">No dungeons yet.</p>
 			} @else {
+				@if (deleteDungonError()) {
+					<p class="sidebar-message sidebar-message-error">{{ deleteDungonError() }}</p>
+				}
 				<ul class="dungons-list">
 					@for (dungon of dungons(); track dungon.id) {
 						<li class="dungons-list-item">
@@ -60,6 +63,13 @@
 									<span class="dungon-badge dungon-badge-pending">PENDING</span>
 								}
 							</button>
+							<button
+								type="button"
+								class="dungons-delete-btn"
+								title="Delete dungeon"
+								[disabled]="isDeletingDungonId() === dungon.id"
+								(click)="deleteDungon(dungon)"
+							>{{ isDeletingDungonId() === dungon.id ? '…' : '✕' }}</button>
 						</li>
 					}
 				</ul>
@@ -70,7 +80,7 @@
 	<section class="creator-main" aria-label="Creator workspace">
 		@if (isCreateFormVisible()) {
 			<form class="create-dungon-form" [formGroup]="createDungonForm" (ngSubmit)="saveCreateForm()">
-				<label class="form-label" for="dungon-name">Dungon Name</label>
+				<label class="form-label" for="dungon-name">Dungeon Name</label>
 				<input id="dungon-name" class="form-input" type="text" formControlName="name" />
 
 				<label class="form-label" for="dungon-description">Description</label>
@@ -128,8 +138,22 @@
 							<input type="checkbox" formControlName="issample" />
 							<span>Sample Game</span>
 						</label>
+						<label class="form-checkbox">
+							<input type="checkbox" formControlName="resettablePerPc" />
+							<span>Resettable Per PC</span>
+						</label>
 					</div>
 				}
+
+				<div class="dungon-image-row">
+					<span class="form-label">Dungeon Image</span>
+					@if (createDungonImagePreviewUrl()) {
+						<img class="dungon-image-preview" [src]="createDungonImagePreviewUrl()" alt="dungeon image" />
+						<button type="button" class="cancel-button" (click)="clearCreateDungonImage()">Remove Image</button>
+					} @else {
+						<app-upload-popup mediaType="image" (mediaUploaded)="onCreateDungonImageUploaded($event)" />
+					}
+				</div>
 
 				<div class="form-actions">
 					<button type="submit" class="save-button" [disabled]="isSaving()">
@@ -149,18 +173,18 @@
 				}
 			</form>
 		} @else if (isLoadingSelectedDungon()) {
-			<p class="details-message">Loading dungon details...</p>
+			<p class="details-message">Loading dungeon details...</p>
 		} @else if (selectedDungonError()) {
 			<p class="details-message details-message-error">{{ selectedDungonError() }}</p>
 		} @else if (selectedDungon(); as selected) {
-			<section class="dungon-details" aria-label="Selected dungon details">
+			<section class="dungon-details" aria-label="Selected dungeon details">
 				<div class="details-title-row">
 					<h4 class="details-title">{{ selected.name }}</h4>
 					<button
 						type="button"
 						class="details-toggle"
 						(click)="toggleSelectedDungonDetails()"
-						[attr.aria-label]="isSelectedDungonExpanded() ? 'Hide dungon details' : 'Show dungon details'"
+						[attr.aria-label]="isSelectedDungonExpanded() ? 'Hide dungeon details' : 'Show dungeon details'"
 						[attr.aria-expanded]="isSelectedDungonExpanded()"
 					>
 						{{ isSelectedDungonExpanded() ? '▼' : '▶' }}
@@ -185,6 +209,17 @@
 								[class.open-block-btn--active]="isMoveMode()"
 								(click)="toggleMoveMode()"
 							>Clear</button>
+							<select
+								class="tools-dropdown-select"
+								aria-label="Tools"
+								(change)="onToolsActionChange($event)"
+							>
+								<option value="">Tools</option>
+								<option value="setStart" [disabled]="!hasAnyWhiteSpace()">Set Start</option>
+								<option value="setExit" [disabled]="!hasAnyWhiteSpace()">Set Exit</option>
+								<option value="createThresher">Create Thresher</option>
+								<option value="createMonseter">Create Monseter</option>
+							</select>
 						</div>
 						<div class="open-block-footer-row">
 							<div class="form-actions tools-inline-actions">
@@ -200,27 +235,87 @@
 										@if (isWhiteSpacePreviewPickMode()) {
 											Pick White Space
 										} @else {
-											10x10
+											<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-label="10x10 preview" style="display:block">
+												<rect x="1" y="1" width="4" height="4" rx="0.5"/>
+												<rect x="6" y="1" width="4" height="4" rx="0.5"/>
+												<rect x="11" y="1" width="4" height="4" rx="0.5"/>
+												<rect x="1" y="6" width="4" height="4" rx="0.5"/>
+												<rect x="6" y="6" width="4" height="4" rx="0.5"/>
+												<rect x="11" y="6" width="4" height="4" rx="0.5"/>
+												<rect x="1" y="11" width="4" height="4" rx="0.5"/>
+												<rect x="6" y="11" width="4" height="4" rx="0.5"/>
+												<rect x="11" y="11" width="4" height="4" rx="0.5"/>
+											</svg>
 										}
 									</button>
 								}
-								<select
-									class="tools-dropdown-select"
-									aria-label="Tools"
-									(change)="onToolsActionChange($event)"
-								>
-									<option value="">Tools</option>
-									<option value="placeKeys">Place Keys</option>
-									<option value="createThresher">Create Thresher</option>
-									<option value="placeTresher" [disabled]="!hasAnyWhiteSpace()">Place Tresher</option>
-									<option value="setStart" [disabled]="!hasAnyWhiteSpace()">Set Start</option>
-									<option value="setExit" [disabled]="!hasAnyWhiteSpace()">Set Exit</option>
-									<option value="createMonseter">Create Monseter</option>
-									<option value="placeMonster" [disabled]="!hasAnyWhiteSpace()">Place Monster</option>
-									<option value="addCellWallText" [disabled]="!hasAnyWhiteSpace()">Add Cell/Wall text</option>
-						<option value="placeFloorTrap" [disabled]="!hasAnyWhiteSpace()">Place Floor Trap</option>
-							<option value="placePortal" [disabled]="!hasAnyWhiteSpace()">Place Portal</option>
-								</select>
+								<button
+									type="button"
+									class="open-block-btn"
+									[class.open-block-btn--active]="isPlaceMonsterMode()"
+									[disabled]="!hasAnyWhiteSpace()"
+									(click)="startPlaceMonsterMode()"
+								>+Monster</button>
+								<button
+									type="button"
+									class="open-block-btn"
+									[class.open-block-btn--active]="isAddTextMode()"
+									[disabled]="!hasAnyWhiteSpace()"
+									(click)="startAddTextMode()"
+								>+Text</button>
+								<button
+									type="button"
+									class="open-block-btn"
+									[class.open-block-btn--active]="isPlaceItemMode()"
+									[disabled]="!hasAnyWhiteSpace()"
+									(click)="startPlaceItemMode()"
+								>+Item</button>
+								<button
+									type="button"
+									class="open-block-btn"
+									[class.open-block-btn--active]="isPlacePotionMode()"
+									[disabled]="!hasAnyWhiteSpace()"
+									(click)="startPlacePotionMode()"
+								>+Potion</button>
+								<button
+									type="button"
+									class="open-block-btn"
+									[class.open-block-btn--active]="isPlaceSpellMode()"
+									[disabled]="!hasAnyWhiteSpace()"
+									(click)="startPlaceSpellMode()"
+								>+Spell</button>
+								<button
+									type="button"
+									class="open-block-btn"
+									(click)="openKaysDialog()"
+								>+Keys</button>
+								<button
+									type="button"
+									class="open-block-btn"
+									[class.open-block-btn--active]="isPlaceTresherMode()"
+									[disabled]="!hasAnyWhiteSpace()"
+									(click)="startPlaceTresherMode()"
+								>+Tresher</button>
+								<button
+									type="button"
+									class="open-block-btn"
+									[class.open-block-btn--active]="isPlaceFloorTrapMode()"
+									[disabled]="!hasAnyWhiteSpace()"
+									(click)="startPlaceFloorTrapMode()"
+								>+FTrap</button>
+								<button
+									type="button"
+									class="open-block-btn"
+									[class.open-block-btn--active]="isPlaceObstacleMode()"
+									[disabled]="!hasAnyWhiteSpace()"
+									(click)="startPlaceObstacleMode()"
+								>+Obstacle</button>
+								<button
+									type="button"
+									class="open-block-btn"
+									[disabled]="!hasAnyWhiteSpace()"
+									(click)="openPortalDialog(null)"
+								>+Portal</button>
 							</div>
 							<div class="publish-actions-column">
 								<button
@@ -267,7 +362,7 @@
 						}
 						@if (selectedKeyForPlacement(); as selectedKey) {
 							<span class="details-message">
-								placing {{ selectedKey.name }} on next white square
+								{{ isKeyPlacedOnGrid(selectedKey.id) ? 'moving' : 'placing' }} {{ selectedKey.name }} — click a white square
 								<button
 									type="button"
 									class="cancel-button"
@@ -337,6 +432,42 @@
 								</button>
 							</span>
 						}
+						@if (isPlaceItemMode()) {
+							<span class="details-message">
+								click a white square to place item
+								<button
+									type="button"
+									class="cancel-button"
+									(click)="cancelPlaceItemMode()"
+								>
+									cancel
+								</button>
+							</span>
+						}
+						@if (isPlacePotionMode()) {
+							<span class="details-message">
+								click a white square to place potion
+								<button
+									type="button"
+									class="cancel-button"
+									(click)="cancelPlacePotionMode()"
+								>
+									cancel
+								</button>
+							</span>
+						}
+						@if (isPlaceSpellMode()) {
+							<span class="details-message">
+								click a white square to place spell
+								<button
+									type="button"
+									class="cancel-button"
+									(click)="cancelPlaceSpellMode()"
+								>
+									cancel
+								</button>
+							</span>
+						}
 						@if (isAddTextMode()) {
 							<span class="details-message">
 								click a white square to add cell/wall text
@@ -347,6 +478,24 @@
 								>
 									cancel
 								</button>
+							</span>
+						}
+						@if (isCopyObstacleMode()) {
+							<span class="details-message">
+								click a white square to place obstacle copy
+								<button type="button" class="cancel-button" (click)="cancelCopyObstacleMode()">cancel</button>
+							</span>
+						}
+						@if (isCopyMonsterMode()) {
+							<span class="details-message">
+								click a white square to place monster copy
+								<button type="button" class="cancel-button" (click)="cancelCopyMonsterMode()">cancel</button>
+							</span>
+						}
+						@if (isCopyFloorTrapMode()) {
+							<span class="details-message">
+								click a white square to place trap copy
+								<button type="button" class="cancel-button" (click)="cancelCopyFloorTrapMode()">cancel</button>
 							</span>
 						}
 					</div>
@@ -361,12 +510,45 @@
 									(click)="moveSelectedPlacement()"
 								>Move</button>
 							}
-							@if (selItem.type === 'monster' || selItem.type === 'tresher') {
+							@if (selItem.type === 'monster' || selItem.type === 'tresher' || selItem.type === 'obstacle' || selItem.type === 'trap' || selItem.type === 'door') {
 								<button
 									type="button"
 									class="cancel-button"
 									(click)="editSelectedPlacement()"
 								>Edit</button>
+							}
+							@if (selItem.type === 'monster') {
+								<button
+									type="button"
+									class="cancel-button"
+									(click)="copyMonsterFromSelection()"
+								>Copy</button>
+							}
+							@if (selItem.type === 'obstacle') {
+								<button
+									type="button"
+									class="cancel-button"
+									(click)="copyObstacleFromSelection()"
+								>Copy</button>
+							}
+							@if (selItem.type === 'trap') {
+								<button
+									type="button"
+									class="cancel-button"
+									(click)="copyFloorTrapFromSelection()"
+								>Copy</button>
+							}
+							@if (selItem.type === 'item') {
+								<button
+									type="button"
+									class="cancel-button"
+									(click)="changeSelectedItemPlacement()"
+								>Change</button>
+								<button
+									type="button"
+									class="cancel-button remove-button"
+									(click)="removeSelectedItemPlacement()"
+								>Remove</button>
 							}
 							<button
 								type="button"
@@ -382,7 +564,7 @@
 								#dungonGridCanvas
 								class="dungon-grid-canvas"
 								(click)="onGridCanvasClick($event)"
-								aria-label="Dungon grid canvas"
+								aria-label="Dungeon grid canvas"
 							></canvas>
 						</div>
 						<div class="placement-inspector">
@@ -465,6 +647,26 @@
 								</div>
 							}
 						</div>
+
+						<label class="placement-inspector-label" for="pi-items">Items</label>
+						<select id="pi-items" class="placement-inspector-select" (change)="onPlacedItemSelect($event)">
+							<option value="">--</option>
+							@for (item of placedItemsForCurrentDungon(); track item.key) {
+								@if (item.type === 'item') {
+									<option [value]="item.key" [selected]="selectedPlacedItemKey() === item.key" [title]="item.label">{{ item.label }}</option>
+								}
+							}
+						</select>
+
+						<label class="placement-inspector-label" for="pi-obstacles">Obstacles</label>
+						<select id="pi-obstacles" class="placement-inspector-select" (change)="onPlacedItemSelect($event)">
+							<option value="">--</option>
+							@for (item of placedItemsForCurrentDungon(); track item.key) {
+								@if (item.type === 'obstacle') {
+									<option [value]="item.key" [selected]="selectedPlacedItemKey() === item.key" [title]="item.label">{{ item.label }}</option>
+								}
+							}
+						</select>
 						</div>
 					</div>
 				}
@@ -494,7 +696,7 @@
 
 					@if (isEditMetadataFormVisible()) {
 						<form class="edit-metadata-form" [formGroup]="editMetadataForm" (ngSubmit)="saveEditMetadataForm()">
-							<label class="form-label" for="edit-dungon-name">Dungon Name</label>
+							<label class="form-label" for="edit-dungon-name">Dungeon Name</label>
 							<input id="edit-dungon-name" class="form-input" type="text" formControlName="name" />
 
 							<label class="form-label" for="edit-dungon-description">Description</label>
@@ -542,6 +744,33 @@
 								/>
 							</div>
 
+							@if (account.isAdmin()) {
+								<div class="form-admin-flags">
+									<label class="form-checkbox">
+										<input type="checkbox" formControlName="ismaingame" />
+										<span>Main Game</span>
+									</label>
+									<label class="form-checkbox">
+										<input type="checkbox" formControlName="issample" />
+										<span>Sample Game</span>
+									</label>
+									<label class="form-checkbox">
+										<input type="checkbox" formControlName="resettablePerPc" />
+										<span>Resettable Per PC</span>
+									</label>
+								</div>
+							}
+
+							<div class="dungon-image-row">
+								<span class="form-label">Dungeon Image</span>
+								@if (editDungonImagePreviewUrl()) {
+									<img class="dungon-image-preview" [src]="editDungonImagePreviewUrl()" alt="dungeon image" />
+									<button type="button" class="cancel-button" (click)="clearEditDungonImage()">Remove Image</button>
+								} @else {
+									<app-upload-popup mediaType="image" (mediaUploaded)="onEditDungonImageUploaded($event)" />
+								}
+							</div>
+
 							<div class="form-actions">
 								<button type="submit" class="save-button" [disabled]="isSavingMetadata()">
 									@if (isSavingMetadata()) {
@@ -563,7 +792,7 @@
 				}
 			</section>
 		} @else {
-			<p class="details-message">Choose a dungon from the left to view details.</p>
+			<p class="details-message">Choose a dungeon from the left to view details.</p>
 		}
 	</section>
 </section>
@@ -593,7 +822,7 @@
 @if (isCreatorTabActive('images')) {
 <section class="dashboard-wrap dashboard-wrap-secondary" aria-label="My images">
 	<div class="dashboard-section-header">
-		<h3 class="dashboard-title">My Images</h3>
+		<h3 class="dashboard-title">IMAGES LIBRARY</h3>
 		<button type="button" class="dashboard-toggle-button" (click)="toggleLibImageSection()">{{ isLibImageSectionVisible() ? 'Hide' : 'Show' }}</button>
 	</div>
 	@if (!isLibImageSectionVisible()) {
@@ -601,8 +830,7 @@
 	} @else {
 		<div class="creator-two-panel">
 			<!-- LEFT 1/3: list -->
-			<div class="creator-panel-list">
-				<h4 class="dashboard-subtitle">Your Images</h4>
+			<div class="creator-panel-list cpanel--images">
 				@if (isLoadingLibImages()) { <p class="dashboard-message">Loading your images...</p> }
 				@else if (libImagesError()) { <p class="dashboard-message dashboard-message-error">{{ libImagesError() }}</p> }
 				@else if (libUserImages().length === 0) { <p class="dashboard-message">No images yet.</p> }
@@ -654,7 +882,7 @@
 @if (isCreatorTabActive('sounds')) {
 <section class="dashboard-wrap dashboard-wrap-secondary" aria-label="My sounds">
 	<div class="dashboard-section-header">
-		<h3 class="dashboard-title">My Sounds</h3>
+		<h3 class="dashboard-title">SOUNDS LIBRARY</h3>
 		<button type="button" class="dashboard-toggle-button" (click)="toggleLibSoundSection()">{{ isLibSoundSectionVisible() ? 'Hide' : 'Show' }}</button>
 	</div>
 	@if (!isLibSoundSectionVisible()) {
@@ -662,8 +890,7 @@
 	} @else {
 		<div class="creator-two-panel">
 			<!-- LEFT 1/3: list -->
-			<div class="creator-panel-list">
-				<h4 class="dashboard-subtitle">Your Sounds</h4>
+			<div class="creator-panel-list cpanel--sounds">
 				@if (isLoadingLibSounds()) { <p class="dashboard-message">Loading your sounds...</p> }
 				@else if (libSoundsError()) { <p class="dashboard-message dashboard-message-error">{{ libSoundsError() }}</p> }
 				@else if (libUserSounds().length === 0) { <p class="dashboard-message">No sounds yet.</p> }
@@ -715,15 +942,14 @@
 @if (isCreatorTabActive('spells')) {
 <section class="dashboard-wrap dashboard-wrap-secondary" aria-label="My spells">
 	<div class="dashboard-section-header">
-		<h3 class="dashboard-title">My Spells</h3>
+		<h3 class="dashboard-title">SPELLS LIBRARY</h3>
 		<button type="button" class="dashboard-toggle-button" (click)="toggleLibSpellSection()">{{ isLibSpellSectionVisible() ? 'Hide' : 'Show' }}</button>
 	</div>
 	@if (!isLibSpellSectionVisible()) {
 		<p class="dashboard-message dashboard-subtle">Spell section is hidden.</p>
 	} @else {
 		<div class="creator-two-panel">
-			<div class="creator-panel-list">
-				<h4 class="dashboard-subtitle">Your Spells</h4>
+			<div class="creator-panel-list cpanel--spells">
 				@if (isLoadingLibSpells()) { <p class="dashboard-message">Loading your spells...</p> }
 				@else if (libSpellsError()) { <p class="dashboard-message dashboard-message-error">{{ libSpellsError() }}</p> }
 				@else if (libUserSpells().length === 0) { <p class="dashboard-message">No spells yet.</p> }
@@ -759,6 +985,7 @@
 						<label class="tresher-field"><span>Skill Points</span><input type="number" formControlName="sp" min="0" /></label>
 						<label class="tresher-field"><span>Success Test Value</span><input type="number" formControlName="successTestValue" /></label>
 						<label class="tresher-field"><span>Magic Cost</span><input type="number" formControlName="magicCost" min="1" /></label>
+						<label class="tresher-field"><span>Cost to Learn (SP)</span><input type="number" formControlName="costToLearn" min="0" /></label>
 						<label class="tresher-field"><span>Image</span>
 							<div style="display:flex;gap:0.4rem;align-items:center">
 								<select formControlName="imageId"><option [ngValue]="null">No Image</option>@for (img of libImageOptions(); track img.id) { <option [ngValue]="img.id">{{ img.name }}</option> }</select>
@@ -802,9 +1029,9 @@
 
 @if (isPublishDialogVisible()) {
 	<div class="door-dialog-backdrop">
-		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Publish dungon">
-			<h4 class="door-dialog-title">Publish Dungon</h4>
-			<p class="publish-dialog-copy">Who can see this dungon?</p>
+		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Publish dungeon">
+			<h4 class="door-dialog-title">Publish Dungeon</h4>
+			<p class="publish-dialog-copy">Who can see this dungeon?</p>
 
 			<div class="publish-visibility-options" role="radiogroup" aria-label="Publish visibility options">
 				<label class="publish-visibility-option">
@@ -851,7 +1078,7 @@
 				} @else if (publishFriends().length === 0) {
 					<small class="details-message">No active friends found. Add friends on Dashboard first.</small>
 				} @else {
-					<div class="publish-friends-list" aria-label="Friends allowed to see this dungon">
+					<div class="publish-friends-list" aria-label="Friends allowed to see this dungeon">
 						@for (friend of publishFriends(); track friend.id) {
 							<label class="publish-friend-option">
 								<input
@@ -870,7 +1097,7 @@
 					</small>
 				}
 			} @else if (publishVisibility() === 'private') {
-				<small class="details-message">Only you can see and start this dungon after publishing.</small>
+				<small class="details-message">Only you can see and start this dungeon after publishing.</small>
 			}
 
 			@if (publishDungonError()) {
@@ -906,7 +1133,7 @@
 @if (isDoorDialogVisible()) {
 	<div class="door-dialog-backdrop">
 		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Door settings">
-			<h4 class="door-dialog-title">Door Settings</h4>
+			<h4 class="door-dialog-title">{{ editingDoorId() !== null ? 'Edit Door' : 'Door Settings' }}</h4>
 			<form class="door-settings-form" [formGroup]="doorForm" (ngSubmit)="saveDoorPlacement()">
 				<label class="form-label" for="door-state">State</label>
 				<select
@@ -972,6 +1199,8 @@
 						<option value="HP">HP</option>
 						<option value="Stamina">Stamina</option>
 						<option value="Mind">Mind</option>
+						<option value="AE">AE (Action Economy)</option>
+						<option value="ROS">ROS (Range of Sight)</option>
 					</select>
 					<label class="form-label" for="door-trap-curse-id">Curse ID (optional)</label>
 					<input id="door-trap-curse-id" class="form-input" type="number" formControlName="trapCurseId" />
@@ -983,6 +1212,21 @@
 
 				@if (doorDialogError()) {
 					<p class="form-error">{{ doorDialogError() }}</p>
+				}
+
+				<div class="form-section-title">Item Requirement <small style="font-weight:400;color:#888">(optional)</small></div>
+				<label class="form-label" for="door-item-req">Item needed to pass</label>
+				<select id="door-item-req" class="form-input" formControlName="itemRequirementItemId">
+					<option [ngValue]="null">— None —</option>
+					@for (item of libItems(); track item.id) {
+						<option [ngValue]="item.id">{{ item.name }} ({{ item.type }})</option>
+					}
+				</select>
+				@if (doorForm.controls.itemRequirementItemId.value !== null) {
+					<label class="door-locked-toggle">
+						<input type="checkbox" formControlName="itemRequirementConsume" />
+						Consume item on pass (player gives it up)
+					</label>
 				}
 
 				<div class="form-actions">
@@ -1073,6 +1317,8 @@
 						<option value="HP">HP</option>
 						<option value="Stamina">Stamina</option>
 						<option value="Mind">Mind</option>
+						<option value="AE">AE (Action Economy)</option>
+						<option value="ROS">ROS (Range of Sight)</option>
 					</select>
 					<label class="form-label" for="tresher-trap-curse-id">Curse ID (optional)</label>
 					<input id="tresher-trap-curse-id" class="form-input" type="number" formControlName="trapCurseId" />
@@ -1164,14 +1410,14 @@
 					formControlName="destinationType"
 					(change)="onExitDestinationTypeChange($event)"
 				>
-					<option value="outside">Exits The Dungon</option>
+					<option value="outside">Exits The Dungeon</option>
 					<option value="dungon" [disabled]="!hasAnyOtherDungonsForExit()">
-						Leads To Another Dungon
+						Leads To Another Dungeon
 					</option>
 				</select>
 
 				@if (exitForm.controls.destinationType.value === 'dungon') {
-					<label class="form-label" for="exit-destination-dungon">Destination Dungon</label>
+					<label class="form-label" for="exit-destination-dungon">Destination Dungeon</label>
 					<select
 						id="exit-destination-dungon"
 						class="form-input"
@@ -1192,6 +1438,21 @@
 
 				@if (exitDialogError()) {
 					<p class="form-error">{{ exitDialogError() }}</p>
+				}
+
+				<div class="form-section-title">Item Requirement <small style="font-weight:400;color:#888">(optional)</small></div>
+				<label class="form-label" for="exit-item-req">Item needed to exit</label>
+				<select id="exit-item-req" class="form-input" formControlName="itemRequirementItemId">
+					<option [ngValue]="null">— None —</option>
+					@for (item of libItems(); track item.id) {
+						<option [ngValue]="item.id">{{ item.name }} ({{ item.type }})</option>
+					}
+				</select>
+				@if (exitForm.controls.itemRequirementItemId.value !== null) {
+					<label class="door-locked-toggle">
+						<input type="checkbox" formControlName="itemRequirementConsume" />
+						Consume item on exit (player gives it up)
+					</label>
 				}
 
 				<div class="form-actions">
@@ -1250,6 +1511,10 @@
 							[exits]="previewExitsForModal()"
 							[squareTexts]="previewSquareTextsForModal()"
 							[showMonsters]="previewShowMonsters()"
+							[itemPlacements]="previewItemPlacementsForModal()"
+							[potionPlacements]="previewPotionPlacementsForModal()"
+					[obstaclePlacements]="previewObstaclePlacementsForModal()"
+					[obstacleImagesBySquare]="previewObstacleImagesBySquareForModal()"
 						></app-dungeon-first-person>
 					</div>
 
@@ -1268,6 +1533,10 @@
 							[exits]="previewExitsForModal()"
 							[startPoint]="previewStartPointForModal()"
 							[squareTexts]="previewSquareTextsForModal()"
+							[itemPlacements]="previewItemPlacementsForModal()"
+							[potionPlacements]="previewPotionPlacementsForModal()"
+							[obstaclePlacements]="previewObstaclePlacementsForModal()"
+							[obstacleImagesBySquare]="previewObstacleImagesBySquareForModal()"
 						></app-dungeon-preview-grid>
 					</div>
 
@@ -1325,7 +1594,7 @@
 			aria-label="Choose key"
 			(click)="$event.stopPropagation()"
 		>
-			<h4 class="door-dialog-title">Pick a key</h4>
+			<h4 class="door-dialog-title">Pick a key to place or move</h4>
 			@if (keyList.length === 0) {
 				<p class="details-message">No keys available yet.</p>
 			} @else {
@@ -1335,12 +1604,10 @@
 							<button
 								type="button"
 								class="dungons-list-button"
-								[disabled]="isKeyPlaced(key.id)"
-								[style.opacity]="isKeyPlaced(key.id) ? '0.45' : '1'"
 								(click)="selectKeyForPlacement(key.id)"
 							>
 								<span>{{ key.name }}</span>
-								<small>{{ isKeyPlaced(key.id) ? 'already placed' : keyPositionLabel(key) }}</small>
+								<small>{{ isKeyPlacedOnGrid(key.id) ? 'placed at ' + keyPositionLabel(key) + ' — click to move' : (isKeyHeldByMonster(key.id) ? 'held by monster' : 'not placed') }}</small>
 							</button>
 						</li>
 					}
@@ -1371,7 +1638,7 @@
 			}
 
 			@if (selectedDungonTreshers().length > 0) {
-				<p class="details-message" style="margin: 0 0 0.4rem">Current Dungon Treshers</p>
+				<p class="details-message" style="margin: 0 0 0.4rem">Current Dungeon Treshers</p>
 				<ul class="dungons-list">
 					@for (tresher of selectedDungonTreshers(); track tresher.id) {
 						<li class="dungons-list-item">
@@ -1381,7 +1648,7 @@
 								(click)="placeSelectedTresherAtPendingPlacement(tresher.id)"
 							>
 								<span>{{ tresher.name }}</span>
-								<small>Gold {{ tresher.gold }} | Slvr {{ tresher.silver }} | Cpr {{ tresher.copper }} | Znc {{ tresher.zinc }} | SP {{ tresher.spReward }} | Dungon</small>
+								<small>Gold {{ tresher.gold }} | Slvr {{ tresher.silver }} | Cpr {{ tresher.copper }} | Znc {{ tresher.zinc }} | SP {{ tresher.spReward }} | Dungeon</small>
 							</button>
 						</li>
 					}
@@ -1478,6 +1745,17 @@
 
 				<label class="form-label" for="monster-sp-reward">Skill Points Reward</label>
 				<input id="monster-sp-reward" class="form-input" type="number" min="0" formControlName="spReward" />
+
+				<label class="form-label" for="monster-to-hit-plus-needed">Requires Weapon + To Hit</label>
+				<input
+					id="monster-to-hit-plus-needed"
+					class="form-input"
+					type="number"
+					min="0"
+					max="10"
+					formControlName="toHitPlusNeeded"
+					title="Minimum weapon + bonus required to damage this monster (0 = any weapon)"
+				/>
 
 				<label class="form-label" for="monster-image-id" style="margin-top: 0.4rem">Image</label>
 				<select id="monster-image-id" class="form-input" (change)="setMonsterDialogImageId($any($event.target).value)">
@@ -1585,7 +1863,7 @@
 			aria-label="Place monster"
 			(click)="$event.stopPropagation()"
 		>
-			<h4 class="door-dialog-title">Place Monster</h4>
+			<h4 class="door-dialog-title">{{ editingMonsterPlacementPos() ? 'Edit Monster' : 'Place Monster' }}</h4>
 			@if (pendingMonsterPlacement(); as pendingPlacement) {
 				<p class="details-message" style="margin: 0 0 0.7rem">
 					row {{ pendingPlacement.row }}, col {{ pendingPlacement.column }}
@@ -1625,6 +1903,40 @@
 					}
 				</div>
 			}
+
+			<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
+				<input
+					type="checkbox"
+					[checked]="placeMonsterIsStationary()"
+					(change)="onPlaceMonsterIsStationaryChange($event)"
+				/>
+				Stationary (stays in place until PC reaches trigger square)
+			</label>
+
+			@if (placeMonsterIsStationary()) {
+				<div style="margin-bottom: 0.7rem; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; font-size: 0.85rem;">
+					<p class="details-message" style="margin: 0 0 0.4rem; font-weight: 600;">Trigger Square (optional)</p>
+					@if (placeMonsterStationaryTriggerRow() !== null) {
+						<p class="details-message" style="margin: 0 0 0.4rem; color: #ff9500;">
+							Trigger at row {{ placeMonsterStationaryTriggerRow() }}, col {{ placeMonsterStationaryTriggerCol() }}
+						</p>
+						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem; margin-right: 0.4rem" (click)="clearMonsterStationaryTriggerSquare()">Clear</button>
+						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingStationaryTriggerSquare()">Change</button>
+					} @else {
+						<p class="details-message" style="margin: 0 0 0.4rem; opacity: 0.7;">No trigger square — monster stays stationary permanently (can still attack if adjacent).</p>
+						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingStationaryTriggerSquare()">Click to set trigger square</button>
+					}
+				</div>
+			}
+
+			<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
+				<input
+					type="checkbox"
+					[checked]="placeMonsterNoAttackUnlessAttacked()"
+					(change)="onPlaceMonsterNoAttackUnlessAttackedChange($event)"
+				/>
+				Won't attack unless attacked first
+			</label>
 
 			@if (selectedDungonTreshers().length > 0) {
 				<p class="details-message" style="margin: 0 0 0.3rem">Drop Treshers</p>
@@ -1678,11 +1990,16 @@
 						<li class="dungons-list-item">
 							<button
 								type="button"
-								class="dungons-list-button"
+								class="dungons-list-button place-select-btn"
 								(click)="placeSelectedMonsterAtPendingPlacement(monster.id)"
 							>
-								<span>{{ monster.name }}</span>
-								<small>{{ monster.type }} | HP {{ monster.hp }} | Mine</small>
+								@if (monster.imageId) {
+									<img class="place-select-thumb" [src]="imageUrlById(monster.imageId)" alt="" />
+								}
+								<span class="place-select-info">
+									<span>{{ monster.name }}</span>
+									<small>{{ monster.type }} | HP {{ monster.hp }} | AC {{ monster.ac }} | Mine</small>
+								</span>
 							</button>
 						</li>
 					}
@@ -1690,11 +2007,16 @@
 						<li class="dungons-list-item">
 							<button
 								type="button"
-								class="dungons-list-button"
+								class="dungons-list-button place-select-btn"
 								(click)="placeLibraryMonsterAtPendingPlacement(monster.id)"
 							>
-								<span>{{ monster.name }}</span>
-								<small>{{ monster.type }} | HP {{ monster.hp }} | {{ libraryMonsterSourceLabel(monster) }}</small>
+								@if (monster.imageId) {
+									<img class="place-select-thumb" [src]="imageUrlById(monster.imageId)" alt="" />
+								}
+								<span class="place-select-info">
+									<span>{{ monster.name }}</span>
+									<small>{{ monster.type }} | HP {{ monster.hp }} | AC {{ monster.ac }} | {{ libraryMonsterSourceLabel(monster) }}</small>
+								</span>
 							</button>
 						</li>
 					}
@@ -1706,9 +2028,137 @@
 			}
 
 			<div class="form-actions">
+				@if (editingMonsterPlacementPos()) {
+					<button type="button" class="save-button" (click)="saveMonsterPlacementSettings()">Update Settings</button>
+					<button type="button" class="cancel-button" (click)="copyMonsterPlacement()">Copy</button>
+					<button type="button" class="cancel-button" style="background-color:#9d2525;color:#fff;border-color:#8f1f1f" (click)="removeMonsterAtEditPos()">Remove</button>
+				}
 				<button type="button" class="cancel-button" (click)="closePlaceMonsterDialog()">
 					Close
 				</button>
+			</div>
+		</section>
+	</div>
+}
+
+@if (isPlaceItemDialogVisible()) {
+	<div class="door-dialog-backdrop" (click)="closePlaceItemDialog()">
+		<section
+			class="door-dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Place item"
+			(click)="$event.stopPropagation()"
+		>
+			<h4 class="door-dialog-title">Place Item</h4>
+			@if (pendingItemPlacement(); as pendingPlacement) {
+				<p class="details-message" style="margin: 0 0 0.7rem">
+					row {{ pendingPlacement.row }}, col {{ pendingPlacement.column }}
+				</p>
+			}
+			@if (libItems().length > 0) {
+				<ul class="dungons-list">
+					@for (item of libItems(); track item.id) {
+						<li class="dungons-list-item">
+							<button type="button" class="dungons-list-button place-select-btn" (click)="placeItemAtPendingPlacement(item.id)">
+								@if (item.imageId) {
+									<img class="place-select-thumb" [src]="imageUrlById(item.imageId)" alt="" />
+								}
+								<span class="place-select-info">
+									<span>{{ item.name }}</span>
+									<small>{{ item.type }}@if (item.damage > 0) { | dmg {{ item.damage }}}@if (item.range > 0) { | range {{ item.range }}}@if (item.effectValue > 0) { | eff {{ item.effectValue }}}@if (item.armorSlot) { | {{ item.armorSlot }}}@if (item.effectOn) { | {{ item.effectOn }}}@if (item.isTwoHanded) { | 2H}</small>
+								</span>
+							</button>
+						</li>
+					}
+				</ul>
+			} @else {
+				<p class="details-message" style="margin-top: 0.6rem">No items available yet.</p>
+			}
+			<div class="form-actions">
+				<button type="button" class="cancel-button" (click)="closePlaceItemDialog()">Close</button>
+			</div>
+		</section>
+	</div>
+}
+
+@if (isPlacePotionDialogVisible()) {
+	<div class="door-dialog-backdrop" (click)="closePlacePotionDialog()">
+		<section
+			class="door-dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Place potion"
+			(click)="$event.stopPropagation()"
+		>
+			<h4 class="door-dialog-title">Place Potion</h4>
+			@if (pendingPotionPlacement(); as pendingPlacement) {
+				<p class="details-message" style="margin: 0 0 0.7rem">
+					row {{ pendingPlacement.row }}, col {{ pendingPlacement.column }}
+				</p>
+			}
+			@if (libPotions().length > 0) {
+				<ul class="dungons-list">
+					@for (potion of libPotions(); track potion.id) {
+						<li class="dungons-list-item">
+							<button type="button" class="dungons-list-button place-select-btn" (click)="placePotionAtPendingPlacement(potion.id)">
+								@if (potion.imageId) {
+									<img class="place-select-thumb" [src]="imageUrlById(potion.imageId)" alt="" />
+								}
+								<span class="place-select-info">
+									<span>{{ potion.name }}</span>
+									<small>{{ potion.effectTo }}@if (potion.effectAmount) { +{{ potion.effectAmount }}}@if (potion.lastFor > 0) { | {{ potion.lastFor }} turns}@if (potion.effectTo2) { | {{ potion.effectTo2 }}@if (potion.effectAmount2) { +{{ potion.effectAmount2 }}}}</small>
+								</span>
+							</button>
+						</li>
+					}
+				</ul>
+			} @else {
+				<p class="details-message" style="margin-top: 0.6rem">No potions available yet.</p>
+			}
+			<div class="form-actions">
+				<button type="button" class="cancel-button" (click)="closePlacePotionDialog()">Close</button>
+			</div>
+		</section>
+	</div>
+}
+
+@if (isPlaceSpellDialogVisible()) {
+	<div class="door-dialog-backdrop" (click)="closePlaceSpellDialog()">
+		<section
+			class="door-dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Place spell"
+			(click)="$event.stopPropagation()"
+		>
+			<h4 class="door-dialog-title">Place Spell</h4>
+			@if (pendingSpellPlacement(); as pendingPlacement) {
+				<p class="details-message" style="margin: 0 0 0.7rem">
+					row {{ pendingPlacement.row }}, col {{ pendingPlacement.column }}
+				</p>
+			}
+			@if (libUserSpells().length > 0) {
+				<ul class="dungons-list">
+					@for (spell of libUserSpells(); track spell.id) {
+						<li class="dungons-list-item">
+							<button type="button" class="dungons-list-button place-select-btn" (click)="placeSpellAtPendingPlacement(spell.id)">
+								@if (spell.imageId) {
+									<img class="place-select-thumb" [src]="imageUrlById(spell.imageId)" alt="" />
+								}
+								<span class="place-select-info">
+									<span>{{ spell.name }}</span>
+									<small>{{ spell.effectOn }}@if (spell.range > 0) { | range {{ spell.range }}}@if (spell.effectAmount > 0) { | eff {{ spell.effectAmount }}}@if (spell.lastFor > 0) { | {{ spell.lastFor }} turns}@if (spell.magicCost > 0) { | cost {{ spell.magicCost }}}</small>
+								</span>
+							</button>
+						</li>
+					}
+				</ul>
+			} @else {
+				<p class="details-message" style="margin-top: 0.6rem">No spells available yet.</p>
+			}
+			<div class="form-actions">
+				<button type="button" class="cancel-button" (click)="closePlaceSpellDialog()">Close</button>
 			</div>
 		</section>
 	</div>
@@ -1762,7 +2212,7 @@
 @if (isFloorTrapDialogVisible()) {
 	<div class="door-dialog-backdrop">
 		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Floor trap settings">
-			<h4 class="door-dialog-title">Floor Trap</h4>
+			<h4 class="door-dialog-title">{{ editingFloorTrapId() !== null ? 'Edit Trap' : 'Floor Trap' }}</h4>
 			<form class="door-settings-form" [formGroup]="floorTrapForm" (ngSubmit)="saveFloorTrap()">
 				<label class="form-label" for="floor-trap-name">Trap Name</label>
 				<input id="floor-trap-name" class="form-input" type="text" formControlName="trapName" />
@@ -1778,6 +2228,8 @@
 					<option value="HP">HP</option>
 					<option value="Stamina">Stamina</option>
 					<option value="Mind">Mind</option>
+					<option value="AE">AE (Action Economy)</option>
+					<option value="ROS">ROS (Range of Sight)</option>
 				</select>
 
 				<label class="form-label" for="floor-trap-curse-id">Curse ID (optional)</label>
@@ -1792,6 +2244,77 @@
 				<div class="form-actions">
 					<button type="submit" class="save-button">Save</button>
 					<button type="button" class="cancel-button" (click)="cancelFloorTrap()">Cancel</button>
+				</div>
+			</form>
+		</section>
+	</div>
+}
+@if (isObstacleDialogVisible()) {
+	<div class="door-dialog-backdrop">
+		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Obstacle settings">
+			<h4 class="door-dialog-title">{{ editingObstacleId() !== null ? 'Edit Obstacle' : 'Place Obstacle' }}</h4>
+			<form class="door-settings-form" [formGroup]="obstacleForm" (ngSubmit)="saveObstacle()">
+				<label class="form-label" for="obstacle-name">Name</label>
+				<input id="obstacle-name" class="form-input" type="text" formControlName="name" placeholder="e.g. Barrel, Crate, Statue" />
+
+				<label class="form-label" for="obstacle-note">Note (readable by player)</label>
+				<textarea id="obstacle-note" class="form-textarea" rows="3" formControlName="note" placeholder="Text the player sees when examining this obstacle"></textarea>
+
+				<label class="form-label" for="obstacle-image">Image (optional)</label>
+				<select id="obstacle-image" class="form-input" formControlName="imageId">
+					<option [value]="null">— None —</option>
+					@for (img of libUserImages(); track img.id) {
+						<option [value]="img.id">{{ img.name }}</option>
+					}
+				</select>
+
+				<label class="form-label" for="obstacle-height">Height % (100 = floor to ceiling)</label>
+				<input id="obstacle-height" class="form-input" type="number" min="1" max="100" formControlName="heightPercent" />
+
+				@if (obstacleForm.controls.heightPercent.value < 100) {
+					<label class="form-label" for="obstacle-height-anchor">Anchored from</label>
+					<select id="obstacle-height-anchor" class="form-input" formControlName="heightAnchor">
+						<option value="floor">Floor</option>
+						<option value="ceiling">Ceiling</option>
+					</select>
+				}
+
+				<label class="form-label" for="obstacle-width">Width % (100 = fills view)</label>
+				<input id="obstacle-width" class="form-input" type="number" min="1" max="100" formControlName="widthPercent" />
+
+				@if (obstacleForm.controls.widthPercent.value < 100) {
+					<label class="form-label" for="obstacle-width-anchor">Horizontal position</label>
+					<select id="obstacle-width-anchor" class="form-input" formControlName="widthAnchor">
+						<option value="center">Center</option>
+						<option value="east">East (right)</option>
+						<option value="west">West (left)</option>
+					</select>
+				}
+
+				<label class="form-label" for="obstacle-color">Color (fallback, no image)</label>
+				<input id="obstacle-color" class="form-input" type="color" formControlName="color" />
+
+				<label class="form-label" for="obstacle-indestructible">
+					<input id="obstacle-indestructible" type="checkbox" formControlName="isIndestructible" />
+					Cannot be destroyed
+				</label>
+
+				@if (!obstacleForm.controls.isIndestructible.value) {
+					<label class="form-label" for="obstacle-hp">Hit Points</label>
+					<input id="obstacle-hp" class="form-input" type="number" min="1" formControlName="hp" />
+				}
+
+				<label class="form-label" for="obstacle-item">Contains Item (optional)</label>
+				<select id="obstacle-item" class="form-input" formControlName="containsItemId">
+					<option [value]="null">— None —</option>
+					@for (item of libItems(); track item.id) {
+						<option [value]="item.id">{{ item.name }}</option>
+					}
+				</select>
+
+				<div class="form-actions">
+					<button type="submit" class="save-button">Save</button>
+					<button type="button" class="cancel-button" (click)="cancelObstacle()">Cancel</button>
 				</div>
 			</form>
 		</section>

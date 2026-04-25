@@ -21,6 +21,7 @@ export interface TresherRecord {
   curse1Id: number | null;
   curse2Id: number | null;
   isPublic: boolean;
+  isquest: boolean;
   createdAt: string;
   updatedAt: string;
   spReward: number;
@@ -50,6 +51,7 @@ export interface UpsertTresherPayload {
   curse1Id: number | null;
   curse2Id: number | null;
   isPublic: boolean;
+  isquest: boolean;
   spReward: number;
   imageId: number | null;
   soundId: number | null;
@@ -86,7 +88,8 @@ const SELECT_TRESHER_FIELDS = `
   soundid AS "soundId",
   potion1id AS "potion1Id",
   potion2id AS "potion2Id",
-  potion3id AS "potion3Id"
+  potion3id AS "potion3Id",
+  COALESCE(isquest, FALSE) AS isquest
 `;
 
 export const isAdminUserByGuid = async (userguid: string): Promise<boolean> => {
@@ -109,7 +112,7 @@ export const getTreshersByUserGuid = async (
     `SELECT ${SELECT_TRESHER_FIELDS}
      FROM treshers
      WHERE userguid = $1
-     ORDER BY updatedat DESC, id DESC`,
+     ORDER BY LOWER(name) ASC, id ASC`,
     [userguid]
   );
 
@@ -192,6 +195,7 @@ export const insertTresherForUser = async (
        curse1id,
        curse2id,
        ispublic,
+       isquest,
        spreward,
        imageid,
        soundid,
@@ -202,7 +206,7 @@ export const insertTresherForUser = async (
      )
      VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-       $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
+       $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
        NOW()
      )
      RETURNING ${SELECT_TRESHER_FIELDS}`,
@@ -226,6 +230,7 @@ export const insertTresherForUser = async (
       payload.curse1Id,
       payload.curse2Id,
       payload.isPublic,
+      payload.isquest,
       payload.spReward,
       payload.imageId,
       payload.soundId,
@@ -264,12 +269,13 @@ export const updateTresherForUser = async (
        curse1id = $18,
        curse2id = $19,
        ispublic = $20,
-       spreward = $21,
-       imageid = $22,
-       soundid = $23,
-       potion1id = $24,
-       potion2id = $25,
-       potion3id = $26,
+       isquest = $21,
+       spreward = $22,
+       imageid = $23,
+       soundid = $24,
+       potion1id = $25,
+       potion2id = $26,
+       potion3id = $27,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_TRESHER_FIELDS}`,
@@ -294,6 +300,7 @@ export const updateTresherForUser = async (
       payload.curse1Id,
       payload.curse2Id,
       payload.isPublic,
+      payload.isquest,
       payload.spReward,
       payload.imageId,
       payload.soundId,
@@ -304,4 +311,32 @@ export const updateTresherForUser = async (
   );
 
   return rows[0] ?? null;
+};
+
+/** Look up isquest treshers by IDs, sum their spReward, award SP to PC. */
+export const tavernTurnInQuestItems = async (
+  pcId: number,
+  userguid: string,
+  tresherIds: number[]
+): Promise<{ spAwarded: number; newSp: number } | null> => {
+  if (tresherIds.length === 0) return { spAwarded: 0, newSp: 0 };
+
+  // Fetch SP rewards for the given tresher IDs — only accept isquest=true ones
+  const placeholders = tresherIds.map((_, i) => `$${i + 1}`).join(', ');
+  const { rows: tresherRows } = await pool.query<{ id: number; spreward: number }>(
+    `SELECT id, COALESCE(spreward, 0) AS spreward FROM treshers WHERE id IN (${placeholders}) AND isquest = TRUE`,
+    tresherIds
+  );
+
+  const spAwarded = tresherRows.reduce((sum, r) => sum + r.spreward, 0);
+  if (spAwarded === 0) return { spAwarded: 0, newSp: 0 };
+
+  // Award SP to the PC
+  const { rows: pcRows } = await pool.query<{ sp: number }>(
+    `UPDATE pcs SET sp = COALESCE(sp, 0) + $1 WHERE id = $2 AND userguid = $3 RETURNING sp`,
+    [spAwarded, pcId, userguid]
+  );
+
+  if (!pcRows[0]) return null;
+  return { spAwarded, newSp: pcRows[0].sp };
 };

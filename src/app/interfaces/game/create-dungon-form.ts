@@ -9,4 +9,6 @@ export interface CreateDungonForm {
   spreward: FormControl<number>;
   ismaingame: FormControl<boolean>;
   issample: FormControl<boolean>;
+  resettablePerPc: FormControl<boolean>;
+  imageId: FormControl<number | null>;
 }

@@ -27,4 +27,13 @@ export interface Monster {
   magic: number;
   magicResistance: number;
   callsReinforcements: boolean;
+  toHitPlusNeeded: number;
+  npcGreeting: string | null;
+  npcInfo1: string | null;
+  npcInfo2: string | null;
+  npcInfo3: string | null;
+  npcOnlyAttackWhenAttacked: boolean;
+  npcGivesInfoAfterDamaged: boolean;
+  npcAttacksAfterInfo: boolean;
+  npcCanTrade: boolean;
 }

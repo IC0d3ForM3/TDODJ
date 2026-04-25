@@ -24,78 +24,258 @@
 	} @else if (publishedGames().length === 0) {
 		<p class="dashboard-message">No available games yet.</p>
 	} @else {
-		<ul class="dashboard-list">
-			@for (game of publishedGames(); track game.id) {
-				<li class="dashboard-list-item">
-					<button
-						type="button"
-						class="dashboard-game-button"
-						[class.dashboard-tab-button-active]="pendingStartGame()?.id === game.id"
-						[disabled]="isStartingGameId() === game.id"
-						(click)="selectGameForStart(game)"
-					>
-						<span class="dashboard-game-name">{{ game.name }}</span>
-						<small class="dashboard-game-meta">ID {{ game.id }} | {{ game.status }}</small>
-						@if (isStartingGameId() === game.id) {
-							<small class="dashboard-game-meta">Starting...</small>
-						}
-					</button>
-				</li>
-			}
-		</ul>
+		<div class="avail-games-columns">
 
-		@if (pendingStartGame()) {
-			<div class="dashboard-pc-picker" style="margin-top: 0.8rem">
-				<h4 class="dashboard-subtitle">Select a PC for "{{ pendingStartGame()!.name }}"</h4>
-
-				@if (isLoadingUserPcs()) {
-					<p class="dashboard-message">Loading your PCs...</p>
-				} @else if (userPcs().length === 0) {
-					<p class="dashboard-message">You have no PCs. Create one in the PC tab first.</p>
-				} @else {
-					<ul class="dashboard-list">
-						@for (pc of userPcs(); track pc.id) {
-							<li class="dashboard-list-item">
-								<button
-									type="button"
-									class="dashboard-game-button"
-									[class.dashboard-tab-button-active]="selectedStartPcId() === pc.id"
-									(click)="selectedStartPcId.set(pc.id)"
-								>
-									<span class="dashboard-game-name">{{ pc.name }}</span>
-									<small class="dashboard-game-meta">{{ pc.species }} {{ pc.type }} | Lvl {{ pc.level }} | HP {{ pc.currentHP }}/{{ pc.maxHP }}</small>
-								</button>
-							</li>
-						}
-					</ul>
-
-					<div class="tresher-form-actions" style="margin-top: 0.6rem">
-						<button
-							type="button"
-							class="dashboard-action-button"
-							[disabled]="!selectedStartPcId() || isStartingGameId() !== null"
-							(click)="confirmStartGame()"
-						>
-							@if (isStartingGameId() !== null) {
-								Starting...
-							} @else {
-								Start Game
+			<!-- Left column: dungeon list -->
+			<div class="avail-games-col">
+				<h4 class="dashboard-subtitle">Pick a Dungeon</h4>
+				<ul class="dashboard-list">
+					@for (game of publishedGames(); track game.id) {
+						<li class="dashboard-list-item" [class.avail-item-selected]="pendingStartGame()?.id === game.id">
+							<button
+								type="button"
+								class="dashboard-game-button"
+								[class.dashboard-game-button-maingame]="game.ismaingame"
+								[disabled]="isStartingGameId() === game.id"
+								(click)="selectGameForStart(game)"
+							>
+								<span class="dashboard-game-name">{{ game.name }}</span>
+								@if (game.ismaingame) {
+									<span class="dashboard-tag dashboard-tag-maingame">Main Game</span>
+								}
+								<small class="dashboard-game-meta">{{ game.status }}</small>
+								@if (isStartingGameId() === game.id) {
+									<small class="dashboard-game-meta">Starting...</small>
+								}
+							</button>
+							@if (pendingStartGame()?.id === game.id && game.imagePath) {
+								<img class="avail-dungon-img" [src]="resolveImageUrl(game.imagePath)" [alt]="game.name" />
 							}
+						</li>
+					}
+				</ul>
+			</div>
+			<div class="avail-games-col">
+			<h4 class="dashboard-subtitle">
+				@if (pendingStartGame()?.ismaingame && mainGamePcChoice() === 'create') {
+					Create Your Character
+				} @else if (pendingStartGame()?.ismaingame && mainGamePcChoice() === 'existing') {
+					Choose Your Character
+				} @else {
+					Pick a PC
+				}
+			</h4>
+
+			@if (isLoadingUserPcs()) {
+				<p class="dashboard-message">Loading your PCs...</p>
+			} @else if (!pendingStartGame()) {
+				<p class="dashboard-message avail-pc-hint">← Select a dungeon first.</p>
+			} @else if (pendingStartGame()!.ismaingame) {
+
+				<!-- Main Game flow: warning + choice -->
+				<div class="maingame-warning">
+					<p>⚠️ <strong>This is a Main Game dungeon.</strong> Characters you bring here can only be used in Main Game dungeons — they won't be available for other adventures. Once you begin, there's no going back to normal jobs.</p>
+					<p>Every legend starts somewhere. This is yours.</p>
+				</div>
+
+				@if (!mainGamePcChoice()) {
+					<div class="maingame-choice">
+						<button type="button" class="maingame-choice-btn" (click)="chooseMainGameOption('create')">
+							⚔️ Create a New Character
 						</button>
 						<button
 							type="button"
-							class="dashboard-action-button dashboard-action-button-muted"
-							(click)="cancelStartGame()"
+							class="maingame-choice-btn maingame-choice-btn-secondary"
+							(click)="chooseMainGameOption('existing')"
+							[disabled]="pcsForSelectedGame().length === 0"
 						>
-							Cancel
+							🗡️ Use an Existing Character
+							@if (pcsForSelectedGame().length === 0) {
+								<small>(None available)</small>
+							}
 						</button>
 					</div>
 				}
-			</div>
-		}
+
+				@if (mainGamePcChoice() === 'create') {
+					<form class="monster-form maingame-pc-form" [formGroup]="userPcForm" (ngSubmit)="savePc()">
+						<div class="pc-id-row">
+							<label class="tresher-field pc-name-field">
+								<span>PC Name</span>
+								<input type="text" formControlName="name" placeholder="Your character's name" />
+							</label>
+							<label class="tresher-field pc-select-sm">
+								<span>Species</span>
+								<select formControlName="species" (change)="onPcSpeciesChanged()">
+									@for (species of pcSpeciesOptions; track species) {
+										<option [value]="species">{{ species }}</option>
+									}
+								</select>
+							</label>
+							<label class="tresher-field pc-select-sm">
+								<span>Type</span>
+								<select formControlName="type" (change)="onPcTypeChanged()">
+									@for (type of pcTypeOptions; track type) {
+										<option [value]="type">{{ type }}</option>
+									}
+								</select>
+							</label>
+						</div>
+						<div class="pc-stat-row">
+							<label class="tresher-field pc-stat-field">
+								<span>AE</span>
+								<input class="pc-stat-num" type="number" formControlName="actionEconomy" readonly />
+							</label>
+							<label class="tresher-field pc-stat-field">
+								<span>Strength</span>
+								<input class="pc-stat-num" type="number" formControlName="strength" readonly />
+							</label>
+							<label class="tresher-field pc-stat-field">
+								<span>Stamina</span>
+								<input class="pc-stat-num" type="number" formControlName="stamina" readonly />
+							</label>
+							<label class="tresher-field pc-stat-field">
+								<span>Mind</span>
+								<input class="pc-stat-num" type="number" formControlName="mind" readonly />
+							</label>
+							<label class="tresher-field pc-stat-field">
+								<span>Magic Power</span>
+								<input class="pc-stat-num" type="number" formControlName="magicPower" readonly />
+							</label>
+							<label class="tresher-field pc-stat-field">
+								<span>Max HP</span>
+								<input class="pc-stat-num" type="number" formControlName="maxHP" readonly />
+							</label>
+							<button type="button" class="pc-reroll-btn" (click)="rerollPcStats()" title="Roll your character stats">Roll Stats ↻</button>
+						</div>
+						<label class="tresher-field pc-image-field" style="margin-top:0.6rem">
+							<span>Character Image <span style="font-weight:400;opacity:0.7">(optional)</span></span>
+							<div style="display:flex;gap:0.4rem;align-items:center">
+								<select formControlName="imageId">
+									<option [ngValue]="null">No Image</option>
+									@for (image of allMonsterImageOptions(); track image.id) {
+										<option [ngValue]="image.id">{{ image.name }}</option>
+									}
+								</select>
+								<app-upload-popup mediaType="image" (mediaUploaded)="onPcImageUploaded($event)" />
+							</div>
+						</label>
+						@if (selectedPcImageUrl()) {
+							<div class="monster-selected-image-wrap">
+								<img class="dashboard-image-thumb monster-selected-image" [src]="selectedPcImageUrl()" [alt]="selectedPcImageName() || 'Character image'" />
+							</div>
+						}
+						@if (userPcSaveMessage()) {
+							<p class="dashboard-message">{{ userPcSaveMessage() }}</p>
+						}
+						<div class="tresher-form-actions" style="margin-top: 12px;">
+							<button
+								type="submit"
+								class="dashboard-action-button"
+								[disabled]="isSavingUserPc() || !pcStatsRolled() || isStartingGameId() !== null"
+							>
+								@if (isSavingUserPc() || isStartingGameId() !== null) {
+									Creating &amp; Starting...
+								} @else {
+									Create &amp; Begin Adventure
+								}
+							</button>
+							<button
+								type="button"
+								class="dashboard-action-button dashboard-action-button-muted"
+								(click)="mainGamePcChoice.set(null)"
+							>
+								← Back
+							</button>
+						</div>
+					</form>
+				}
+
+				@if (mainGamePcChoice() === 'existing') {
+					@if (pcsForSelectedGame().length === 0) {
+						<p class="dashboard-message">You have no eligible Main Game characters yet. Create a new one to begin your adventure.</p>
+					} @else {
+						<ul class="dashboard-list">
+							@for (pc of pcsForSelectedGame(); track pc.id) {
+								<li class="dashboard-list-item" [class.avail-item-selected]="selectedStartPcId() === pc.id">
+									<button
+										type="button"
+										class="dashboard-game-button"
+										(click)="selectedStartPcId.set(pc.id)"
+									>
+										<span class="dashboard-game-name">{{ pc.name }}</span>
+										<small class="dashboard-game-meta">{{ pc.species }} {{ pc.type }} | Lvl {{ pc.level }} | HP {{ pc.currentHP }}/{{ pc.maxHP }}</small>
+									</button>
+									@if (selectedStartPcId() === pc.id && selectedPcForGameImageUrl()) {
+										<img class="avail-dungon-img" [src]="selectedPcForGameImageUrl()" alt="PC image" />
+									}
+								</li>
+							}
+						</ul>
+					}
+					<button
+						type="button"
+						class="dashboard-action-button dashboard-action-button-muted"
+						style="margin-top: 8px;"
+						(click)="mainGamePcChoice.set(null)"
+					>
+						← Back
+					</button>
+				}
+
+			} @else if (pcsForSelectedGame().length === 0) {
+				<p class="dashboard-message">No eligible PCs. Create one in the PC tab first.</p>
+			} @else {
+				<ul class="dashboard-list">
+					@for (pc of pcsForSelectedGame(); track pc.id) {
+						<li class="dashboard-list-item" [class.avail-item-selected]="selectedStartPcId() === pc.id">
+							<button
+								type="button"
+								class="dashboard-game-button"
+								(click)="selectedStartPcId.set(pc.id)"
+							>
+								<span class="dashboard-game-name">{{ pc.name }}</span>
+								<small class="dashboard-game-meta">{{ pc.species }} {{ pc.type }} | Lvl {{ pc.level }} | HP {{ pc.currentHP }}/{{ pc.maxHP }}</small>
+							</button>
+							@if (selectedStartPcId() === pc.id && selectedPcForGameImageUrl()) {
+								<img class="avail-dungon-img" [src]="selectedPcForGameImageUrl()" alt="PC image" />
+							}
+						</li>
+					}
+				</ul>
+			}
+		</div>
+	</div>
+
+	<!-- Start / Cancel actions -->
+	@if (pendingStartGame()) {
+		<div class="tresher-form-actions avail-actions">
+			@if (!(pendingStartGame()!.ismaingame && mainGamePcChoice() === 'create')) {
+				<button
+					type="button"
+					class="dashboard-action-button"
+					[disabled]="!selectedStartPcId() || isStartingGameId() !== null"
+					(click)="confirmStartGame()"
+				>
+					@if (isStartingGameId() !== null) {
+						Starting...
+					} @else {
+						Start Game
+					}
+				</button>
+			}
+			<button
+				type="button"
+				class="dashboard-action-button dashboard-action-button-muted"
+				(click)="cancelStartGame()"
+			>
+				Cancel
+			</button>
+		</div>
+	}
 
 		@if (startGameMessage()) {
-			<p class="dashboard-message" style="margin-top: 0.6rem">{{ startGameMessage() }}</p>
+			<p class="dashboard-message avail-actions">{{ startGameMessage() }}</p>
 		}
 	}
 </section>
@@ -251,8 +431,70 @@
 	@if (!isLoggedIn()) {
 		<p class="dashboard-message">Log in to add or edit your PCs.</p>
 	} @else {
-		<form class="monster-form" [formGroup]="userPcForm" (ngSubmit)="savePc()">
-			<!-- Identity row -->
+		<div class="pc-two-panel">
+
+			<!-- LEFT: library list -->
+			<div class="monster-list-wrap pc-list-panel">
+				<h4 class="dashboard-subtitle pc-panel-title">PC's LIBRARY</h4>
+
+				@if (isLoadingUserPcs()) {
+					<p class="dashboard-message">Loading your PCs...</p>
+				} @else if (userPcsError()) {
+					<p class="dashboard-message dashboard-message-error">{{ userPcsError() }}</p>
+				} @else if (userPcs().length === 0) {
+					<p class="dashboard-message">No PCs yet. Add your first one above.</p>
+				} @else {
+					<ul class="dashboard-list">
+						@for (item of userPcs(); track item.id) {
+							<li class="dashboard-list-item pc-list-item">
+								<!-- Collapsed header row — always visible -->
+								<button type="button" class="pc-accordion-header" (click)="togglePcExpanded(item.id)">
+									<span class="pc-item-name">{{ item.name }}</span>
+									<span class="pc-item-meta">{{ item.species }} · {{ item.type }} · Lvl {{ item.level }}</span>
+									<span class="pc-accordion-chevron">{{ expandedPcId() === item.id ? '▲' : '▼' }}</span>
+								</button>
+
+								<!-- Expanded body -->
+								@if (expandedPcId() === item.id) {
+									<div class="pc-accordion-body">
+										@if (pcImageUrlForPc(item)) {
+											<img
+												class="dashboard-image-thumb monster-inline-image"
+												[src]="pcImageUrlForPc(item)"
+												[alt]="item.name"
+											/>
+										}
+										<p class="tresher-description pc-item-desc">HP {{ item.currentHP }}/{{ item.maxHP }} | AC {{ item.ac }} | AE {{ item.actionEconomy }} | NOA {{ item.numberOfAttacks }} | SP {{ item.sp }} | MP {{ item.magicPower }} | Mind {{ item.mind }} | Stamina {{ item.stamina }} | POV {{ item.rangeOfView }}</p>
+										<p class="tresher-description pc-item-desc">Treshers: {{ pcTresherSummaryForPc(item) }}</p>
+										<div class="pc-accordion-actions">
+											<button type="button" class="dashboard-action-button dashboard-action-button-small pc-edit-btn" (click)="editPc(item)">
+												Edit
+											</button>
+											<button
+												type="button"
+												class="dashboard-action-button dashboard-action-button-small"
+												(click)="upgradeNoa(item.id)"
+												[disabled]="isUpgradingNoa() === item.id || item.sp < 5"
+												title="Spend 5 SP to gain +1 NOA"
+											>
+												+1 NOA (5 SP)
+											</button>
+										</div>
+									</div>
+								}
+							</li>
+						}
+					</ul>
+				}
+				@if (noaUpgradeMessage()) {
+					<p class="dashboard-message">{{ noaUpgradeMessage() }}</p>
+				}
+			</div>
+
+			<!-- RIGHT: create / edit form -->
+			<div class="pc-form-wrap">
+			<form class="monster-form" [formGroup]="userPcForm" (ngSubmit)="savePc()">
+				<!-- Identity row -->
 			<div class="pc-id-row">
 				<label class="tresher-field pc-name-field">
 					<span>PC Name</span>
@@ -567,66 +809,14 @@
 					New Blank
 				</button>
 			</div>
-		</form>
+			</form>
 
-		@if (userPcSaveMessage()) {
-			<p class="dashboard-message" style="margin-top: 0.6rem">{{ userPcSaveMessage() }}</p>
-		}
-
-		<div class="monster-list-wrap">
-			<h4 class="dashboard-subtitle">Your PCs</h4>
-
-			@if (isLoadingUserPcs()) {
-				<p class="dashboard-message">Loading your PCs...</p>
-			} @else if (userPcsError()) {
-				<p class="dashboard-message dashboard-message-error">{{ userPcsError() }}</p>
-			} @else if (userPcs().length === 0) {
-				<p class="dashboard-message">No PCs yet. Add your first one above.</p>
-			} @else {
-				<ul class="dashboard-list">
-					@for (item of userPcs(); track item.id) {
-						<li class="dashboard-list-item">
-							<div class="tresher-list-row">
-								<div>
-									@if (pcImageUrlForPc(item)) {
-										<img
-											class="dashboard-image-thumb monster-inline-image"
-											[src]="pcImageUrlForPc(item)"
-											[alt]="item.name"
-										/>
-									}
-
-									<p class="dashboard-game-name">{{ item.name }}</p>
-									<small class="dashboard-game-meta">
-										ID {{ item.id }} | {{ item.species }} | {{ item.type }} | Lvl {{ item.level }}
-									</small>
-									<p class="tresher-description">
-										HP {{ item.currentHP }}/{{ item.maxHP }} | AC {{ item.ac }} | AE {{ item.actionEconomy }} | NOA {{ item.numberOfAttacks }} | SP {{ item.sp }} | MP {{ item.magicPower }} | Mind {{ item.mind }} | Stamina {{ item.stamina }} | POV {{ item.rangeOfView }}
-									</p>
-									<p class="tresher-description">Treshers: {{ pcTresherSummaryForPc(item) }}</p>
-								</div>
-
-								<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editPc(item)">
-									Edit
-								</button>
-								<button
-									type="button"
-									class="dashboard-action-button dashboard-action-button-small"
-									(click)="upgradeNoa(item.id)"
-									[disabled]="isUpgradingNoa() === item.id || item.sp < 5"
-									title="Spend 5 SP to gain +1 NOA"
-								>
-									+1 NOA (5 SP)
-								</button>
-							</div>
-						</li>
-					}
-				</ul>
+			@if (userPcSaveMessage()) {
+				<p class="dashboard-message" style="margin-top: 0.6rem">{{ userPcSaveMessage() }}</p>
 			}
-			@if (noaUpgradeMessage()) {
-				<p class="dashboard-message">{{ noaUpgradeMessage() }}</p>
-			}
-		</div>
+			</div><!-- /pc-form-wrap -->
+
+		</div><!-- /pc-two-panel -->
 	}
 </section>
 }

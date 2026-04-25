@@ -15,6 +15,7 @@ export interface SpellRecord {
   sp: number;
   successTestValue: number;
   magicCost: number;
+  costToLearn: number;
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;
@@ -35,6 +36,7 @@ export interface UpsertSpellPayload {
   sp: number;
   successTestValue: number;
   magicCost: number;
+  costToLearn: number;
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;
@@ -55,6 +57,7 @@ const SELECT_SPELL_FIELDS = `
   COALESCE(sp, 0) AS sp,
   COALESCE(successtestvalue, 0) AS "successTestValue",
   COALESCE(magiccost, 1) AS "magicCost",
+  COALESCE(costtolearn, 0) AS "costToLearn",
   imageid AS "imageId",
   soundid AS "soundId",
   ispublic AS "isPublic",
@@ -72,6 +75,17 @@ export const fetchSpellsByIds = async (ids: number[]): Promise<SpellRecord[]> =>
   return rows;
 };
 
+/** Look up public spells by exact name and return their id + name. */
+export const getPublicSpellsByNames = async (names: string[]): Promise<Array<{ id: number; name: string }>> => {
+  if (names.length === 0) return [];
+  const placeholders = names.map((_, i) => `$${i + 1}`).join(', ');
+  const { rows } = await pool.query<{ id: number; name: string }>(
+    `SELECT id, name FROM spells WHERE ispublic = TRUE AND name IN (${placeholders})`,
+    names
+  );
+  return rows;
+};
+
 export const isAdminUserByGuid = async (userguid: string): Promise<boolean> => {
   const { rows } = await pool.query<{ isadmin: boolean }>(
     'SELECT isadmin FROM users WHERE key = $1',
@@ -85,7 +99,7 @@ export const getSpellsByUserGuid = async (userguid: string): Promise<SpellRecord
     `SELECT ${SELECT_SPELL_FIELDS}
      FROM spells
      WHERE userguid = $1
-     ORDER BY updatedat DESC, id DESC`,
+     ORDER BY LOWER(name) ASC, id ASC`,
     [userguid]
   );
   return rows;
@@ -98,8 +112,8 @@ export const insertSpellForUser = async (
   const { rows } = await pool.query<SpellRecord>(
     `INSERT INTO spells
        (userguid, name, description, range, effecton, effecton2, lastfor, damage,
-        effectamount2, effectto, value, sp, successtestvalue, magiccost, imageid, soundid, ispublic)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        effectamount2, effectto, value, sp, successtestvalue, magiccost, costtolearn, imageid, soundid, ispublic)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      RETURNING ${SELECT_SPELL_FIELDS}`,
     [
       userguid,
@@ -116,6 +130,7 @@ export const insertSpellForUser = async (
       payload.sp,
       payload.successTestValue,
       payload.magicCost,
+      payload.costToLearn,
       payload.imageId,
       payload.soundId,
       payload.isPublic,
@@ -144,9 +159,10 @@ export const updateSpellForUser = async (
        sp = $12,
        successtestvalue = $13,
        magiccost = $14,
-       imageid = $15,
-       soundid = $16,
-       ispublic = $17,
+       costtolearn = $15,
+       imageid = $16,
+       soundid = $17,
+       ispublic = $18,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_SPELL_FIELDS}`,
@@ -165,6 +181,7 @@ export const updateSpellForUser = async (
       payload.sp,
       payload.successTestValue,
       payload.magicCost,
+      payload.costToLearn,
       payload.imageId,
       payload.soundId,
       payload.isPublic,

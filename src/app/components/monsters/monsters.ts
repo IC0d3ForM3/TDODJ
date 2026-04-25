@@ -86,6 +86,15 @@ export class Monsters implements OnInit {
     attacks: new FormArray<MonsterAttackFormGroup>([this.createMonsterAttackForm()]),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
     callsReinforcements: new FormControl<boolean>(false, { nonNullable: true }),
+    toHitPlusNeeded: new FormControl<number>(0, { nonNullable: true }),
+    npcGreeting: new FormControl<string>('', { nonNullable: true }),
+    npcInfo1: new FormControl<string>('', { nonNullable: true }),
+    npcInfo2: new FormControl<string>('', { nonNullable: true }),
+    npcInfo3: new FormControl<string>('', { nonNullable: true }),
+    npcOnlyAttackWhenAttacked: new FormControl<boolean>(false, { nonNullable: true }),
+    npcGivesInfoAfterDamaged: new FormControl<boolean>(false, { nonNullable: true }),
+    npcAttacksAfterInfo: new FormControl<boolean>(false, { nonNullable: true }),
+    npcCanTrade: new FormControl<boolean>(false, { nonNullable: true }),
   });
 
   ngOnInit(): void {
@@ -235,6 +244,15 @@ export class Monsters implements OnInit {
     c.spReward.setValue(this.normalizeNumber(item.spReward, 0));
     c.isPublic.setValue(item.isPublic);
     c.callsReinforcements.setValue(item.callsReinforcements === true);
+    c.toHitPlusNeeded.setValue(this.normalizeNumber(item.toHitPlusNeeded, 0));
+    c.npcGreeting.setValue(item.npcGreeting ?? '');
+    c.npcInfo1.setValue(item.npcInfo1 ?? '');
+    c.npcInfo2.setValue(item.npcInfo2 ?? '');
+    c.npcInfo3.setValue(item.npcInfo3 ?? '');
+    c.npcOnlyAttackWhenAttacked.setValue(item.npcOnlyAttackWhenAttacked === true);
+    c.npcGivesInfoAfterDamaged.setValue(item.npcGivesInfoAfterDamaged === true);
+    c.npcAttacksAfterInfo.setValue(item.npcAttacksAfterInfo === true);
+    c.npcCanTrade.setValue(item.npcCanTrade === true);
   }
 
   cancelEdit(): void {
@@ -336,6 +354,15 @@ export class Monsters implements OnInit {
       attacks,
       isPublic: this.isAdminUser() ? c.isPublic.value === true : false,
       callsReinforcements: c.callsReinforcements.value === true,
+      toHitPlusNeeded: Math.max(0, this.normalizeNumber(c.toHitPlusNeeded.value, 0)),
+      npcGreeting: c.npcGreeting.value.trim() || null,
+      npcInfo1: c.npcInfo1.value.trim() || null,
+      npcInfo2: c.npcInfo2.value.trim() || null,
+      npcInfo3: c.npcInfo3.value.trim() || null,
+      npcOnlyAttackWhenAttacked: c.npcOnlyAttackWhenAttacked.value === true,
+      npcGivesInfoAfterDamaged: c.npcGivesInfoAfterDamaged.value === true,
+      npcAttacksAfterInfo: c.npcAttacksAfterInfo.value === true,
+      npcCanTrade: c.npcCanTrade.value === true,
     };
   }
 
@@ -358,6 +385,15 @@ export class Monsters implements OnInit {
     c.magic.setValue(0);
     c.spReward.setValue(0);
     c.isPublic.setValue(false);
+    c.toHitPlusNeeded.setValue(0);
+    c.npcGreeting.setValue('');
+    c.npcInfo1.setValue('');
+    c.npcInfo2.setValue('');
+    c.npcInfo3.setValue('');
+    c.npcOnlyAttackWhenAttacked.setValue(false);
+    c.npcGivesInfoAfterDamaged.setValue(false);
+    c.npcAttacksAfterInfo.setValue(false);
+    c.npcCanTrade.setValue(false);
   }
 
   private replaceTresherForms(tresherIds: number[]): void {

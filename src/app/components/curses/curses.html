@@ -1,6 +1,6 @@
 <div class="cu-section" aria-label="My curses">
 	<div class="cu-section-header">
-		<h3 class="cu-title">My Curses</h3>
+		<h3 class="cu-title">CURSES LIBRARY</h3>
 		<button type="button" class="cu-toggle-btn" (click)="toggleSectionVisibility()">
 			{{ isCurseSectionVisible() ? 'Hide' : 'Show' }}
 		</button>
@@ -15,7 +15,6 @@
 
 			<!-- 1/3 LEFT: list -->
 			<aside class="cu-list-panel">
-				<h4 class="cu-panel-title">Your Curse Library</h4>
 				@if (isLoading()) {
 					<p class="cu-message">Loading your curses...</p>
 				} @else if (error()) {

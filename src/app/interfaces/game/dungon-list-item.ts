@@ -6,4 +6,5 @@ export interface DungonListItem {
   status: DungonStatus;
   ismaingame: boolean;
   issample: boolean;
+  imagePath?: string | null;
 }

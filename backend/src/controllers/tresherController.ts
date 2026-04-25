@@ -32,6 +32,7 @@ interface TresherWriteInput {
   curse2Id?: unknown;
   isPublic?: unknown;
   ispublic?: unknown;
+  isquest?: unknown;
   spReward?: unknown;
   spreward?: unknown;
   imageId?: unknown;
@@ -159,6 +160,7 @@ const normalizeTresherPayload = (value: unknown): UpsertTresherPayload | null =>
     curse1Id: normalizeNullableNumber(input.curse1Id),
     curse2Id: normalizeNullableNumber(input.curse2Id),
     isPublic: normalizeBoolean(input.isPublic ?? input.ispublic),
+    isquest: normalizeBoolean(input.isquest),
     spReward: Math.max(0, normalizeNumber(input.spReward ?? input.spreward, 0)),
     imageId: normalizeNullableNumber(input.imageId),
     soundId: normalizeNullableNumber(input.soundId),

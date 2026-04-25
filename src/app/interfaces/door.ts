@@ -1,6 +1,12 @@
 import { Key } from "./key";
 import { Trap } from "./game/trap";
 
+export interface DoorItemRequirement {
+    itemId: number;
+    itemName: string;
+    consume: boolean;
+}
+
 export interface Door {
     id: number;
     name: string;
@@ -16,4 +22,5 @@ export interface Door {
     toFind: number;
     isFound: boolean;
     spReward: number | null;
+    itemRequirement: DoorItemRequirement | null;
 }

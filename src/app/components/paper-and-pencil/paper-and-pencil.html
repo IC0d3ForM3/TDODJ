@@ -1,0 +1,371 @@
+<section class="pnp-page">
+  <header class="pnp-hero">
+    <h2>TDODJ with Paper &amp; Pencil</h2>
+    <p>
+      Take the adventure away from the screen! Everything in the digital game translates directly
+      to a tabletop experience — grab some dice, a sheet of grid paper, and a pencil.
+    </p>
+  </header>
+
+  <!-- ── What You Need ────────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>What You Need</h3>
+    <ul>
+      <li><strong>Dice:</strong> 1d4, 1d6, 1d8, 1d10, 1d12 (a full polyhedral set works great)</li>
+      <li><strong>Grid paper</strong> — each square is one dungeon square</li>
+      <li><strong>Pencils</strong> and an eraser (HP and AE change a lot)</li>
+      <li><strong>One character sheet per player</strong> — see the template at the bottom of this page</li>
+      <li><strong>Index cards</strong> (optional) — great for tracking monsters and items</li>
+    </ul>
+  </section>
+
+  <!-- ── Drawing the Dungeon ──────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Drawing the Dungeon</h3>
+    <p>
+      One player acts as the <strong>Dungeon Keeper</strong> (DK). The DK draws the map on grid
+      paper — walls are solid lines between squares, doors are breaks in the wall, and empty
+      squares are the rooms and corridors.
+    </p>
+    <ul>
+      <li>Each grid square is one movement square (costs 1 AE to enter; diagonal costs 2 AE)</li>
+      <li>Draw walls as solid lines on the <em>edges</em> between squares</li>
+      <li>Mark doors with a small symbol: <strong>□ closed</strong>, <strong>Δ locked</strong>, <strong>? hidden</strong></li>
+      <li>Mark treshers with a circle <strong>○</strong></li>
+      <li>Mark monster starting positions with a triangle <strong>▲</strong></li>
+      <li>Mark traps with an X <strong>✕</strong> (only the DK knows where they are)</li>
+      <li>Mark the exit square with a star <strong>★</strong></li>
+    </ul>
+  </section>
+
+  <!-- ── Creating a PC ────────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Creating a PC</h3>
+    <p>Each player fills out a character sheet. Follow these steps:</p>
+    <ol>
+      <li>Choose a <strong>Name</strong></li>
+      <li>Choose a <strong>Species</strong> — this sets your Range of Sight and Action Economy</li>
+      <li>Choose a <strong>Class</strong> — this sets your HP, AC bonus, and Magic Power</li>
+      <li>Roll <strong>Strength</strong> using the formula for your species</li>
+      <li>Roll or assign <strong>Stamina</strong> (1d6), <strong>Mind</strong> (1d6)</li>
+      <li>Calculate <strong>Max HP</strong> and <strong>starting AC</strong> using your class</li>
+    </ol>
+
+    <p class="pnp-subsection-title">Species</p>
+    <table class="pnp-table">
+      <thead>
+        <tr><th>Species</th><th>Range of Sight</th><th>AE / Turn</th><th>Strength Formula</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Human</td><td>5</td><td>5</td><td>d12 ÷ 2 + 1</td></tr>
+        <tr><td>Elph</td><td>7</td><td>5</td><td>d12 ÷ 2</td></tr>
+        <tr><td>DwarPh</td><td>7</td><td>4</td><td>d12 ÷ 2 + 4</td></tr>
+        <tr><td>Shorties</td><td>5</td><td>4</td><td>d12 ÷ 4 + 2</td></tr>
+      </tbody>
+    </table>
+
+    <p class="pnp-subsection-title">Class</p>
+    <table class="pnp-table">
+      <thead>
+        <tr><th>Class</th><th>Max HP</th><th>AC Bonus</th><th>Magic Power</th><th>Special</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Fighter</td><td>d12 + 4</td><td>+4</td><td>0</td><td>Boost Attack ability</td></tr>
+        <tr><td>Thieph</td><td>d12 + 2</td><td>+2</td><td>2</td><td>Search twice per turn</td></tr>
+        <tr><td>Mage</td><td>d12 ÷ 2 + 2</td><td>+2</td><td>8+</td><td>Powerful spells</td></tr>
+        <tr><td>Healer</td><td>d12 ÷ 2 + 2</td><td>+2</td><td>6+</td><td>Recovery focus</td></tr>
+      </tbody>
+    </table>
+
+    <p class="pnp-subsection-title">Starting Stats</p>
+    <ul>
+      <li><strong>Max HP</strong> — roll based on class (above); write it down</li>
+      <li><strong>Current HP</strong> — starts equal to Max HP</li>
+      <li><strong>AC</strong> — starts at 10 + class AC bonus</li>
+      <li><strong>AE</strong> — 5 (Human/Elph) or 4 (DwarPh/Shorties)</li>
+      <li><strong>Stamina</strong> — roll 1d6; adds to attack rolls and AC when defending</li>
+      <li><strong>Mind</strong> — roll 1d6; used for spells, traps, lock-picking, and magic resistance (Mind ÷ 2, rounded down)</li>
+      <li><strong>Magic Power (MP)</strong> — from class; used to fuel spells</li>
+      <li><strong>NOA</strong> — Number of Attacks per turn; starts at 1</li>
+      <li><strong>NOD</strong> — Number of Defends per turn; starts at 1</li>
+      <li><strong>SP</strong> — Skill Points; starts at 0; awarded for kills and dungeon completion</li>
+    </ul>
+  </section>
+
+  <!-- ── Turn Structure ────────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Turn Structure</h3>
+    <p>Play proceeds in turns. The Dungeon Keeper handles all monsters.</p>
+    <ol>
+      <li><strong>Player Turn</strong> — each PC gets their full AE; spend AE on actions below</li>
+      <li><strong>Monster Turn</strong> — the DK moves and attacks with each monster (closest first)</li>
+    </ol>
+    <p class="pnp-subsection-title">Player Actions (each costs 1 AE unless noted)</p>
+    <table class="pnp-table">
+      <thead>
+        <tr><th>Action</th><th>AE Cost</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Move (forward / back / turn)</td><td>1</td><td>Diagonal costs 2</td></tr>
+        <tr><td>Attack</td><td>1</td><td>Up to NOA times per turn</td></tr>
+        <tr><td>Defend</td><td>1</td><td>+2 AC until your next turn; up to NOD times</td></tr>
+        <tr><td>Search</td><td>1</td><td>Thieph / Shorties may do this twice per turn</td></tr>
+        <tr><td>Pick Lock / Disarm Trap</td><td>1</td><td>Mind + d12 vs DC</td></tr>
+        <tr><td>Open door</td><td>1</td><td>Free if already unlocked and adjacent</td></tr>
+        <tr><td>Take loot</td><td>1</td><td>Pick up items on your square</td></tr>
+        <tr><td>Drink potion</td><td>1</td><td>Only on your turn</td></tr>
+        <tr><td>Cast spell</td><td>Spell cost</td><td>Minimum 1 AE; target must be in range</td></tr>
+        <tr><td>Boost Attack (Fighter)</td><td>All remaining AE</td><td>First action only; see below</td></tr>
+        <tr><td>End Turn</td><td>—</td><td>Voluntarily end before AE runs out</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ── Movement ──────────────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Movement</h3>
+    <ul>
+      <li>Move one square in any orthogonal direction for <strong>1 AE</strong></li>
+      <li>Move diagonally for <strong>2 AE</strong></li>
+      <li>You cannot pass through walls or closed doors</li>
+      <li>You can enter a square occupied by a monster only to push through (DK discretion)</li>
+      <li>On the map, track your facing direction — you can only attack the monster you are facing (or within weapon range)</li>
+    </ul>
+  </section>
+
+  <!-- ── Combat ────────────────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Combat</h3>
+    <p class="pnp-subsection-title">Attacking a Monster</p>
+    <ol>
+      <li>Roll <strong>d12 + weapon to-hit bonus + Stamina</strong></li>
+      <li>If the result ≥ the monster's <strong>AC</strong>, the attack hits</li>
+      <li>On a hit, roll <strong>weapon damage die + Strength</strong> and subtract from the monster's HP (minimum 1)</li>
+    </ol>
+    <table class="pnp-table">
+      <thead>
+        <tr><th>Weapon Type</th><th>Damage Die</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Unarmed punch</td><td>—</td><td>1 + Strength ÷ 2 (min 1); −1 to hit</td></tr>
+        <tr><td>Light weapon</td><td>d4</td><td>Fast, low damage</td></tr>
+        <tr><td>Standard weapon</td><td>d6</td><td>Balanced</td></tr>
+        <tr><td>Heavy weapon</td><td>d8</td><td>Hard-hitting but may be two-handed</td></tr>
+        <tr><td>Great weapon</td><td>d12</td><td>Two-handed; highest damage</td></tr>
+      </tbody>
+    </table>
+    <p>
+      <strong>Combo Bonus:</strong> hitting the same monster on consecutive attacks in a turn
+      (or across turns) adds up to <strong>+4</strong> to your hit roll.
+    </p>
+
+    <p class="pnp-subsection-title">Boost Attack (Fighter only)</p>
+    <ul>
+      <li>Must be the first action of your turn</li>
+      <li>Costs <strong>all remaining AE</strong> — your turn ends immediately after</li>
+      <li>
+        Add a bonus die to your hit roll:
+        <strong>+1d3</strong> at lower levels, increasing to <strong>+1d6</strong> at high levels
+      </li>
+      <li>Your AC is reduced by <strong>−4</strong> until your next turn</li>
+    </ul>
+
+    <p class="pnp-subsection-title">Defending</p>
+    <ul>
+      <li>A monster attacks: DK rolls <strong>d12 + monster to-hit bonus</strong> vs your <strong>AC + Stamina</strong></li>
+      <li>If the roll ≥ your total, you take the monster's damage</li>
+      <li>
+        Use the <strong>Defend</strong> action (1 AE) anytime on your turn to add <strong>+2 AC</strong>
+        until your next turn — defenders become much harder to hit
+      </li>
+      <li>You can Defend up to <strong>NOD</strong> times per turn; each stacks</li>
+      <li>
+        <strong>AC summary:</strong> 10 + class bonus + armor items − any Boost Attack penalty + (2 × defensive actions used)
+      </li>
+    </ul>
+  </section>
+
+  <!-- ── Doors ──────────────────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Doors</h3>
+    <table class="pnp-table">
+      <thead>
+        <tr><th>Door Type</th><th>Symbol</th><th>How to Pass</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Open</td><td>gap in wall</td><td>Walk through freely</td></tr>
+        <tr><td>Closed</td><td>□</td><td>Spend 1 AE to open</td></tr>
+        <tr><td>Locked</td><td>Δ</td><td>Use matching key, or pick it (1 AE: d12 + Mind vs DC)</td></tr>
+        <tr><td>Trapped</td><td>Δ✕</td><td>Search to find trap; disarm before opening or picking</td></tr>
+        <tr><td>Hidden</td><td>?</td><td>Search roll d12 + Mind ≥ Find DC (1–6); appears as a normal door after</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ── Traps ──────────────────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Traps</h3>
+    <p>Traps are hidden until a Search roll reveals them.</p>
+    <ul>
+      <li><strong>Detect:</strong> d12 + Mind ≥ trap's Detect DC</li>
+      <li><strong>Disarm:</strong> d12 + Mind ≥ trap's Disarm DC (once detected)</li>
+      <li>A failed lock-pick on a trapped door <em>triggers</em> the trap</li>
+    </ul>
+    <p>Trap effects (DK sets amount):</p>
+    <ul>
+      <li>HP damage — reduce current HP by the trap value</li>
+      <li>Stamina drain — lower Stamina by the trap value</li>
+      <li>Mind drain — lower Mind by the trap value</li>
+      <li>AE drain — lose that many AE from remaining actions this turn</li>
+      <li>Range of Sight reduction — narrow how far you can see</li>
+    </ul>
+  </section>
+
+  <!-- ── Treshers and Loot ──────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Treshers and Loot</h3>
+    <p>When a player steps onto a tresher square the DK reveals its contents (index card works great).</p>
+    <ul>
+      <li><strong>Coins:</strong> record the type (gold &gt; silver &gt; copper &gt; zinc) on your sheet</li>
+      <li><strong>Weapons:</strong> note the to-hit bonus, damage die, and range; equip in hand slots</li>
+      <li><strong>Armor:</strong> note the AC bonus; equip to body slot — stacks with class AC</li>
+      <li><strong>Rings / Necklaces:</strong> note passive effects; equip to their slots</li>
+      <li><strong>Magic Gems:</strong> add gem's value to your Magic Power when equipped</li>
+      <li><strong>Potions:</strong> note healing amount; drink for 1 AE (your turn only)</li>
+      <li><strong>Spells:</strong> note the spell's TN, AE cost, range, and damage</li>
+    </ul>
+    <p>
+      A tresher with a <strong>✕</strong> mark is trapped — Search before taking it.
+    </p>
+  </section>
+
+  <!-- ── Magic ─────────────────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Magic</h3>
+    <p class="pnp-subsection-title">Casting a Spell</p>
+    <ol>
+      <li>Choose a spell in your inventory; check its AE cost and range</li>
+      <li>Spend the AE cost</li>
+      <li>Roll <strong>d12 + Mind</strong> vs the spell's <strong>Target Number + monster Magic Resistance</strong></li>
+      <li>On success: apply the spell's damage or effect to the target</li>
+      <li>On failure: spell fizzles — AE is still spent</li>
+    </ol>
+    <p class="pnp-subsection-title">Magic Resistance</p>
+    <ul>
+      <li><strong>Your resistance:</strong> Mind ÷ 2 (round down) — monsters must beat this when casting at you</li>
+      <li><strong>Monster resistance:</strong> set by the DK on the monster card; adds to the spell DC</li>
+    </ul>
+  </section>
+
+  <!-- ── Monsters ───────────────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Monsters</h3>
+    <p>
+      The DK creates a small index card for each monster with:
+      <strong>Name, HP, AC, to-hit bonus, damage, Magic Resistance, SP reward.</strong>
+    </p>
+    <p class="pnp-subsection-title">Monster behaviour</p>
+    <table class="pnp-table">
+      <thead>
+        <tr><th>Behaviour</th><th>Rule</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Stationary</td><td>Does not move until a PC enters its trigger zone (typically 5 squares + line of sight)</td></tr>
+        <tr><td>Roaming</td><td>Wanders each monster turn even when no PC is near</td></tr>
+        <tr><td>Fleeing</td><td>When HP drops below a set threshold the monster runs away</td></tr>
+        <tr><td>Calls reinforcements</td><td>When the monster spots a PC, it alerts other nearby monsters to join in</td></tr>
+      </tbody>
+    </table>
+    <p>
+      On the monster's turn: move 1 square toward the nearest PC (or 2 if roaming aimlessly), then
+      attack if adjacent (or within weapon range). Roll d12 + to-hit vs PC's AC + Stamina.
+    </p>
+  </section>
+
+  <!-- ── SP and Advancement ─────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Skill Points and Advancement</h3>
+    <ul>
+      <li>Earn <strong>SP</strong> for every monster killed (amount set by DK on each monster card)</li>
+      <li>Earn a bonus SP for completing a dungeon run</li>
+      <li>Between adventures spend SP 1-for-1 to permanently raise any stat by 1:</li>
+    </ul>
+    <table class="pnp-table">
+      <thead>
+        <tr><th>Stat</th><th>Effect</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Strength</td><td>+1 weapon damage</td></tr>
+        <tr><td>Stamina</td><td>+1 to attack rolls and +1 AC when defending</td></tr>
+        <tr><td>Mind</td><td>+1 to spell rolls, trap detection, lock-picking; +0.5 magic resistance</td></tr>
+        <tr><td>Magic Power</td><td>+1 MP for spells</td></tr>
+        <tr><td>NOA</td><td>Attack one extra time per turn</td></tr>
+        <tr><td>NOD</td><td>Defend one extra time per turn (+2 AC per stack)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ── Character Sheet ────────────────────────────────────────── -->
+  <section class="pnp-section pnp-section-sheet">
+    <h3>Character Sheet Template</h3>
+    <p>Copy the fields below onto a piece of paper:</p>
+    <div class="pnp-sheet">
+      <div class="pnp-sheet-grid">
+        <div class="pnp-field"><span class="pnp-field-label">Name</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">Species</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">Class</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">Level</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">HP</span><span class="pnp-field-line"></span><span class="pnp-field-slash">/</span><span class="pnp-field-max">max HP</span></div>
+        <div class="pnp-field"><span class="pnp-field-label">AE</span><span class="pnp-field-line"></span><span class="pnp-field-slash">/</span><span class="pnp-field-max">per turn</span></div>
+        <div class="pnp-field"><span class="pnp-field-label">AC</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">Magic Power</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">Strength</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">Stamina</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">Mind</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">Magic Resistance</span><span class="pnp-field-line"></span><span class="pnp-field-max">(Mind ÷ 2)</span></div>
+        <div class="pnp-field"><span class="pnp-field-label">NOA</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">NOD</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">SP</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">Range of Sight</span><span class="pnp-field-line"></span></div>
+      </div>
+
+      <div class="pnp-sheet-section-title">Equipment</div>
+      <div class="pnp-sheet-grid">
+        <div class="pnp-field pnp-field-wide"><span class="pnp-field-label">Hand 1</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field pnp-field-wide"><span class="pnp-field-label">Hand 2 (or 2-handed)</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field pnp-field-wide"><span class="pnp-field-label">Armor</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field pnp-field-wide"><span class="pnp-field-label">Ring</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field pnp-field-wide"><span class="pnp-field-label">Necklace</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field pnp-field-wide"><span class="pnp-field-label">Magic Gem</span><span class="pnp-field-line"></span></div>
+      </div>
+
+      <div class="pnp-sheet-section-title">Inventory (coins, items, spells, potions)</div>
+      <div class="pnp-inventory-box"></div>
+
+      <div class="pnp-sheet-section-title">Spells</div>
+      <table class="pnp-table pnp-spell-table">
+        <thead>
+          <tr><th>Spell Name</th><th>AE Cost</th><th>Range</th><th>TN</th><th>Damage</th></tr>
+        </thead>
+        <tbody>
+          <tr><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Tips ──────────────────────────────────────────────────── -->
+  <section class="pnp-section">
+    <h3>Tips for the Dungeon Keeper</h3>
+    <ul>
+      <li>Set ACs between 10–18 for interesting combat; monsters rarely need AC over 18.</li>
+      <li>Give early monsters low SP rewards (1–3) and low HP (4–12) to ease new players in.</li>
+      <li>Treshers with good loot are more rewarding early; powerful items mid-dungeon keep things exciting.</li>
+      <li>Mark trap squares with a light pencil dot players cannot see — erase when detected.</li>
+      <li>Monsters with <em>Calls Reinforcements</em> make quiet rooms into sudden chaos — use sparingly.</li>
+      <li>A hidden door to a secret loot room is always a welcome surprise.</li>
+    </ul>
+  </section>
+</section>

@@ -18,6 +18,8 @@ export interface DungonRecord {
   maxsplifetime: number;
   ismaingame: boolean;
   issample: boolean;
+  resettable_per_pc: boolean;
+  imageid: number | null;
 }
 
 export interface PublishDungonOptions {
@@ -30,6 +32,9 @@ export interface PublishedDungonListItemRecord {
   id: number;
   name: string;
   status: DungonRecord['status'];
+  ismaingame: boolean;
+  issample: boolean;
+  imagePath: string | null;
 }
 
 export interface GameRecord {
@@ -66,13 +71,15 @@ export interface NewDungon {
   maxsplifetime?: number;
   ismaingame?: boolean;
   issample?: boolean;
+  resettable_per_pc?: boolean;
+  imageid?: number | null;
 }
 
 export const getDungonsByUserKey = async (
   userkey: string
 ): Promise<DungonRecord[]> => {
   const { rows } = await pool.query<DungonRecord>(
-    `SELECT id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample
+    `SELECT id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid
      FROM dungons
      WHERE userkey = $1
      ORDER BY id DESC`,
@@ -87,8 +94,9 @@ export const getPublishedDungons = async (
 ): Promise<PublishedDungonListItemRecord[]> => {
   if (userkey) {
     const { rows } = await pool.query<PublishedDungonListItemRecord>(
-      `SELECT d.id, d.name, d.status
+      `SELECT d.id, d.name, d.status, COALESCE(d.ismaingame, FALSE) AS ismaingame, COALESCE(d.issample, FALSE) AS issample, i.path AS "imagePath"
        FROM dungons d
+       LEFT JOIN images i ON i.id = d.imageid
        WHERE d.status = 'published'
          AND (
            d.ispublic = TRUE
@@ -109,13 +117,24 @@ export const getPublishedDungons = async (
   }
 
   const { rows } = await pool.query<PublishedDungonListItemRecord>(
-    `SELECT id, name, status
-     FROM dungons
-     WHERE status = 'published' AND ispublic = TRUE
-     ORDER BY id DESC`
+    `SELECT d.id, d.name, d.status, COALESCE(d.ismaingame, FALSE) AS ismaingame, COALESCE(d.issample, FALSE) AS issample, i.path AS "imagePath"
+     FROM dungons d
+     LEFT JOIN images i ON i.id = d.imageid
+     WHERE d.status = 'published' AND d.ispublic = TRUE
+     ORDER BY d.id DESC`
   );
 
   return rows;
+};
+
+export const getDungonIsMainGameStatusById = async (
+  id: number
+): Promise<{ ismaingame: boolean; resettable_per_pc: boolean } | null> => {
+  const { rows } = await pool.query<{ ismaingame: boolean; resettable_per_pc: boolean }>(
+    `SELECT ismaingame, resettable_per_pc FROM dungons WHERE id = $1`,
+    [id]
+  );
+  return rows[0] ?? null;
 };
 
 export const getDungonByIdForUser = async (
@@ -123,7 +142,7 @@ export const getDungonByIdForUser = async (
   userkey: string
 ): Promise<DungonRecord | null> => {
   const { rows } = await pool.query<DungonRecord>(
-    `SELECT id, key, userkey, name, description, intro, "dungenJson" AS "dungenJson", ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample
+    `SELECT id, key, userkey, name, description, intro, "dungenJson" AS "dungenJson", ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid
      FROM dungons
      WHERE id = $1 AND userkey = $2`,
     [id, userkey]
@@ -287,11 +306,12 @@ export const startGameFromPublishedDungon = async (
        $3,
        NOW()
      FROM source
-     ON CONFLICT (dungonid, userkey, pcid)
+     ON CONFLICT ON CONSTRAINT uq_games_dungonid_userkey
      DO UPDATE SET
        "dungenJson" = EXCLUDED."dungenJson",
        inventory = EXCLUDED.inventory,
        monsters = EXCLUDED.monsters,
+       pcid = EXCLUDED.pcid,
        lastupdated = NOW()
      RETURNING
        id,
@@ -401,14 +421,26 @@ export const deleteGameForUser = async (
   return (rowCount ?? 0) > 0;
 };
 
+export const deleteDungonForUser = async (
+  id: number,
+  userkey: string
+): Promise<boolean> => {
+  const { rowCount } = await pool.query(
+    `DELETE FROM dungons WHERE id = $1 AND userkey = $2`,
+    [id, userkey]
+  );
+
+  return (rowCount ?? 0) > 0;
+};
+
 export const insertDungon = async (
   payload: NewDungon
 ): Promise<DungonRecord> => {
   const { rows } = await pool.query<DungonRecord>(
-    `INSERT INTO dungons (key, userkey, name, description, intro, status, minsplifetime, maxsplifetime, ismaingame, issample)
-     VALUES ($1, $1, $2, $3, $4, 'inproces', COALESCE($5, 0), COALESCE($6, 1000000), COALESCE($7, FALSE), COALESCE($8, FALSE))
-     RETURNING id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample`,
-    [payload.userkey, payload.name, payload.description, payload.intro, payload.minsplifetime, payload.maxsplifetime, payload.ismaingame, payload.issample]
+    `INSERT INTO dungons (key, userkey, name, description, intro, status, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid)
+     VALUES ($1, $1, $2, $3, $4, 'inproces', COALESCE($5, 0), COALESCE($6, 1000000), COALESCE($7, FALSE), COALESCE($8, FALSE), COALESCE($9, FALSE), $10)
+     RETURNING id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid`,
+    [payload.userkey, payload.name, payload.description, payload.intro, payload.minsplifetime, payload.maxsplifetime, payload.ismaingame, payload.issample, payload.resettable_per_pc, payload.imageid ?? null]
   );
 
   return rows[0];
@@ -417,7 +449,7 @@ export const insertDungon = async (
 export const updateDungonMetadataForUser = async (
   id: number,
   userkey: string,
-  metadata: Partial<Pick<DungonRecord, 'name' | 'description' | 'intro' | 'minsplifetime' | 'maxsplifetime'>>
+  metadata: Partial<Pick<DungonRecord, 'name' | 'description' | 'intro' | 'minsplifetime' | 'maxsplifetime' | 'resettable_per_pc' | 'imageid'>>
 ): Promise<DungonRecord | null> => {
   const updates: string[] = [];
   const values: unknown[] = [id, userkey];
@@ -443,6 +475,14 @@ export const updateDungonMetadataForUser = async (
     updates.push(`maxsplifetime = $${paramIndex++}`);
     values.push(metadata.maxsplifetime);
   }
+  if (typeof metadata.resettable_per_pc === 'boolean') {
+    updates.push(`resettable_per_pc = $${paramIndex++}`);
+    values.push(metadata.resettable_per_pc);
+  }
+  if ('imageid' in metadata) {
+    updates.push(`imageid = $${paramIndex++}`);
+    values.push(metadata.imageid ?? null);
+  }
 
   if (updates.length === 0) {
     return null;
@@ -452,7 +492,7 @@ export const updateDungonMetadataForUser = async (
     `UPDATE dungons
      SET ${updates.join(', ')}
      WHERE id = $1 AND userkey = $2
-     RETURNING id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime`,
+     RETURNING id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, resettable_per_pc, imageid`,
     values
   );
 
