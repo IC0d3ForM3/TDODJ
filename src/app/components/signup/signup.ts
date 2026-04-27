@@ -4,11 +4,12 @@ import { Account } from '../../services/account';
 import { User } from '../../interfaces/user';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
+import { TacModal } from '../tac-modal/tac-modal';
 
 @Component({
   selector: 'app-signup',
   standalone: true,
-  imports: [FormsModule, CommonModule, RouterLink],
+  imports: [FormsModule, CommonModule, RouterLink, TacModal],
   templateUrl: './signup.html',
   styleUrl: './signup.css',
 })
@@ -20,6 +21,8 @@ export class Signup {
   result: number | null = null;
   error: string | null = null;
   showSuccess = false;
+  agreedToTac = false;
+  showTac = false;
 
   constructor(private account: Account, private router: Router) {}
 
@@ -39,7 +42,8 @@ export class Signup {
       !!this.confirmPassword &&
       this.isEmailValid(this.email) &&
       this.isStrongPassword(this.password) &&
-      this.password === this.confirmPassword
+      this.password === this.confirmPassword &&
+      this.agreedToTac
     );
   }
 

@@ -5,6 +5,7 @@ import {
   HostListener,
   OnInit,
   ViewChild,
+  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -343,6 +344,23 @@ export class Creator implements OnInit {
   readonly pendingItemPlacement = signal<PendingItemPlacement | null>(null);
   readonly itemPlacementsByDungon = signal<Record<number, ItemPlacement[]>>({});
   readonly placeMonsterDropItemIds = signal<number[]>([]);
+  readonly placeMonsterDropSpellIds = signal<number[]>([]);
+  readonly placeMonsterDropPotionIds = signal<number[]>([]);
+  readonly placeMonsterGold = signal(0);
+  readonly placeMonsterSilver = signal(0);
+  readonly placeMonsterCopper = signal(0);
+  readonly placeMonsterZinc = signal(0);
+  readonly placeMonsterWeaponItemId = signal<number | null>(null);
+  readonly placeMonsterWeaponChoices = computed(() =>
+    this.libItems().filter((i) => this.placeMonsterDropItemIds().includes(i.id) && i.type === 'weapon')
+  );
+  readonly placeMonsterSelectedId = signal<number | null>(null);
+  readonly placeMonsterSelectedInfo = computed(() => {
+    const id = this.placeMonsterSelectedId();
+    const pending = this.pendingMonsterPlacement();
+    if (id === null || !pending) return null;
+    return (this.monsterListByDungon()[pending.dungonId] ?? []).find((m) => m.id === id) ?? null;
+  });
 
   // ── Potion placement ──────────────────────────────────────────────────────
   readonly isPlacePotionMode = signal(false);
@@ -1442,7 +1460,8 @@ export class Creator implements OnInit {
       (mp) => mp.row === item.row && mp.column === item.column
     );
     if (!placement) return;
-    this.copyMonsterSource.set({ ...placement });
+    const { keyIds: _keys, ...rest } = placement;
+    this.copyMonsterSource.set({ ...rest });
     this.isCopyMonsterMode.set(true);
     this.selectedPlacedItemKey.set(null);
     this.drawGridCanvas();
@@ -2753,8 +2772,37 @@ export class Creator implements OnInit {
     const current = this.placeMonsterDropItemIds();
     if (current.includes(id)) {
       this.placeMonsterDropItemIds.set(current.filter((v) => v !== id));
+      if (this.placeMonsterWeaponItemId() === id) {
+        this.placeMonsterWeaponItemId.set(null);
+      }
     } else {
       this.placeMonsterDropItemIds.set([...current, id]);
+    }
+  }
+
+  isMonsterDropSpellSelected(id: number): boolean {
+    return this.placeMonsterDropSpellIds().includes(id);
+  }
+
+  toggleMonsterDropSpell(id: number): void {
+    const current = this.placeMonsterDropSpellIds();
+    if (current.includes(id)) {
+      this.placeMonsterDropSpellIds.set(current.filter((v) => v !== id));
+    } else {
+      this.placeMonsterDropSpellIds.set([...current, id]);
+    }
+  }
+
+  isMonsterDropPotionSelected(id: number): boolean {
+    return this.placeMonsterDropPotionIds().includes(id);
+  }
+
+  toggleMonsterDropPotion(id: number): void {
+    const current = this.placeMonsterDropPotionIds();
+    if (current.includes(id)) {
+      this.placeMonsterDropPotionIds.set(current.filter((v) => v !== id));
+    } else {
+      this.placeMonsterDropPotionIds.set([...current, id]);
     }
   }
 
@@ -2765,6 +2813,14 @@ export class Creator implements OnInit {
     this.placeMonsterDropTresherIds.set([]);
     this.placeMonsterDropKeyIds.set([]);
     this.placeMonsterDropItemIds.set([]);
+    this.placeMonsterDropSpellIds.set([]);
+    this.placeMonsterDropPotionIds.set([]);
+    this.placeMonsterGold.set(0);
+    this.placeMonsterSilver.set(0);
+    this.placeMonsterCopper.set(0);
+    this.placeMonsterZinc.set(0);
+    this.placeMonsterWeaponItemId.set(null);
+    this.placeMonsterSelectedId.set(null);
     this.placeMonsterIsDormant.set(false);
     this.placeMonsterGuardRow.set(null);
     this.placeMonsterGuardCol.set(null);
@@ -2788,6 +2844,13 @@ export class Creator implements OnInit {
     this.placeMonsterDropTresherIds.set([...(placement.tresherIds ?? [])]);
     this.placeMonsterDropKeyIds.set([...(placement.keyIds ?? [])]);
     this.placeMonsterDropItemIds.set([...(placement.itemIds ?? [])]);
+    this.placeMonsterDropSpellIds.set([...(placement.spellIds ?? [])]);
+    this.placeMonsterDropPotionIds.set([...(placement.potionIds ?? [])]);
+    this.placeMonsterGold.set(placement.gold ?? 0);
+    this.placeMonsterSilver.set(placement.silver ?? 0);
+    this.placeMonsterCopper.set(placement.copper ?? 0);
+    this.placeMonsterZinc.set(placement.zinc ?? 0);
+    this.placeMonsterWeaponItemId.set(placement.weaponItemId ?? null);
     this.placeMonsterIsDormant.set(placement.isDormant ?? false);
     this.placeMonsterGuardRow.set(placement.guardRow ?? null);
     this.placeMonsterGuardCol.set(placement.guardColumn ?? null);
@@ -2818,6 +2881,13 @@ export class Creator implements OnInit {
               tresherIds: this.placeMonsterDropTresherIds().length > 0 ? [...this.placeMonsterDropTresherIds()] : undefined,
               keyIds: this.placeMonsterDropKeyIds().length > 0 ? [...this.placeMonsterDropKeyIds()] : undefined,
               itemIds: this.placeMonsterDropItemIds().length > 0 ? [...this.placeMonsterDropItemIds()] : undefined,
+              spellIds: this.placeMonsterDropSpellIds().length > 0 ? [...this.placeMonsterDropSpellIds()] : undefined,
+              potionIds: this.placeMonsterDropPotionIds().length > 0 ? [...this.placeMonsterDropPotionIds()] : undefined,
+              gold: this.placeMonsterGold() > 0 ? this.placeMonsterGold() : undefined,
+              silver: this.placeMonsterSilver() > 0 ? this.placeMonsterSilver() : undefined,
+              copper: this.placeMonsterCopper() > 0 ? this.placeMonsterCopper() : undefined,
+              zinc: this.placeMonsterZinc() > 0 ? this.placeMonsterZinc() : undefined,
+              weaponItemId: this.placeMonsterWeaponItemId() ?? undefined,
               isDormant: this.placeMonsterIsDormant() || undefined,
               guardRow: this.placeMonsterIsDormant() && this.placeMonsterGuardRow() !== null ? this.placeMonsterGuardRow() : undefined,
               guardColumn: this.placeMonsterIsDormant() && this.placeMonsterGuardCol() !== null ? this.placeMonsterGuardCol() : undefined,
@@ -2842,7 +2912,8 @@ export class Creator implements OnInit {
       (mp) => mp.row === pos.row && mp.column === pos.column
     );
     if (!placement) return;
-    this.copyMonsterSource.set({ ...placement });
+    const { keyIds: _keys, ...rest } = placement;
+    this.copyMonsterSource.set({ ...rest });
     this.isCopyMonsterMode.set(true);
     this.closePlaceMonsterDialog();
   }
@@ -2907,7 +2978,7 @@ export class Creator implements OnInit {
       return;
     }
 
-    this.placeMonsterByIdAtPendingPlacement(monsterId);
+    this.placeMonsterSelectedId.set(monsterId);
   }
 
   placeLibraryMonsterAtPendingPlacement(libraryMonsterId: number): void {
@@ -2927,7 +2998,13 @@ export class Creator implements OnInit {
       pending.dungonId,
       selectedLibraryMonster
     );
-    this.placeMonsterByIdAtPendingPlacement(localMonsterId);
+    this.placeMonsterSelectedId.set(localMonsterId);
+  }
+
+  confirmPlaceSelectedMonster(): void {
+    const id = this.placeMonsterSelectedId();
+    if (id === null) return;
+    this.placeMonsterByIdAtPendingPlacement(id);
   }
 
   private placeTresherByIdAtPendingPlacement(tresherId: number): void {
@@ -3017,6 +3094,13 @@ export class Creator implements OnInit {
             tresherIds: this.placeMonsterDropTresherIds().length > 0 ? [...this.placeMonsterDropTresherIds()] : undefined,
             keyIds: this.placeMonsterDropKeyIds().length > 0 ? [...this.placeMonsterDropKeyIds()] : undefined,
             itemIds: this.placeMonsterDropItemIds().length > 0 ? [...this.placeMonsterDropItemIds()] : undefined,
+            spellIds: this.placeMonsterDropSpellIds().length > 0 ? [...this.placeMonsterDropSpellIds()] : undefined,
+            potionIds: this.placeMonsterDropPotionIds().length > 0 ? [...this.placeMonsterDropPotionIds()] : undefined,
+            gold: this.placeMonsterGold() > 0 ? this.placeMonsterGold() : undefined,
+            silver: this.placeMonsterSilver() > 0 ? this.placeMonsterSilver() : undefined,
+            copper: this.placeMonsterCopper() > 0 ? this.placeMonsterCopper() : undefined,
+            zinc: this.placeMonsterZinc() > 0 ? this.placeMonsterZinc() : undefined,
+            weaponItemId: this.placeMonsterWeaponItemId() ?? undefined,
             isDormant: this.placeMonsterIsDormant() || undefined,
             guardRow: this.placeMonsterIsDormant() && this.placeMonsterGuardRow() !== null ? this.placeMonsterGuardRow() : undefined,
             guardColumn: this.placeMonsterIsDormant() && this.placeMonsterGuardCol() !== null ? this.placeMonsterGuardCol() : undefined,
@@ -5531,7 +5615,14 @@ export class Creator implements OnInit {
     for (const obs of obstaclePlacements) {
       if (obs.containsItemId !== null) placedItemIds.add(obs.containsItemId);
     }
+    // Include items and potions referenced by monster drops
+    for (const mp of monsterPlacements) {
+      for (const id of mp.itemIds ?? []) placedItemIds.add(id);
+    }
     const placedPotionIds = new Set(potionPlacements.map((p) => p.potionId));
+    for (const mp of monsterPlacements) {
+      for (const id of mp.potionIds ?? []) placedPotionIds.add(id);
+    }
     const floorItemList = allLibItems
       .filter((i) => placedItemIds.has(i.id))
       .map((i) => ({

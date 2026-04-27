@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { DatePipe } from '@angular/common';
 import { forkJoin } from 'rxjs';
 import { API_BASE_URL } from '../../api-config';
 import { Account } from '../../services/account';
@@ -39,9 +40,22 @@ interface AdminPc {
   issample: boolean;
 }
 
+interface ContactRequest {
+  id: number;
+  name: string;
+  email: string;
+  problem: string;
+  username: string | null;
+  message: string;
+  createdat: string;
+  isread: boolean;
+  isresponded: boolean;
+}
+
 @Component({
   selector: 'app-admin',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DatePipe],
   templateUrl: './admin.html',
   styleUrl: './admin.css',
 })
@@ -70,6 +84,19 @@ export class Admin implements OnInit {
   readonly pcSaving = signal<number | null>(null);
   readonly pcSaveSuccess = signal<string | null>(null);
 
+  // Contact requests
+  readonly contactRequests = signal<ContactRequest[]>([]);
+  readonly isContactsLoading = signal(false);
+  readonly contactError = signal<string | null>(null);
+  readonly contactSortDir = signal<'desc' | 'asc'>('desc');
+  readonly contactSortedRequests = computed(() => {
+    const dir = this.contactSortDir();
+    return [...this.contactRequests()].sort((a, b) => {
+      const diff = new Date(a.createdat).getTime() - new Date(b.createdat).getTime();
+      return dir === 'desc' ? -diff : diff;
+    });
+  });
+
   private readonly originalFlagsById = signal<Record<number, EditableFlags>>({});
   private readonly pendingEditsById = signal<Record<number, EditableFlags>>({});
 
@@ -81,6 +108,7 @@ export class Admin implements OnInit {
     this.loadUsers();
     this.loadDungons();
     this.loadAllPcs();
+    this.loadContactRequests();
   }
 
   private loadUsers(): void {
@@ -283,5 +311,39 @@ export class Admin implements OnInit {
         this.pcSaving.set(null);
       },
     });
+  }
+
+  private loadContactRequests(): void {
+    this.isContactsLoading.set(true);
+    this.contactError.set(null);
+    this.http.get<ContactRequest[]>(`${API_BASE_URL}/contact`).subscribe({
+      next: (contacts) => {
+        this.contactRequests.set(contacts);
+        this.isContactsLoading.set(false);
+      },
+      error: () => {
+        this.contactError.set('Failed to load contact requests.');
+        this.isContactsLoading.set(false);
+      },
+    });
+  }
+
+  toggleContactSortDir(): void {
+    this.contactSortDir.update((d) => (d === 'desc' ? 'asc' : 'desc'));
+  }
+
+  updateContactFlags(request: ContactRequest, isread: boolean, isresponded: boolean): void {
+    this.http
+      .put<ContactRequest>(`${API_BASE_URL}/contact/${request.id}`, { isread, isresponded })
+      .subscribe({
+        next: (updated) => {
+          this.contactRequests.update((list) =>
+            list.map((c) => (c.id === updated.id ? updated : c))
+          );
+        },
+        error: () => {
+          this.contactError.set('Failed to update contact request.');
+        },
+      });
   }
 }

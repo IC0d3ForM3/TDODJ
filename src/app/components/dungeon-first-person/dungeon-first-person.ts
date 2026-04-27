@@ -1264,21 +1264,23 @@ export class DungeonFirstPersonComponent {
 
     if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
       const maxWidth = tileWidth * 0.72 * widthPct;
-      const maxHeight = tileHeight * 0.88 * heightPct;
+      const maxHeight = tileHeight * heightPct;
       const aspectRatio = image.naturalWidth / image.naturalHeight;
-      let drawWidth = maxWidth;
-      let drawHeight = drawWidth / aspectRatio;
-      if (drawHeight > maxHeight) {
-        drawHeight = maxHeight;
-        drawWidth = drawHeight * aspectRatio;
+      let drawHeight = maxHeight;
+      let drawWidth = drawHeight * aspectRatio;
+      if (drawWidth > maxWidth) {
+        drawWidth = maxWidth;
+        drawHeight = drawWidth / aspectRatio;
       }
+      if (heightPct === 1) drawHeight = maxHeight;
+      if (widthPct === 1) drawWidth = maxWidth;
       drawWidth = Math.max(8, drawWidth);
       drawHeight = Math.max(8, drawHeight);
       const drawY = heightAnchor === 'ceiling' ? midTop : midBottom - drawHeight;
       context.drawImage(image, edgeX - drawWidth / 2, drawY, drawWidth, drawHeight);
     } else {
       const w = Math.max(6, tileWidth * 0.22 * widthPct);
-      const h = Math.max(10, tileHeight * 0.82 * heightPct);
+      const h = Math.max(10, tileHeight * heightPct);
       const x = edgeX - w / 2;
       const y = heightAnchor === 'ceiling' ? midTop : midBottom - h;
       if (color) {
@@ -1338,14 +1340,16 @@ export class DungeonFirstPersonComponent {
     if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
       const baseWidth = tileWidth * 0.72 * lateralScale;
       const maxWidth = baseWidth * widthPct;
-      const maxHeight = tileHeight * 0.88 * lateralScale * heightPct;
+      const maxHeight = tileHeight * lateralScale * heightPct;
       const aspectRatio = image.naturalWidth / image.naturalHeight;
-      let drawWidth = maxWidth;
-      let drawHeight = drawWidth / aspectRatio;
-      if (drawHeight > maxHeight) {
-        drawHeight = maxHeight;
-        drawWidth = drawHeight * aspectRatio;
+      let drawHeight = maxHeight;
+      let drawWidth = drawHeight * aspectRatio;
+      if (drawWidth > maxWidth) {
+        drawWidth = maxWidth;
+        drawHeight = drawWidth / aspectRatio;
       }
+      if (heightPct === 1) drawHeight = maxHeight;
+      if (widthPct === 1) drawWidth = maxWidth;
       drawWidth = Math.max(8, drawWidth);
       drawHeight = Math.max(8, drawHeight);
       const halfSlack = (baseWidth - drawWidth) / 2;
@@ -1362,7 +1366,7 @@ export class DungeonFirstPersonComponent {
     // Fallback: thin column
     const baseW = tileWidth * 0.22 * lateralScale;
     const w = Math.max(6, baseW * widthPct);
-    const h = Math.max(10, tileHeight * 0.82 * lateralScale * heightPct);
+    const h = Math.max(10, tileHeight * lateralScale * heightPct);
     const halfSlack = (baseW - w) / 2;
     const x = widthAnchor === 'east'
       ? centerX - w / 2 + halfSlack

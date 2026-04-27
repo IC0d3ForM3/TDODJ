@@ -13,50 +13,49 @@ const isAdminUserByGuid = async (userguid) => {
     return rows[0].isadmin === true;
 };
 exports.isAdminUserByGuid = isAdminUserByGuid;
+const SELECT_MONSTER_FIELDS = `
+  id,
+  userguid::text AS userguid,
+  imageid AS "imageId",
+  soundid AS "soundId",
+  COALESCE(tresherids, '[]'::jsonb) AS "tresherIds",
+  COALESCE(keyids, '[]'::jsonb) AS "keyIds",
+  name,
+  type,
+  description,
+  hp,
+  movmenteconomy AS "movementEconomy",
+  ac,
+  runat AS "runAt",
+  numberofattacks AS "numberOfAttacks",
+  attacks,
+  ispublic AS "isPublic",
+  createdat::text AS "createdAt",
+  updatedat::text AS "updatedAt",
+  COALESCE(spreward, 0) AS "spReward",
+  COALESCE(magic, 0) AS magic,
+  COALESCE(magicresistance, 0) AS "magicResistance",
+  COALESCE(callsreinforcements, FALSE) AS "callsReinforcements",
+  COALESCE(tohitplusneeded, 0) AS "toHitPlusNeeded",
+  npc_greeting AS "npcGreeting",
+  npc_info_1 AS "npcInfo1",
+  npc_info_2 AS "npcInfo2",
+  npc_info_3 AS "npcInfo3",
+  COALESCE(npc_only_attack_when_attacked, FALSE) AS "npcOnlyAttackWhenAttacked",
+  COALESCE(npc_gives_info_after_damaged, FALSE) AS "npcGivesInfoAfterDamaged",
+  COALESCE(npc_attacks_after_info, FALSE) AS "npcAttacksAfterInfo",
+  COALESCE(npc_can_trade, FALSE) AS "npcCanTrade"
+`;
 const getMonstersByUserGuid = async (userguid) => {
-    const { rows } = await db_1.default.query(`SELECT
-       id,
-       userguid::text AS userguid,
-      imageid AS "imageId",
-      COALESCE(tresherids, '[]'::jsonb) AS "tresherIds",
-      COALESCE(keyids, '[]'::jsonb) AS "keyIds",
-       name,
-       type,
-       description,
-       hp,
-       movmenteconomy AS "movementEconomy",
-       ac,
-       runat AS "runAt",
-       numberofattacks AS "numberOfAttacks",
-       attacks,
-       ispublic AS "isPublic",
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"
+    const { rows } = await db_1.default.query(`SELECT ${SELECT_MONSTER_FIELDS}
      FROM monsters
      WHERE userguid = $1
-     ORDER BY updatedat DESC, id DESC`, [userguid]);
+     ORDER BY LOWER(name) ASC, id ASC`, [userguid]);
     return rows;
 };
 exports.getMonstersByUserGuid = getMonstersByUserGuid;
 const getMonsterLibraryByUserGuid = async (userguid) => {
-    const { rows } = await db_1.default.query(`SELECT
-       id,
-       userguid::text AS userguid,
-      imageid AS "imageId",
-      COALESCE(tresherids, '[]'::jsonb) AS "tresherIds",
-      COALESCE(keyids, '[]'::jsonb) AS "keyIds",
-       name,
-       type,
-       description,
-       hp,
-       movmenteconomy AS "movementEconomy",
-       ac,
-       runat AS "runAt",
-       numberofattacks AS "numberOfAttacks",
-       attacks,
-       ispublic AS "isPublic",
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"
+    const { rows } = await db_1.default.query(`SELECT ${SELECT_MONSTER_FIELDS}
      FROM monsters
      WHERE userguid = $1 OR ispublic = true
      ORDER BY
@@ -69,7 +68,7 @@ exports.getMonsterLibraryByUserGuid = getMonsterLibraryByUserGuid;
 const insertMonsterForUser = async (userguid, payload) => {
     const { rows } = await db_1.default.query(`INSERT INTO monsters (
        userguid,
-      imageid,
+       imageid,
        name,
        type,
        description,
@@ -78,47 +77,34 @@ const insertMonsterForUser = async (userguid, payload) => {
        ac,
        runat,
        numberofattacks,
-      tresherids,
-      keyids,
+       tresherids,
+       keyids,
        attacks,
        ispublic,
+       spreward,
+       soundid,
+       magic,
+       magicresistance,
+       callsreinforcements,
+       tohitplusneeded,
+       npc_greeting,
+       npc_info_1,
+       npc_info_2,
+       npc_info_3,
+       npc_only_attack_when_attacked,
+       npc_gives_info_after_damaged,
+       npc_attacks_after_info,
+       npc_can_trade,
        updatedat
      )
      VALUES (
-       $1,
-       $2,
-       $3,
-       $4,
-       $5,
-       $6,
-       $7,
-       $8,
-       $9,
-       $10,
-       $11::jsonb,
-       $12::jsonb,
-       $13::jsonb,
-       $14,
+       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+       $11::jsonb, $12::jsonb, $13::jsonb,
+       $14, $15, $16, $17, $18, $19, $20,
+       $21, $22, $23, $24, $25, $26, $27, $28,
        NOW()
      )
-     RETURNING
-       id,
-       userguid::text AS userguid,
-       imageid AS "imageId",
-       COALESCE(tresherids, '[]'::jsonb) AS "tresherIds",
-       COALESCE(keyids, '[]'::jsonb) AS "keyIds",
-       name,
-       type,
-       description,
-       hp,
-       movmenteconomy AS "movementEconomy",
-       ac,
-       runat AS "runAt",
-       numberofattacks AS "numberOfAttacks",
-       attacks,
-       ispublic AS "isPublic",
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"`, [
+     RETURNING ${SELECT_MONSTER_FIELDS}`, [
         userguid,
         payload.imageId,
         payload.name,
@@ -133,6 +119,20 @@ const insertMonsterForUser = async (userguid, payload) => {
         JSON.stringify(payload.keyIds),
         JSON.stringify(payload.attacks),
         payload.isPublic,
+        payload.spReward,
+        payload.soundId,
+        payload.magic,
+        payload.magicResistance,
+        payload.callsReinforcements,
+        payload.toHitPlusNeeded,
+        payload.npcGreeting,
+        payload.npcInfo1,
+        payload.npcInfo2,
+        payload.npcInfo3,
+        payload.npcOnlyAttackWhenAttacked,
+        payload.npcGivesInfoAfterDamaged,
+        payload.npcAttacksAfterInfo,
+        payload.npcCanTrade,
     ]);
     return rows[0];
 };
@@ -153,26 +153,23 @@ const updateMonsterForUser = async (id, userguid, payload) => {
        keyids = $13::jsonb,
        attacks = $14::jsonb,
        ispublic = $15,
+       spreward = $16,
+       soundid = $17,
+       magic = $18,
+       magicresistance = $19,
+       callsreinforcements = $20,
+       tohitplusneeded = $21,
+       npc_greeting = $22,
+       npc_info_1 = $23,
+       npc_info_2 = $24,
+       npc_info_3 = $25,
+       npc_only_attack_when_attacked = $26,
+       npc_gives_info_after_damaged = $27,
+       npc_attacks_after_info = $28,
+       npc_can_trade = $29,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
-     RETURNING
-       id,
-       userguid::text AS userguid,
-       imageid AS "imageId",
-       COALESCE(tresherids, '[]'::jsonb) AS "tresherIds",
-       COALESCE(keyids, '[]'::jsonb) AS "keyIds",
-       name,
-       type,
-       description,
-       hp,
-       movmenteconomy AS "movementEconomy",
-       ac,
-       runat AS "runAt",
-       numberofattacks AS "numberOfAttacks",
-       attacks,
-       ispublic AS "isPublic",
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"`, [
+     RETURNING ${SELECT_MONSTER_FIELDS}`, [
         id,
         userguid,
         payload.name,
@@ -188,6 +185,20 @@ const updateMonsterForUser = async (id, userguid, payload) => {
         JSON.stringify(payload.keyIds),
         JSON.stringify(payload.attacks),
         payload.isPublic,
+        payload.spReward,
+        payload.soundId,
+        payload.magic,
+        payload.magicResistance,
+        payload.callsReinforcements,
+        payload.toHitPlusNeeded,
+        payload.npcGreeting,
+        payload.npcInfo1,
+        payload.npcInfo2,
+        payload.npcInfo3,
+        payload.npcOnlyAttackWhenAttacked,
+        payload.npcGivesInfoAfterDamaged,
+        payload.npcAttacksAfterInfo,
+        payload.npcCanTrade,
     ]);
     return rows[0] ?? null;
 };

@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
+app.set('trust proxy', 1); // Trust Caddy reverse proxy for rate limiting + IP detection
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
@@ -32,6 +33,7 @@ import * as curseController from './controllers/curseController';
 import * as itemController from './controllers/itemController';
 import * as soundController from './controllers/soundController';
 import * as tavernStashController from './controllers/tavernStashController';
+import * as contactController from './controllers/contactController';
 app.get('/users/:id', userController.getUser);
 app.post('/users', authLimiter, userController.createUser);
 app.post('/login', authLimiter, userController.loginUser);
@@ -98,6 +100,9 @@ app.put('/items/:id', itemController.updateItem);
 app.get('/sounds', soundController.getSounds);
 app.post('/sounds', soundController.uploadSoundMiddleware, soundController.createSound);
 app.put('/sounds/:id', soundController.updateSound);
+app.post('/contact', contactController.submitContact);
+app.get('/contact', contactController.getContacts);
+app.put('/contact/:id', contactController.updateContactFlags);
 app.use('/images', express.static(path.resolve(__dirname, '../../public/images')));
 app.use('/sounds', express.static(path.resolve(__dirname, '../../public/sounds')));
 

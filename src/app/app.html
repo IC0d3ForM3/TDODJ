@@ -1,3 +1,6 @@
+<div class="beta-banner" role="status">
+  ⚠ This site is currently in <strong>Beta</strong> — features may change and progress may be reset.
+</div>
 <header>
   <div class="page-title-row">
     <ng-container *ngIf="!isGamePage() && !isSamplePlayPage()">
@@ -39,6 +42,8 @@
       <li *ngIf="isLoggedIn() && isCreator()"><a routerLink="/create" routerLinkActive="nav-link-active"
           [routerLinkActiveOptions]="{ exact: true }">Create</a></li>
       <li *ngIf="isLoggedIn()"><a href="#" (click)="logout()">Log out</a></li>
+      <li><a routerLink="/contact" routerLinkActive="nav-link-active"
+          [routerLinkActiveOptions]="{ exact: true }">Contact Us</a></li>
     </ul>
   </nav>
 </header>

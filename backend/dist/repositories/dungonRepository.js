@@ -3,10 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateDungonMetadataForUser = exports.insertDungon = exports.deleteGameForUser = exports.updateGameDungenJson = exports.getGameByIdForUser = exports.getGamesForUser = exports.startGameFromPublishedDungon = exports.publishDungonForUser = exports.updateDungonJsonForUser = exports.getDungonByIdForUser = exports.getPublishedDungons = exports.getDungonsByUserKey = void 0;
+exports.getAllPublishedDungonsForAdmin = exports.setSampleDungonInDb = exports.getSampleDungonFullFromDb = exports.getSampleDungonFromDb = exports.getDungonSpRewardById = exports.approveDungon = exports.updateDungonMetadataForUser = exports.insertDungon = exports.deleteDungonForUser = exports.deleteGameForUser = exports.updateGameDungenJson = exports.getGameByIdForUser = exports.getGamesForUser = exports.startGameFromPublishedDungon = exports.publishDungonForUser = exports.updateDungonJsonForUser = exports.getDungonByIdForUser = exports.getDungonIsMainGameStatusById = exports.getPublishedDungons = exports.getDungonsByUserKey = void 0;
 const db_1 = __importDefault(require("../db"));
 const getDungonsByUserKey = async (userkey) => {
-    const { rows } = await db_1.default.query(`SELECT id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime
+    const { rows } = await db_1.default.query(`SELECT id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid
      FROM dungons
      WHERE userkey = $1
      ORDER BY id DESC`, [userkey]);
@@ -15,8 +15,9 @@ const getDungonsByUserKey = async (userkey) => {
 exports.getDungonsByUserKey = getDungonsByUserKey;
 const getPublishedDungons = async (userkey = null) => {
     if (userkey) {
-        const { rows } = await db_1.default.query(`SELECT d.id, d.name, d.status
+        const { rows } = await db_1.default.query(`SELECT d.id, d.name, d.status, COALESCE(d.ismaingame, FALSE) AS ismaingame, COALESCE(d.issample, FALSE) AS issample, i.path AS "imagePath"
        FROM dungons d
+       LEFT JOIN images i ON i.id = d.imageid
        WHERE d.status = 'published'
          AND (
            d.ispublic = TRUE
@@ -32,15 +33,21 @@ const getPublishedDungons = async (userkey = null) => {
        ORDER BY d.id DESC`, [userkey]);
         return rows;
     }
-    const { rows } = await db_1.default.query(`SELECT id, name, status
-     FROM dungons
-     WHERE status = 'published' AND ispublic = TRUE
-     ORDER BY id DESC`);
+    const { rows } = await db_1.default.query(`SELECT d.id, d.name, d.status, COALESCE(d.ismaingame, FALSE) AS ismaingame, COALESCE(d.issample, FALSE) AS issample, i.path AS "imagePath"
+     FROM dungons d
+     LEFT JOIN images i ON i.id = d.imageid
+     WHERE d.status = 'published' AND d.ispublic = TRUE
+     ORDER BY d.id DESC`);
     return rows;
 };
 exports.getPublishedDungons = getPublishedDungons;
+const getDungonIsMainGameStatusById = async (id) => {
+    const { rows } = await db_1.default.query(`SELECT ismaingame, resettable_per_pc FROM dungons WHERE id = $1`, [id]);
+    return rows[0] ?? null;
+};
+exports.getDungonIsMainGameStatusById = getDungonIsMainGameStatusById;
 const getDungonByIdForUser = async (id, userkey) => {
-    const { rows } = await db_1.default.query(`SELECT id, key, userkey, name, description, intro, "dungenJson" AS "dungenJson", ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime
+    const { rows } = await db_1.default.query(`SELECT id, key, userkey, name, description, intro, "dungenJson" AS "dungenJson", ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid
      FROM dungons
      WHERE id = $1 AND userkey = $2`, [id, userkey]);
     return rows[0] ?? null;
@@ -57,16 +64,20 @@ const publishDungonForUser = async (id, userkey, options) => {
     const client = await db_1.default.connect();
     try {
         await client.query('BEGIN');
-        const isPublic = options.visibility === 'public';
+        const isPublicRequest = options.visibility === 'public';
         const isFriendShared = options.visibility === 'friends';
+        const isAdminUser = options.isAdminUser === true;
+        // Admins publish directly as public; creators submit a pending request
+        const newStatus = (isPublicRequest && !isAdminUser) ? 'pending' : 'published';
+        const newIspublic = isPublicRequest && isAdminUser;
         const requestedFriendUserKeys = Array.from(new Set(options.friendUserKeys
             .map((friendUserKey) => friendUserKey.trim())
             .filter((friendUserKey) => friendUserKey.length > 0)));
         const published = await client.query(`UPDATE dungons
-       SET status = 'published',
-           ispublic = $3
+       SET status = $3,
+           ispublic = $4
        WHERE id = $1 AND userkey = $2
-       RETURNING id`, [id, userkey, isPublic]);
+       RETURNING id`, [id, userkey, newStatus, newIspublic]);
         if ((published.rowCount ?? 0) === 0) {
             await client.query('ROLLBACK');
             return false;
@@ -155,9 +166,13 @@ const startGameFromPublishedDungon = async (dungonId, userkey, pcId) => {
        $3,
        NOW()
      FROM source
-     ON CONFLICT (dungonid, userkey, pcid)
+     ON CONFLICT ON CONSTRAINT uq_games_dungonid_userkey
      DO UPDATE SET
-       lastupdated = games.lastupdated
+       "dungenJson" = EXCLUDED."dungenJson",
+       inventory = EXCLUDED.inventory,
+       monsters = EXCLUDED.monsters,
+       pcid = EXCLUDED.pcid,
+       lastupdated = NOW()
      RETURNING
        id,
        dungonid,
@@ -235,10 +250,15 @@ const deleteGameForUser = async (id, userkey) => {
     return (rowCount ?? 0) > 0;
 };
 exports.deleteGameForUser = deleteGameForUser;
+const deleteDungonForUser = async (id, userkey) => {
+    const { rowCount } = await db_1.default.query(`DELETE FROM dungons WHERE id = $1 AND userkey = $2`, [id, userkey]);
+    return (rowCount ?? 0) > 0;
+};
+exports.deleteDungonForUser = deleteDungonForUser;
 const insertDungon = async (payload) => {
-    const { rows } = await db_1.default.query(`INSERT INTO dungons (key, userkey, name, description, intro, status, minsplifetime, maxsplifetime)
-     VALUES ($1, $1, $2, $3, $4, 'pending', COALESCE($5, 0), COALESCE($6, 1000000))
-     RETURNING id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime`, [payload.userkey, payload.name, payload.description, payload.intro, payload.minsplifetime, payload.maxsplifetime]);
+    const { rows } = await db_1.default.query(`INSERT INTO dungons (key, userkey, name, description, intro, status, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid)
+     VALUES ($1, $1, $2, $3, $4, 'inproces', COALESCE($5, 0), COALESCE($6, 1000000), COALESCE($7, FALSE), COALESCE($8, FALSE), COALESCE($9, FALSE), $10)
+     RETURNING id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid`, [payload.userkey, payload.name, payload.description, payload.intro, payload.minsplifetime, payload.maxsplifetime, payload.ismaingame, payload.issample, payload.resettable_per_pc, payload.imageid ?? null]);
     return rows[0];
 };
 exports.insertDungon = insertDungon;
@@ -266,13 +286,66 @@ const updateDungonMetadataForUser = async (id, userkey, metadata) => {
         updates.push(`maxsplifetime = $${paramIndex++}`);
         values.push(metadata.maxsplifetime);
     }
+    if (typeof metadata.resettable_per_pc === 'boolean') {
+        updates.push(`resettable_per_pc = $${paramIndex++}`);
+        values.push(metadata.resettable_per_pc);
+    }
+    if ('imageid' in metadata) {
+        updates.push(`imageid = $${paramIndex++}`);
+        values.push(metadata.imageid ?? null);
+    }
     if (updates.length === 0) {
         return null;
     }
     const { rows } = await db_1.default.query(`UPDATE dungons
      SET ${updates.join(', ')}
      WHERE id = $1 AND userkey = $2
-     RETURNING id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime`, values);
+     RETURNING id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, resettable_per_pc, imageid`, values);
     return rows[0] ?? null;
 };
 exports.updateDungonMetadataForUser = updateDungonMetadataForUser;
+const approveDungon = async (id, adminKey) => {
+    const { rowCount } = await db_1.default.query(`UPDATE dungons
+     SET status = 'published',
+         ispublic = TRUE,
+         approvedby = $2,
+         approveddate = NOW()
+     WHERE id = $1 AND status = 'pending'`, [id, adminKey]);
+    return (rowCount ?? 0) > 0;
+};
+exports.approveDungon = approveDungon;
+const getDungonSpRewardById = async (id) => {
+    const { rows } = await db_1.default.query(`SELECT COALESCE(spreward, 0) AS spreward FROM dungons WHERE id = $1`, [id]);
+    return rows[0]?.spreward ?? 0;
+};
+exports.getDungonSpRewardById = getDungonSpRewardById;
+const getSampleDungonFromDb = async () => {
+    const { rows } = await db_1.default.query(`SELECT id, name, description, intro
+     FROM dungons
+     WHERE issample = TRUE AND status = 'published'
+     LIMIT 1`);
+    return rows[0] ?? null;
+};
+exports.getSampleDungonFromDb = getSampleDungonFromDb;
+const getSampleDungonFullFromDb = async () => {
+    const { rows } = await db_1.default.query(`SELECT id, name, description, intro, "dungenJson" AS "dungenJson", COALESCE(spreward, 0) AS spreward
+     FROM dungons
+     WHERE issample = TRUE AND status = 'published'
+     LIMIT 1`);
+    return rows[0] ?? null;
+};
+exports.getSampleDungonFullFromDb = getSampleDungonFullFromDb;
+const setSampleDungonInDb = async (id) => {
+    await db_1.default.query(`UPDATE dungons SET issample = FALSE WHERE issample = TRUE`);
+    const { rowCount } = await db_1.default.query(`UPDATE dungons SET issample = TRUE WHERE id = $1 AND status = 'published'`, [id]);
+    return (rowCount ?? 0) > 0;
+};
+exports.setSampleDungonInDb = setSampleDungonInDb;
+const getAllPublishedDungonsForAdmin = async () => {
+    const { rows } = await db_1.default.query(`SELECT id, name, issample
+     FROM dungons
+     WHERE status = 'published'
+     ORDER BY id DESC`);
+    return rows;
+};
+exports.getAllPublishedDungonsForAdmin = getAllPublishedDungonsForAdmin;

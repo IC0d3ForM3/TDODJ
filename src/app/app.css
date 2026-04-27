@@ -1,3 +1,18 @@
+.beta-banner {
+  background: linear-gradient(90deg, #6b2800, #9a3c00);
+  color: #fff3e0;
+  text-align: center;
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid #c45800;
+}
+
+.beta-banner strong {
+  font-weight: 700;
+  color: #ffd080;
+}
+
 .page-title-row {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

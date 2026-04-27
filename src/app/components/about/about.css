@@ -104,6 +104,31 @@
   color: #7fefab;
 }
 
+.about-section-legal {
+  border-color: rgba(120, 100, 60, 0.3);
+  background: rgba(20, 15, 8, 0.5);
+}
+
+.about-section-legal h3 {
+  color: #c8a860;
+}
+
+.about-tac-link {
+  background: none;
+  border: none;
+  color: #e8c57a;
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.about-tac-link:hover {
+  color: #ffd080;
+}
+
 @media (max-width: 700px) {
   .about-page {
     padding: 1.2rem 0.8rem 2rem;

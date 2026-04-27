@@ -1,0 +1,77 @@
+<div class="tac-backdrop" (click)="onClose()">
+  <div class="tac-modal" role="dialog" aria-modal="true" aria-labelledby="tac-title" (click)="$event.stopPropagation()">
+
+    <div class="tac-header">
+      <h2 class="tac-title" id="tac-title">Terms &amp; Conditions</h2>
+      <button type="button" class="tac-close" aria-label="Close" (click)="onClose()">&#x2715;</button>
+    </div>
+
+    <div class="tac-body">
+
+      <p class="tac-intro">Please read these Terms and Conditions carefully before creating an account or using the Service.</p>
+
+      <h3>1. Agreement to Terms</h3>
+      <p>By accessing or using The Dungeons of Danny Joe ("TDODJ," "the Service"), you agree to be bound by these Terms and Conditions. If you do not agree, do not use the Service.</p>
+
+      <h3>2. Beta Status</h3>
+      <p>The Service is currently in <strong>beta</strong>. This means:</p>
+      <ul>
+        <li>Features may be added, changed, or removed at any time without prior notice.</li>
+        <li>Your account data, game progress, and created content may be reset, altered, or deleted during the beta period.</li>
+        <li>The Service may experience downtime or instability without warning.</li>
+        <li>We provide no guarantees regarding uptime, performance, or data retention.</li>
+      </ul>
+
+      <h3>3. Eligibility</h3>
+      <p>You must be at least 13 years of age to use the Service. By registering, you confirm that you meet this requirement. If you are under 18, you confirm that you have your parent or guardian's permission.</p>
+
+      <h3>4. User Accounts</h3>
+      <p>You are responsible for keeping your account credentials confidential. You agree not to share your account with others or use another person's account. You are responsible for all activity that occurs under your account.</p>
+
+      <h3>5. Acceptable Use</h3>
+      <p>You agree not to:</p>
+      <ul>
+        <li>Use the Service for any unlawful purpose;</li>
+        <li>Attempt to gain unauthorized access to other accounts, systems, or data;</li>
+        <li>Create, upload, or distribute content that is harmful, abusive, offensive, or defamatory;</li>
+        <li>Attempt to reverse-engineer, decompile, or otherwise interfere with the Service;</li>
+        <li>Use automated tools or bots to interact with the Service without express permission;</li>
+        <li>Impersonate any other person or entity.</li>
+      </ul>
+
+      <h3>6. User-Created Content</h3>
+      <p>Content you create (dungeons, characters, etc.) remains your intellectual property. By publishing content through the Service, you grant us a non-exclusive, worldwide, royalty-free license to store, display, and distribute that content to other users for as long as it remains published.</p>
+
+      <h3>7. Privacy and Data</h3>
+      <p>We collect your username, email address, and gameplay data to provide the Service. We do not sell your personal information to third parties. Data is stored securely and used only to operate the Service.</p>
+
+      <h3>8. Disclaimer of Warranties</h3>
+      <p>THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTY OF ANY KIND. WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.</p>
+
+      <h3>9. Limitation of Liability</h3>
+      <p>TO THE FULLEST EXTENT PERMITTED BY LAW, TDODJ AND ITS CREATORS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR USE OF THE SERVICE.</p>
+
+      <h3>10. Changes to Terms</h3>
+      <p>We may update these Terms at any time. Your continued use of the Service after changes are posted constitutes acceptance of the updated Terms.</p>
+
+      <h3>11. Termination</h3>
+      <p>We reserve the right to suspend or terminate your account at any time, with or without cause, particularly if you violate these Terms.</p>
+
+      <h3>12. Governing Law</h3>
+      <p>These Terms are governed by applicable law without regard to conflict of law provisions.</p>
+
+      <h3>13. Contact</h3>
+      <p>Questions about these Terms? Please reach us through the <a href="/contact">Contact page</a>.</p>
+
+    </div>
+
+    <div class="tac-footer">
+      <button type="button" class="tac-btn-download" (click)="downloadTac()">&#x2B07; Download (.txt)</button>
+      @if (showAgreeButton) {
+        <button type="button" class="tac-btn-agree" (click)="onAgree()">I Agree</button>
+      }
+      <button type="button" class="tac-btn-close" (click)="onClose()">Close</button>
+    </div>
+
+  </div>
+</div>

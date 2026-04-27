@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveImageForUser = exports.createImageForUser = exports.checkImageAccessibleByIdForUser = exports.checkUserIsAdminByGuid = exports.fetchImageLibraryByUserGuid = exports.fetchImagesByUserGuid = void 0;
+exports.fetchImagesByIds = exports.fetchPublicImagesByIds = exports.saveImageForUser = exports.createImageForUser = exports.checkImageAccessibleByIdForUser = exports.checkUserIsAdminByGuid = exports.fetchImageLibraryByUserGuid = exports.fetchImagesByUserGuid = void 0;
 const imageRepository_1 = require("../repositories/imageRepository");
 const fetchImagesByUserGuid = async (userguid) => {
     return await (0, imageRepository_1.getImagesByUserGuid)(userguid);
@@ -26,3 +26,11 @@ const saveImageForUser = async (id, userguid, payload) => {
     return await (0, imageRepository_1.updateImageForUser)(id, userguid, payload);
 };
 exports.saveImageForUser = saveImageForUser;
+const fetchPublicImagesByIds = async (ids) => {
+    return await (0, imageRepository_1.getPublicImagesByIds)(ids);
+};
+exports.fetchPublicImagesByIds = fetchPublicImagesByIds;
+const fetchImagesByIds = async (ids) => {
+    return await (0, imageRepository_1.getImagesByIds)(ids);
+};
+exports.fetchImagesByIds = fetchImagesByIds;

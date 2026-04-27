@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.saveCurseForUser = exports.createCurseForUser = exports.checkUserIsAdminByGuid = exports.fetchCursesByUserGuid = void 0;
+const curseRepository_1 = require("../repositories/curseRepository");
+const fetchCursesByUserGuid = (userguid) => (0, curseRepository_1.getCursesByUserGuid)(userguid);
+exports.fetchCursesByUserGuid = fetchCursesByUserGuid;
+const checkUserIsAdminByGuid = (userguid) => (0, curseRepository_1.isAdminUserByGuid)(userguid);
+exports.checkUserIsAdminByGuid = checkUserIsAdminByGuid;
+const createCurseForUser = (userguid, payload) => (0, curseRepository_1.insertCurseForUser)(userguid, payload);
+exports.createCurseForUser = createCurseForUser;
+const saveCurseForUser = (id, userguid, payload) => (0, curseRepository_1.updateCurseForUser)(id, userguid, payload);
+exports.saveCurseForUser = saveCurseForUser;

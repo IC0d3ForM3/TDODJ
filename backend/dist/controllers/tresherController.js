@@ -36,22 +36,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateTresher = exports.createTresher = exports.getTreshers = void 0;
 const tresherService = __importStar(require("../services/tresherService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const VALID_TRESHER_TYPES = [
-    'Weapon',
-    'Armor',
-    'Coins',
-    'Potion',
-    'OtherTresher',
-];
-const VALID_ARMOR_TYPES = [
-    'head',
-    'hand',
-    'body',
-    'arms',
-    'legs',
-];
-const VALID_COIN_TYPES = ['Gold', 'Silver', 'Copper', 'Tin'];
-const VALID_POTION_EFFECT_TARGETS = ['Health', 'AC', 'AE'];
 const getTreshers = async (req, res) => {
     const userkey = req.query['userkey'];
     const scope = req.query['scope'];
@@ -139,92 +123,33 @@ const normalizeTresherPayload = (value) => {
         return null;
     }
     const input = value;
-    const type = normalizeTresherType(input.type);
-    if (!type) {
-        return null;
-    }
-    const payload = {
-        type,
+    return {
+        type: normalizeTresherType(input.type),
         name: normalizeText(input.name, 'Unnamed Tresher'),
         description: normalizeText(input.description, ''),
-        worth: Math.max(0, normalizeNumber(input.worth, 0)),
-        curseID: normalizeNullableNumber(input.curseID ?? input.curseId),
-        trapID: normalizeNullableNumber(input.trapID ?? input.trapId),
-        HP: null,
-        damage: null,
-        hands: null,
-        range: null,
-        ammoType: null,
-        speedReduction: null,
-        armorType: null,
-        coinType: null,
-        effectNumber: null,
-        effectTarget: null,
-        effectDuration: null,
+        gold: Math.max(0, normalizeNumber(input.gold, 0)),
+        silver: Math.max(0, normalizeNumber(input.silver, 0)),
+        copper: Math.max(0, normalizeNumber(input.copper, 0)),
+        zinc: Math.max(0, normalizeNumber(input.zinc, 0)),
+        item1Id: normalizeNullableNumber(input.item1Id),
+        item2Id: normalizeNullableNumber(input.item2Id),
+        item3Id: normalizeNullableNumber(input.item3Id),
+        item4Id: normalizeNullableNumber(input.item4Id),
+        spell1Id: normalizeNullableNumber(input.spell1Id),
+        spell2Id: normalizeNullableNumber(input.spell2Id),
+        spell3Id: normalizeNullableNumber(input.spell3Id),
+        spell4Id: normalizeNullableNumber(input.spell4Id),
+        curse1Id: normalizeNullableNumber(input.curse1Id),
+        curse2Id: normalizeNullableNumber(input.curse2Id),
         isPublic: normalizeBoolean(input.isPublic ?? input.ispublic),
+        isquest: normalizeBoolean(input.isquest),
+        spReward: Math.max(0, normalizeNumber(input.spReward ?? input.spreward, 0)),
+        imageId: normalizeNullableNumber(input.imageId),
+        soundId: normalizeNullableNumber(input.soundId),
+        potion1Id: normalizeNullableNumber(input.potion1Id),
+        potion2Id: normalizeNullableNumber(input.potion2Id),
+        potion3Id: normalizeNullableNumber(input.potion3Id),
     };
-    if (type === 'Weapon') {
-        payload.HP = normalizeNumber(input.HP ?? input.hp, 10);
-        payload.damage = normalizeNumber(input.damage, 0);
-        payload.hands = Math.max(1, normalizeNumber(input.hands, 1));
-        payload.range = Math.max(0, normalizeNumber(input.range, 0));
-        payload.ammoType = normalizeNullableText(input.ammoType);
-        return payload;
-    }
-    if (type === 'Armor') {
-        payload.HP = normalizeNumber(input.HP ?? input.hp, 10);
-        payload.hands = Math.max(0, normalizeNumber(input.hands, 0));
-        payload.speedReduction = normalizeNumber(input.speedReduction, 0);
-        payload.armorType = normalizeArmorType(input.armorType);
-        return payload;
-    }
-    if (type === 'Coins') {
-        payload.coinType = normalizeCoinType(input.coinType);
-        return payload;
-    }
-    if (type === 'Potion') {
-        payload.effectNumber = normalizeNumber(input.effectNumber, 0);
-        payload.effectTarget = normalizePotionEffectTarget(input.effectTarget);
-        const target = payload.effectTarget;
-        if (target === 'AC' || target === 'AE') {
-            payload.effectDuration = Math.max(0, normalizeNumber(input.effectDuration, 1));
-        }
-        return payload;
-    }
-    payload.HP = normalizeNumber(input.HP ?? input.hp, 10);
-    return payload;
-};
-const normalizeTresherType = (value) => {
-    if (typeof value !== 'string') {
-        return null;
-    }
-    return VALID_TRESHER_TYPES.includes(value)
-        ? value
-        : null;
-};
-const normalizeArmorType = (value) => {
-    if (typeof value !== 'string') {
-        return null;
-    }
-    return VALID_ARMOR_TYPES.includes(value)
-        ? value
-        : null;
-};
-const normalizeCoinType = (value) => {
-    if (typeof value !== 'string') {
-        return null;
-    }
-    return VALID_COIN_TYPES.includes(value)
-        ? value
-        : null;
-};
-const normalizePotionEffectTarget = (value) => {
-    if (typeof value !== 'string') {
-        return null;
-    }
-    return VALID_POTION_EFFECT_TARGETS.includes(value)
-        ? value
-        : null;
 };
 const normalizeText = (value, fallback) => {
     if (typeof value !== 'string') {
@@ -259,3 +184,12 @@ const normalizeNullableNumber = (value) => {
     return Number.isFinite(normalized) ? normalized : null;
 };
 const normalizeBoolean = (value) => value === true;
+const VALID_TRESHER_TYPES = ['Weapon', 'Armor', 'Coins', 'Potion', 'OtherTresher'];
+const normalizeTresherType = (value) => {
+    if (typeof value === 'string') {
+        const match = VALID_TRESHER_TYPES.find((t) => t.toLowerCase() === value.trim().toLowerCase());
+        if (match)
+            return match;
+    }
+    return 'OtherTresher';
+};

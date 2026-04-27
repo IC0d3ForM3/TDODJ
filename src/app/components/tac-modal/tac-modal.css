@@ -1,0 +1,159 @@
+.tac-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.tac-modal {
+  background: #1a1610;
+  border: 1px solid #5a3a1a;
+  border-radius: 8px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  max-height: 88vh;
+  color: #e8d9c0;
+}
+
+.tac-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid #5a3a1a;
+  flex-shrink: 0;
+}
+
+.tac-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #e8c57a;
+  letter-spacing: 0.04em;
+}
+
+.tac-close {
+  background: none;
+  border: none;
+  color: #a08060;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.tac-close:hover {
+  color: #e8c57a;
+  background: rgba(255, 200, 80, 0.1);
+}
+
+.tac-body {
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+  flex: 1;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.tac-body h3 {
+  color: #e8c57a;
+  font-size: 0.95rem;
+  margin: 1.1rem 0 0.35rem;
+}
+
+.tac-body h3:first-of-type {
+  margin-top: 0.4rem;
+}
+
+.tac-body p {
+  margin: 0 0 0.5rem;
+  color: #d0b890;
+}
+
+.tac-body ul {
+  margin: 0.25rem 0 0.6rem 1.2rem;
+  padding: 0;
+  color: #d0b890;
+}
+
+.tac-body ul li {
+  margin-bottom: 0.25rem;
+}
+
+.tac-intro {
+  font-style: italic;
+  color: #a08060;
+}
+
+.tac-body a {
+  color: #e8c57a;
+  text-decoration: underline;
+}
+
+.tac-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #5a3a1a;
+  flex-shrink: 0;
+}
+
+.tac-btn-download {
+  background: none;
+  border: 1px solid #5a3a1a;
+  color: #a08060;
+  border-radius: 5px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  margin-right: auto;
+}
+
+.tac-btn-download:hover {
+  border-color: #a08060;
+  color: #e8d9c0;
+}
+
+.tac-btn-agree {
+  background: linear-gradient(135deg, #7c3100, #a84200);
+  border: 1px solid #d46000;
+  color: #fff3e0;
+  border-radius: 5px;
+  padding: 0.42rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.tac-btn-agree:hover {
+  opacity: 0.88;
+}
+
+.tac-btn-close {
+  background: none;
+  border: 1px solid #5a3a1a;
+  color: #a08060;
+  border-radius: 5px;
+  padding: 0.42rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.tac-btn-close:hover {
+  border-color: #a08060;
+  color: #e8d9c0;
+}

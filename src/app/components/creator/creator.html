@@ -1863,180 +1863,330 @@
 			aria-label="Place monster"
 			(click)="$event.stopPropagation()"
 		>
-			<h4 class="door-dialog-title">{{ editingMonsterPlacementPos() ? 'Edit Monster' : 'Place Monster' }}</h4>
 			@if (pendingMonsterPlacement(); as pendingPlacement) {
 				<p class="details-message" style="margin: 0 0 0.7rem">
 					row {{ pendingPlacement.row }}, col {{ pendingPlacement.column }}
 				</p>
 			}
 
-			<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
-				<input
-					type="checkbox"
-					[checked]="placeMonsterRoam()"
-					(change)="onPlaceMonsterRoamChange($event)"
-				/>
-				Roam
-			</label>
+			@if (!editingMonsterPlacementPos() && placeMonsterSelectedId() === null) {
+				<!-- ── STEP 1: Pick a monster ─────────────────────────────────── -->
+				<h4 class="door-dialog-title">Place Monster</h4>
 
-			<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
-				<input
-					type="checkbox"
-					[checked]="placeMonsterIsDormant()"
-					(change)="onPlaceMonsterIsDormantChange($event)"
-				/>
-				Dormant (only acts when triggered)
-			</label>
-
-			@if (placeMonsterIsDormant()) {
-				<div style="margin-bottom: 0.7rem; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; font-size: 0.85rem;">
-					<p class="details-message" style="margin: 0 0 0.4rem; font-weight: 600;">Guard Square (optional)</p>
-					@if (placeMonsterGuardRow() !== null) {
-						<p class="details-message" style="margin: 0 0 0.4rem; color: #ff9500;">
-							Guarding row {{ placeMonsterGuardRow() }}, col {{ placeMonsterGuardCol() }}
-						</p>
-						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem; margin-right: 0.4rem" (click)="clearMonsterGuardSquare()">Clear</button>
-						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingGuardSquare()">Change</button>
-					} @else {
-						<p class="details-message" style="margin: 0 0 0.4rem; opacity: 0.7;">No guard square — will only wake on reinforcement call or if attacked.</p>
-						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingGuardSquare()">Click to set guard square</button>
-					}
-				</div>
-			}
-
-			<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
-				<input
-					type="checkbox"
-					[checked]="placeMonsterIsStationary()"
-					(change)="onPlaceMonsterIsStationaryChange($event)"
-				/>
-				Stationary (stays in place until PC reaches trigger square)
-			</label>
-
-			@if (placeMonsterIsStationary()) {
-				<div style="margin-bottom: 0.7rem; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; font-size: 0.85rem;">
-					<p class="details-message" style="margin: 0 0 0.4rem; font-weight: 600;">Trigger Square (optional)</p>
-					@if (placeMonsterStationaryTriggerRow() !== null) {
-						<p class="details-message" style="margin: 0 0 0.4rem; color: #ff9500;">
-							Trigger at row {{ placeMonsterStationaryTriggerRow() }}, col {{ placeMonsterStationaryTriggerCol() }}
-						</p>
-						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem; margin-right: 0.4rem" (click)="clearMonsterStationaryTriggerSquare()">Clear</button>
-						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingStationaryTriggerSquare()">Change</button>
-					} @else {
-						<p class="details-message" style="margin: 0 0 0.4rem; opacity: 0.7;">No trigger square — monster stays stationary permanently (can still attack if adjacent).</p>
-						<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingStationaryTriggerSquare()">Click to set trigger square</button>
-					}
-				</div>
-			}
-
-			<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
-				<input
-					type="checkbox"
-					[checked]="placeMonsterNoAttackUnlessAttacked()"
-					(change)="onPlaceMonsterNoAttackUnlessAttackedChange($event)"
-				/>
-				Won't attack unless attacked first
-			</label>
-
-			@if (selectedDungonTreshers().length > 0) {
-				<p class="details-message" style="margin: 0 0 0.3rem">Drop Treshers</p>
-				<ul class="dungons-list" style="margin-bottom: 0.6rem">
-					@for (tresher of selectedDungonTreshers(); track tresher.id) {
-						<li class="dungons-list-item">
-							<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box">
-								<input
-									type="checkbox"
-									[checked]="isMonsterDropTresherSelected(tresher.id)"
-									(change)="toggleMonsterDropTresher(tresher.id)"
-								/>
-								{{ tresher.name || 'Unnamed Tresher' }}
-								<small style="margin-left: 0.4rem; opacity: 0.7">({{ tresher.type }})</small>
-							</label>
-						</li>
-					}
-				</ul>
-			}
-
-			@if (keyList.length > 0) {
-				<p class="details-message" style="margin: 0 0 0.3rem">Drop Keys</p>
-				<ul class="dungons-list" style="margin-bottom: 0.6rem">
-					@for (key of keyList; track key.id) {
-						<li class="dungons-list-item">
-							<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box" [style.opacity]="isKeyPlaced(key.id) ? '0.45' : '1'">
-								<input
-									type="checkbox"
-									[checked]="isMonsterDropKeySelected(key.id)"
-									[disabled]="isKeyPlaced(key.id)"
-									(change)="toggleMonsterDropKey(key.id)"
-								/>
-								{{ key.name || 'Unnamed Key' }}{{ isKeyPlaced(key.id) ? ' (placed)' : '' }}
-							</label>
-						</li>
-					}
-				</ul>
-			}
-
-			@if (isLoadingMonsterLibrary()) {
-				<p class="details-message" style="margin-top: 0.6rem">Loading monsters...</p>
-			}
-			@if (monsterLibraryError()) {
-				<p class="details-message details-message-error" style="margin-top: 0.6rem">{{ monsterLibraryError() }}</p>
-			}
-
-			@if (selectedDungonMonsters().length > 0 || placeDialogLibraryMonsters().length > 0) {
-				<p class="details-message" style="margin: 0.7rem 0 0.4rem">My Available Monsters</p>
-				<ul class="dungons-list">
-					@for (monster of selectedDungonMonsters(); track monster.id) {
-						<li class="dungons-list-item">
-							<button
-								type="button"
-								class="dungons-list-button place-select-btn"
-								(click)="placeSelectedMonsterAtPendingPlacement(monster.id)"
-							>
-								@if (monster.imageId) {
-									<img class="place-select-thumb" [src]="imageUrlById(monster.imageId)" alt="" />
-								}
-								<span class="place-select-info">
-									<span>{{ monster.name }}</span>
-									<small>{{ monster.type }} | HP {{ monster.hp }} | AC {{ monster.ac }} | Mine</small>
-								</span>
-							</button>
-						</li>
-					}
-					@for (monster of placeDialogLibraryMonsters(); track monster.userguid + ':' + monster.id) {
-						<li class="dungons-list-item">
-							<button
-								type="button"
-								class="dungons-list-button place-select-btn"
-								(click)="placeLibraryMonsterAtPendingPlacement(monster.id)"
-							>
-								@if (monster.imageId) {
-									<img class="place-select-thumb" [src]="imageUrlById(monster.imageId)" alt="" />
-								}
-								<span class="place-select-info">
-									<span>{{ monster.name }}</span>
-									<small>{{ monster.type }} | HP {{ monster.hp }} | AC {{ monster.ac }} | {{ libraryMonsterSourceLabel(monster) }}</small>
-								</span>
-							</button>
-						</li>
-					}
-				</ul>
-			}
-
-			@if (!isLoadingMonsterLibrary() && !hasAnyPlaceableMonsters()) {
-				<p class="details-message" style="margin-top: 0.6rem">No monsters available yet.</p>
-			}
-
-			<div class="form-actions">
-				@if (editingMonsterPlacementPos()) {
-					<button type="button" class="save-button" (click)="saveMonsterPlacementSettings()">Update Settings</button>
-					<button type="button" class="cancel-button" (click)="copyMonsterPlacement()">Copy</button>
-					<button type="button" class="cancel-button" style="background-color:#9d2525;color:#fff;border-color:#8f1f1f" (click)="removeMonsterAtEditPos()">Remove</button>
+				@if (isLoadingMonsterLibrary()) {
+					<p class="details-message" style="margin-top: 0.6rem">Loading monsters...</p>
 				}
-				<button type="button" class="cancel-button" (click)="closePlaceMonsterDialog()">
-					Close
-				</button>
-			</div>
+				@if (monsterLibraryError()) {
+					<p class="details-message details-message-error" style="margin-top: 0.6rem">{{ monsterLibraryError() }}</p>
+				}
+
+				@if (selectedDungonMonsters().length > 0 || placeDialogLibraryMonsters().length > 0) {
+					<p class="details-message" style="margin: 0 0 0.4rem">Select a monster to place:</p>
+					<ul class="dungons-list">
+						@for (monster of selectedDungonMonsters(); track monster.id) {
+							<li class="dungons-list-item">
+								<button
+									type="button"
+									class="dungons-list-button place-select-btn"
+									(click)="placeSelectedMonsterAtPendingPlacement(monster.id)"
+								>
+									@if (monster.imageId) {
+										<img class="place-select-thumb" [src]="imageUrlById(monster.imageId)" alt="" />
+									}
+									<span class="place-select-info">
+										<span>{{ monster.name }}</span>
+										<small>{{ monster.type }} | HP {{ monster.hp }} | AC {{ monster.ac }} | Mine</small>
+									</span>
+								</button>
+							</li>
+						}
+						@for (monster of placeDialogLibraryMonsters(); track monster.userguid + ':' + monster.id) {
+							<li class="dungons-list-item">
+								<button
+									type="button"
+									class="dungons-list-button place-select-btn"
+									(click)="placeLibraryMonsterAtPendingPlacement(monster.id)"
+								>
+									@if (monster.imageId) {
+										<img class="place-select-thumb" [src]="imageUrlById(monster.imageId)" alt="" />
+									}
+									<span class="place-select-info">
+										<span>{{ monster.name }}</span>
+										<small>{{ monster.type }} | HP {{ monster.hp }} | AC {{ monster.ac }} | {{ libraryMonsterSourceLabel(monster) }}</small>
+									</span>
+								</button>
+							</li>
+						}
+					</ul>
+				}
+
+				@if (!isLoadingMonsterLibrary() && !hasAnyPlaceableMonsters()) {
+					<p class="details-message" style="margin-top: 0.6rem">No monsters available yet.</p>
+				}
+
+				<div class="form-actions">
+					<button type="button" class="cancel-button" (click)="closePlaceMonsterDialog()">Close</button>
+				</div>
+			} @else {
+				<!-- ── STEP 2: Configure (new) or Edit ────────────────────────── -->
+				<h4 class="door-dialog-title">{{ editingMonsterPlacementPos() ? 'Edit Monster' : 'Configure Monster' }}</h4>
+
+				@if (placeMonsterSelectedInfo(); as info) {
+					<div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem; padding: 0.4rem 0.5rem; background: #2a2a2a; border-radius: 4px;">
+						@if (info.imageId) {
+							<img class="place-select-thumb" [src]="imageUrlById(info.imageId)" alt="" />
+						}
+						<span>
+							<strong style="color: #f0e6d3">{{ info.name }}</strong>
+							<small style="display: block; opacity: 0.7">{{ info.type }} | HP {{ info.hp }} | AC {{ info.ac }}</small>
+						</span>
+					</div>
+				}
+
+				<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
+					<input
+						type="checkbox"
+						[checked]="placeMonsterRoam()"
+						(change)="onPlaceMonsterRoamChange($event)"
+					/>
+					Roam
+				</label>
+
+				<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
+					<input
+						type="checkbox"
+						[checked]="placeMonsterIsDormant()"
+						(change)="onPlaceMonsterIsDormantChange($event)"
+					/>
+					Dormant (only acts when triggered)
+				</label>
+
+				@if (placeMonsterIsDormant()) {
+					<div style="margin-bottom: 0.7rem; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; font-size: 0.85rem;">
+						<p class="details-message" style="margin: 0 0 0.4rem; font-weight: 600;">Guard Square (optional)</p>
+						@if (placeMonsterGuardRow() !== null) {
+							<p class="details-message" style="margin: 0 0 0.4rem; color: #ff9500;">
+								Guarding row {{ placeMonsterGuardRow() }}, col {{ placeMonsterGuardCol() }}
+							</p>
+							<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem; margin-right: 0.4rem" (click)="clearMonsterGuardSquare()">Clear</button>
+							<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingGuardSquare()">Change</button>
+						} @else {
+							<p class="details-message" style="margin: 0 0 0.4rem; opacity: 0.7;">No guard square — will only wake on reinforcement call or if attacked.</p>
+							<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingGuardSquare()">Click to set guard square</button>
+						}
+					</div>
+				}
+
+				<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
+					<input
+						type="checkbox"
+						[checked]="placeMonsterIsStationary()"
+						(change)="onPlaceMonsterIsStationaryChange($event)"
+					/>
+					Stationary (stays in place until PC reaches trigger square)
+				</label>
+
+				@if (placeMonsterIsStationary()) {
+					<div style="margin-bottom: 0.7rem; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; font-size: 0.85rem;">
+						<p class="details-message" style="margin: 0 0 0.4rem; font-weight: 600;">Trigger Square (optional)</p>
+						@if (placeMonsterStationaryTriggerRow() !== null) {
+							<p class="details-message" style="margin: 0 0 0.4rem; color: #ff9500;">
+								Trigger at row {{ placeMonsterStationaryTriggerRow() }}, col {{ placeMonsterStationaryTriggerCol() }}
+							</p>
+							<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem; margin-right: 0.4rem" (click)="clearMonsterStationaryTriggerSquare()">Clear</button>
+							<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingStationaryTriggerSquare()">Change</button>
+						} @else {
+							<p class="details-message" style="margin: 0 0 0.4rem; opacity: 0.7;">No trigger square — monster stays stationary permanently (can still attack if adjacent).</p>
+							<button type="button" class="cancel-button" style="font-size: 0.8rem; padding: 0.2rem 0.5rem" (click)="startSelectingStationaryTriggerSquare()">Click to set trigger square</button>
+						}
+					</div>
+				}
+
+				<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
+					<input
+						type="checkbox"
+						[checked]="placeMonsterNoAttackUnlessAttacked()"
+						(change)="onPlaceMonsterNoAttackUnlessAttackedChange($event)"
+					/>
+					Won't attack unless attacked first
+				</label>
+
+				@if (selectedDungonTreshers().length > 0) {
+					<p class="details-message" style="margin: 0 0 0.3rem">Drop Treshers</p>
+					<ul class="dungons-list" style="margin-bottom: 0.6rem">
+						@for (tresher of selectedDungonTreshers(); track tresher.id) {
+							<li class="dungons-list-item">
+								<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box">
+									<input
+										type="checkbox"
+										[checked]="isMonsterDropTresherSelected(tresher.id)"
+										(change)="toggleMonsterDropTresher(tresher.id)"
+									/>
+									{{ tresher.name || 'Unnamed Tresher' }}
+									<small style="margin-left: 0.4rem; opacity: 0.7">({{ tresher.type }})</small>
+								</label>
+							</li>
+						}
+					</ul>
+				}
+
+				@if (keyList.length > 0) {
+					<p class="details-message" style="margin: 0 0 0.3rem">Drop Keys</p>
+					<ul class="dungons-list" style="margin-bottom: 0.6rem">
+						@for (key of keyList; track key.id) {
+							<li class="dungons-list-item">
+								<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box" [style.opacity]="isKeyPlaced(key.id) ? '0.45' : '1'">
+									<input
+										type="checkbox"
+										[checked]="isMonsterDropKeySelected(key.id)"
+										[disabled]="isKeyPlaced(key.id)"
+										(change)="toggleMonsterDropKey(key.id)"
+									/>
+									{{ key.name || 'Unnamed Key' }}{{ isKeyPlaced(key.id) ? ' (placed)' : '' }}
+								</label>
+							</li>
+						}
+					</ul>
+				}
+
+				@if (libItems().length > 0) {
+					<p class="details-message" style="margin: 0 0 0.3rem">Drop Items</p>
+					<ul class="dungons-list" style="margin-bottom: 0.6rem">
+						@for (item of libItems(); track item.id) {
+							<li class="dungons-list-item">
+								<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box">
+									<input
+										type="checkbox"
+										[checked]="isMonsterDropItemSelected(item.id)"
+										(change)="toggleMonsterDropItem(item.id)"
+									/>
+									{{ item.name || 'Unnamed Item' }}
+									<small style="margin-left: 0.4rem; opacity: 0.7">({{ item.type }})</small>
+								</label>
+							</li>
+						}
+					</ul>
+					@if (placeMonsterWeaponChoices().length > 0) {
+						<div style="margin-bottom: 0.7rem; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; font-size: 0.85rem;">
+							<p class="details-message" style="margin: 0 0 0.4rem; font-weight: 600;">Monster Weapon (used in combat)</p>
+							<label class="door-locked-toggle" style="padding: 0.2rem 0; display: block">
+								<input
+									type="radio"
+									name="monsterWeapon"
+									[checked]="placeMonsterWeaponItemId() === null"
+									(change)="placeMonsterWeaponItemId.set(null)"
+								/>
+								None
+							</label>
+							@for (w of placeMonsterWeaponChoices(); track w.id) {
+								<label class="door-locked-toggle" style="padding: 0.2rem 0; display: block">
+									<input
+										type="radio"
+										name="monsterWeapon"
+										[checked]="placeMonsterWeaponItemId() === w.id"
+										(change)="placeMonsterWeaponItemId.set(w.id)"
+									/>
+									{{ w.name }}
+								</label>
+							}
+						</div>
+					}
+				}
+
+				@if (libUserSpells().length > 0) {
+					<p class="details-message" style="margin: 0 0 0.3rem">Drop Spells</p>
+					<ul class="dungons-list" style="margin-bottom: 0.6rem">
+						@for (spell of libUserSpells(); track spell.id) {
+							<li class="dungons-list-item">
+								<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box">
+									<input
+										type="checkbox"
+										[checked]="isMonsterDropSpellSelected(spell.id)"
+										(change)="toggleMonsterDropSpell(spell.id)"
+									/>
+									{{ spell.name || 'Unnamed Spell' }}
+								</label>
+							</li>
+						}
+					</ul>
+				}
+
+				@if (libPotions().length > 0) {
+					<p class="details-message" style="margin: 0 0 0.3rem">Drop Potions</p>
+					<ul class="dungons-list" style="margin-bottom: 0.6rem">
+						@for (potion of libPotions(); track potion.id) {
+							<li class="dungons-list-item">
+								<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box">
+									<input
+										type="checkbox"
+										[checked]="isMonsterDropPotionSelected(potion.id)"
+										(change)="toggleMonsterDropPotion(potion.id)"
+									/>
+									{{ potion.name || 'Unnamed Potion' }}
+								</label>
+							</li>
+						}
+					</ul>
+				}
+
+				<div style="margin-bottom: 0.7rem;">
+					<p class="details-message" style="margin: 0 0 0.4rem">Drop Currency</p>
+					<div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+						<label style="display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem;">
+							Gold
+							<input
+								type="number"
+								min="0"
+								style="width: 5rem; padding: 0.2rem 0.4rem; background: #2a2a2a; color: #f0e6d3; border: 1px solid #555; border-radius: 4px;"
+								[value]="placeMonsterGold()"
+								(input)="placeMonsterGold.set(+$any($event.target).value || 0)"
+							/>
+						</label>
+						<label style="display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem;">
+							Silver
+							<input
+								type="number"
+								min="0"
+								style="width: 5rem; padding: 0.2rem 0.4rem; background: #2a2a2a; color: #f0e6d3; border: 1px solid #555; border-radius: 4px;"
+								[value]="placeMonsterSilver()"
+								(input)="placeMonsterSilver.set(+$any($event.target).value || 0)"
+							/>
+						</label>
+						<label style="display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem;">
+							Copper
+							<input
+								type="number"
+								min="0"
+								style="width: 5rem; padding: 0.2rem 0.4rem; background: #2a2a2a; color: #f0e6d3; border: 1px solid #555; border-radius: 4px;"
+								[value]="placeMonsterCopper()"
+								(input)="placeMonsterCopper.set(+$any($event.target).value || 0)"
+							/>
+						</label>
+						<label style="display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem;">
+							Zinc
+							<input
+								type="number"
+								min="0"
+								style="width: 5rem; padding: 0.2rem 0.4rem; background: #2a2a2a; color: #f0e6d3; border: 1px solid #555; border-radius: 4px;"
+								[value]="placeMonsterZinc()"
+								(input)="placeMonsterZinc.set(+$any($event.target).value || 0)"
+							/>
+						</label>
+					</div>
+				</div>
+
+				<div class="form-actions">
+					@if (editingMonsterPlacementPos()) {
+						<button type="button" class="save-button" (click)="saveMonsterPlacementSettings()">Update Settings</button>
+						<button type="button" class="cancel-button" (click)="copyMonsterPlacement()">Copy</button>
+						<button type="button" class="cancel-button" style="background-color:#9d2525;color:#fff;border-color:#8f1f1f" (click)="removeMonsterAtEditPos()">Remove</button>
+					} @else {
+						<button type="button" class="save-button" (click)="confirmPlaceSelectedMonster()">Place Monster</button>
+						<button type="button" class="cancel-button" (click)="placeMonsterSelectedId.set(null)">Back</button>
+					}
+					<button type="button" class="cancel-button" (click)="closePlaceMonsterDialog()">Close</button>
+				</div>
+			}
 		</section>
 	</div>
 }

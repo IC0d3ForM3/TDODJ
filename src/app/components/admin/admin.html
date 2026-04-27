@@ -210,3 +210,68 @@
 		</table>
 	}
 </div>
+
+<!-- ── Contact Requests ─────────────────────────────────────────── -->
+<div class="container mt-5 mb-5">
+	<div class="d-flex justify-content-between align-items-center mb-3">
+		<h2 class="mb-0">Contact Requests</h2>
+		<button type="button" class="btn btn-outline-secondary btn-sm" (click)="toggleContactSortDir()">
+			Date {{ contactSortDir() === 'desc' ? '▼ Newest first' : '▲ Oldest first' }}
+		</button>
+	</div>
+
+	@if (contactError()) {
+		<p class="text-danger">{{ contactError() }}</p>
+	}
+
+	@if (isContactsLoading()) {
+		<p>Loading contact requests…</p>
+	}
+
+	@if (!isContactsLoading() && contactRequests().length === 0 && !contactError()) {
+		<p class="text-muted">No contact requests yet.</p>
+	}
+
+	@if (!isContactsLoading() && contactRequests().length > 0) {
+		<table class="table table-bordered table-striped">
+			<thead>
+				<tr>
+					<th>Date</th>
+					<th>Name</th>
+					<th>Email</th>
+					<th>Problem</th>
+					<th>Username</th>
+					<th>Message</th>
+					<th>Read</th>
+					<th>Responded</th>
+				</tr>
+			</thead>
+			<tbody>
+				@for (req of contactSortedRequests(); track req.id) {
+					<tr [class.table-secondary]="req.isread && req.isresponded">
+						<td style="white-space: nowrap; font-size: 0.85rem;">{{ req.createdat | date:'short' }}</td>
+						<td>{{ req.name }}</td>
+						<td>{{ req.email }}</td>
+						<td>{{ req.problem }}</td>
+						<td>{{ req.username || '—' }}</td>
+						<td style="max-width: 300px; white-space: pre-wrap; word-break: break-word;">{{ req.message }}</td>
+						<td style="text-align: center;">
+							<input
+								type="checkbox"
+								[checked]="req.isread"
+								(change)="updateContactFlags(req, !req.isread, req.isresponded)"
+							/>
+						</td>
+						<td style="text-align: center;">
+							<input
+								type="checkbox"
+								[checked]="req.isresponded"
+								(change)="updateContactFlags(req, req.isread, !req.isresponded)"
+							/>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+</div>

@@ -1,0 +1,2 @@
+ALTER TABLE monsters
+  ADD COLUMN IF NOT EXISTS attacks JSONB NOT NULL DEFAULT '[]'::jsonb;

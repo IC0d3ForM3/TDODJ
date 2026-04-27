@@ -108,4 +108,16 @@
     </p>
   </section>
 
+  <!-- Legal -->
+  <section class="about-section about-section-legal">
+    <h3>Legal</h3>
+    <p>
+      By using this site you agree to our
+      <button type="button" class="about-tac-link" (click)="showTac = true">Terms &amp; Conditions</button>.
+    </p>
+    @if (showTac) {
+      <app-tac-modal (closed)="showTac = false" />
+    }
+  </section>
+
 </section>

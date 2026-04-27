@@ -8,6 +8,13 @@ export interface MonsterPlacement {
   tresherIds?: number[];
   keyIds?: number[];
   itemIds?: number[];
+  spellIds?: number[];
+  potionIds?: number[];
+  gold?: number;
+  silver?: number;
+  copper?: number;
+  zinc?: number;
+  weaponItemId?: number | null;
   isDormant?: boolean;
   guardRow?: number | null;
   guardColumn?: number | null;

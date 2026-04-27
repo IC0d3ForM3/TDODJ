@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateImage = exports.createImage = exports.getImages = exports.uploadImageMiddleware = void 0;
+exports.updateImage = exports.createImage = exports.getPublicImagesByIds = exports.getImages = exports.uploadImageMiddleware = void 0;
 const node_fs_1 = __importDefault(require("node:fs"));
 const node_path_1 = __importDefault(require("node:path"));
 const node_crypto_1 = require("node:crypto");
@@ -89,6 +89,28 @@ const getImages = async (req, res) => {
     }
 };
 exports.getImages = getImages;
+const getPublicImagesByIds = async (req, res) => {
+    const idsRaw = req.query['ids'];
+    if (typeof idsRaw !== 'string' || !idsRaw.trim()) {
+        return res.status(400).json({ error: 'ids query parameter is required' });
+    }
+    const ids = idsRaw
+        .split(',')
+        .map((s) => Number.parseInt(s.trim(), 10))
+        .filter((n) => Number.isInteger(n) && n > 0);
+    if (ids.length === 0) {
+        return res.json([]);
+    }
+    try {
+        const images = await imageService.fetchPublicImagesByIds(ids);
+        return res.json(images);
+    }
+    catch (error) {
+        console.error('Error fetching public images by ids:', error);
+        return res.status(500).json({ error: 'Failed to fetch images' });
+    }
+};
+exports.getPublicImagesByIds = getPublicImagesByIds;
 const createImage = async (req, res) => {
     const userkeyRaw = req.body?.['userkey'];
     if (typeof userkeyRaw !== 'string' || !UUID_REGEX.test(userkeyRaw.trim())) {

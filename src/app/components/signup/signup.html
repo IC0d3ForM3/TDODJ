@@ -43,6 +43,22 @@
       <div *ngIf="result === 2" class="signup-notice signup-notice-warn">That email is already registered.</div>
       <div *ngIf="result === -1 || error" class="signup-notice signup-notice-error">Signup failed. {{ error }}</div>
 
+      <div class="signup-tac-row">
+        <label class="signup-tac-label">
+          <input type="checkbox" name="agreedToTac" [(ngModel)]="agreedToTac" />
+          I have read and agree to the
+          <button type="button" class="signup-tac-link" (click)="showTac = true">Terms &amp; Conditions</button>
+        </label>
+      </div>
+
+      @if (showTac) {
+        <app-tac-modal
+          [showAgreeButton]="true"
+          (closed)="showTac = false"
+          (agreed)="agreedToTac = true; showTac = false"
+        />
+      }
+
       <button type="submit" class="signup-btn" [disabled]="!canSave()">Create Account</button>
     </form>
 

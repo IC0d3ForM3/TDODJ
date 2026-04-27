@@ -1,9 +1,12 @@
 import { Component } from '@angular/core';
+import { TacModal } from '../tac-modal/tac-modal';
 
 @Component({
   selector: 'app-about',
-  imports: [],
+  imports: [TacModal],
   templateUrl: './about.html',
   styleUrl: './about.css',
 })
-export class About {}
+export class About {
+  showTac = false;
+}

@@ -162,6 +162,7 @@ const normalizeMonsterPayload = (value) => {
     const numberOfAttacks = Math.max(0, Math.max(numberOfAttacksInput, attacks.length));
     return {
         imageId: normalizeNullableNumber(input.imageId ?? input.imageid),
+        soundId: normalizeNullableNumber(input.soundId),
         tresherIds: normalizeIdList(input.tresherIds ?? input.tresherids ?? input.trusherIds ?? input.trusherids),
         keyIds: normalizeIdList(input.keyIds ?? input.keyids),
         name: normalizeText(input.name, 'Unnamed Monster'),
@@ -174,6 +175,19 @@ const normalizeMonsterPayload = (value) => {
         numberOfAttacks,
         attacks,
         isPublic: normalizeBoolean(input.isPublic ?? input.ispublic),
+        spReward: Math.max(0, normalizeNumber(input.spReward, 0)),
+        magic: Math.max(0, normalizeNumber(input.magic, 0)),
+        magicResistance: Math.max(0, normalizeNumber(input.magicResistance, 0)),
+        callsReinforcements: normalizeBoolean(input.callsReinforcements),
+        toHitPlusNeeded: Math.max(0, normalizeNumber(input.toHitPlusNeeded, 0)),
+        npcGreeting: normalizeNullableText(input.npcGreeting),
+        npcInfo1: normalizeNullableText(input.npcInfo1),
+        npcInfo2: normalizeNullableText(input.npcInfo2),
+        npcInfo3: normalizeNullableText(input.npcInfo3),
+        npcOnlyAttackWhenAttacked: normalizeBoolean(input.npcOnlyAttackWhenAttacked),
+        npcGivesInfoAfterDamaged: normalizeBoolean(input.npcGivesInfoAfterDamaged),
+        npcAttacksAfterInfo: normalizeBoolean(input.npcAttacksAfterInfo),
+        npcCanTrade: normalizeBoolean(input.npcCanTrade),
     };
 };
 const normalizeMonsterAttacks = (value) => {
@@ -187,9 +201,13 @@ const normalizeMonsterAttacks = (value) => {
         }
         const source = item;
         return {
+            type: normalizeText(source.type, 'Weapon'),
             description: normalizeText(source.description ?? source.discription, ''),
             damage: Math.max(0, normalizeNumber(source.damage, 0)),
             plusToHit: normalizeNumber(source.plusToHit ?? source.plushToHit, 0),
+            weaponItemId: normalizeNullableNumber(source.weaponItemId),
+            spellId: normalizeNullableNumber(source.spellId),
+            curseId: normalizeNullableNumber(source.curseId),
         };
     })
         .filter((item) => item !== null);
@@ -238,3 +256,9 @@ const findFirstInvalidTresherIdForUser = async (tresherIds, userguid) => {
     return null;
 };
 const normalizeBoolean = (value) => value === true;
+const normalizeNullableText = (value) => {
+    if (typeof value !== 'string')
+        return null;
+    const trimmed = value.trim();
+    return trimmed || null;
+};

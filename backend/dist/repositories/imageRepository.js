@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateImageForUser = exports.insertImageForUser = exports.isImageAccessibleByIdForUser = exports.getImageLibraryByUserGuid = exports.getImagesByUserGuid = exports.isAdminUserByGuid = void 0;
+exports.getPublicImagesByIds = exports.getImagesByIds = exports.updateImageForUser = exports.insertImageForUser = exports.isImageAccessibleByIdForUser = exports.getImageLibraryByUserGuid = exports.getImagesByUserGuid = exports.isAdminUserByGuid = void 0;
 const db_1 = __importDefault(require("../db"));
 const isAdminUserByGuid = async (userguid) => {
     const { rows } = await db_1.default.query('SELECT isadmin FROM users WHERE key = $1', [userguid]);
@@ -107,3 +107,41 @@ const updateImageForUser = async (id, userguid, payload) => {
     return rows[0] ?? null;
 };
 exports.updateImageForUser = updateImageForUser;
+const getImagesByIds = async (ids) => {
+    if (ids.length === 0) {
+        return [];
+    }
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+    const { rows } = await db_1.default.query(`SELECT
+       id,
+       userguid::text AS userguid,
+       path,
+       ispublic AS "isPublic",
+       isactive AS "isActive",
+       name,
+       createdat::text AS "createdAt",
+       updatedat::text AS "updatedAt"
+     FROM images
+     WHERE id IN (${placeholders})`, ids);
+    return rows;
+};
+exports.getImagesByIds = getImagesByIds;
+const getPublicImagesByIds = async (ids) => {
+    if (ids.length === 0) {
+        return [];
+    }
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+    const { rows } = await db_1.default.query(`SELECT
+       id,
+       userguid::text AS userguid,
+       path,
+       ispublic AS "isPublic",
+       isactive AS "isActive",
+       name,
+       createdat::text AS "createdAt",
+       updatedat::text AS "updatedAt"
+     FROM images
+     WHERE id IN (${placeholders}) AND ispublic = true AND isactive = true`, ids);
+    return rows;
+};
+exports.getPublicImagesByIds = getPublicImagesByIds;

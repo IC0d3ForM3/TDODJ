@@ -437,8 +437,8 @@ export const insertDungon = async (
   payload: NewDungon
 ): Promise<DungonRecord> => {
   const { rows } = await pool.query<DungonRecord>(
-    `INSERT INTO dungons (key, userkey, name, description, intro, status, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid)
-     VALUES ($1, $1, $2, $3, $4, 'inproces', COALESCE($5, 0), COALESCE($6, 1000000), COALESCE($7, FALSE), COALESCE($8, FALSE), COALESCE($9, FALSE), $10)
+    `INSERT INTO dungons (key, userkey, userguid, name, description, intro, status, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid)
+     VALUES ($1, $1, $1, $2, $3, $4, 'inproces', COALESCE($5, 0), COALESCE($6, 1000000), COALESCE($7, FALSE), COALESCE($8, FALSE), COALESCE($9, FALSE), $10)
      RETURNING id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid`,
     [payload.userkey, payload.name, payload.description, payload.intro, payload.minsplifetime, payload.maxsplifetime, payload.ismaingame, payload.issample, payload.resettable_per_pc, payload.imageid ?? null]
   );

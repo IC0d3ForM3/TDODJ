@@ -10,6 +10,7 @@ import { Game } from './components/game/game';
 import { HowToPlay } from './components/how-to-play/how-to-play';
 import { PaperAndPencil } from './components/paper-and-pencil/paper-and-pencil';
 import { SampleGame } from './components/sample-game/sample-game';
+import { Contact } from './components/contact/contact';
 import { loggedInGuard } from './guards/logged-in.guard';
 
 export const routes: Routes = [
@@ -26,4 +27,5 @@ export const routes: Routes = [
 	{ path: 'create', component: Creator },
 	{ path: 'game/:gameId', component: Game },
 	{ path: 'sample-play', component: Game },
+  { path: 'contact', component: Contact },
 ];

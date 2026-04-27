@@ -7025,6 +7025,37 @@ export class Game implements OnInit {
         .filter((v): v is number => v !== null)
         .map((v) => Math.max(0, Math.floor(v)));
     }
+    const rawItemIds = (source as Record<string, unknown>)['itemIds'];
+    if (Array.isArray(rawItemIds)) {
+      result.itemIds = rawItemIds
+        .map((v) => this.toFiniteNumber(v))
+        .filter((v): v is number => v !== null)
+        .map((v) => Math.max(0, Math.floor(v)));
+    }
+    const rawSpellIds = (source as Record<string, unknown>)['spellIds'];
+    if (Array.isArray(rawSpellIds)) {
+      result.spellIds = rawSpellIds
+        .map((v) => this.toFiniteNumber(v))
+        .filter((v): v is number => v !== null)
+        .map((v) => Math.max(0, Math.floor(v)));
+    }
+    const rawPotionIds = (source as Record<string, unknown>)['potionIds'];
+    if (Array.isArray(rawPotionIds)) {
+      result.potionIds = rawPotionIds
+        .map((v) => this.toFiniteNumber(v))
+        .filter((v): v is number => v !== null)
+        .map((v) => Math.max(0, Math.floor(v)));
+    }
+    const gold = this.toFiniteNumber((source as Record<string, unknown>)['gold']);
+    if (gold !== null && gold > 0) result.gold = Math.max(0, Math.floor(gold));
+    const silver = this.toFiniteNumber((source as Record<string, unknown>)['silver']);
+    if (silver !== null && silver > 0) result.silver = Math.max(0, Math.floor(silver));
+    const copper = this.toFiniteNumber((source as Record<string, unknown>)['copper']);
+    if (copper !== null && copper > 0) result.copper = Math.max(0, Math.floor(copper));
+    const zinc = this.toFiniteNumber((source as Record<string, unknown>)['zinc']);
+    if (zinc !== null && zinc > 0) result.zinc = Math.max(0, Math.floor(zinc));
+    const weaponItemId = this.toFiniteNumber((source as Record<string, unknown>)['weaponItemId']);
+    if (weaponItemId !== null) result.weaponItemId = Math.max(0, Math.floor(weaponItemId));
 
     if (source.isDormant === true) {
       result.isDormant = true;
