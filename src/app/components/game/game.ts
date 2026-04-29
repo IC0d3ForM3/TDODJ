@@ -13,6 +13,12 @@ import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Account } from '../../services/account';
+import { DungeonJsonService } from '../../services/dungeon-json';
+import { DungeonStateService } from '../../services/dungeon-state';
+import { GameInventoryService, PcTresherSpellData } from '../../services/game-inventory';
+import { GameCombatService, TurnPhase, GameMonsterInstance, CombatLogEntry, ActiveEffect } from '../../services/game-combat';
+import { GameMovementService } from '../../services/game-movement';
+import { GameInteractionService, InfoPanelTab, NearbyDoorInfo, StashItem } from '../../services/game-interaction';
 import { DungeonFirstPersonComponent } from '../dungeon-first-person/dungeon-first-person';
 import { DungeonPreviewGridComponent } from '../dungeon-preview-grid/dungeon-preview-grid';
 import { TavernModalComponent, TavernStat } from '../tavern-modal/tavern-modal';
@@ -90,94 +96,11 @@ interface ImageRecordPayload {
 type DiagonalFacingDirection = 'upRight' | 'downRight' | 'downLeft' | 'upLeft';
 type DisplayFacingDirection = FacingDirection | DiagonalFacingDirection;
 type DirectionPadDirection = DisplayFacingDirection | 'center';
-type InfoPanelTab = 'nearby' | 'inventory';
-type TurnPhase = 'player' | 'monsters' | 'gameover';
-
-interface GameMonsterInstance {
-  placementIndex: number;
-  monsterId: number;
-  row: number;
-  column: number;
-  roam: boolean;
-  currentHp: number;
-  isDead: boolean;
-  remainingAE: number;
-  attacksUsedThisTurn: number;
-  dropTresherIds: number[];
-  dropKeyIds: number[];
-  activeEffects: ActiveEffect[];
-  isDormant: boolean;
-  guardRow: number | null;
-  guardColumn: number | null;
-  isStationary: boolean;
-  stationaryTriggerRow: number | null;
-  stationaryTriggerCol: number | null;
-  noAttackUnlessAttacked: boolean;
-  hasCalledReinforcements: boolean;
-  // NPC state
-  hasGreeted: boolean;
-  hasSharedInfo: boolean;
-  isSpared: boolean;
-  npcIsHostile: boolean;
-}
-
-interface CombatLogEntry {
-  text: string;
-}
-
-interface PcTresherSpellData {
-  id: number;
-  name: string;
-  description: string;
-  range: number;
-  effectOn: string;
-  effectAmount: number;
-  successTestValue: number;
-  sp: number;
-  lastFor: number;
-  numberOfTargets: number;
-}
-
-interface ActiveEffect {
-  effectOn: string;
-  effectAmount: number;
-  remainingAE: number;
-  sourceName: string;
-}
-
-interface NearbyDoorInfo {
-  door: Door;
-  squareKey: string;
-  side: SquareSide;
-  neighborSquareKey: string;
-  neighborSide: SquareSide;
-  direction: string;
-  canOpen: boolean;
-  canUnlock: boolean;
-  canPick: boolean;
-  matchingKeyIndex: number | null;
-  canPassWithItem: boolean;
-}
 
 interface DirectionPadButton {
   direction: DirectionPadDirection;
   label: string;
   ariaLabel: string;
-}
-
-interface StashItem {
-  id: number;
-  name: string;
-  description: string;
-  type: string;
-  gold: number;
-  silver: number;
-  copper: number;
-  zinc: number;
-  spReward: number;
-  imageId: number | null;
-  soundId: number | null;
-  isquest: boolean;
 }
 
 @Component({
@@ -193,6 +116,12 @@ export class Game implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly account = inject(Account);
+  private readonly dungeonJsonService = inject(DungeonJsonService);
+  private readonly dungeonState = inject(DungeonStateService);
+  readonly inventoryService = inject(GameInventoryService);
+  readonly combatService = inject(GameCombatService);
+  readonly movementService = inject(GameMovementService);
+  readonly interactionService = inject(GameInteractionService);
 
   private previewGridCanvasRef: ElementRef<HTMLCanvasElement> | null = null;
   private firstPersonCanvasRef: ElementRef<HTMLCanvasElement> | null = null;
@@ -213,7 +142,7 @@ export class Game implements OnInit {
   readonly gameLoadError = signal<string | null>(null);
   readonly gameName = signal('Game');
   readonly gameLastUpdated = signal<string | null>(null);
-  readonly previewActionMessage = signal<string | null>(null);
+  get previewActionMessage() { return this.interactionService.previewActionMessage; }
 
   readonly playerDeadName = computed(() => {
     if (this.turnPhase() !== 'gameover') return null;
@@ -221,21 +150,22 @@ export class Game implements OnInit {
     if (!preview) return null;
     return this.cheaterByDungon()[preview.dungonId]?.name ?? null;
   });
-  readonly visualFacingByDungon = signal<Record<number, DisplayFacingDirection>>({});
-  readonly activeInfoPanelTab = signal<InfoPanelTab>('nearby');
-  readonly equippedTresherIndexesByDungon = signal<Record<number, number[]>>({});
-  readonly equippedItemIdsByDungon = signal<Record<number, number[]>>({});
+  get playerDeathCause() { return this.combatService.playerDeathCause; }
+  get visualFacingByDungon() { return this.movementService.visualFacingByDungon; }
+  get activeInfoPanelTab() { return this.interactionService.activeInfoPanelTab; }
+  get equippedTresherIndexesByDungon() { return this.inventoryService.equippedTresherIndexesByDungon; }
+  get equippedItemIdsByDungon() { return this.inventoryService.equippedItemIdsByDungon; }
 
-  readonly gridPreviewContext = signal<GridPreviewContext | null>(null);
-  readonly cheaterByDungon = signal<Record<number, Cheater>>({});
-  readonly startPointByDungon = signal<Record<number, StartPoint | null>>({});
-  readonly tresherListByDungon = signal<Record<number, Tresher[]>>({});
-  readonly tresherPlacementsByDungon = signal<Record<number, TresherPlacement[]>>({});
-  readonly monsterListByDungon = signal<Record<number, Monster[]>>({});
-  readonly monsterPlacementsByDungon = signal<Record<number, MonsterPlacement[]>>({});
-  readonly filledSquaresByDungon = signal<Record<number, Record<string, true>>>({});
-  readonly squaresByDungon = signal<Record<number, Record<string, Square>>>({});
-  readonly squareTextsByDungon = signal<Record<number, SquareText[]>>({});
+  get gridPreviewContext() { return this.movementService.gridPreviewContext; }
+  get cheaterByDungon() { return this.dungeonState.cheaterByDungon; }
+  get startPointByDungon() { return this.dungeonState.startPointByDungon; }
+  get tresherListByDungon() { return this.dungeonState.tresherListByDungon; }
+  get tresherPlacementsByDungon() { return this.dungeonState.tresherPlacementsByDungon; }
+  get monsterListByDungon() { return this.dungeonState.monsterListByDungon; }
+  get monsterPlacementsByDungon() { return this.dungeonState.monsterPlacementsByDungon; }
+  get filledSquaresByDungon() { return this.dungeonState.filledSquaresByDungon; }
+  get squaresByDungon() { return this.dungeonState.squaresByDungon; }
+  get squareTextsByDungon() { return this.dungeonState.squareTextsByDungon; };
 
   private readonly monsterImageCache = new Map<number, HTMLImageElement>();
   private readonly monsterImageCacheVersion = signal(0);
@@ -243,35 +173,35 @@ export class Game implements OnInit {
   private readonly obstacleImageCacheVersion = signal(0);
   private readonly doorImageCache = new Map<string, HTMLImageElement>();
 
-  readonly turnPhase = signal<TurnPhase>('player');
-  readonly playerAE = signal(0);
-  readonly playerMaxAE = 5;
-  readonly playerNOA = signal(1);
-  readonly playerAttacksThisTurn = signal(0);
-  readonly playerNOD = signal(1);
-  readonly playerDefendsThisTurn = signal(0);
-  readonly playerDefendStacks = signal(0);
-  readonly playerBoostAttackACPenalty = signal(0);
-  readonly playerType = signal<string | null>(null);
-  readonly playerSpecies = signal<string | null>(null);
-  readonly playerName = signal<string | null>(null);
-  readonly playerSearchesThisTurn = signal(0);
-  readonly playerHp = signal(20);
-  readonly playerMaxHp = signal(20);
-  readonly playerBaseAC = signal<number>(10);
-  readonly monsterInstances = signal<GameMonsterInstance[]>([]);
-  readonly combatLog = signal<CombatLogEntry[]>([]);
+  get turnPhase() { return this.combatService.turnPhase; }
+  get playerAE() { return this.combatService.playerAE; }
+  get playerMaxAE() { return this.combatService.playerMaxAE; }
+  get playerNOA() { return this.combatService.playerNOA; }
+  get playerAttacksThisTurn() { return this.combatService.playerAttacksThisTurn; }
+  get playerNOD() { return this.combatService.playerNOD; }
+  get playerDefendsThisTurn() { return this.combatService.playerDefendsThisTurn; }
+  get playerDefendStacks() { return this.combatService.playerDefendStacks; }
+  get playerBoostAttackACPenalty() { return this.combatService.playerBoostAttackACPenalty; }
+  get playerType() { return this.combatService.playerType; }
+  get playerSpecies() { return this.combatService.playerSpecies; }
+  get playerName() { return this.combatService.playerName; }
+  get playerSearchesThisTurn() { return this.combatService.playerSearchesThisTurn; }
+  get playerHp() { return this.combatService.playerHp; }
+  get playerMaxHp() { return this.combatService.playerMaxHp; }
+  get playerBaseAC() { return this.combatService.playerBaseAC; }
+  get monsterInstances() { return this.combatService.monsterInstances; }
+  get combatLog() { return this.combatService.combatLog; }
   readonly currentGameId = signal<number | null>(null);
   readonly isSampleMode = signal(false);
-  readonly pcInventoryInitializedByDungon = signal<Record<number, boolean>>({});
-  readonly pcTresherItemsById = signal<Map<number, { id: number; name: string; description: string; type: string; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }>>(new Map());
-  readonly pcTresherPotionsById = signal<Map<number, { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>>(new Map());
-  readonly exitsByDungon = signal<Record<number, DungonExit[]>>({});
-  readonly playerSp = signal<number>(0);
-  readonly playerMind = signal<number>(0);
-  readonly playerStamina = signal<number>(0);
-  readonly playerStrength = signal<number>(0);
-  readonly playerMagicPower = signal<number>(0);
+  get pcInventoryInitializedByDungon() { return this.inventoryService.pcInventoryInitializedByDungon; }
+  get pcTresherItemsById() { return this.inventoryService.pcTresherItemsById; }
+  get pcTresherPotionsById() { return this.inventoryService.pcTresherPotionsById; }
+  get exitsByDungon() { return this.dungeonState.exitsByDungon; }
+  get playerSp() { return this.combatService.playerSp; }
+  get playerMind() { return this.combatService.playerMind; }
+  get playerStamina() { return this.combatService.playerStamina; }
+  get playerStrength() { return this.combatService.playerStrength; }
+  get playerMagicPower() { return this.combatService.playerMagicPower; }
 
   readonly playerLevel = computed(() => {
     const wStr = this.playerStrength() * 2;
@@ -314,31 +244,31 @@ export class Game implements OnInit {
     }
     return level;
   }
-  readonly pcTresherSpellsById = signal<Map<number, PcTresherSpellData>>(new Map());
-  readonly selectedSpellId = signal<number | null>(null);
-  readonly selectedCombatTarget = signal<{ row: number; column: number } | null>(null);
-  readonly outOfRangeTarget = signal<{ row: number; column: number } | null>(null);
-  private readonly comboTracker = signal<{ placementIndex: number; count: number } | null>(null);
-  readonly playerActiveEffects = signal<ActiveEffect[]>([]);
-  readonly floorTrapPlacementsByDungon = signal<Record<number, FloorTrapPlacement[]>>({});
-  readonly floorItemPlacementsByDungon = signal<Record<number, ItemPlacement[]>>({});
-  readonly floorPotionPlacementsByDungon = signal<Record<number, PotionPlacement[]>>({});
-  readonly obstaclePlacementsByDungon = signal<Record<number, ObstaclePlacement[]>>({});
-  readonly floorItemListByDungon = signal<Record<number, Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }>>>({});
-  readonly floorPotionListByDungon = signal<Record<number, Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>>>({});
-  readonly collectedFloorItemsByDungon = signal<Record<number, Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }>>>({});
-  readonly collectedFloorPotionsByDungon = signal<Record<number, Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>>>({});
-  readonly foundTrap = signal<{ trap: Trap; source: 'door' | 'tresher' | 'floor'; doorInfo?: NearbyDoorInfo; tresherIndex?: number; floorTrapId?: number; adjacentRow?: number; adjacentColumn?: number } | null>(null);
-  readonly bloodSplatter = signal<{ x: number; y: number; r: number }[]>([]);
-  readonly playerHitFlash = signal(false);
-  readonly spellTargetMode = signal<{ spellId: number; maxTargets: number; targets: { row: number; column: number }[] } | null>(null);
-  readonly spellBeamEffects = signal<{ fromRow: number; fromCol: number; toRow: number; toCol: number; isHP: boolean }[]>([]);
-  readonly monsterGlowKeys = signal<Set<string>>(new Set());
-  readonly playerYellowHitFlash = signal(false);
+  get pcTresherSpellsById() { return this.inventoryService.pcTresherSpellsById; }
+  get selectedSpellId() { return this.combatService.selectedSpellId; }
+  get selectedCombatTarget() { return this.combatService.selectedCombatTarget; }
+  get outOfRangeTarget() { return this.combatService.outOfRangeTarget; }
+  private get comboTracker() { return this.combatService.comboTracker; }
+  get playerActiveEffects() { return this.combatService.playerActiveEffects; }
+  get floorTrapPlacementsByDungon() { return this.dungeonState.floorTrapPlacementsByDungon; }
+  get floorItemPlacementsByDungon() { return this.inventoryService.floorItemPlacementsByDungon; }
+  get floorPotionPlacementsByDungon() { return this.inventoryService.floorPotionPlacementsByDungon; }
+  get obstaclePlacementsByDungon() { return this.dungeonState.obstaclePlacementsByDungon; }
+  get floorItemListByDungon() { return this.inventoryService.floorItemListByDungon; }
+  get floorPotionListByDungon() { return this.inventoryService.floorPotionListByDungon; }
+  get collectedFloorItemsByDungon() { return this.inventoryService.collectedFloorItemsByDungon; }
+  get collectedFloorPotionsByDungon() { return this.inventoryService.collectedFloorPotionsByDungon; }
+  get foundTrap() { return this.interactionService.foundTrap; }
+  get bloodSplatter() { return this.combatService.bloodSplatter; }
+  get playerHitFlash() { return this.combatService.playerHitFlash; }
+  get spellTargetMode() { return this.combatService.spellTargetMode; }
+  get spellBeamEffects() { return this.combatService.spellBeamEffects; }
+  get monsterGlowKeys() { return this.combatService.monsterGlowKeys; }
+  get playerYellowHitFlash() { return this.combatService.playerYellowHitFlash; }
   readonly currentPcId_ = signal<number | null>(null);
-  readonly dungonSpReward = signal<number>(0);
-  readonly dungonWon = signal<boolean>(false);
-  readonly showTavernModal = signal<boolean>(false);
+  get dungonSpReward() { return this.interactionService.dungonSpReward; }
+  get dungonWon() { return this.interactionService.dungonWon; }
+  get showTavernModal() { return this.interactionService.showTavernModal; }
   readonly soundMuted = signal<boolean>(localStorage.getItem('soundMuted') === 'true');
   readonly showReportBugModal = signal<boolean>(false);
   readonly bugReportUsername = signal<string>('');
@@ -357,18 +287,18 @@ export class Game implements OnInit {
     }
     return result;
   }
-  readonly npcDialog = signal<{ instance: GameMonsterInstance; template: Monster; creativeGreeting?: string } | null>(null);
-  readonly npcTradesPurchased = signal<number[]>([]);
+  get npcDialog() { return this.interactionService.npcDialog; }
+  get npcTradesPurchased() { return this.interactionService.npcTradesPurchased; }
   readonly isMainGame = signal<boolean>(false);
   readonly resettablePerPc = signal<boolean>(false);
-  readonly stashItems = signal<StashItem[]>([]);
+  get stashItems() { return this.interactionService.stashItems; }
   readonly cheaterByPcId_ = signal<Record<number, Cheater>>({});
   readonly saveStatus = signal<'saving' | 'saved' | 'error' | 'lost' | null>(null);
   private saveStatusTimer: ReturnType<typeof setTimeout> | null = null;
   private isSaveInFlight = false;
   private pendingSavePayload: { gameId: number; dungonId: number; userKey: string } | null = null;
-  readonly winStairsImageIndex = signal<1 | 2 | 3 | null>(null);
-  readonly pendingExitTransitionType = signal<ExitTransitionType | null>(null);
+  get winStairsImageIndex() { return this.movementService.winStairsImageIndex; }
+  get pendingExitTransitionType() { return this.movementService.pendingExitTransitionType; }
 
   readonly gridCellSize = 20;
   readonly gridColumnCount = 50;
@@ -706,8 +636,7 @@ export class Game implements OnInit {
   }
 
   isTresherEquipable(tresher: Tresher): boolean {
-    const type = tresher.type ?? 'OtherTresher';
-    return type === 'Weapon' || type === 'Armor';
+    return this.inventoryService.isTresherEquipable(tresher);
   }
 
   hasWeaponEquipped(): boolean {
@@ -1015,12 +944,7 @@ export class Game implements OnInit {
   }
 
   getInventoryTresherMeta(tresher: Tresher): string {
-    const parts: string[] = [];
-    if (tresher.gold > 0) parts.push(`Gold: ${tresher.gold}`);
-    if (tresher.silver > 0) parts.push(`Silver: ${tresher.silver}`);
-    if (tresher.copper > 0) parts.push(`Copper: ${tresher.copper}`);
-    if (tresher.zinc > 0) parts.push(`Zinc: ${tresher.zinc}`);
-    return parts.join(' | ');
+    return this.inventoryService.getInventoryTresherMeta(tresher);
   }
 
   totalInventoryCurrency(): { gold: number; silver: number; copper: number; zinc: number } {
@@ -1176,31 +1100,11 @@ export class Game implements OnInit {
   });
 
   getTresherInnerItems(tresher: Tresher): Array<{ id: number; name: string; description: string; type: string; effectValue: number | null; armorSlot: string | null; damage: number; range: number }> {
-    const itemsMap = this.pcTresherItemsById();
-    const result: Array<{ id: number; name: string; description: string; type: string; effectValue: number | null; armorSlot: string | null; damage: number; range: number }> = [];
-    for (const itemId of [tresher.item1Id, tresher.item2Id, tresher.item3Id, tresher.item4Id]) {
-      if (itemId != null) {
-        const item = itemsMap.get(itemId);
-        if (item) {
-          result.push(item);
-        }
-      }
-    }
-    return result;
+    return this.inventoryService.getTresherInnerItems(tresher);
   }
 
   getTresherInnerPotions(tresher: Tresher): Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }> {
-    const potionsMap = this.pcTresherPotionsById();
-    const result: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }> = [];
-    for (const potionId of [tresher.potion1Id, tresher.potion2Id, tresher.potion3Id]) {
-      if (potionId != null) {
-        const potion = potionsMap.get(potionId);
-        if (potion) {
-          result.push(potion);
-        }
-      }
-    }
-    return result;
+    return this.inventoryService.getTresherInnerPotions(tresher);
   }
 
   isInnerPotionDrinkable(potion: { effectTo: string }): boolean {
@@ -1212,17 +1116,7 @@ export class Game implements OnInit {
   }
 
   getTresherInnerSpells(tresher: Tresher): PcTresherSpellData[] {
-    const spellsMap = this.pcTresherSpellsById();
-    const result: PcTresherSpellData[] = [];
-    for (const spellId of [tresher.spell1Id, tresher.spell2Id, tresher.spell3Id, tresher.spell4Id]) {
-      if (spellId != null) {
-        const spell = spellsMap.get(spellId);
-        if (spell) {
-          result.push(spell);
-        }
-      }
-    }
-    return result;
+    return this.inventoryService.getTresherInnerSpells(tresher);
   }
 
   getPlayerMagicResistance(): number {
@@ -1517,7 +1411,7 @@ export class Game implements OnInit {
   }
 
   isItemEquipable(type: string): boolean {
-    return type === 'weapon' || type === 'armor' || type === 'ring' || type === 'necklace';
+    return this.inventoryService.isItemEquipable(type);
   }
 
   isItemEquippedById(itemId: number): boolean {
@@ -2463,6 +2357,7 @@ export class Game implements OnInit {
       this.playerHp.set(newHp);
       this.addCombatLog(`Trap triggered! ${trap.name || 'Trap'} deals ${trap.damage} damage to HP.`);
       if (newHp <= 0) {
+        this.playerDeathCause.set(`Killed by a trap${trap.name ? ': ' + trap.name : ''}`);
         this.turnPhase.set('gameover');
         setTimeout(() => this.goHome(), 3500);
       }
@@ -3129,39 +3024,16 @@ export class Game implements OnInit {
     };
   }
 
-  private getEquippedTresherIndexesForDungon(
-    dungonId: number,
-    itemCount: number
-  ): number[] {
-    const seen = new Set<number>();
-    const equippedIndexes = this.equippedTresherIndexesByDungon()[dungonId] ?? [];
-    const sanitizedIndexes: number[] = [];
-
-    for (const rawIndex of equippedIndexes) {
-      if (!Number.isInteger(rawIndex)) {
-        continue;
-      }
-
-      if (rawIndex < 0 || rawIndex >= itemCount || seen.has(rawIndex)) {
-        continue;
-      }
-
-      seen.add(rawIndex);
-      sanitizedIndexes.push(rawIndex);
-    }
-
-    return sanitizedIndexes;
+  private getEquippedTresherIndexesForDungon(dungonId: number, itemCount: number): number[] {
+    return this.inventoryService.getEquippedTresherIndexesForDungon(dungonId, itemCount);
   }
 
   private setEquippedTresherIndexesForDungon(dungonId: number, indexes: number[]): void {
-    this.equippedTresherIndexesByDungon.update((allIndexes) => ({
-      ...allIndexes,
-      [dungonId]: indexes,
-    }));
+    this.inventoryService.setEquippedTresherIndexesForDungon(dungonId, indexes);
   }
 
   private getHandsRequiredForEquip(tresher: Tresher): number {
-    return (tresher.type ?? 'OtherTresher') === 'Weapon' ? 1 : 0;
+    return this.inventoryService.getHandsRequiredForEquip(tresher);
   }
 
   private getCurrentPreviewSquareContext():
@@ -3214,123 +3086,19 @@ export class Game implements OnInit {
   }
 
   private addItemsToCheaterInventory(dungonId: number, keys: Key[], treshers: Tresher[]): void {
-    const existingCheater = this.cheaterByDungon()[dungonId] ?? { ...DEFAULT_CHEATER };
-    const existingInventory = this.normalizeCheaterInventory(existingCheater.inventory);
-
-    const inventoryKeys = keys.map((key) => ({
-      ...key,
-      rownId: null,
-      columnId: null,
-    }));
-
-    this.cheaterByDungon.update((allCheaters) => ({
-      ...allCheaters,
-      [dungonId]: {
-        ...existingCheater,
-        inventory: {
-          keys: [...existingInventory.keys, ...inventoryKeys],
-          treshers: [...existingInventory.treshers, ...treshers.map((tresher) => ({ ...tresher }))],
-        },
-      },
-    }));
-
-    this.setPcInventoryInitialized(dungonId, true);
+    this.inventoryService.addItemsToCheaterInventory(dungonId, keys, treshers);
   }
 
   private seedPcTreshersIntoInventory(dungonId: number, rawPcTreshers: unknown[] | undefined): void {
-    if (this.pcInventoryInitializedByDungon()[dungonId]) {
-      return;
-    }
-
-    if (!Array.isArray(rawPcTreshers) || rawPcTreshers.length === 0) {
-      this.setPcInventoryInitialized(dungonId, true);
-      return;
-    }
-
-    const existingCheater = this.cheaterByDungon()[dungonId] ?? { ...DEFAULT_CHEATER };
-    const existingInventory = this.normalizeCheaterInventory(existingCheater.inventory);
-    const existingIds = new Set(existingInventory.treshers.map((t) => t.id));
-
-    const newTreshers = rawPcTreshers
-      .map((item) => this.parseTresherItem(item))
-      .filter((item): item is Tresher => item !== null && !existingIds.has(item.id));
-
-    if (newTreshers.length === 0) {
-      this.setPcInventoryInitialized(dungonId, true);
-      return;
-    }
-
-    this.cheaterByDungon.update((allCheaters) => ({
-      ...allCheaters,
-      [dungonId]: {
-        ...existingCheater,
-        inventory: {
-          keys: existingInventory.keys,
-          treshers: [...newTreshers, ...existingInventory.treshers],
-        },
-      },
-    }));
-
-    this.setPcInventoryInitialized(dungonId, true);
+    this.inventoryService.seedPcTreshersIntoInventory(dungonId, rawPcTreshers);
   }
 
   private removeInnerPotionSlotFromInventoryTresher(dungonId: number, tresherIndex: number, potionId: number): void {
-    const existingCheater = this.cheaterByDungon()[dungonId] ?? { ...DEFAULT_CHEATER };
-    const existingInventory = this.normalizeCheaterInventory(existingCheater.inventory);
-    if (tresherIndex < 0 || tresherIndex >= existingInventory.treshers.length) return;
-
-    const tresher = existingInventory.treshers[tresherIndex];
-    const updatedTresher: Tresher = {
-      ...tresher,
-      potion1Id: tresher.potion1Id === potionId ? null : tresher.potion1Id,
-      potion2Id: tresher.potion2Id === potionId ? null : tresher.potion2Id,
-      potion3Id: tresher.potion3Id === potionId ? null : tresher.potion3Id,
-    };
-
-    const updatedTreshers = existingInventory.treshers.map((t, i) =>
-      i === tresherIndex ? updatedTresher : t
-    );
-
-    this.cheaterByDungon.update((allCheaters) => ({
-      ...allCheaters,
-      [dungonId]: {
-        ...existingCheater,
-        inventory: {
-          keys: existingInventory.keys,
-          treshers: updatedTreshers,
-        },
-      },
-    }));
+    this.inventoryService.removeInnerPotionSlotFromInventoryTresher(dungonId, tresherIndex, potionId);
   }
 
   private removeInventoryTresherAtIndex(dungonId: number, index: number): void {
-    const existingCheater = this.cheaterByDungon()[dungonId] ?? { ...DEFAULT_CHEATER };
-    const existingInventory = this.normalizeCheaterInventory(existingCheater.inventory);
-    if (index < 0 || index >= existingInventory.treshers.length) {
-      return;
-    }
-
-    const updatedTreshers = existingInventory.treshers.filter((_, itemIndex) => itemIndex !== index);
-    const updatedEquippedIndexes = this.getEquippedTresherIndexesForDungon(
-      dungonId,
-      existingInventory.treshers.length
-    )
-      .filter((equippedIndex) => equippedIndex !== index)
-      .map((equippedIndex) => (equippedIndex > index ? equippedIndex - 1 : equippedIndex));
-
-    this.cheaterByDungon.update((allCheaters) => ({
-      ...allCheaters,
-      [dungonId]: {
-        ...existingCheater,
-        inventory: {
-          keys: existingInventory.keys,
-          treshers: updatedTreshers,
-        },
-      },
-    }));
-
-    this.setEquippedTresherIndexesForDungon(dungonId, updatedEquippedIndexes);
-    this.setPcInventoryInitialized(dungonId, true);
+    this.inventoryService.removeInventoryTresherAtIndex(dungonId, index);
   }
 
   private removeTresherPlacementsAtSquare(dungonId: number, row: number, column: number): void {
@@ -6681,7 +6449,7 @@ export class Game implements OnInit {
           })
         : {};
 
-    const inventory = this.parseCheaterInventory(sourceCheater);
+    const inventory = this.dungeonJsonService.parseCheaterInventory(sourceCheater);
     const cheater: Cheater = {
       name:
         typeof sourceCheater.name === 'string' && sourceCheater.name.trim()
@@ -6740,7 +6508,7 @@ export class Game implements OnInit {
             : [];
 
     const tresherList = sourceTresherList
-      .map((item) => this.parseTresherItem(item))
+      .map((item) => this.dungeonJsonService.parseTresherItem(item))
       .filter((item): item is Tresher => item !== null);
 
     const sourceTresherPlacements = Array.isArray(source.tresherPlacements)
@@ -6753,7 +6521,7 @@ export class Game implements OnInit {
 
     const validTresherIds = new Set(tresherList.map((tresher) => tresher.id));
     const tresherPlacements = sourceTresherPlacements
-      .map((item) => this.parseTresherPlacementItem(item))
+      .map((item) => this.dungeonJsonService.parseTresherPlacementItem(item))
       .filter(
         (item): item is TresherPlacement => item !== null && validTresherIds.has(item.tresherId)
       );
@@ -6824,8 +6592,8 @@ export class Game implements OnInit {
       .map((item) => this.parseExitItem(item))
       .filter((item): item is DungonExit => item !== null);
 
-    const floorTrapPlacements = this.parseFloorTrapPlacements(source.floorTrapPlacements);
-    const obstaclePlacements = this.parseObstaclePlacementsGame(source.obstaclePlacements);
+    const floorTrapPlacements = this.dungeonJsonService.parseFloorTrapPlacements(source.floorTrapPlacements);
+    const obstaclePlacements = this.dungeonJsonService.parseObstaclePlacements(source.obstaclePlacements);
 
     const itemPlacements: ItemPlacement[] = Array.isArray(source.itemPlacements)
       ? source.itemPlacements
@@ -6950,7 +6718,7 @@ export class Game implements OnInit {
           name: typeof raw.name === 'string' && raw.name.trim() ? raw.name : DEFAULT_CHEATER.name,
           rangeOfSight: typeof raw.rangeOfSight === 'number' && Number.isFinite(raw.rangeOfSight) ? raw.rangeOfSight : DEFAULT_CHEATER.rangeOfSight,
           facingDir: this.normalizeFacingDirection(raw.facingDir),
-          inventory: this.parseCheaterInventory(raw),
+          inventory: this.dungeonJsonService.parseCheaterInventory(raw),
         };
       }
     }
@@ -6983,177 +6751,6 @@ export class Game implements OnInit {
       savedPlayerColumn: savedPlayerColumn !== null ? Math.floor(savedPlayerColumn) : null,
       npcTradesPurchased,
       cheaterByPcId,
-    };
-  }
-
-  private parseTresherItem(item: unknown): Tresher | null {
-    if (!item || typeof item !== 'object') {
-      return null;
-    }
-
-    const source = item as Partial<Record<string, unknown>>;
-    const parsedId = this.toFiniteNumber(source['id']);
-    if (parsedId === null) {
-      return null;
-    }
-
-    return {
-      id: Math.max(0, Math.floor(parsedId)),
-      type: typeof source['type'] === 'string' && (source['type'] as string).trim() ? (source['type'] as string).trim() : 'OtherTresher',
-      name: typeof source['name'] === 'string' && (source['name'] as string).trim() ? source['name'] as string : 'Unnamed Tresher',
-      description: typeof source['description'] === 'string' ? source['description'] as string : '',
-      gold: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['gold']), 0)),
-      silver: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['silver']), 0)),
-      copper: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['copper']), 0)),
-      zinc: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['zinc']), 0)),
-      item1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item1Id'])),
-      item2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item2Id'])),
-      item3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item3Id'])),
-      item4Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item4Id'])),
-      spell1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell1Id'])),
-      spell2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell2Id'])),
-      spell3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell3Id'])),
-      spell4Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell4Id'])),
-      curse1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['curse1Id'])),
-      curse2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['curse2Id'])),
-      potion1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion1Id'])),
-      potion2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion2Id'])),
-      potion3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion3Id'])),
-      imageId: this.normalizeNullableNumber(this.toFiniteNumber(source['imageId'])),
-      soundId: this.normalizeNullableNumber(this.toFiniteNumber(source['soundId'])),
-      spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['spReward']), 0)),
-      trap: this.parseTrapObject(source['trap']),
-    };
-  }
-
-  private parseTrapObject(raw: unknown): Trap | null {
-    if (!raw || typeof raw !== 'object') return null;
-    const src = raw as Partial<Record<string, unknown>>;
-    const damageTo = src['damageTo'] === 'Stamina' ? 'Stamina'
-      : src['damageTo'] === 'Mind' ? 'Mind'
-      : src['damageTo'] === 'AE' ? 'AE'
-      : src['damageTo'] === 'ROS' ? 'ROS'
-      : 'HP';
-    return {
-      name: typeof src['name'] === 'string' ? src['name'] : '',
-      description: typeof src['description'] === 'string' ? src['description'] : '',
-      damage: typeof src['damage'] === 'number' ? Math.max(0, src['damage']) : 0,
-      damageTo: damageTo as 'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS',
-      curseId: typeof src['curseId'] === 'number' ? src['curseId'] : null,
-      toDetect: typeof src['toDetect'] === 'number' ? Math.max(0, src['toDetect']) : 10,
-      toDisarm: typeof src['toDisarm'] === 'number' ? Math.max(0, src['toDisarm']) : 10,
-    };
-  }
-
-  private parseFloorTrapPlacements(raw: unknown[] | undefined): FloorTrapPlacement[] {
-    if (!Array.isArray(raw)) return [];
-    const result: FloorTrapPlacement[] = [];
-    for (const item of raw) {
-      if (!item || typeof item !== 'object') continue;
-      const src = item as Partial<Record<string, unknown>>;
-      const trap = this.parseTrapObject(src['trap']);
-      if (!trap) continue;
-      const id = typeof src['id'] === 'number' ? src['id'] : 0;
-      const row = typeof src['row'] === 'number' ? src['row'] : -1;
-      const column = typeof src['column'] === 'number' ? src['column'] : -1;
-      if (row < 0 || column < 0) continue;
-      result.push({
-        id,
-        row,
-        column,
-        trap,
-        isTriggered: src['isTriggered'] === true,
-        isDisarmed: src['isDisarmed'] === true,
-        isDetected: src['isDetected'] === true,
-      });
-    }
-    return result;
-  }
-
-  private parseObstaclePlacementsGame(raw: unknown[] | undefined): ObstaclePlacement[] {
-    if (!Array.isArray(raw)) return [];
-    const result: ObstaclePlacement[] = [];
-    for (const item of raw) {
-      if (!item || typeof item !== 'object') continue;
-      const src = item as Partial<Record<string, unknown>>;
-      const id = typeof src['id'] === 'number' ? src['id'] : 0;
-      const row = typeof src['row'] === 'number' ? src['row'] : -1;
-      const column = typeof src['column'] === 'number' ? src['column'] : -1;
-      if (row < 0 || column < 0) continue;
-      const hp = typeof src['hp'] === 'number' ? Math.max(1, src['hp']) : 10;
-      const currentHp = typeof src['currentHp'] === 'number' ? Math.max(0, src['currentHp']) : hp;
-      const heightPercent = typeof src['heightPercent'] === 'number' ? Math.max(1, Math.min(100, src['heightPercent'])) : 100;
-      const heightAnchor: 'floor' | 'ceiling' = src['heightAnchor'] === 'ceiling' ? 'ceiling' : 'floor';
-      const widthPercent = typeof src['widthPercent'] === 'number' ? Math.max(1, Math.min(100, src['widthPercent'])) : 100;
-      const widthAnchor: 'center' | 'east' | 'west' = src['widthAnchor'] === 'east' ? 'east' : src['widthAnchor'] === 'west' ? 'west' : 'center';
-      const color = typeof src['color'] === 'string' && src['color'] ? src['color'] : null;
-      const shape: 'circle' | 'square' = src['shape'] === 'square' ? 'square' : 'circle';
-      result.push({
-        id,
-        row,
-        column,
-        name: typeof src['name'] === 'string' ? src['name'] : 'Obstacle',
-        note: typeof src['note'] === 'string' ? src['note'] : '',
-        imageId: typeof src['imageId'] === 'number'
-        ? src['imageId']
-        : typeof src['imageId'] === 'string' && src['imageId']
-          ? (parseInt(src['imageId'], 10) || null)
-          : null,
-        hp,
-        isIndestructible: src['isIndestructible'] === true,
-        containsItemId: typeof src['containsItemId'] === 'number' ? src['containsItemId'] : null,
-        shape,
-        heightPercent,
-        heightAnchor,
-        widthPercent,
-        widthAnchor,
-        color,
-        currentHp,
-        isDestroyed: src['isDestroyed'] === true,
-        itemTaken: src['itemTaken'] === true,
-      });
-    }
-    return result;
-  }
-
-  private parseTresherPlacementItem(item: unknown): TresherPlacement | null {
-    if (!item || typeof item !== 'object') {
-      return null;
-    }
-
-    const source = item as Partial<TresherPlacement> & {
-      trasherId?: unknown;
-      tresherID?: unknown;
-      rownId?: unknown;
-      columnId?: unknown;
-      col?: unknown;
-    };
-
-    const tresherIdRaw =
-      source.tresherId !== undefined
-        ? source.tresherId
-        : source.tresherID !== undefined
-          ? source.tresherID
-          : source.trasherId;
-    const rowRaw = source.row !== undefined ? source.row : source.rownId;
-    const columnRaw =
-      source.column !== undefined
-        ? source.column
-        : source.columnId !== undefined
-          ? source.columnId
-          : source.col;
-
-    const tresherId = this.toFiniteNumber(tresherIdRaw);
-    const row = this.toFiniteNumber(rowRaw);
-    const column = this.toFiniteNumber(columnRaw);
-    if (tresherId === null || row === null || column === null) {
-      return null;
-    }
-
-    return {
-      tresherId: Math.max(0, Math.floor(tresherId)),
-      row: Math.floor(row),
-      column: Math.floor(column),
     };
   }
 
@@ -7386,89 +6983,10 @@ export class Game implements OnInit {
       .filter((item): item is MonsterAttack => item !== null);
   }
 
-  private parseCheaterInventory(
-    sourceCheater: Partial<Cheater> & {
-      inventory?: unknown;
-      inventoryKeys?: unknown[];
-      inventoryTreshers?: unknown[];
-    }
-  ): CheaterInventory {
-    const sourceInventory =
-      sourceCheater.inventory && typeof sourceCheater.inventory === 'object'
-        ? (sourceCheater.inventory as Partial<CheaterInventory> & {
-            tresherList?: unknown[];
-            tresherInventory?: unknown[];
-          })
-        : null;
-
-    const sourceInventoryKeys = Array.isArray(sourceInventory?.keys)
-      ? sourceInventory.keys
-      : Array.isArray(sourceCheater.inventoryKeys)
-        ? sourceCheater.inventoryKeys
-        : [];
-
-    const sourceInventoryTreshers = Array.isArray(sourceInventory?.treshers)
-      ? sourceInventory.treshers
-      : Array.isArray(sourceInventory?.tresherList)
-        ? sourceInventory.tresherList
-        : Array.isArray(sourceInventory?.tresherInventory)
-          ? sourceInventory.tresherInventory
-          : Array.isArray(sourceCheater.inventoryTreshers)
-            ? sourceCheater.inventoryTreshers
-            : [];
-
-    const keys = sourceInventoryKeys
-      .map((item) => this.parseInventoryKeyItem(item))
-      .filter((item): item is Key => item !== null);
-
-    const treshers = sourceInventoryTreshers
-      .map((item) => this.parseTresherItem(item))
-      .filter((item): item is Tresher => item !== null);
-
-    return {
-      keys,
-      treshers,
-    };
-  }
-
-  private parseInventoryKeyItem(item: unknown): Key | null {
-    if (!item || typeof item !== 'object') {
-      return null;
-    }
-
-    const sourceKey = item as Partial<Key> & {
-      row?: unknown;
-      column?: unknown;
-    };
-    const parsedId = this.toFiniteNumber(sourceKey.id);
-    if (parsedId === null) {
-      return null;
-    }
-
-    const rowValue = sourceKey.rownId !== undefined ? sourceKey.rownId : sourceKey.row;
-    const columnValue = sourceKey.columnId !== undefined ? sourceKey.columnId : sourceKey.column;
-
-    return {
-      id: Math.max(0, Math.floor(parsedId)),
-      name: typeof sourceKey.name === 'string' ? sourceKey.name : '',
-      description: typeof sourceKey.description === 'string' ? sourceKey.description : '',
-      doorId: this.normalizeNullableNumber(this.toFiniteNumber(sourceKey.doorId)),
-      rownId: this.normalizeNullableNumber(this.toFiniteNumber(rowValue)),
-      columnId: this.normalizeNullableNumber(this.toFiniteNumber(columnValue)),
-    };
-  }
-
   private normalizeCheaterInventory(
     inventory: CheaterInventory | null | undefined
   ): CheaterInventory {
-    return {
-      keys: Array.isArray(inventory?.keys)
-        ? inventory.keys.map((key) => ({ ...key }))
-        : [],
-      treshers: Array.isArray(inventory?.treshers)
-        ? inventory.treshers.map((tresher) => ({ ...tresher }))
-        : [],
-    };
+    return this.inventoryService.normalizeCheaterInventory(inventory);
   }
 
   private getHealingPotionAmount(tresher: Tresher): number {
@@ -7494,10 +7012,7 @@ export class Game implements OnInit {
   }
 
   private setPcInventoryInitialized(dungonId: number, isInitialized: boolean): void {
-    this.pcInventoryInitializedByDungon.update((allStates) => ({
-      ...allStates,
-      [dungonId]: isInitialized,
-    }));
+    this.inventoryService.setPcInventoryInitialized(dungonId, isInitialized);
   }
 
   private toFiniteNumber(value: unknown): number | null {
@@ -8564,6 +8079,7 @@ export class Game implements OnInit {
           const sign = eff.effectAmount >= 0 ? '+' : '';
           this.addCombatLog(`${eff.sourceName}: ${sign}${eff.effectAmount} HP (${eff.remainingAE - 1} AE left).`);
           if (newHp <= 0) {
+            this.playerDeathCause.set(`Killed by ${eff.sourceName}`);
             this.turnPhase.set('gameover');
             setTimeout(() => this.goHome(), 3500);
           }
@@ -9219,6 +8735,7 @@ export class Game implements OnInit {
       );
 
       if (this.playerHp() <= 0) {
+        this.playerDeathCause.set(`Slain by ${template.name}`);
         this.turnPhase.set('gameover');
         this.addCombatLog('You have been slain. Game Over!');
         setTimeout(() => this.goHome(), 3500);

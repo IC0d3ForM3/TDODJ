@@ -1,0 +1,163 @@
+DANDDANNY REFACTOR PROGRESS LOG
+================================
+Branch: refactor1
+Started: April 29, 2026
+
+ALREADY COMPLETED (previous sessions)
+--------------------------------------
+[DONE] Ticket 1.1 — DungeonJsonService
+  File: src/app/services/dungeon-json.ts
+  Extracted 7 shared parsing methods from game.ts + creator.ts
+
+[DONE] Ticket 1.2 — DungeonStateService
+  File: src/app/services/dungeon-state.ts
+  Extracted 12 shared dungeon-keyed signals from game.ts + creator.ts
+
+[DONE] Ticket 2.1 — GameInventoryService
+  File: src/app/services/game-inventory.ts
+  Extracted 12 inventory signals + 15 helper methods from game.ts
+  Exported types: PcTresherSpellData, PcTresherItemData, FloorItemData
+
+
+CURRENT SESSION
+--------------------------------------
+
+[DONE] Ticket 2.2 — GameCombatService
+    File: src/app/services/game-combat.ts
+    Extracted signals: turnPhase, playerAE, playerMaxAE, playerNOA, playerNOD,
+      playerAttacksThisTurn, playerDefendsThisTurn, playerDefendStacks,
+      playerBoostAttackACPenalty, playerSearchesThisTurn, playerType,
+      playerSpecies, playerName, playerHp, playerMaxHp, playerBaseAC,
+      playerSp, playerMind, playerStamina, playerStrength, playerMagicPower,
+      monsterInstances, combatLog, selectedSpellId, selectedCombatTarget,
+      outOfRangeTarget, comboTracker, playerActiveEffects, bloodSplatter,
+      playerHitFlash, playerYellowHitFlash, spellBeamEffects, monsterGlowKeys,
+      spellTargetMode
+    Exported types: TurnPhase, ActiveEffect, GameMonsterInstance, CombatLogEntry
+    Notes: All methods that call consumePlayerAE/startMonsterTurns/saveGameState
+           intentionally remain in game.ts (they are orchestrators)
+    Status: DONE — 0 errors
+
+[DONE] Ticket 2.3 — GameMovementService
+    File: src/app/services/game-movement.ts
+    Extracted signals: gridPreviewContext (player position), visualFacingByDungon,
+      winStairsImageIndex, pendingExitTransitionType
+    Notes: Movement methods (tryMoveCheaterByDelta, checkFloorTrapsAtCurrentSquare)
+           stay in game.ts — they call consumePlayerAE/startMonsterTurns/saveGameState
+    Status: DONE — 0 errors
+
+[DONE] Ticket 2.4 — GameInteractionService
+    File: src/app/services/game-interaction.ts
+    Extracted signals: activeInfoPanelTab, previewActionMessage, foundTrap,
+      npcDialog, npcTradesPurchased, stashItems, dungonSpReward, dungonWon,
+      showTavernModal
+    Exported types: InfoPanelTab, NearbyDoorInfo, StashItem
+      (NearbyDoorInfo and StashItem removed as local interfaces from game.ts)
+    Status: DONE — 0 errors
+
+[DONE] Ticket 3.1 — CreatorPlacementService
+    File: src/app/services/creator-placement.ts
+    Extracted signals (58 total):
+      Mode flags (15): isMoveMode, isStartPointMode, isExitMode, isPlaceTresherMode,
+        isPlaceMonsterMode, isAddTextMode, isPlaceFloorTrapMode, isPlaceObstacleMode,
+        isPlaceItemMode, isPlacePotionMode, isPlaceSpellMode, isImportPlacementMode,
+        isSelectingGuardSquare, isSelectingStationaryTriggerSquare, isWhiteSpacePreviewPickMode
+      Selection (2): selectedKeyIdForPlacement, selectedPlacedItemKey
+      Text placement (5): pendingTextRow, pendingTextColumn, textDialogInput,
+        textDialogWallSide, editingSquareTextId
+      Door (2): pendingDoorPlacement, editingDoorId
+      Start/exit (2): pendingStartPointPlacement, pendingExitPlacement
+      Tresher (1): pendingTresherPlacement
+      Monster (22): pendingMonsterPlacement, editingMonsterPlacementPos,
+        isCopyMonsterMode, copyMonsterSource, placeMonsterSelectedId,
+        placeMonsterRoam, placeMonsterIsDormant, placeMonsterGuardRow,
+        placeMonsterGuardCol, placeMonsterIsStationary, placeMonsterStationaryTriggerRow,
+        placeMonsterStationaryTriggerCol, placeMonsterNoAttackUnlessAttacked,
+        placeMonsterDropTresherIds, placeMonsterDropKeyIds, placeMonsterDropItemIds,
+        placeMonsterDropSpellIds, placeMonsterDropPotionIds, placeMonsterGold,
+        placeMonsterSilver, placeMonsterCopper, placeMonsterZinc, placeMonsterWeaponItemId
+      Floor trap (4): pendingFloorTrapPlacement, editingFloorTrapId,
+        isCopyFloorTrapMode, copyFloorTrapSource
+      Obstacle (4): pendingObstaclePlacement, editingObstacleId,
+        isCopyObstacleMode, copyObstacleSource
+      Portal (5): portalPlacementsByDungon, editingPortalId, selectedPortalId,
+        portalPickMode, portalPickingId
+      Item/potion/spell (6): pendingItemPlacement, itemPlacementsByDungon,
+        pendingPotionPlacement, potionPlacementsByDungon, pendingSpellPlacement,
+        spellPlacementsByDungon
+      Map import (1): pendingImportTiles
+    Notes: placeMonsterWeaponChoices and placeMonsterSelectedInfo are computed()
+           signals that depend on library/dungeon state — left in creator.ts
+    Status: DONE — 0 errors
+
+[DONE] Ticket 3.2 — CreatorLibraryService
+    File: src/app/services/creator-library.ts
+    Extracted signals (34 total):
+      Tab: activeCreatorTab
+      Tresher library (3): tresherLibrary, isLoadingTresherLibrary, tresherLibraryError
+      Monster library (3): monsterLibrary, isLoadingMonsterLibrary, monsterLibraryError
+      Option lists (3): libSpells, libImageOptions, libSoundOptions
+      Image library (8): libUserImages, isLoadingLibImages, libImagesError,
+        isSavingLibImage, editingLibImageId, libImageSaveMessage,
+        isLibImageSectionVisible, selectedLibImageFile
+      Sound library (8): libUserSounds, isLoadingLibSounds, libSoundsError,
+        isSavingLibSound, editingLibSoundId, libSoundSaveMessage,
+        isLibSoundSectionVisible, selectedLibSoundFile
+      Spell library (7): libUserSpells, isLoadingLibSpells, libSpellsError,
+        isSavingLibSpell, editingLibSpellId, libSpellSaveMessage,
+        isLibSpellSectionVisible
+      Constant: libSpellEffectToOptions
+    Exported types: TresherLibraryItem, MonsterLibraryItem, LibImageItem,
+      LibSoundItem, LibSpellItem, CreatorTabId
+    Notes: libItems/libCurses/libPotions are service references, not signals —
+           left in creator.ts. Form groups (libImageForm, libSoundForm,
+           libSpellForm) are FormGroup instances — left in creator.ts.
+    Status: DONE — 0 errors
+
+[DONE] Ticket 3.3 — CreatorPublishService
+    File: src/app/services/creator-publish.ts
+    Extracted signals (9 total):
+      isPublishingDungon, isPublishDialogVisible, savedPublishUpdatesByDungon,
+      publishVisibility, publishFriendUserKeys, isLoadingPublishFriends,
+      publishFriendsError, publishFriends, publishDungonError
+    Exported types: PublishVisibility, CreatorFriendListItem
+    Status: DONE — 0 errors
+
+[DONE] Phase 4 — Routing Cleanup
+    Changes:
+      - Removed duplicate { path: 'home' } route (now only { path: '' })
+      - Created src/app/guards/auth.guard.ts — requires login, redirects to /login
+      - Created src/app/guards/admin.guard.ts — requires login + isAdmin(),
+          redirects to /login if not authenticated, /dashboard if not admin
+      - Added authGuard to: dashboard, create, game/:gameId
+      - Added adminGuard to: admin
+      - Added { path: '**', redirectTo: '' } wildcard 404 catch-all
+      - sample-play left public (no auth guard — accessible without login)
+    Status: DONE — 0 errors
+
+[DONE] Phase 5 — Interface Cleanup
+    New interfaces:
+      - src/app/interfaces/game/base-placement.ts
+          BasePlacement { row: number; column: number; }
+      - src/app/interfaces/game/base-pending-placement.ts
+          BasePendingPlacement { dungonId: number; row: number; column: number; }
+    Concrete placements updated to extend BasePlacement (row/column removed):
+      TresherPlacement, ItemPlacement, PotionPlacement, SpellPlacement,
+      MonsterPlacement, FloorTrapPlacement, ObstaclePlacement
+    Pending placements updated to extend BasePendingPlacement:
+      PendingMonsterPlacement, PendingTresherPlacement, PendingItemPlacement,
+      PendingExitPlacement, PendingStartPointPlacement (all now empty bodies)
+      PendingDoorPlacement (keeps squareKey, isNewSquare, selections)
+    First-person interfaces (FirstPersonBlock, FirstPersonStep, FirstPersonView):
+      Already well-structured in individual files — left as-is.
+    index.ts updated to export BasePlacement and BasePendingPlacement.
+    Status: DONE — 0 errors
+
+
+NOTES
+--------------------------------------
+- grep_search on .ts files requires includeIgnoredFiles: true
+- Getter delegate pattern: get signalName() { return this.service.signalName; }
+- replace_string_in_file: match exact whitespace, use PowerShell ReadAllLines to inspect
+- Deploy frontend: npx ng build --configuration production, then python -m awscli s3 sync
+- Deploy backend: .\deploy-backend.ps1

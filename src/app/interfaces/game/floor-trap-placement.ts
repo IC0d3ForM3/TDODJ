@@ -1,9 +1,8 @@
+import { BasePlacement } from './base-placement';
 import { Trap } from './trap';
 
-export interface FloorTrapPlacement {
+export interface FloorTrapPlacement extends BasePlacement {
   id: number;
-  row: number;
-  column: number;
   trap: Trap;
   isTriggered: boolean;
   isDisarmed: boolean;

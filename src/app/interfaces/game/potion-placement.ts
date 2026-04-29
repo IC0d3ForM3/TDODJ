@@ -1,5 +1,5 @@
-export interface PotionPlacement {
+import { BasePlacement } from './base-placement';
+
+export interface PotionPlacement extends BasePlacement {
   potionId: number;
-  row: number;
-  column: number;
 }

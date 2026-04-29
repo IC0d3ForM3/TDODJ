@@ -1,7 +1,7 @@
-export interface ObstaclePlacement {
+import { BasePlacement } from './base-placement';
+
+export interface ObstaclePlacement extends BasePlacement {
   id: number;
-  row: number;
-  column: number;
   name: string;
   note: string;
   imageId: number | null;

@@ -1,3 +1,5 @@
+export * from './base-placement';
+export * from './base-pending-placement';
 export * from './active-game-list-item';
 export * from './creator-types';
 export * from './dungon-list-item';

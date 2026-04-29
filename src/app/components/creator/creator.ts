@@ -13,6 +13,11 @@ import { HttpClient } from '@angular/common/http';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { Account } from '../../services/account';
+import { DungeonJsonService } from '../../services/dungeon-json';
+import { DungeonStateService } from '../../services/dungeon-state';
+import { CreatorPlacementService } from '../../services/creator-placement';
+import { CreatorLibraryService, CreatorTabId, LibImageItem, LibSoundItem, LibSpellItem, MonsterLibraryItem, TresherLibraryItem } from '../../services/creator-library';
+import { CreatorPublishService, CreatorFriendListItem, PublishVisibility } from '../../services/creator-publish';
 import { DungeonFirstPersonComponent } from '../dungeon-first-person/dungeon-first-person';
 import { DungeonPreviewGridComponent } from '../dungeon-preview-grid/dungeon-preview-grid';
 import { CreatorLayout } from '../../services/creator-layout';
@@ -133,28 +138,9 @@ const SIDE_RULES: SideRule[] = [
   },
 ];
 
-interface TresherLibraryItem extends Tresher {
-  userguid: string;
-  isPublic: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface MonsterLibraryItem extends Monster {
-  userguid: string;
-  isPublic: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface LibImageItem { id: number; name: string; path: string; isPublic: boolean; isActive: boolean; createdAt: string; updatedAt: string; userguid: string; }
-interface LibSoundItem { id: number; name: string; path: string; isPublic: boolean; isActive: boolean; createdAt: string; updatedAt: string; userguid: string; }
-interface LibSpellItem { id: number; name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; costToLearn: number; imageId: number | null; soundId: number | null; isPublic: boolean; numberOfTargets?: number; createdAt: string; updatedAt: string; }
 interface LibImageWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
 interface LibSoundWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
 interface LibSpellWritePayload { name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; costToLearn: number; imageId: number | null; soundId: number | null; isPublic: boolean; numberOfTargets: number; }
-
-type CreatorTabId = 'dungons' | 'treshers' | 'monsters' | 'images' | 'sounds' | 'spells' | 'potions' | 'items' | 'curses';
 
 interface GridPlacedItem {
   key: string;
@@ -163,16 +149,6 @@ interface GridPlacedItem {
   row: number;
   column: number;
   refId: number;
-}
-
-type PublishVisibility = 'public' | 'friends' | 'private';
-
-interface CreatorFriendListItem {
-  id: number;
-  userurid: string;
-  friendurid: string;
-  isActiveFriend: boolean;
-  friendEmail: string;
 }
 
 @Component({
@@ -190,6 +166,11 @@ export class Creator implements OnInit {
   private readonly obstacleImageCache = new Map<number, HTMLImageElement>();
   private readonly obstacleImageCacheVersion = signal(0);
   readonly account = inject(Account);
+  private readonly dungeonJsonService = inject(DungeonJsonService);
+  private readonly dungeonState = inject(DungeonStateService);
+  readonly placementService = inject(CreatorPlacementService);
+  readonly libraryService = inject(CreatorLibraryService);
+  readonly publishService = inject(CreatorPublishService);
   readonly creatorLayout = inject(CreatorLayout);
   private readonly itemService = inject(ItemService);
   private readonly curseService = inject(CurseService);
@@ -222,62 +203,62 @@ export class Creator implements OnInit {
   readonly deleteDungonError = signal<string | null>(null);
   readonly isLoadingSelectedDungon = signal(false);
   readonly isSelectedDungonExpanded = signal(false);
-  readonly isMoveMode = signal(false);
+  get isMoveMode() { return this.placementService.isMoveMode; }
   readonly hasUnsavedDungonJson = signal(false);
   readonly isSavingDungonJson = signal(false);
-  readonly isPublishingDungon = signal(false);
-  readonly isPublishDialogVisible = signal(false);
-  readonly savedPublishUpdatesByDungon = signal<Record<number, boolean>>({});
-  readonly publishVisibility = signal<PublishVisibility>('public');
-  readonly publishFriendUserKeys = signal<string[]>([]);
-  readonly isLoadingPublishFriends = signal(false);
-  readonly publishFriendsError = signal<string | null>(null);
-  readonly publishFriends = signal<CreatorFriendListItem[]>([]);
+  get isPublishingDungon() { return this.publishService.isPublishingDungon; }
+  get isPublishDialogVisible() { return this.publishService.isPublishDialogVisible; }
+  get savedPublishUpdatesByDungon() { return this.publishService.savedPublishUpdatesByDungon; }
+  get publishVisibility() { return this.publishService.publishVisibility; }
+  get publishFriendUserKeys() { return this.publishService.publishFriendUserKeys; }
+  get isLoadingPublishFriends() { return this.publishService.isLoadingPublishFriends; }
+  get publishFriendsError() { return this.publishService.publishFriendsError; }
+  get publishFriends() { return this.publishService.publishFriends; }
   readonly isDoorDialogVisible = signal(false);
   readonly isKaysDialogVisible = signal(false);
-  readonly isWhiteSpacePreviewPickMode = signal(false);
+  get isWhiteSpacePreviewPickMode() { return this.placementService.isWhiteSpacePreviewPickMode; }
   readonly isGridPreviewModalVisible = signal(false);
-  readonly isStartPointMode = signal(false);
-  readonly isExitMode = signal(false);
-  readonly isPlaceTresherMode = signal(false);
-  readonly isPlaceMonsterMode = signal(false);
-  readonly isAddTextMode = signal(false);
+  get isStartPointMode() { return this.placementService.isStartPointMode; }
+  get isExitMode() { return this.placementService.isExitMode; }
+  get isPlaceTresherMode() { return this.placementService.isPlaceTresherMode; }
+  get isPlaceMonsterMode() { return this.placementService.isPlaceMonsterMode; }
+  get isAddTextMode() { return this.placementService.isAddTextMode; }
   readonly isTextDialogVisible = signal(false);
-  readonly pendingTextRow = signal<number | null>(null);
-  readonly pendingTextColumn = signal<number | null>(null);
-  readonly textDialogInput = signal('');
-  readonly textDialogWallSide = signal<SquareSide | null>(null);
-  readonly editingSquareTextId = signal<number | null>(null);
+  get pendingTextRow() { return this.placementService.pendingTextRow; }
+  get pendingTextColumn() { return this.placementService.pendingTextColumn; }
+  get textDialogInput() { return this.placementService.textDialogInput; }
+  get textDialogWallSide() { return this.placementService.textDialogWallSide; }
+  get editingSquareTextId() { return this.placementService.editingSquareTextId; }
   readonly isStartPointDialogVisible = signal(false);
   readonly isExitDialogVisible = signal(false);
   readonly isTresherDialogVisible = signal(false);
   readonly isMonsterDialogVisible = signal(false);
   readonly isPlaceTresherDialogVisible = signal(false);
   readonly isPlaceMonsterDialogVisible = signal(false);
-  readonly isLoadingTresherLibrary = signal(false);
-  readonly isLoadingMonsterLibrary = signal(false);
+  get isLoadingTresherLibrary() { return this.libraryService.isLoadingTresherLibrary; }
+  get isLoadingMonsterLibrary() { return this.libraryService.isLoadingMonsterLibrary; }
   readonly loadError = signal<string | null>(null);
-  readonly tresherLibraryError = signal<string | null>(null);
-  readonly monsterLibraryError = signal<string | null>(null);
+  get tresherLibraryError() { return this.libraryService.tresherLibraryError; }
+  get monsterLibraryError() { return this.libraryService.monsterLibraryError; }
   readonly selectedDungonError = signal<string | null>(null);
   readonly dungonJsonSaveError = signal<string | null>(null);
   readonly mapImportError = signal<string | null>(null);
   readonly isImportingMap = signal(false);
-  readonly isImportPlacementMode = signal(false);
-  readonly pendingImportTiles = signal<Array<{ row: number; col: number }>>([]);
-  readonly publishDungonError = signal<string | null>(null);
+  get isImportPlacementMode() { return this.placementService.isImportPlacementMode; }
+  get pendingImportTiles() { return this.placementService.pendingImportTiles; }
+  get publishDungonError() { return this.publishService.publishDungonError; }
   readonly doorDialogError = signal<string | null>(null);
   readonly exitDialogError = signal<string | null>(null);
   readonly previewActionMessage = signal<string | null>(null);
   readonly selectedDungonId = signal<number | null>(null);
-  readonly selectedKeyIdForPlacement = signal<number | null>(null);
+  get selectedKeyIdForPlacement() { return this.placementService.selectedKeyIdForPlacement; }
   readonly selectedDungon = signal<DungonDetails | null>(null);
-  readonly pendingDoorPlacement = signal<PendingDoorPlacement | null>(null);
-  readonly editingDoorId = signal<number | null>(null);
-  readonly pendingStartPointPlacement = signal<PendingStartPointPlacement | null>(null);
-  readonly pendingExitPlacement = signal<PendingExitPlacement | null>(null);
-  readonly pendingTresherPlacement = signal<PendingTresherPlacement | null>(null);
-  readonly pendingMonsterPlacement = signal<PendingMonsterPlacement | null>(null);
+  get pendingDoorPlacement() { return this.placementService.pendingDoorPlacement; }
+  get editingDoorId() { return this.placementService.editingDoorId; }
+  get pendingStartPointPlacement() { return this.placementService.pendingStartPointPlacement; }
+  get pendingExitPlacement() { return this.placementService.pendingExitPlacement; }
+  get pendingTresherPlacement() { return this.placementService.pendingTresherPlacement; }
+  get pendingMonsterPlacement() { return this.placementService.pendingMonsterPlacement; }
   readonly editingMonsterId = signal<number | null>(null);
   readonly editingMonsterKeyIds = signal<number[]>([]);
   readonly editingMonsterImageId = signal<number | null>(null);
@@ -288,77 +269,77 @@ export class Creator implements OnInit {
   readonly monsterDialogSounds = signal<{ id: number; name: string; path: string }[]>([]);
   readonly monsterDialogWeaponItems = signal<{ id: number; name: string }[]>([]);
   readonly monsterDialogSpells = signal<{ id: number; name: string }[]>([]);
-  readonly placeMonsterRoam = signal(false);
-  readonly placeMonsterDropTresherIds = signal<number[]>([]);
-  readonly placeMonsterDropKeyIds = signal<number[]>([]);
-  readonly placeMonsterIsDormant = signal(false);
-  readonly placeMonsterGuardRow = signal<number | null>(null);
-  readonly placeMonsterGuardCol = signal<number | null>(null);
-  readonly isSelectingGuardSquare = signal(false);
-  readonly placeMonsterIsStationary = signal(false);
-  readonly placeMonsterStationaryTriggerRow = signal<number | null>(null);
-  readonly placeMonsterStationaryTriggerCol = signal<number | null>(null);
-  readonly isSelectingStationaryTriggerSquare = signal(false);
-  readonly placeMonsterNoAttackUnlessAttacked = signal(false);
-  readonly editingMonsterPlacementPos = signal<{ dungonId: number; row: number; column: number } | null>(null);
-  readonly isCopyMonsterMode = signal(false);
-  readonly copyMonsterSource = signal<MonsterPlacement | null>(null);
+  get placeMonsterRoam() { return this.placementService.placeMonsterRoam; }
+  get placeMonsterDropTresherIds() { return this.placementService.placeMonsterDropTresherIds; }
+  get placeMonsterDropKeyIds() { return this.placementService.placeMonsterDropKeyIds; }
+  get placeMonsterIsDormant() { return this.placementService.placeMonsterIsDormant; }
+  get placeMonsterGuardRow() { return this.placementService.placeMonsterGuardRow; }
+  get placeMonsterGuardCol() { return this.placementService.placeMonsterGuardCol; }
+  get isSelectingGuardSquare() { return this.placementService.isSelectingGuardSquare; }
+  get placeMonsterIsStationary() { return this.placementService.placeMonsterIsStationary; }
+  get placeMonsterStationaryTriggerRow() { return this.placementService.placeMonsterStationaryTriggerRow; }
+  get placeMonsterStationaryTriggerCol() { return this.placementService.placeMonsterStationaryTriggerCol; }
+  get isSelectingStationaryTriggerSquare() { return this.placementService.isSelectingStationaryTriggerSquare; }
+  get placeMonsterNoAttackUnlessAttacked() { return this.placementService.placeMonsterNoAttackUnlessAttacked; }
+  get editingMonsterPlacementPos() { return this.placementService.editingMonsterPlacementPos; }
+  get isCopyMonsterMode() { return this.placementService.isCopyMonsterMode; }
+  get copyMonsterSource() { return this.placementService.copyMonsterSource; }
   readonly gridPreviewContext = signal<GridPreviewContext | null>(null);
-  readonly cheaterByDungon = signal<Record<number, Cheater>>({});
-  readonly startPointByDungon = signal<Record<number, StartPoint | null>>({});
-  readonly exitsByDungon = signal<Record<number, DungonExit[]>>({});
-  readonly tresherListByDungon = signal<Record<number, Tresher[]>>({});
-  readonly tresherLibrary = signal<TresherLibraryItem[]>([]);
-  readonly tresherPlacementsByDungon = signal<Record<number, TresherPlacement[]>>({});
-  readonly monsterListByDungon = signal<Record<number, Monster[]>>({});
-  readonly monsterLibrary = signal<MonsterLibraryItem[]>([]);
-  readonly monsterPlacementsByDungon = signal<Record<number, MonsterPlacement[]>>({});
-  readonly squareTextsByDungon = signal<Record<number, SquareText[]>>({});
-  readonly filledSquaresByDungon = signal<Record<number, Record<string, true>>>({});
-  readonly squaresByDungon = signal<Record<number, Record<string, Square>>>({});
-  readonly floorTrapPlacementsByDungon = signal<Record<number, FloorTrapPlacement[]>>({});
-  readonly isPlaceFloorTrapMode = signal(false);
+  get cheaterByDungon() { return this.dungeonState.cheaterByDungon; }
+  get startPointByDungon() { return this.dungeonState.startPointByDungon; }
+  get exitsByDungon() { return this.dungeonState.exitsByDungon; }
+  get tresherListByDungon() { return this.dungeonState.tresherListByDungon; }
+  get tresherLibrary() { return this.libraryService.tresherLibrary; }
+  get tresherPlacementsByDungon() { return this.dungeonState.tresherPlacementsByDungon; }
+  get monsterListByDungon() { return this.dungeonState.monsterListByDungon; }
+  get monsterLibrary() { return this.libraryService.monsterLibrary; }
+  get monsterPlacementsByDungon() { return this.dungeonState.monsterPlacementsByDungon; }
+  get squareTextsByDungon() { return this.dungeonState.squareTextsByDungon; }
+  get filledSquaresByDungon() { return this.dungeonState.filledSquaresByDungon; }
+  get squaresByDungon() { return this.dungeonState.squaresByDungon; }
+  get floorTrapPlacementsByDungon() { return this.dungeonState.floorTrapPlacementsByDungon; }
+  get isPlaceFloorTrapMode() { return this.placementService.isPlaceFloorTrapMode; }
   readonly isFloorTrapDialogVisible = signal(false);
-  readonly pendingFloorTrapPlacement = signal<{ dungonId: number; row: number; column: number } | null>(null);
-  readonly editingFloorTrapId = signal<number | null>(null);
-  readonly isCopyFloorTrapMode = signal(false);
-  readonly copyFloorTrapSource = signal<FloorTrapPlacement | null>(null);
+  get pendingFloorTrapPlacement() { return this.placementService.pendingFloorTrapPlacement; }
+  get editingFloorTrapId() { return this.placementService.editingFloorTrapId; }
+  get isCopyFloorTrapMode() { return this.placementService.isCopyFloorTrapMode; }
+  get copyFloorTrapSource() { return this.placementService.copyFloorTrapSource; }
   private nextFloorTrapId = 1;
-  readonly obstaclePlacementsByDungon = signal<Record<number, ObstaclePlacement[]>>({});
-  readonly isPlaceObstacleMode = signal(false);
+  get obstaclePlacementsByDungon() { return this.dungeonState.obstaclePlacementsByDungon; }
+  get isPlaceObstacleMode() { return this.placementService.isPlaceObstacleMode; }
   readonly isObstacleDialogVisible = signal(false);
-  readonly pendingObstaclePlacement = signal<{ dungonId: number; row: number; column: number } | null>(null);
-  readonly editingObstacleId = signal<number | null>(null);
-  readonly isCopyObstacleMode = signal(false);
-  readonly copyObstacleSource = signal<ObstaclePlacement | null>(null);
+  get pendingObstaclePlacement() { return this.placementService.pendingObstaclePlacement; }
+  get editingObstacleId() { return this.placementService.editingObstacleId; }
+  get isCopyObstacleMode() { return this.placementService.isCopyObstacleMode; }
+  get copyObstacleSource() { return this.placementService.copyObstacleSource; }
   private nextObstacleId = 1;
-  readonly selectedPlacedItemKey = signal<string | null>(null);
+  get selectedPlacedItemKey() { return this.placementService.selectedPlacedItemKey; }
 
-  readonly portalPlacementsByDungon = signal<Record<number, PortalPlacement[]>>({});
+  get portalPlacementsByDungon() { return this.placementService.portalPlacementsByDungon; }
   readonly isPortalDialogVisible = signal(false);
-  readonly editingPortalId = signal<number | null>(null);
-  readonly selectedPortalId = signal<number | null>(null);
-  readonly portalPickMode = signal<'start' | 'end' | null>(null);
-  readonly portalPickingId = signal<number | null>(null);
+  get editingPortalId() { return this.placementService.editingPortalId; }
+  get selectedPortalId() { return this.placementService.selectedPortalId; }
+  get portalPickMode() { return this.placementService.portalPickMode; }
+  get portalPickingId() { return this.placementService.portalPickingId; }
   private nextPortalId = 1;
 
   // ── Item placement ────────────────────────────────────────────────────────
-  readonly isPlaceItemMode = signal(false);
+  get isPlaceItemMode() { return this.placementService.isPlaceItemMode; }
   readonly isPlaceItemDialogVisible = signal(false);
-  readonly pendingItemPlacement = signal<PendingItemPlacement | null>(null);
-  readonly itemPlacementsByDungon = signal<Record<number, ItemPlacement[]>>({});
-  readonly placeMonsterDropItemIds = signal<number[]>([]);
-  readonly placeMonsterDropSpellIds = signal<number[]>([]);
-  readonly placeMonsterDropPotionIds = signal<number[]>([]);
-  readonly placeMonsterGold = signal(0);
-  readonly placeMonsterSilver = signal(0);
-  readonly placeMonsterCopper = signal(0);
-  readonly placeMonsterZinc = signal(0);
-  readonly placeMonsterWeaponItemId = signal<number | null>(null);
+  get pendingItemPlacement() { return this.placementService.pendingItemPlacement; }
+  get itemPlacementsByDungon() { return this.placementService.itemPlacementsByDungon; }
+  get placeMonsterDropItemIds() { return this.placementService.placeMonsterDropItemIds; }
+  get placeMonsterDropSpellIds() { return this.placementService.placeMonsterDropSpellIds; }
+  get placeMonsterDropPotionIds() { return this.placementService.placeMonsterDropPotionIds; }
+  get placeMonsterGold() { return this.placementService.placeMonsterGold; }
+  get placeMonsterSilver() { return this.placementService.placeMonsterSilver; }
+  get placeMonsterCopper() { return this.placementService.placeMonsterCopper; }
+  get placeMonsterZinc() { return this.placementService.placeMonsterZinc; }
+  get placeMonsterWeaponItemId() { return this.placementService.placeMonsterWeaponItemId; }
   readonly placeMonsterWeaponChoices = computed(() =>
     this.libItems().filter((i) => this.placeMonsterDropItemIds().includes(i.id) && i.type === 'weapon')
   );
-  readonly placeMonsterSelectedId = signal<number | null>(null);
+  get placeMonsterSelectedId() { return this.placementService.placeMonsterSelectedId; }
   readonly placeMonsterSelectedInfo = computed(() => {
     const id = this.placeMonsterSelectedId();
     const pending = this.pendingMonsterPlacement();
@@ -367,19 +348,19 @@ export class Creator implements OnInit {
   });
 
   // ── Potion placement ──────────────────────────────────────────────────────
-  readonly isPlacePotionMode = signal(false);
+  get isPlacePotionMode() { return this.placementService.isPlacePotionMode; }
   readonly isPlacePotionDialogVisible = signal(false);
-  readonly pendingPotionPlacement = signal<PendingItemPlacement | null>(null);
-  readonly potionPlacementsByDungon = signal<Record<number, PotionPlacement[]>>({});
+  get pendingPotionPlacement() { return this.placementService.pendingPotionPlacement; }
+  get potionPlacementsByDungon() { return this.placementService.potionPlacementsByDungon; }
 
   // ── Spell placement ───────────────────────────────────────────────────────
-  readonly isPlaceSpellMode = signal(false);
+  get isPlaceSpellMode() { return this.placementService.isPlaceSpellMode; }
   readonly isPlaceSpellDialogVisible = signal(false);
-  readonly pendingSpellPlacement = signal<PendingItemPlacement | null>(null);
-  readonly spellPlacementsByDungon = signal<Record<number, SpellPlacement[]>>({});
+  get pendingSpellPlacement() { return this.placementService.pendingSpellPlacement; }
+  get spellPlacementsByDungon() { return this.placementService.spellPlacementsByDungon; }
 
   // ── Library tabs ──────────────────────────────────────────────────────────
-  readonly activeCreatorTab = signal<CreatorTabId>('dungons');
+  get activeCreatorTab() { return this.libraryService.activeCreatorTab; }
   readonly creatorTabs: { id: CreatorTabId; label: string }[] = [
     { id: 'dungons', label: 'Dungeons' },
     { id: 'treshers', label: 'Treshers' },
@@ -395,40 +376,38 @@ export class Creator implements OnInit {
   readonly libItems = this.itemService.items;
   readonly libCurses = this.curseService.items;
   readonly libPotions = this.potionService.items;
-  readonly libSpells = signal<{ id: number; name: string }[]>([]);
+  get libSpells() { return this.libraryService.libSpells; }
 
-  readonly libImageOptions = signal<{ id: number; name: string; path: string }[]>([]);
-  readonly libSoundOptions = signal<{ id: number; name: string; path: string }[]>([]);
+  get libImageOptions() { return this.libraryService.libImageOptions; }
+  get libSoundOptions() { return this.libraryService.libSoundOptions; }
 
-  readonly libUserImages = signal<LibImageItem[]>([]);
-  readonly isLoadingLibImages = signal(false);
-  readonly libImagesError = signal<string | null>(null);
-  readonly isSavingLibImage = signal(false);
-  readonly editingLibImageId = signal<number | null>(null);
-  readonly libImageSaveMessage = signal<string | null>(null);
-  readonly isLibImageSectionVisible = signal(true);
-  readonly selectedLibImageFile = signal<File | null>(null);
+  get libUserImages() { return this.libraryService.libUserImages; }
+  get isLoadingLibImages() { return this.libraryService.isLoadingLibImages; }
+  get libImagesError() { return this.libraryService.libImagesError; }
+  get isSavingLibImage() { return this.libraryService.isSavingLibImage; }
+  get editingLibImageId() { return this.libraryService.editingLibImageId; }
+  get libImageSaveMessage() { return this.libraryService.libImageSaveMessage; }
+  get isLibImageSectionVisible() { return this.libraryService.isLibImageSectionVisible; }
+  get selectedLibImageFile() { return this.libraryService.selectedLibImageFile; }
 
-  readonly libUserSounds = signal<LibSoundItem[]>([]);
-  readonly isLoadingLibSounds = signal(false);
-  readonly libSoundsError = signal<string | null>(null);
-  readonly isSavingLibSound = signal(false);
-  readonly editingLibSoundId = signal<number | null>(null);
-  readonly libSoundSaveMessage = signal<string | null>(null);
-  readonly isLibSoundSectionVisible = signal(true);
-  readonly selectedLibSoundFile = signal<File | null>(null);
+  get libUserSounds() { return this.libraryService.libUserSounds; }
+  get isLoadingLibSounds() { return this.libraryService.isLoadingLibSounds; }
+  get libSoundsError() { return this.libraryService.libSoundsError; }
+  get isSavingLibSound() { return this.libraryService.isSavingLibSound; }
+  get editingLibSoundId() { return this.libraryService.editingLibSoundId; }
+  get libSoundSaveMessage() { return this.libraryService.libSoundSaveMessage; }
+  get isLibSoundSectionVisible() { return this.libraryService.isLibSoundSectionVisible; }
+  get selectedLibSoundFile() { return this.libraryService.selectedLibSoundFile; }
 
-  readonly libUserSpells = signal<LibSpellItem[]>([]);
-  readonly isLoadingLibSpells = signal(false);
-  readonly libSpellsError = signal<string | null>(null);
-  readonly isSavingLibSpell = signal(false);
-  readonly editingLibSpellId = signal<number | null>(null);
-  readonly libSpellSaveMessage = signal<string | null>(null);
-  readonly isLibSpellSectionVisible = signal(true);
+  get libUserSpells() { return this.libraryService.libUserSpells; }
+  get isLoadingLibSpells() { return this.libraryService.isLoadingLibSpells; }
+  get libSpellsError() { return this.libraryService.libSpellsError; }
+  get isSavingLibSpell() { return this.libraryService.isSavingLibSpell; }
+  get editingLibSpellId() { return this.libraryService.editingLibSpellId; }
+  get libSpellSaveMessage() { return this.libraryService.libSpellSaveMessage; }
+  get isLibSpellSectionVisible() { return this.libraryService.isLibSpellSectionVisible; }
 
-  readonly libSpellEffectToOptions = [
-    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'Action Economy',
-  ] as const;
+  get libSpellEffectToOptions() { return this.libraryService.libSpellEffectToOptions; }
 
   readonly libImageForm = new FormGroup({
     path: new FormControl<string>('', { nonNullable: true }),
@@ -5465,7 +5444,7 @@ export class Creator implements OnInit {
       updatedat?: unknown;
     };
 
-    const parsedTresher = this.parseTresherItem(item);
+    const parsedTresher = this.dungeonJsonService.parseTresherItem(item);
     if (!parsedTresher || typeof source.userguid !== 'string' || !source.userguid.trim()) {
       return null;
     }
@@ -6059,7 +6038,7 @@ export class Creator implements OnInit {
           })
         : {};
 
-    const inventory = this.parseCheaterInventory(sourceCheater);
+    const inventory = this.dungeonJsonService.parseCheaterInventory(sourceCheater);
 
     const cheater: Cheater = {
       name:
@@ -6119,7 +6098,7 @@ export class Creator implements OnInit {
           : [];
 
     const tresherList = sourceTresherList
-      .map((item) => this.parseTresherItem(item))
+      .map((item) => this.dungeonJsonService.parseTresherItem(item))
       .filter((item): item is Tresher => item !== null);
 
     const sourceTresherPlacements = Array.isArray(source.tresherPlacements)
@@ -6132,7 +6111,7 @@ export class Creator implements OnInit {
 
     const validTresherIds = new Set(tresherList.map((tresher) => tresher.id));
     const tresherPlacements = sourceTresherPlacements
-      .map((item) => this.parseTresherPlacementItem(item))
+      .map((item) => this.dungeonJsonService.parseTresherPlacementItem(item))
       .filter(
         (item): item is TresherPlacement => item !== null && validTresherIds.has(item.tresherId)
       );
@@ -6186,6 +6165,17 @@ export class Creator implements OnInit {
           .filter((st) => st.text.trim().length > 0)
       : [];
 
+    const floorTrapPlacements = this.dungeonJsonService.parseFloorTrapPlacements((source as Record<string, unknown>)['floorTrapPlacements']);
+    const maxFloorTrapId = floorTrapPlacements.reduce((max: number, p) => Math.max(max, p.id), 0);
+    if (maxFloorTrapId >= this.nextFloorTrapId) {
+      this.nextFloorTrapId = maxFloorTrapId + 1;
+    }
+    const obstaclePlacements = this.dungeonJsonService.parseObstaclePlacements((source as Record<string, unknown>)['obstaclePlacements']);
+    const maxObstacleId = obstaclePlacements.reduce((max: number, p) => Math.max(max, p.id), 0);
+    if (maxObstacleId >= this.nextObstacleId) {
+      this.nextObstacleId = maxObstacleId + 1;
+    }
+
     return {
       filledSquares,
       squares,
@@ -6198,12 +6188,12 @@ export class Creator implements OnInit {
       monsterPlacements,
       exits,
       squareTexts,
-      floorTrapPlacements: this.parseFloorTrapPlacements((source as Record<string, unknown>)['floorTrapPlacements']),
+      floorTrapPlacements,
       portalPlacements: this.parsePortalPlacements((source as Record<string, unknown>)['portalPlacements']),
       itemPlacements: this.parseItemPlacements((source as Record<string, unknown>)['itemPlacements']),
       potionPlacements: this.parsePotionPlacements((source as Record<string, unknown>)['potionPlacements']),
       spellPlacements: this.parseSpellPlacements((source as Record<string, unknown>)['spellPlacements']),
-      obstaclePlacements: this.parseObstaclePlacements((source as Record<string, unknown>)['obstaclePlacements']),
+      obstaclePlacements,
     };
   }
 
@@ -6252,98 +6242,6 @@ export class Creator implements OnInit {
     return result;
   }
 
-  private parseFloorTrapPlacements(raw: unknown): FloorTrapPlacement[] {
-    if (!Array.isArray(raw)) return [];
-    let maxId = 0;
-    const result: FloorTrapPlacement[] = [];
-    for (const item of raw) {
-      if (!item || typeof item !== 'object') continue;
-      const src = item as Partial<Record<string, unknown>>;
-      const id = typeof src['id'] === 'number' ? Math.floor(src['id']) : 0;
-      const row = typeof src['row'] === 'number' ? Math.floor(src['row']) : null;
-      const column = typeof src['column'] === 'number' ? Math.floor(src['column']) : null;
-      if (row === null || column === null) continue;
-      const trap = this.parseTrapObject(src['trap']);
-      if (!trap) continue;
-      result.push({
-        id,
-        row,
-        column,
-        trap,
-        isTriggered: Boolean(src['isTriggered']),
-        isDisarmed: Boolean(src['isDisarmed']),
-        isDetected: src['isDetected'] === true,
-      });
-      if (id > maxId) maxId = id;
-    }
-    if (maxId >= this.nextFloorTrapId) {
-      this.nextFloorTrapId = maxId + 1;
-    }
-    return result;
-  }
-
-  private parseObstaclePlacements(raw: unknown): ObstaclePlacement[] {
-    if (!Array.isArray(raw)) return [];
-    let maxId = 0;
-    const result: ObstaclePlacement[] = [];
-    for (const item of raw) {
-      if (!item || typeof item !== 'object') continue;
-      const src = item as Partial<Record<string, unknown>>;
-      const id = typeof src['id'] === 'number' ? Math.floor(src['id']) : 0;
-      const row = typeof src['row'] === 'number' ? Math.floor(src['row']) : null;
-      const column = typeof src['column'] === 'number' ? Math.floor(src['column']) : null;
-      if (row === null || column === null) continue;
-      const hp = typeof src['hp'] === 'number' ? Math.max(1, Math.floor(src['hp'])) : 10;
-      const currentHp = typeof src['currentHp'] === 'number' ? Math.max(0, Math.floor(src['currentHp'])) : hp;
-      const heightPercent = typeof src['heightPercent'] === 'number' ? Math.max(1, Math.min(100, src['heightPercent'])) : 100;
-      const heightAnchor = src['heightAnchor'] === 'ceiling' ? 'ceiling' : 'floor';
-      const widthPercent = typeof src['widthPercent'] === 'number' ? Math.max(1, Math.min(100, src['widthPercent'])) : 100;
-      const widthAnchor = src['widthAnchor'] === 'east' ? 'east' : src['widthAnchor'] === 'west' ? 'west' : 'center';
-      const color = typeof src['color'] === 'string' && src['color'] ? src['color'] : null;
-      const shape: 'circle' | 'square' = src['shape'] === 'square' ? 'square' : 'circle';
-      result.push({
-        id,
-        row,
-        column,
-        name: typeof src['name'] === 'string' ? src['name'] : 'Obstacle',
-        note: typeof src['note'] === 'string' ? src['note'] : '',
-        imageId: typeof src['imageId'] === 'number' ? src['imageId'] : null,
-        hp,
-        isIndestructible: src['isIndestructible'] === true,
-        containsItemId: typeof src['containsItemId'] === 'number' ? src['containsItemId'] : null,
-        shape,
-        heightPercent,
-        heightAnchor,
-        widthPercent,
-        widthAnchor,
-        color,
-        currentHp,
-        isDestroyed: src['isDestroyed'] === true,
-        itemTaken: src['itemTaken'] === true,
-      });
-      if (id > maxId) maxId = id;
-    }
-    if (maxId >= this.nextObstacleId) {
-      this.nextObstacleId = maxId + 1;
-    }
-    return result;
-  }
-
-  private parseTrapObject(raw: unknown): Trap | null {
-    if (!raw || typeof raw !== 'object') return null;
-    const src = raw as Partial<Record<string, unknown>>;
-    const damageTo = src['damageTo'] === 'Stamina' ? 'Stamina' : src['damageTo'] === 'Mind' ? 'Mind' : 'HP';
-    return {
-      name: typeof src['name'] === 'string' ? src['name'] : '',
-      description: typeof src['description'] === 'string' ? src['description'] : '',
-      damage: typeof src['damage'] === 'number' ? Math.max(0, src['damage']) : 0,
-      damageTo: damageTo as 'HP' | 'Stamina' | 'Mind',
-      curseId: typeof src['curseId'] === 'number' ? src['curseId'] : null,
-      toDetect: typeof src['toDetect'] === 'number' ? Math.max(0, src['toDetect']) : 10,
-      toDisarm: typeof src['toDisarm'] === 'number' ? Math.max(0, src['toDisarm']) : 10,
-    };
-  }
-
   private parsePortalPlacements(raw: unknown): PortalPlacement[] {
     if (!Array.isArray(raw)) return [];
     let maxId = 0;
@@ -6373,87 +6271,6 @@ export class Creator implements OnInit {
       this.nextPortalId = maxId + 1;
     }
     return result;
-  }
-
-  private parseTresherItem(item: unknown): Tresher | null {
-    if (!item || typeof item !== 'object') {
-      return null;
-    }
-
-    const source = item as Partial<Record<string, unknown>>;
-    const parsedId = this.toFiniteNumber(source['id']);
-    if (parsedId === null) {
-      return null;
-    }
-
-    return {
-      id: Math.max(0, Math.floor(parsedId)),
-      type: typeof source['type'] === 'string' && (source['type'] as string).trim() ? (source['type'] as string).trim() : 'OtherTresher',
-      name: typeof source['name'] === 'string' && (source['name'] as string).trim() ? source['name'] as string : 'Unnamed Tresher',
-      description: typeof source['description'] === 'string' ? source['description'] as string : '',
-      gold: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['gold']), 0)),
-      silver: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['silver']), 0)),
-      copper: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['copper']), 0)),
-      zinc: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['zinc']), 0)),
-      item1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item1Id'])),
-      item2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item2Id'])),
-      item3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item3Id'])),
-      item4Id: this.normalizeNullableNumber(this.toFiniteNumber(source['item4Id'])),
-      spell1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell1Id'])),
-      spell2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell2Id'])),
-      spell3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell3Id'])),
-      spell4Id: this.normalizeNullableNumber(this.toFiniteNumber(source['spell4Id'])),
-      curse1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['curse1Id'])),
-      curse2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['curse2Id'])),
-      potion1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion1Id'])),
-      potion2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion2Id'])),
-      potion3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion3Id'])),
-      imageId: this.normalizeNullableNumber(this.toFiniteNumber(source['imageId'])),
-      soundId: this.normalizeNullableNumber(this.toFiniteNumber(source['soundId'])),
-      spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['spReward']), 0)),
-      trap: this.parseTrapObject(source['trap']),
-    };
-  }
-
-  private parseTresherPlacementItem(item: unknown): TresherPlacement | null {
-    if (!item || typeof item !== 'object') {
-      return null;
-    }
-
-    const source = item as Partial<TresherPlacement> & {
-      trasherId?: unknown;
-      tresherID?: unknown;
-      rownId?: unknown;
-      columnId?: unknown;
-      col?: unknown;
-    };
-
-    const tresherIdRaw =
-      source.tresherId !== undefined
-        ? source.tresherId
-        : source.tresherID !== undefined
-          ? source.tresherID
-          : source.trasherId;
-    const rowRaw = source.row !== undefined ? source.row : source.rownId;
-    const columnRaw =
-      source.column !== undefined
-        ? source.column
-        : source.columnId !== undefined
-          ? source.columnId
-          : source.col;
-
-    const tresherId = this.toFiniteNumber(tresherIdRaw);
-    const row = this.toFiniteNumber(rowRaw);
-    const column = this.toFiniteNumber(columnRaw);
-    if (tresherId === null || row === null || column === null) {
-      return null;
-    }
-
-    return {
-      tresherId: Math.max(0, Math.floor(tresherId)),
-      row: Math.floor(row),
-      column: Math.floor(column),
-    };
   }
 
   private parseMonsterItem(item: unknown): Monster | null {
@@ -6674,78 +6491,6 @@ export class Creator implements OnInit {
       itemId,
       itemName: typeof src['itemName'] === 'string' ? src['itemName'] : '',
       consume: src['consume'] === true,
-    };
-  }
-
-  private parseCheaterInventory(
-    sourceCheater: Partial<Cheater> & {
-      inventory?: unknown;
-      inventoryKeys?: unknown[];
-      inventoryTreshers?: unknown[];
-    }
-  ): CheaterInventory {
-    const sourceInventory =
-      sourceCheater.inventory && typeof sourceCheater.inventory === 'object'
-        ? (sourceCheater.inventory as Partial<CheaterInventory> & {
-            tresherList?: unknown[];
-            tresherInventory?: unknown[];
-          })
-        : null;
-
-    const sourceInventoryKeys = Array.isArray(sourceInventory?.keys)
-      ? sourceInventory.keys
-      : Array.isArray(sourceCheater.inventoryKeys)
-        ? sourceCheater.inventoryKeys
-        : [];
-
-    const sourceInventoryTreshers = Array.isArray(sourceInventory?.treshers)
-      ? sourceInventory.treshers
-      : Array.isArray(sourceInventory?.tresherList)
-        ? sourceInventory.tresherList
-        : Array.isArray(sourceInventory?.tresherInventory)
-          ? sourceInventory.tresherInventory
-          : Array.isArray(sourceCheater.inventoryTreshers)
-            ? sourceCheater.inventoryTreshers
-            : [];
-
-    const keys = sourceInventoryKeys
-      .map((item) => this.parseInventoryKeyItem(item))
-      .filter((item): item is Key => item !== null);
-
-    const treshers = sourceInventoryTreshers
-      .map((item) => this.parseTresherItem(item))
-      .filter((item): item is Tresher => item !== null);
-
-    return {
-      keys,
-      treshers,
-    };
-  }
-
-  private parseInventoryKeyItem(item: unknown): Key | null {
-    if (!item || typeof item !== 'object') {
-      return null;
-    }
-
-    const sourceKey = item as Partial<Key> & {
-      row?: unknown;
-      column?: unknown;
-    };
-    const parsedId = this.toFiniteNumber(sourceKey.id);
-    if (parsedId === null) {
-      return null;
-    }
-
-    const rowValue = sourceKey.rownId !== undefined ? sourceKey.rownId : sourceKey.row;
-    const columnValue = sourceKey.columnId !== undefined ? sourceKey.columnId : sourceKey.column;
-
-    return {
-      id: Math.max(0, Math.floor(parsedId)),
-      name: typeof sourceKey.name === 'string' ? sourceKey.name : '',
-      description: typeof sourceKey.description === 'string' ? sourceKey.description : '',
-      doorId: this.normalizeNullableNumber(this.toFiniteNumber(sourceKey.doorId)),
-      rownId: this.normalizeNullableNumber(this.toFiniteNumber(rowValue)),
-      columnId: this.normalizeNullableNumber(this.toFiniteNumber(columnValue)),
     };
   }
 

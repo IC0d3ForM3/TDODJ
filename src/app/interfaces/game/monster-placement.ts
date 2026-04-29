@@ -1,7 +1,7 @@
-export interface MonsterPlacement {
+import { BasePlacement } from './base-placement';
+
+export interface MonsterPlacement extends BasePlacement {
   monsterId: number;
-  row: number;
-  column: number;
   roam: boolean;
   isDead?: boolean;
   currentHp?: number;
