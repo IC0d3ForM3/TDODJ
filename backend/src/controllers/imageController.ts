@@ -9,7 +9,9 @@ import * as imageService from '../services/imageService';
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const IMAGE_STORAGE_DIR = path.resolve(__dirname, '../../../public/images');
+const IMAGE_STORAGE_DIR = process.env['PUBLIC_DIR']
+  ? path.join(process.env['PUBLIC_DIR'], 'images')
+  : path.resolve(__dirname, '../../../public/images');
 
 interface ImageWriteRequestBody {
   userkey?: unknown;

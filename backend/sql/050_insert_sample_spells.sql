@@ -42,4 +42,5 @@ FROM (VALUES
   ('Vampiric Touch',   'Drain enemy HP and restore your own.',                              1,  'HP',              'HP',          0,  -5, 3,  18, 3,  10,  3,  18),
   ('Storm Bolt',       'Shock an enemy and dazzle their sight with arcane lightning.',      3,  'HP',              'Sight',       1,  -4, -2, 20, 3,  9,   3,  20)
 ) AS s(name, description, range, effecton, effecton2, lastfor, damage, effectamount2, value, sp, successtestvalue, magiccost, costtolearn)
-CROSS JOIN (SELECT key FROM users WHERE isadmin = TRUE ORDER BY id LIMIT 1) AS u;
+CROSS JOIN (SELECT key FROM users WHERE isadmin = TRUE ORDER BY id LIMIT 1) AS u
+WHERE NOT EXISTS (SELECT 1 FROM spells WHERE name = s.name AND ispublic = TRUE);

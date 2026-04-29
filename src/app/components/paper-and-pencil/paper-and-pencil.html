@@ -70,10 +70,10 @@
         <tr><th>Class</th><th>Max HP</th><th>AC Bonus</th><th>Magic Power</th><th>Special</th></tr>
       </thead>
       <tbody>
-        <tr><td>Fighter</td><td>d12 + 4</td><td>+4</td><td>0</td><td>Boost Attack ability</td></tr>
-        <tr><td>Thieph</td><td>d12 + 2</td><td>+2</td><td>2</td><td>Search twice per turn</td></tr>
-        <tr><td>Mage</td><td>d12 ÷ 2 + 2</td><td>+2</td><td>8+</td><td>Powerful spells</td></tr>
-        <tr><td>Healer</td><td>d12 ÷ 2 + 2</td><td>+2</td><td>6+</td><td>Recovery focus</td></tr>
+        <tr><td>Fighter</td><td>d12 + 4</td><td>2 + Str÷2 (max 5) + 1d6÷2</td><td>0</td><td>Boost Attack ability</td></tr>
+        <tr><td>Thieph</td><td>d12 + 2</td><td>1</td><td>2</td><td>Search twice per turn</td></tr>
+        <tr><td>Mage</td><td>d12 ÷ 2 + 2</td><td>1</td><td>8+</td><td>Powerful spells</td></tr>
+        <tr><td>Healer</td><td>d12 ÷ 2 + 2</td><td>1</td><td>6+</td><td>Recovery focus</td></tr>
       </tbody>
     </table>
 
@@ -81,9 +81,9 @@
     <ul>
       <li><strong>Max HP</strong> — roll based on class (above); write it down</li>
       <li><strong>Current HP</strong> — starts equal to Max HP</li>
-      <li><strong>AC</strong> — starts at 10 + class AC bonus</li>
+      <li><strong>AC</strong> — your starting AC. Fighter: 2 + Str÷2 (max +5) + 1d6÷2; all other classes: 1. Armor treshers and armor items add on top in-game.</li>
       <li><strong>AE</strong> — 5 (Human/Elph) or 4 (DwarPh/Shorties)</li>
-      <li><strong>Stamina</strong> — roll 1d6; adds to attack rolls and AC when defending</li>
+      <li><strong>Stamina</strong> — roll 1d6; adds to attack rolls</li>
       <li><strong>Mind</strong> — roll 1d6; used for spells, traps, lock-picking, and magic resistance (Mind ÷ 2, rounded down)</li>
       <li><strong>Magic Power (MP)</strong> — from class; used to fuel spells</li>
       <li><strong>NOA</strong> — Number of Attacks per turn; starts at 1</li>
@@ -158,6 +158,27 @@
       <strong>Combo Bonus:</strong> hitting the same monster on consecutive attacks in a turn
       (or across turns) adds up to <strong>+4</strong> to your hit roll.
     </p>
+
+    <p class="pnp-subsection-title">Boost Dice</p>
+    <p>
+      Any time a to-hit roll (PC attack, monster attack, or spell) lands on the
+      <strong>maximum</strong> value of its die, a <em>boost die</em> is immediately added
+      to the total. That boost die can itself trigger another if it also rolls maximum,
+      creating a chain:
+    </p>
+    <table class="pnp-table">
+      <thead>
+        <tr><th>Die rolled</th><th>Roll needed</th><th>Boost die added</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>d12 (base to-hit)</td><td>12</td><td>+1d6</td></tr>
+        <tr><td>d6</td><td>6</td><td>+1d4</td></tr>
+        <tr><td>d4</td><td>4</td><td>+1d3</td></tr>
+        <tr><td>d3</td><td>3</td><td>+1d2</td></tr>
+        <tr><td>d2</td><td>2</td><td>+1d2 (can keep chaining)</td></tr>
+      </tbody>
+    </table>
+    <p>The chain stops as soon as a die rolls below its maximum.</p>
 
     <p class="pnp-subsection-title">Boost Attack (Fighter only)</p>
     <ul>

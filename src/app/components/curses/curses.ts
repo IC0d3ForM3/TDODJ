@@ -38,7 +38,7 @@ export class Curses implements OnInit {
   readonly allSoundOptions = computed(() => [...this.soundOptions(), ...this._localSounds()]);
 
   readonly effectToOptions = [
-    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'Action Economy',
+    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'Action Economy', 'Boost Dice',
   ] as const;
 
   readonly isCurseSectionVisible = signal(true);

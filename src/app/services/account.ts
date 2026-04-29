@@ -27,6 +27,7 @@ export class Account {
   private _userKey = signal<string | null>(null);
   private _isAdmin = signal<boolean>(false);
   private _isCreator = signal<boolean>(false);
+  private _username = signal<string | null>(null);
 
   constructor(private http: HttpClient) {}
 
@@ -45,23 +46,30 @@ export class Account {
     );
   }
 
-  setKey(key: string | null, isAdmin: boolean = false, isCreator: boolean = false) {
+  setKey(key: string | null, isAdmin: boolean = false, isCreator: boolean = false, username: string | null = null) {
     this._userKey.set(key);
     this._isAdmin.set(isAdmin);
     this._isCreator.set(isCreator);
+    this._username.set(username);
     if (key) {
       localStorage.setItem('userKey', key);
       localStorage.setItem('isAdmin', isAdmin ? 'true' : 'false');
       localStorage.setItem('isCreator', isCreator ? 'true' : 'false');
+      if (username) localStorage.setItem('username', username);
     } else {
       localStorage.removeItem('userKey');
       localStorage.removeItem('isAdmin');
       localStorage.removeItem('isCreator');
+      localStorage.removeItem('username');
     }
   }
 
   getKey(): string | null {
     return this._userKey();
+  }
+
+  getUsername(): string | null {
+    return this._username();
   }
 
   isLoggedIn(): boolean {
@@ -80,9 +88,11 @@ export class Account {
     const key = localStorage.getItem('userKey');
     const isAdmin = localStorage.getItem('isAdmin') === 'true';
     const isCreator = localStorage.getItem('isCreator') === 'true';
+    const username = localStorage.getItem('username');
     this._userKey.set(key);
     this._isAdmin.set(isAdmin);
     this._isCreator.set(isCreator);
+    this._username.set(username);
   }
   logout() {
     this.setKey(null);

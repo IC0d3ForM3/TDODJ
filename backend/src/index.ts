@@ -103,8 +103,9 @@ app.put('/sounds/:id', soundController.updateSound);
 app.post('/contact', contactController.submitContact);
 app.get('/contact', contactController.getContacts);
 app.put('/contact/:id', contactController.updateContactFlags);
-app.use('/images', express.static(path.resolve(__dirname, '../../public/images')));
-app.use('/sounds', express.static(path.resolve(__dirname, '../../public/sounds')));
+const PUBLIC_DIR = process.env['PUBLIC_DIR'] ?? path.resolve(__dirname, '../../public');
+app.use('/images', express.static(path.join(PUBLIC_DIR, 'images')));
+app.use('/sounds', express.static(path.join(PUBLIC_DIR, 'sounds')));
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {

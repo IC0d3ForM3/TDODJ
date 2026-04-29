@@ -34,4 +34,5 @@ FROM (VALUES
   ('Staff of Striking',   'A wizard''s battle staff crackling with arcane energy.',               '2', 50, 4,  3, 2, TRUE),
   ('Cursed Blade',        'A dark sword with uncanny accuracy. Something feels wrong.',           '1', 35, 3,  4, 1, FALSE)
 ) AS w(name, description, range, value, weight, effectvalue, damage, istwohanded)
-CROSS JOIN (SELECT key FROM users WHERE isadmin = TRUE ORDER BY id LIMIT 1) AS admin_user;
+CROSS JOIN (SELECT key FROM users WHERE isadmin = TRUE ORDER BY id LIMIT 1) AS admin_user
+WHERE NOT EXISTS (SELECT 1 FROM items WHERE name = w.name AND ispublic = TRUE);

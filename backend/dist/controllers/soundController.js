@@ -43,7 +43,9 @@ const node_crypto_1 = require("node:crypto");
 const multer_1 = __importDefault(require("multer"));
 const soundService = __importStar(require("../services/soundService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SOUND_STORAGE_DIR = node_path_1.default.resolve(__dirname, '../../../public/sounds');
+const SOUND_STORAGE_DIR = process.env['PUBLIC_DIR']
+    ? node_path_1.default.join(process.env['PUBLIC_DIR'], 'sounds')
+    : node_path_1.default.resolve(__dirname, '../../../public/sounds');
 const ALLOWED_AUDIO_MIMES = new Set([
     'audio/mpeg',
     'audio/mp3',

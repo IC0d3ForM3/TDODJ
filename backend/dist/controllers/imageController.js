@@ -43,7 +43,9 @@ const node_crypto_1 = require("node:crypto");
 const multer_1 = __importDefault(require("multer"));
 const imageService = __importStar(require("../services/imageService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const IMAGE_STORAGE_DIR = node_path_1.default.resolve(__dirname, '../../../public/images');
+const IMAGE_STORAGE_DIR = process.env['PUBLIC_DIR']
+    ? node_path_1.default.join(process.env['PUBLIC_DIR'], 'images')
+    : node_path_1.default.resolve(__dirname, '../../../public/images');
 const storage = multer_1.default.diskStorage({
     destination: (_req, _file, callback) => {
         node_fs_1.default.mkdirSync(IMAGE_STORAGE_DIR, { recursive: true });

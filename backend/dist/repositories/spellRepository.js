@@ -24,6 +24,7 @@ const SELECT_SPELL_FIELDS = `
   imageid AS "imageId",
   soundid AS "soundId",
   ispublic AS "isPublic",
+  COALESCE(numberoftargets, 1) AS "numberOfTargets",
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -60,8 +61,8 @@ exports.getSpellsByUserGuid = getSpellsByUserGuid;
 const insertSpellForUser = async (userguid, payload) => {
     const { rows } = await db_1.default.query(`INSERT INTO spells
        (userguid, name, description, range, effecton, effecton2, lastfor, damage,
-        effectamount2, effectto, value, sp, successtestvalue, magiccost, costtolearn, imageid, soundid, ispublic)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        effectamount2, effectto, value, sp, successtestvalue, magiccost, costtolearn, imageid, soundid, ispublic, numberoftargets)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
      RETURNING ${SELECT_SPELL_FIELDS}`, [
         userguid,
         payload.name,
@@ -81,6 +82,7 @@ const insertSpellForUser = async (userguid, payload) => {
         payload.imageId,
         payload.soundId,
         payload.isPublic,
+        payload.numberOfTargets,
     ]);
     return rows[0];
 };
@@ -104,6 +106,7 @@ const updateSpellForUser = async (id, userguid, payload) => {
        imageid = $16,
        soundid = $17,
        ispublic = $18,
+       numberoftargets = $19,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_SPELL_FIELDS}`, [
@@ -125,6 +128,7 @@ const updateSpellForUser = async (id, userguid, payload) => {
         payload.imageId,
         payload.soundId,
         payload.isPublic,
+        payload.numberOfTargets,
     ]);
     return rows[0] ?? null;
 };

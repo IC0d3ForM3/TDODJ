@@ -74,6 +74,7 @@ function buildSpellPayload(input, isAdmin) {
         imageId: normalizeNullableInt(input.imageId ?? input.imageid),
         soundId: normalizeNullableInt(input.soundId ?? input.soundid),
         isPublic: isAdmin ? input.isPublic === true || input.ispublic === true : false,
+        numberOfTargets: Math.max(1, normalizeNumber(input.numberOfTargets ?? input.numberoftargets, 1)),
     };
 }
 const getSpells = async (req, res) => {

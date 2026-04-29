@@ -19,6 +19,7 @@ export interface SpellRecord {
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;
+  numberOfTargets: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,6 +41,7 @@ export interface UpsertSpellPayload {
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;
+  numberOfTargets: number;
 }
 
 const SELECT_SPELL_FIELDS = `
@@ -61,6 +63,7 @@ const SELECT_SPELL_FIELDS = `
   imageid AS "imageId",
   soundid AS "soundId",
   ispublic AS "isPublic",
+  COALESCE(numberoftargets, 1) AS "numberOfTargets",
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -112,8 +115,8 @@ export const insertSpellForUser = async (
   const { rows } = await pool.query<SpellRecord>(
     `INSERT INTO spells
        (userguid, name, description, range, effecton, effecton2, lastfor, damage,
-        effectamount2, effectto, value, sp, successtestvalue, magiccost, costtolearn, imageid, soundid, ispublic)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        effectamount2, effectto, value, sp, successtestvalue, magiccost, costtolearn, imageid, soundid, ispublic, numberoftargets)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
      RETURNING ${SELECT_SPELL_FIELDS}`,
     [
       userguid,
@@ -134,6 +137,7 @@ export const insertSpellForUser = async (
       payload.imageId,
       payload.soundId,
       payload.isPublic,
+      payload.numberOfTargets,
     ]
   );
   return rows[0];
@@ -163,6 +167,7 @@ export const updateSpellForUser = async (
        imageid = $16,
        soundid = $17,
        ispublic = $18,
+       numberoftargets = $19,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_SPELL_FIELDS}`,
@@ -185,6 +190,7 @@ export const updateSpellForUser = async (
       payload.imageId,
       payload.soundId,
       payload.isPublic,
+      payload.numberOfTargets,
     ]
   );
   return rows[0] ?? null;

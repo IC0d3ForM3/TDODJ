@@ -9,7 +9,9 @@ import * as soundService from '../services/soundService';
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const SOUND_STORAGE_DIR = path.resolve(__dirname, '../../../public/sounds');
+const SOUND_STORAGE_DIR = process.env['PUBLIC_DIR']
+  ? path.join(process.env['PUBLIC_DIR'], 'sounds')
+  : path.resolve(__dirname, '../../../public/sounds');
 
 const ALLOWED_AUDIO_MIMES = new Set([
   'audio/mpeg',

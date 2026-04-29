@@ -36,20 +36,20 @@
         <tr><th>Class</th><th>Max HP</th><th>AC Bonus</th><th>Magic Power</th><th>Role</th></tr>
       </thead>
       <tbody>
-        <tr><td>Fighter</td><td>d12 + 4</td><td>+4</td><td>0</td><td>Front-line brawler</td></tr>
-        <tr><td>Thieph</td><td>d12 + 2</td><td>+2</td><td>2</td><td>Stealth, picking locks</td></tr>
-        <tr><td>Mage</td><td>d12÷2 + 2</td><td>+2</td><td>8 +</td><td>Spell power, fragile</td></tr>
-        <tr><td>Healer</td><td>d12÷2 + 2</td><td>+2</td><td>6 +</td><td>Support, recovery</td></tr>
+        <tr><td>Fighter</td><td>d12 + 4</td><td>2 + Str÷2 (max 5) + 1d6÷2</td><td>0</td><td>Front-line brawler</td></tr>
+        <tr><td>Thieph</td><td>d12 + 2</td><td>1</td><td>2</td><td>Stealth, picking locks</td></tr>
+        <tr><td>Mage</td><td>d12÷2 + 2</td><td>1</td><td>8 +</td><td>Spell power, fragile</td></tr>
+        <tr><td>Healer</td><td>d12÷2 + 2</td><td>1</td><td>6 +</td><td>Support, recovery</td></tr>
       </tbody>
     </table>
 
     <p class="htp-subsection-title">PC Stats at a Glance</p>
     <ul>
       <li><strong>HP</strong> — Health points. Reach 0 and the run is over.</li>
-      <li><strong>AC</strong> — Armor Class. Higher AC means monsters hit you less often.</li>
+      <li><strong>AC</strong> — Armor Class. Set during character creation by your class. Armor treshers and armor items add on top. Higher AC means monsters hit you less often.</li>
       <li><strong>AE</strong> — Action Economy. How many actions you have each turn (5 for Human/Elph, 4 for DwarPh/Shorties).</li>
       <li><strong>Strength</strong> — Adds to weapon damage.</li>
-      <li><strong>Stamina</strong> — Adds to your attack roll and to your effective AC when defending.</li>
+      <li><strong>Stamina</strong> — Adds to your attack roll.</li>
       <li><strong>Mind</strong> — Used for trap detection, lock picking, finding hidden doors, and casting spells. Also determines your Magic Resistance (Mind ÷ 2, rounded down).</li>
       <li><strong>Magic Power (MP)</strong> — How many magic points you have available to fuel spells. Each magic point costs 1 AE to spend.</li>
       <li><strong>Range of View</strong> — How far you can see in the first-person view.</li>
@@ -156,6 +156,17 @@
         <strong>Combo bonus:</strong> Hit the same monster repeatedly and each consecutive strike
         adds up to +4 to your hit roll, making sustained pressure increasingly accurate.
       </li>
+    </ul>
+    <p class="htp-subsection-title">Boost Dice</p>
+    <ul>
+      <li>
+        Rolling the <strong>maximum</strong> on any to-hit die triggers a <strong>boost die</strong>
+        added to the roll — and that boost die can itself chain if it also rolls max.
+      </li>
+      <li>
+        Chain: d12 max → +1d6 &rarr; d6 max → +1d4 &rarr; d4 max → +1d3 &rarr; d3 max → +1d2 &rarr; d2 max → +1d2 (repeats).
+      </li>
+      <li>Applies to all PC attacks, monster attacks, and spell to-hit rolls.</li>
     </ul>
     <p class="htp-subsection-title">Boost Attack (Fighter only)</p>
     <ul>

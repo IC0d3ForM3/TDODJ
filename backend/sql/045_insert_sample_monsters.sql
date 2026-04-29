@@ -47,4 +47,5 @@ FROM (VALUES
   ('Fire Imp',           'Beast',    'A small mischievous fire fiend',6,  7,  9, 4, 1,  3,  4),
   ('Bandit',             'Humanoid', 'A human highwayman',          12,  5, 11, 3, 1,  0,  6)
 ) AS m(name, type, description, hp, movmenteconomy, ac, runat, numberofattacks, magic, spreward)
-WHERE (SELECT key FROM users WHERE isadmin = TRUE ORDER BY id LIMIT 1) IS NOT NULL;
+WHERE (SELECT key FROM users WHERE isadmin = TRUE ORDER BY id LIMIT 1) IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM monsters WHERE name = m.name AND ispublic = TRUE);

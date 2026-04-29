@@ -149,10 +149,10 @@ interface MonsterLibraryItem extends Monster {
 
 interface LibImageItem { id: number; name: string; path: string; isPublic: boolean; isActive: boolean; createdAt: string; updatedAt: string; userguid: string; }
 interface LibSoundItem { id: number; name: string; path: string; isPublic: boolean; isActive: boolean; createdAt: string; updatedAt: string; userguid: string; }
-interface LibSpellItem { id: number; name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; costToLearn: number; imageId: number | null; soundId: number | null; isPublic: boolean; createdAt: string; updatedAt: string; }
+interface LibSpellItem { id: number; name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; costToLearn: number; imageId: number | null; soundId: number | null; isPublic: boolean; numberOfTargets?: number; createdAt: string; updatedAt: string; }
 interface LibImageWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
 interface LibSoundWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
-interface LibSpellWritePayload { name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; costToLearn: number; imageId: number | null; soundId: number | null; isPublic: boolean; }
+interface LibSpellWritePayload { name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; costToLearn: number; imageId: number | null; soundId: number | null; isPublic: boolean; numberOfTargets: number; }
 
 type CreatorTabId = 'dungons' | 'treshers' | 'monsters' | 'images' | 'sounds' | 'spells' | 'potions' | 'items' | 'curses';
 
@@ -261,6 +261,10 @@ export class Creator implements OnInit {
   readonly monsterLibraryError = signal<string | null>(null);
   readonly selectedDungonError = signal<string | null>(null);
   readonly dungonJsonSaveError = signal<string | null>(null);
+  readonly mapImportError = signal<string | null>(null);
+  readonly isImportingMap = signal(false);
+  readonly isImportPlacementMode = signal(false);
+  readonly pendingImportTiles = signal<Array<{ row: number; col: number }>>([]);
   readonly publishDungonError = signal<string | null>(null);
   readonly doorDialogError = signal<string | null>(null);
   readonly exitDialogError = signal<string | null>(null);
@@ -457,6 +461,7 @@ export class Creator implements OnInit {
     imageId: new FormControl<number | null>(null),
     soundId: new FormControl<number | null>(null),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
+    numberOfTargets: new FormControl<number>(1, { nonNullable: true }),
   });
   readonly openBlockOptions: OpenBlockOption[] = [
      { key: 'wallTop', label: 'WT' },
@@ -651,6 +656,7 @@ export class Creator implements OnInit {
     hp: new FormControl<number>(10, { nonNullable: true }),
     isIndestructible: new FormControl<boolean>(false, { nonNullable: true }),
     containsItemId: new FormControl<number | null>(null),
+    shape: new FormControl<'circle' | 'square'>('circle', { nonNullable: true }),
     heightPercent: new FormControl<number>(100, { nonNullable: true }),
     heightAnchor: new FormControl<'floor' | 'ceiling'>('floor', { nonNullable: true }),
     widthPercent: new FormControl<number>(100, { nonNullable: true }),
@@ -1305,6 +1311,7 @@ export class Creator implements OnInit {
       hp: 10,
       isIndestructible: false,
       containsItemId: null,
+      shape: 'circle',
       heightPercent: 100,
       heightAnchor: 'floor',
       widthPercent: 100,
@@ -1340,6 +1347,7 @@ export class Creator implements OnInit {
                 widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
                 widthAnchor: controls.widthAnchor.value,
                 color: controls.color.value || null,
+                shape: controls.shape.value,
               }
             : obs
         ),
@@ -1361,6 +1369,7 @@ export class Creator implements OnInit {
         widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
         widthAnchor: controls.widthAnchor.value,
         color: controls.color.value || null,
+        shape: controls.shape.value,
         currentHp: Math.max(1, controls.hp.value),
         isDestroyed: false,
         itemTaken: false,
@@ -1396,6 +1405,7 @@ export class Creator implements OnInit {
       hp: obstacle.hp,
       isIndestructible: obstacle.isIndestructible,
       containsItemId: obstacle.containsItemId,
+      shape: obstacle.shape ?? 'circle',
       heightPercent: obstacle.heightPercent ?? 100,
       heightAnchor: obstacle.heightAnchor ?? 'floor',
       widthPercent: obstacle.widthPercent ?? 100,
@@ -1425,6 +1435,7 @@ export class Creator implements OnInit {
       widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
       widthAnchor: controls.widthAnchor.value,
       color: controls.color.value || null,
+      shape: controls.shape.value,
       currentHp: Math.max(1, controls.hp.value),
       isDestroyed: false,
       itemTaken: false,
@@ -4267,6 +4278,166 @@ export class Creator implements OnInit {
     return this.potionPlacementsByDungon()[preview.dungonId] ?? [];
   }
 
+  importMapFromFile(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) {
+      this.mapImportError.set('Select a dungeon first.');
+      return;
+    }
+
+    this.mapImportError.set(null);
+    this.isImportingMap.set(true);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const source = JSON.parse(reader.result as string) as {
+          rects?: Array<{ x: number; y: number; w: number; h: number }>;
+        };
+
+        if (!source.rects || !Array.isArray(source.rects)) {
+          this.mapImportError.set('Invalid map file: missing rects array.');
+          this.isImportingMap.set(false);
+          return;
+        }
+
+        // Compute offset so all coords are >= 0 (normalize to top-left = 0,0)
+        let minX = Infinity, minY = Infinity;
+        for (const r of source.rects) {
+          minX = Math.min(minX, r.x);
+          minY = Math.min(minY, r.y);
+        }
+        const ox = -minX;
+        const oy = -minY;
+
+        // Build normalized tile list
+        const tiles: Array<{ row: number; col: number }> = [];
+        const seenKeys = new Set<string>();
+        for (const rect of source.rects) {
+          for (let dy = 0; dy < rect.h; dy++) {
+            for (let dx = 0; dx < rect.w; dx++) {
+              const row = rect.y + dy + oy;
+              const col = rect.x + dx + ox;
+              const k = `${row}:${col}`;
+              if (!seenKeys.has(k)) {
+                seenKeys.add(k);
+                tiles.push({ row, col });
+              }
+            }
+          }
+        }
+
+        if (tiles.length === 0) {
+          this.mapImportError.set('No tiles found in map file.');
+          this.isImportingMap.set(false);
+          return;
+        }
+
+        this.pendingImportTiles.set(tiles);
+        this.isImportPlacementMode.set(true);
+      } catch {
+        this.mapImportError.set('Failed to parse map file. Make sure it is valid JSON.');
+      } finally {
+        this.isImportingMap.set(false);
+      }
+    };
+    reader.onerror = () => {
+      this.mapImportError.set('Failed to read file.');
+      this.isImportingMap.set(false);
+    };
+    reader.readAsText(file);
+  }
+
+  cancelImportPlacementMode(): void {
+    this.isImportPlacementMode.set(false);
+    this.pendingImportTiles.set([]);
+  }
+
+  placeImportAtPosition(anchorRow: number, anchorCol: number): void {
+    const dungonId = this.selectedDungonId();
+    const tiles = this.pendingImportTiles();
+    if (dungonId === null || tiles.length === 0) return;
+
+    // Find the top-right tile (min row, max col among those) as the anchor
+    const minRow = Math.min(...tiles.map(t => t.row));
+    const topRowTiles = tiles.filter(t => t.row === minRow);
+    const topRightCol = Math.max(...topRowTiles.map(t => t.col));
+
+    const rowOffset = anchorRow - minRow;
+    const colOffset = anchorCol - topRightCol;
+
+    const newTileKeys = new Set<string>(
+      tiles.map(t => `${t.row + rowOffset}:${t.col + colOffset}`)
+    );
+
+    const existingFilled = this.filledSquaresByDungon()[dungonId] ?? {};
+    const existingSquares = this.squaresByDungon()[dungonId] ?? {};
+
+    // Combined set so new tiles open walls toward each other AND toward existing tiles
+    const combinedFilled = new Set<string>([...Object.keys(existingFilled), ...newTileKeys]);
+
+    let uid = Date.now();
+    const makeWall = () => ({ id: uid++, name: 'Stone Wall', description: '', HP: 50, state: 'intact' as const, isDestructible: false });
+
+    const mergedFilled: Record<string, true> = { ...existingFilled };
+    const mergedSquares: Record<string, Square> = { ...existingSquares };
+
+    // Add new tiles; walls determined by combined set
+    for (const key of newTileKeys) {
+      if (existingFilled[key]) continue; // tile already exists, skip
+      const [row, col] = key.split(':').map(Number);
+      mergedFilled[key] = true;
+      mergedSquares[key] = {
+        id: uid++,
+        row,
+        column: col,
+        description: '',
+        isTrapped: false,
+        toTop:    combinedFilled.has(`${row - 1}:${col}`) ? null : makeWall(),
+        toRight:  combinedFilled.has(`${row}:${col + 1}`) ? null : makeWall(),
+        toBottom: combinedFilled.has(`${row + 1}:${col}`) ? null : makeWall(),
+        toLeft:   combinedFilled.has(`${row}:${col - 1}`) ? null : makeWall(),
+      };
+    }
+
+    // Open walls on existing tiles that now border a newly-added tile
+    const oppSide = (s: 'toTop' | 'toRight' | 'toBottom' | 'toLeft') =>
+      s === 'toTop' ? 'toBottom' : s === 'toBottom' ? 'toTop' : s === 'toLeft' ? 'toRight' : 'toLeft';
+
+    const dirs: Array<{ dr: number; dc: number; side: 'toTop' | 'toRight' | 'toBottom' | 'toLeft' }> = [
+      { dr: -1, dc:  0, side: 'toTop' },
+      { dr:  0, dc:  1, side: 'toRight' },
+      { dr:  1, dc:  0, side: 'toBottom' },
+      { dr:  0, dc: -1, side: 'toLeft' },
+    ];
+
+    for (const key of newTileKeys) {
+      if (existingFilled[key]) continue;
+      const [row, col] = key.split(':').map(Number);
+      for (const { dr, dc, side } of dirs) {
+        const neighborKey = `${row + dr}:${col + dc}`;
+        if (existingFilled[neighborKey] && mergedSquares[neighborKey]) {
+          mergedSquares[neighborKey] = { ...mergedSquares[neighborKey], [oppSide(side)]: null };
+        }
+      }
+    }
+
+    this.filledSquaresByDungon.update((all) => ({ ...all, [dungonId]: mergedFilled }));
+    this.squaresByDungon.update((all) => ({ ...all, [dungonId]: mergedSquares }));
+
+    this.markDungonJsonChanged();
+    this.saveDungonJson();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+    this.isImportPlacementMode.set(false);
+    this.pendingImportTiles.set([]);
+  }
+
   saveDungonJson(): void {
     if (this.isSavingDungonJson()) {
       return;
@@ -4441,6 +4612,11 @@ export class Creator implements OnInit {
       return;
     }
 
+    if (this.isImportPlacementMode()) {
+      this.placeImportAtPosition(row, column);
+      return;
+    }
+
     const squareKey = `${row}:${column}`;
     const eraseModeEnabled = this.isMoveMode();
     const filledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
@@ -4449,6 +4625,15 @@ export class Creator implements OnInit {
 
     if (this.isCopyObstacleMode()) {
       if (isFilledSquare) {
+        const existingAtCell = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find(
+          (obs) => obs.row === row && obs.column === column && !obs.isDestroyed
+        );
+        if (existingAtCell) {
+          // Clicking on an existing obstacle cancels copy mode
+          this.cancelCopyObstacleMode();
+          this.drawGridCanvas();
+          return;
+        }
         const src = this.copyObstacleSource();
         if (src) {
           const copy: ObstaclePlacement = {
@@ -4476,6 +4661,15 @@ export class Creator implements OnInit {
 
     if (this.isCopyMonsterMode()) {
       if (isFilledSquare) {
+        const existingMonsterAtCell = (this.monsterPlacementsByDungon()[dungonId] ?? []).find(
+          (mp) => mp.row === row && mp.column === column
+        );
+        if (existingMonsterAtCell) {
+          // Clicking on an existing monster cancels copy mode
+          this.cancelCopyMonsterMode();
+          this.drawGridCanvas();
+          return;
+        }
         const src = this.copyMonsterSource();
         if (src) {
           this.monsterPlacementsByDungon.update((all) => ({
@@ -4492,6 +4686,15 @@ export class Creator implements OnInit {
 
     if (this.isCopyFloorTrapMode()) {
       if (isFilledSquare) {
+        const existingTrapAtCell = (this.floorTrapPlacementsByDungon()[dungonId] ?? []).find(
+          (ft) => ft.row === row && ft.column === column
+        );
+        if (existingTrapAtCell) {
+          // Clicking on an existing trap cancels copy mode
+          this.cancelCopyFloorTrapMode();
+          this.drawGridCanvas();
+          return;
+        }
         const src = this.copyFloorTrapSource();
         if (src) {
           const copy: FloorTrapPlacement = {
@@ -6097,6 +6300,7 @@ export class Creator implements OnInit {
       const widthPercent = typeof src['widthPercent'] === 'number' ? Math.max(1, Math.min(100, src['widthPercent'])) : 100;
       const widthAnchor = src['widthAnchor'] === 'east' ? 'east' : src['widthAnchor'] === 'west' ? 'west' : 'center';
       const color = typeof src['color'] === 'string' && src['color'] ? src['color'] : null;
+      const shape: 'circle' | 'square' = src['shape'] === 'square' ? 'square' : 'circle';
       result.push({
         id,
         row,
@@ -6107,6 +6311,7 @@ export class Creator implements OnInit {
         hp,
         isIndestructible: src['isIndestructible'] === true,
         containsItemId: typeof src['containsItemId'] === 'number' ? src['containsItemId'] : null,
+        shape,
         heightPercent,
         heightAnchor,
         widthPercent,
@@ -9823,15 +10028,14 @@ export class Creator implements OnInit {
       return;
     }
 
-    if (
-      this.isMovementBlockedBetweenAdjacentSquares(
-        preview.dungonId,
-        preview.centerRow,
-        preview.centerColumn,
-        nextRow,
-        nextColumn
-      )
-    ) {
+    const blockType = this.getMovementBlockTypeBetweenAdjacentSquares(
+      preview.dungonId,
+      preview.centerRow,
+      preview.centerColumn,
+      nextRow,
+      nextColumn
+    );
+    if (blockType === 'wall' || blockType === 'void') {
       return;
     }
 
@@ -10667,6 +10871,7 @@ export class Creator implements OnInit {
       lastFor: item.lastFor ?? 0, effectAmount: item.effectAmount ?? 0, effectAmount2: item.effectAmount2 ?? 0,
       value: item.value ?? 0, sp: item.sp ?? 0, successTestValue: item.successTestValue ?? 0,
       magicCost: item.magicCost ?? 1, costToLearn: item.costToLearn ?? 0, imageId: item.imageId ?? null, soundId: item.soundId ?? null, isPublic: item.isPublic,
+      numberOfTargets: item.numberOfTargets ?? 1,
     });
   }
   cancelEditLibSpell(): void { this.editingLibSpellId.set(null); this.libSpellSaveMessage.set(null); this.resetLibSpellForm(); }
@@ -10797,6 +11002,7 @@ export class Creator implements OnInit {
       imageId: c.imageId.value ?? null,
       soundId: c.soundId.value ?? null,
       isPublic: this.isAdminUser() ? c.isPublic.value : false,
+      numberOfTargets: Math.max(1, c.numberOfTargets.value ?? 1),
     };
     const editingId = this.editingLibSpellId();
     const request$ = editingId
@@ -10819,7 +11025,7 @@ export class Creator implements OnInit {
 
   private resetLibSpellForm(): void {
     this.libSpellForm.reset({ name: '', description: '', range: 0, effectOn: 'HP', effectOn2: '',
-      lastFor: 0, effectAmount: 0, effectAmount2: 0, value: 0, sp: 0, successTestValue: 0, magicCost: 1, costToLearn: 0, imageId: null, soundId: null, isPublic: false });
+      lastFor: 0, effectAmount: 0, effectAmount2: 0, value: 0, sp: 0, successTestValue: 0, magicCost: 1, costToLearn: 0, imageId: null, soundId: null, isPublic: false, numberOfTargets: 1 });
   }
 
   private libFileBaseName(fileName: string): string {

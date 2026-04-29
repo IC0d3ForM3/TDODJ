@@ -371,6 +371,7 @@ const getGameById = async (req, res) => {
         let pcSp = null;
         let pcMind = 0;
         let pcStamina = 0;
+        let pcAc = 10;
         let pcStrength = 0;
         let pcMagicPower = 0;
         let pcNumberOfAttacks = 1;
@@ -387,6 +388,7 @@ const getGameById = async (req, res) => {
                 pcSp = pc.sp;
                 pcMind = pc.mind;
                 pcStamina = pc.stamina ?? 0;
+                pcAc = pc.ac ?? 10;
                 pcStrength = pc.strength ?? 0;
                 pcMagicPower = pc.magicPower ?? 0;
                 pcNumberOfAttacks = pc.numberOfAttacks ?? 1;
@@ -485,7 +487,45 @@ const getGameById = async (req, res) => {
             dungonService.fetchDungonSpReward(game.dungonid),
             dungonService.fetchDungonIsMainGameStatus(game.dungonid),
         ]);
-        return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false });
+        // Also include items from dungeon treshers so players can equip them after pickup
+        try {
+            const dungonJsonObj = typeof game.dungenJson === 'string'
+                ? JSON.parse(game.dungenJson)
+                : game.dungenJson;
+            const rawTresherList = Array.isArray(dungonJsonObj?.['tresherList'])
+                ? dungonJsonObj['tresherList']
+                : Array.isArray(dungonJsonObj?.['trasherList'])
+                    ? dungonJsonObj['trasherList']
+                    : Array.isArray(dungonJsonObj?.['tresher'])
+                        ? dungonJsonObj['tresher']
+                        : [];
+            const existingItemIds = new Set(pcTresherItems.map((it) => it.id));
+            const dungonItemIds = Array.from(new Set(rawTresherList.flatMap((t) => {
+                const obj = t;
+                return [obj['item1Id'], obj['item2Id'], obj['item3Id'], obj['item4Id']];
+            }).filter((id) => typeof id === 'number' && id > 0 && !existingItemIds.has(id))));
+            if (dungonItemIds.length > 0) {
+                const dungonItems = await itemService.fetchItemsByIds(dungonItemIds);
+                pcTresherItems = [
+                    ...pcTresherItems,
+                    ...dungonItems.map((it) => ({
+                        id: it.id,
+                        name: it.name,
+                        description: it.description,
+                        type: it.type,
+                        effectValue: it.effectValue,
+                        damage: it.damage ?? 0,
+                        range: Math.max(1, parseInt(String(it.range), 10) || 1),
+                        armorSlot: it.armorSlot ?? null,
+                        effectOn: it.effectOn ?? null,
+                    })),
+                ];
+            }
+        }
+        catch {
+            // non-fatal — proceed without dungeon tresher items
+        }
+        return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false });
     }
     catch (error) {
         console.error('Error fetching game by id:', error);
@@ -781,6 +821,44 @@ const getSampleGameSession = async (req, res) => {
         catch {
             // non-fatal — just proceed without images
         }
+        // Also include items from dungeon treshers so players can equip them after pickup
+        try {
+            const dungonJsonObj = typeof dungon.dungenJson === 'string'
+                ? JSON.parse(dungon.dungenJson)
+                : dungon.dungenJson;
+            const rawTresherList = Array.isArray(dungonJsonObj?.['tresherList'])
+                ? dungonJsonObj['tresherList']
+                : Array.isArray(dungonJsonObj?.['trasherList'])
+                    ? dungonJsonObj['trasherList']
+                    : Array.isArray(dungonJsonObj?.['tresher'])
+                        ? dungonJsonObj['tresher']
+                        : [];
+            const existingItemIds = new Set(pcTresherItems.map((it) => it.id));
+            const dungonItemIds = Array.from(new Set(rawTresherList.flatMap((t) => {
+                const obj = t;
+                return [obj['item1Id'], obj['item2Id'], obj['item3Id'], obj['item4Id']];
+            }).filter((id) => typeof id === 'number' && id > 0 && !existingItemIds.has(id))));
+            if (dungonItemIds.length > 0) {
+                const dungonItems = await itemService.fetchItemsByIds(dungonItemIds);
+                pcTresherItems = [
+                    ...pcTresherItems,
+                    ...dungonItems.map((it) => ({
+                        id: it.id,
+                        name: it.name,
+                        description: it.description,
+                        type: it.type,
+                        effectValue: it.effectValue,
+                        damage: it.damage ?? 0,
+                        range: Math.max(1, parseInt(String(it.range), 10) || 1),
+                        armorSlot: it.armorSlot ?? null,
+                        effectOn: it.effectOn ?? null,
+                    })),
+                ];
+            }
+        }
+        catch {
+            // non-fatal — proceed without dungeon tresher items
+        }
         return res.json({
             id: 0,
             dungonid: dungon.id,
@@ -798,6 +876,7 @@ const getSampleGameSession = async (req, res) => {
             pcSp: 0,
             pcMind: pc.mind,
             pcStamina: pc.stamina,
+            pcAc: pc.ac ?? 10,
             pcStrength: pc.strength,
             pcMagicPower: pc.magicPower,
             pcNumberOfAttacks: 1,

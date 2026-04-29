@@ -44,4 +44,5 @@ FROM (VALUES
   ('Berserker''s Potion',    'Grants two extra attacks but slowly drains HP each round.',        '# of attacks #OA', 'HP',               3, 2,  -2, 22),
   ('Ironheart Tincture',     'Restores stamina and reinforces your armor for several rounds.',   'Stamina',          'AC',               3, 4,  1,  24)
 ) AS p(name, description, effectto, effectto2, effecttime, effectnumber, effectamount2, value)
-CROSS JOIN (SELECT key FROM users WHERE isadmin = TRUE ORDER BY id LIMIT 1) AS u;
+CROSS JOIN (SELECT key FROM users WHERE isadmin = TRUE ORDER BY id LIMIT 1) AS u
+WHERE NOT EXISTS (SELECT 1 FROM potions WHERE name = p.name AND ispublic = TRUE);

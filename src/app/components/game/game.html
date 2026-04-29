@@ -109,6 +109,7 @@
 			<button type="button" class="sound-toggle-btn" (click)="toggleMute()" [title]="soundMuted() ? 'Unmute sounds' : 'Mute sounds'" aria-label="Toggle sound">
 				{{ soundMuted() ? '🔇' : '🔊' }}
 			</button>
+			<button type="button" class="report-bug-btn" (click)="openReportBug()" title="Report a bug">🐛 Report Bug</button>
 		</div>
 		@if (isSampleMode()) {
 			<p class="game-sample-banner">Sample game — no progress is saved@if (playerName()) { &nbsp;|&nbsp; {{ playerName() }} &mdash; {{ playerSpecies() }} {{ playerType() }} Lv {{ playerLevel() }}}</p>
@@ -169,6 +170,20 @@
 								}
 								@if (playerHitFlash()) {
 									<div class="fpv-hit-flash"></div>
+								}
+								@if (playerYellowHitFlash()) {
+									<div class="fpv-yellow-hit-flash"></div>
+								}
+								@for (beam of spellBeamEffects(); track $index) {
+									@if (getBeamFpvLine(beam); as line) {
+										<svg class="fpv-spell-beam-svg" width="330" height="220" style="position:absolute;top:0;left:0;pointer-events:none;">
+											<line [attr.x1]="line.x1" [attr.y1]="line.y1" [attr.x2]="line.x2" [attr.y2]="line.y2"
+												[attr.stroke]="beam.isHP ? '#ff2222' : '#2266ff'"
+												stroke-width="4" stroke-linecap="round"
+												[attr.filter]="beam.isHP ? 'drop-shadow(0 0 8px #ff0000)' : 'drop-shadow(0 0 8px #0055ff)'"
+												opacity="0.92" />
+										</svg>
+									}
 								}
 							</div>
 							<div class="fpv-move-row">
@@ -462,7 +477,7 @@
 					@if (nearbyItemsForPreview().length > 0) {
 						<ul class="discovery-list">
 							@for (item of nearbyItemsForPreview(); track item.kind + ':' + item.row + ':' + item.column + ':' + item.name) {
-								<li class="discovery-item">
+							<li class="discovery-item" [class.discovery-item-wall-note]="item.kind === 'Text'">
 									<span class="discovery-kind">{{ item.kind }}</span>
 									<p class="discovery-name">{{ item.name }}</p>
 									<p class="discovery-description">{{ item.description }}</p>
@@ -621,6 +636,23 @@
 
 							@if (allTresherSpellsFlat().length > 0) {
 								<p class="inventory-section-label">Spells</p>
+								@if (spellTargetMode(); as targetMode) {
+									<div class="spell-target-banner">
+										<span class="spell-target-banner-text">
+											{{ pcTresherSpellsById().get(targetMode.spellId)?.name ?? 'Spell' }}:
+											{{ targetMode.targets.length }}/{{ targetMode.maxTargets }} targets selected
+											(click monsters on map)
+										</span>
+										<div class="spell-target-banner-actions">
+											<button type="button" class="action-button action-button-strong"
+												[disabled]="targetMode.targets.length === 0"
+												(click)="executeMultiTargetSpell()">
+												Cast ({{ pcTresherSpellsById().get(targetMode.spellId)?.sp ?? 0 }} AE)
+											</button>
+											<button type="button" class="action-button" (click)="cancelSpellTargetMode()">Cancel</button>
+										</div>
+									</div>
+								}
 								<ul class="tresher-items-list">
 									@for (spell of allTresherSpellsFlat(); track spell.id) {
 										<li class="tresher-inner-item">
@@ -629,14 +661,14 @@
 												<span class="tresher-item-desc">{{ spell.description }}</span>
 											}
 											<span class="tresher-item-desc">
-												Cost: {{ spell.sp }} MP (AE) | Range: {{ spell.range }} | Effect: {{ spell.effectOn }}
+												Cost: {{ spell.sp }} MP (AE) | Range: {{ spell.range }} | Effect: {{ spell.effectOn }}@if (spell.numberOfTargets > 1) { | Targets: {{ spell.numberOfTargets }}}
 											</span>
 											<div class="inventory-item-actions">
 												<button
 													type="button"
 													class="action-button action-button-strong"
-													[disabled]="!canCastSpell(spell)"
-													(click)="castSpell(spell.id)"
+													[disabled]="!canCastSpell(spell) || spellTargetMode() !== null"
+													(click)="initSpellCast(spell.id)"
 												>
 													Cast ({{ spell.sp }} AE)
 												</button>
@@ -757,6 +789,37 @@
 				<h2 class="death-name">{{ playerDeadName() }}</h2>
 				<p class="death-subtitle">Passed Away</p>
 				<button type="button" class="death-home-btn" (click)="goHome()">Return Home</button>
+			</div>
+		</div>
+	}
+
+	@if (showReportBugModal()) {
+		<div class="bug-report-overlay" (click)="closeReportBug()">
+			<div class="bug-report-modal" (click)="$event.stopPropagation()">
+				<div class="bug-report-header">
+					<h3 class="bug-report-title">🐛 Report a Bug</h3>
+					<button type="button" class="bug-report-close" (click)="closeReportBug()">✕</button>
+				</div>
+				@if (bugReportSuccess()) {
+					<p class="bug-report-success">Thanks! Your report has been sent.</p>
+					<button type="button" class="bug-report-send" (click)="closeReportBug()">Close</button>
+				} @else {
+					<label class="bug-report-field">
+						<span>Username</span>
+						<input type="text" [value]="bugReportUsername()" (input)="bugReportUsername.set($any($event.target).value)" placeholder="Your username" />
+					</label>
+					<label class="bug-report-field">
+						<span>What went wrong?</span>
+						<textarea rows="5" [value]="bugReportMessage()" (input)="bugReportMessage.set($any($event.target).value)" placeholder="Describe the bug..."></textarea>
+					</label>
+					<p class="bug-report-note">A snapshot of the current game state will be attached automatically.</p>
+					@if (bugReportError()) {
+						<p class="bug-report-error">{{ bugReportError() }}</p>
+					}
+					<button type="button" class="bug-report-send" [disabled]="bugReportSubmitting() || !bugReportMessage().trim()" (click)="submitBugReport()">
+						{{ bugReportSubmitting() ? 'Sending…' : 'Send Report' }}
+					</button>
+				}
 			</div>
 		</div>
 	}

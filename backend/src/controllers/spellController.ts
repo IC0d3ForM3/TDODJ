@@ -40,6 +40,8 @@ interface SpellWriteInput {
   soundid?: unknown;
   isPublic?: unknown;
   ispublic?: unknown;
+  numberOfTargets?: unknown;
+  numberoftargets?: unknown;
 }
 
 function normalizeNumber(value: unknown, fallback: number): number {
@@ -79,6 +81,7 @@ function buildSpellPayload(input: SpellWriteInput, isAdmin: boolean): UpsertSpel
     imageId: normalizeNullableInt(input.imageId ?? input.imageid),
     soundId: normalizeNullableInt(input.soundId ?? input.soundid),
     isPublic: isAdmin ? input.isPublic === true || input.ispublic === true : false,
+    numberOfTargets: Math.max(1, normalizeNumber(input.numberOfTargets ?? input.numberoftargets, 1)),
   };
 }
 

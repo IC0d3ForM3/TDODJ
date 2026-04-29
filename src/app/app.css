@@ -27,6 +27,16 @@
   max-height: 140px;
   max-width: 800px;
   width: 800px;
+  content: url('/logo2.png');
+}
+
+@media (max-width: 600px) {
+  .site-logo {
+    content: url('/logo.png');
+    max-height: 80px;
+    max-width: 100%;
+    width: auto;
+  }
 }
 
 .exit-game-button {

@@ -491,7 +491,8 @@ export class DungeonFirstPersonComponent {
               farFrame,
               obsImage,
               slot.lateralOffset < 0 ? 'left' : 'right',
-              obsPlacement
+              obsPlacement,
+              segment.depth
             );
           } else {
             this.drawFirstPersonObstacle(
@@ -501,7 +502,8 @@ export class DungeonFirstPersonComponent {
               obsImage,
               slot.lateralOffset,
               obstacleLateralRange,
-              obsPlacement
+              obsPlacement,
+              segment.depth
             );
           }
         }
@@ -1237,7 +1239,8 @@ export class DungeonFirstPersonComponent {
     farFrame: { left: number; right: number; top: number; bottom: number },
     image: HTMLImageElement | null,
     side: 'left' | 'right',
-    obs?: ObstaclePlacement
+    obs?: ObstaclePlacement,
+    depth: number = 0
   ): void {
     const midLeft = (nearFrame.left + farFrame.left) / 2;
     const midRight = (nearFrame.right + farFrame.right) / 2;
@@ -1251,6 +1254,8 @@ export class DungeonFirstPersonComponent {
     const heightAnchor = obs?.heightAnchor ?? 'floor';
     const widthPct = Math.max(1, Math.min(100, obs?.widthPercent ?? 100)) / 100;
     const color = obs?.color ?? null;
+    const fogAlpha = Math.min(0.72, depth * 0.16);
+    const shape = obs?.shape ?? 'circle';
 
     context.save();
     context.beginPath();
@@ -1262,7 +1267,42 @@ export class DungeonFirstPersonComponent {
     context.clip();
     context.globalAlpha = 0.8;
 
-    if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+    if (shape === 'square') {
+      // side-face of a square box: show a slab anchored to the edge
+      const frameH = nearFrame.bottom - nearFrame.top;
+      const sh = Math.max(4, frameH * heightPct);
+      const sy = heightAnchor === 'ceiling' ? nearFrame.top : nearFrame.bottom - sh;
+      // side face width is proportional to widthPct scaled to a slab depth
+      const slabW = Math.max(5, tileWidth * 0.30 * widthPct);
+      const sx = side === 'left' ? nearFrame.left - slabW / 2 : nearFrame.right - slabW / 2;
+
+      if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+        context.drawImage(image, sx, sy, slabW, sh);
+      } else if (color) {
+        context.fillStyle = color;
+        context.fillRect(sx, sy, slabW, sh);
+        context.strokeStyle = 'rgba(0,0,0,0.4)';
+        context.lineWidth = 1;
+        context.strokeRect(sx, sy, slabW, sh);
+      } else {
+        const grad = context.createLinearGradient(sx, 0, sx + slabW, 0);
+        grad.addColorStop(0, '#7a7a7a');
+        grad.addColorStop(0.5, '#d0d0d0');
+        grad.addColorStop(1, '#7a7a7a');
+        context.fillStyle = grad;
+        context.fillRect(sx, sy, slabW, sh);
+        this.drawStoneTextureInRect(context, sx, sy, slabW, sh, Math.floor(sx * 7 + sy * 13));
+        context.strokeStyle = 'rgba(0,0,0,0.3)';
+        context.lineWidth = 1;
+        context.strokeRect(sx, sy, slabW, sh);
+      }
+      if (fogAlpha > 0) {
+        context.globalAlpha = fogAlpha;
+        context.fillStyle = '#000';
+        context.fillRect(sx, sy, slabW, sh);
+        context.globalAlpha = 0.8;
+      }
+    } else if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
       const maxWidth = tileWidth * 0.72 * widthPct;
       const maxHeight = tileHeight * heightPct;
       const aspectRatio = image.naturalWidth / image.naturalHeight;
@@ -1278,6 +1318,12 @@ export class DungeonFirstPersonComponent {
       drawHeight = Math.max(8, drawHeight);
       const drawY = heightAnchor === 'ceiling' ? midTop : midBottom - drawHeight;
       context.drawImage(image, edgeX - drawWidth / 2, drawY, drawWidth, drawHeight);
+      if (fogAlpha > 0) {
+        context.globalAlpha = fogAlpha;
+        context.fillStyle = '#000';
+        context.fillRect(edgeX - drawWidth / 2, drawY, drawWidth, drawHeight);
+        context.globalAlpha = 0.8;
+      }
     } else {
       const w = Math.max(6, tileWidth * 0.22 * widthPct);
       const h = Math.max(10, tileHeight * heightPct);
@@ -1302,6 +1348,12 @@ export class DungeonFirstPersonComponent {
         context.lineWidth = 1;
         context.strokeRect(x, y, w, h);
       }
+      if (fogAlpha > 0) {
+        context.globalAlpha = fogAlpha;
+        context.fillStyle = '#000';
+        context.fillRect(x, y, w, h);
+        context.globalAlpha = 0.8;
+      }
     }
 
     context.globalAlpha = 1;
@@ -1315,7 +1367,8 @@ export class DungeonFirstPersonComponent {
     image: HTMLImageElement | null,
     lateralOffset: number = 0,
     lateralRange: number = 1,
-    obs?: ObstaclePlacement
+    obs?: ObstaclePlacement,
+    depth: number = 0
   ): void {
     const midLeft = (nearFrame.left + farFrame.left) / 2;
     const midRight = (nearFrame.right + farFrame.right) / 2;
@@ -1336,7 +1389,105 @@ export class DungeonFirstPersonComponent {
     const widthPct = Math.max(1, Math.min(100, obs?.widthPercent ?? 100)) / 100;
     const widthAnchor = obs?.widthAnchor ?? 'center';
     const color = obs?.color ?? null;
+    const fogAlpha = Math.min(0.72, depth * 0.16);
+    const shape = obs?.shape ?? 'circle';
 
+    // ── Square shape: flat face box fills the tile front ──────────────────────
+    // Side squares (lateralOffset != 0) have no correct lateral face calculation;
+    // the peek path handles corner visibility, so skip here to avoid painting
+    // the full nearFrame width across the front view.
+    if (shape === 'square') {
+      if (lateralOffset !== 0) return;
+      const frameW = nearFrame.right - nearFrame.left;
+      const frameH = nearFrame.bottom - nearFrame.top;
+      const sw = Math.max(4, frameW * widthPct);
+      const sx = nearFrame.left + (frameW - sw) / 2;
+      const sh = Math.max(4, frameH * heightPct);
+      const sy = heightAnchor === 'ceiling' ? nearFrame.top : nearFrame.bottom - sh;
+
+      if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+        context.drawImage(image, sx, sy, sw, sh);
+      } else if (color) {
+        context.fillStyle = color;
+        context.fillRect(sx, sy, sw, sh);
+        context.strokeStyle = 'rgba(0,0,0,0.4)';
+        context.lineWidth = 1.5;
+        context.strokeRect(sx, sy, sw, sh);
+      } else {
+        // stone wall face gradient
+        const grad = context.createLinearGradient(sx, 0, sx + sw, 0);
+        grad.addColorStop(0, '#7a7a7a');
+        grad.addColorStop(0.05, '#c8c8c8');
+        grad.addColorStop(0.5, '#e8e8e8');
+        grad.addColorStop(0.95, '#c0c0c0');
+        grad.addColorStop(1, '#7a7a7a');
+        context.fillStyle = grad;
+        context.fillRect(sx, sy, sw, sh);
+        this.drawStoneTextureInRect(context, sx, sy, sw, sh, Math.floor(sx * 7 + sy * 13));
+        context.strokeStyle = 'rgba(0,0,0,0.3)';
+        context.lineWidth = 1;
+        context.strokeRect(sx, sy, sw, sh);
+      }
+
+      // For 100% fill on a straight-ahead obstacle: cover the floor/ceiling
+      // trapezoids and far face so adjacent 100% obstacles touch with no gap.
+      // Only applies when lateralOffset === 0 — side obstacles must not extend
+      // across the full view width.
+      if (widthPct >= 1 && heightPct >= 1 && lateralOffset === 0) {
+        if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+          context.fillStyle = '#c0c0c0';
+        } else if (!color) {
+          context.fillStyle = '#c8c8c8';
+        }
+        // floor trapezoid
+        context.beginPath();
+        context.moveTo(nearFrame.left, nearFrame.bottom);
+        context.lineTo(nearFrame.right, nearFrame.bottom);
+        context.lineTo(farFrame.right, farFrame.bottom);
+        context.lineTo(farFrame.left, farFrame.bottom);
+        context.closePath();
+        context.fill();
+        // ceiling trapezoid
+        context.beginPath();
+        context.moveTo(nearFrame.left, nearFrame.top);
+        context.lineTo(nearFrame.right, nearFrame.top);
+        context.lineTo(farFrame.right, farFrame.top);
+        context.lineTo(farFrame.left, farFrame.top);
+        context.closePath();
+        context.fill();
+        // far face
+        context.fillRect(farFrame.left, farFrame.top,
+          farFrame.right - farFrame.left, farFrame.bottom - farFrame.top);
+
+        if (fogAlpha > 0) {
+          context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
+          context.beginPath();
+          context.moveTo(nearFrame.left, nearFrame.bottom);
+          context.lineTo(nearFrame.right, nearFrame.bottom);
+          context.lineTo(farFrame.right, farFrame.bottom);
+          context.lineTo(farFrame.left, farFrame.bottom);
+          context.closePath();
+          context.fill();
+          context.beginPath();
+          context.moveTo(nearFrame.left, nearFrame.top);
+          context.lineTo(nearFrame.right, nearFrame.top);
+          context.lineTo(farFrame.right, farFrame.top);
+          context.lineTo(farFrame.left, farFrame.top);
+          context.closePath();
+          context.fill();
+          context.fillRect(farFrame.left, farFrame.top,
+            farFrame.right - farFrame.left, farFrame.bottom - farFrame.top);
+        }
+      }
+
+      if (fogAlpha > 0) {
+        context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
+        context.fillRect(sx, sy, sw, sh);
+      }
+      return;
+    }
+
+    // ── Circle shape (default): pillar / column ───────────────────────────────
     if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
       const baseWidth = tileWidth * 0.72 * lateralScale;
       const maxWidth = baseWidth * widthPct;
@@ -1360,6 +1511,10 @@ export class DungeonFirstPersonComponent {
           : centerX - drawWidth / 2;
       const drawY = heightAnchor === 'ceiling' ? midTop : midBottom - drawHeight;
       context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      if (fogAlpha > 0) {
+        context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
+        context.fillRect(drawX, drawY, drawWidth, drawHeight);
+      }
       return;
     }
 
@@ -1392,6 +1547,10 @@ export class DungeonFirstPersonComponent {
       context.strokeStyle = 'rgba(0,0,0,0.35)';
       context.lineWidth = 1;
       context.strokeRect(x, y, w, h);
+    }
+    if (fogAlpha > 0) {
+      context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
+      context.fillRect(x, y, w, h);
     }
   }
 

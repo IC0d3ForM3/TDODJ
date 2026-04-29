@@ -67,6 +67,7 @@ interface GameSessionPayload {
   pcSp?: number | null;
   pcMind?: number | null;
   pcStamina?: number | null;
+  pcAc?: number | null;
   pcStrength?: number | null;
   pcMagicPower?: number | null;
   pcNumberOfAttacks?: number | null;
@@ -134,6 +135,7 @@ interface PcTresherSpellData {
   successTestValue: number;
   sp: number;
   lastFor: number;
+  numberOfTargets: number;
 }
 
 interface ActiveEffect {
@@ -256,7 +258,7 @@ export class Game implements OnInit {
   readonly playerSearchesThisTurn = signal(0);
   readonly playerHp = signal(20);
   readonly playerMaxHp = signal(20);
-  readonly playerBaseAC = 10;
+  readonly playerBaseAC = signal<number>(10);
   readonly monsterInstances = signal<GameMonsterInstance[]>([]);
   readonly combatLog = signal<CombatLogEntry[]>([]);
   readonly currentGameId = signal<number | null>(null);
@@ -329,11 +331,21 @@ export class Game implements OnInit {
   readonly foundTrap = signal<{ trap: Trap; source: 'door' | 'tresher' | 'floor'; doorInfo?: NearbyDoorInfo; tresherIndex?: number; floorTrapId?: number; adjacentRow?: number; adjacentColumn?: number } | null>(null);
   readonly bloodSplatter = signal<{ x: number; y: number; r: number }[]>([]);
   readonly playerHitFlash = signal(false);
+  readonly spellTargetMode = signal<{ spellId: number; maxTargets: number; targets: { row: number; column: number }[] } | null>(null);
+  readonly spellBeamEffects = signal<{ fromRow: number; fromCol: number; toRow: number; toCol: number; isHP: boolean }[]>([]);
+  readonly monsterGlowKeys = signal<Set<string>>(new Set());
+  readonly playerYellowHitFlash = signal(false);
   readonly currentPcId_ = signal<number | null>(null);
   readonly dungonSpReward = signal<number>(0);
   readonly dungonWon = signal<boolean>(false);
   readonly showTavernModal = signal<boolean>(false);
   readonly soundMuted = signal<boolean>(localStorage.getItem('soundMuted') === 'true');
+  readonly showReportBugModal = signal<boolean>(false);
+  readonly bugReportUsername = signal<string>('');
+  readonly bugReportMessage = signal<string>('');
+  readonly bugReportSubmitting = signal<boolean>(false);
+  readonly bugReportSuccess = signal<boolean>(false);
+  readonly bugReportError = signal<string | null>(null);
   private tavernMusicCtx: AudioContext | null = null;
 
   get questItemsForTavern(): Tresher[] {
@@ -740,6 +752,38 @@ export class Game implements OnInit {
   onMapCellClicked(cell: { row: number; column: number }): void {
     const preview = this.gridPreviewContext();
     if (!preview || this.turnPhase() !== 'player' || this.playerHp() <= 0) return;
+
+    // Handle spell multi-target selection mode
+    const targetMode = this.spellTargetMode();
+    if (targetMode) {
+      const monster = this.monsterInstances().find(m => !m.isDead && m.row === cell.row && m.column === cell.column);
+      if (!monster) return;
+      const spell = this.pcTresherSpellsById().get(targetMode.spellId);
+      if (!spell) return;
+      const dr = Math.abs(cell.row - preview.centerRow);
+      const dc = Math.abs(cell.column - preview.centerColumn);
+      if (Math.max(dr, dc) > spell.range || !this.hasLineOfSight(preview.dungonId, preview.centerRow, preview.centerColumn, cell.row, cell.column)) {
+        const name = this.getMonstersByIdForDungon(preview.dungonId).get(monster.monsterId)?.name ?? 'monster';
+        this.previewActionMessage.set(`${name} is out of spell range (${spell.range}).`);
+        return;
+      }
+      const idx = targetMode.targets.findIndex(t => t.row === cell.row && t.column === cell.column);
+      let newTargets: { row: number; column: number }[];
+      if (idx >= 0) {
+        newTargets = targetMode.targets.filter((_, i) => i !== idx);
+        this.previewActionMessage.set(`Target removed. (${newTargets.length}/${targetMode.maxTargets} selected)`);
+      } else if (targetMode.targets.length < targetMode.maxTargets) {
+        newTargets = [...targetMode.targets, { row: cell.row, column: cell.column }];
+        this.previewActionMessage.set(`Target added. (${newTargets.length}/${targetMode.maxTargets} selected)`);
+      } else {
+        this.previewActionMessage.set(`Max targets (${targetMode.maxTargets}) already selected.`);
+        return;
+      }
+      this.spellTargetMode.set({ ...targetMode, targets: newTargets });
+      this.drawPreviewGridCanvas();
+      return;
+    }
+
     const monster = this.monsterInstances().find(
       m => !m.isDead && m.row === cell.row && m.column === cell.column
     );
@@ -1193,6 +1237,23 @@ export class Game implements OnInit {
     return this.findAdjacentLiveMonster(preview.centerRow, preview.centerColumn, spell.range, preview.dungonId) !== null;
   }
 
+  initSpellCast(spellId: number): void {
+    if (this.turnPhase() !== 'player') return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const spell = this.pcTresherSpellsById().get(spellId);
+    if (!spell) return;
+
+    if (spell.numberOfTargets > 1) {
+      this.spellTargetMode.set({ spellId, maxTargets: spell.numberOfTargets, targets: [] });
+      this.selectedSpellId.set(spellId);
+      this.previewActionMessage.set(`${spell.name}: click up to ${spell.numberOfTargets} monsters on the map, then press Cast.`);
+      this.addCombatLog(`Select up to ${spell.numberOfTargets} targets for ${spell.name}.`);
+    } else {
+      this.castSpell(spellId);
+    }
+  }
+
   castSpell(spellId: number): void {
     if (this.turnPhase() !== 'player') return;
     const preview = this.gridPreviewContext();
@@ -1224,6 +1285,10 @@ export class Game implements OnInit {
     this.addCombatLog(`Cast ${spell.name} — rolled ${roll} (1d12+${this.playerMind()}) vs DC ${dc} (TN ${spell.successTestValue} + MR ${magicResistance}).`);
 
     if (roll >= dc) {
+      const dist = Math.max(Math.abs(target.row - preview.centerRow), Math.abs(target.column - preview.centerColumn));
+      if (dist > 1) {
+        this.triggerSpellBeam(preview.centerRow, preview.centerColumn, target.row, target.column, spell.effectOn === 'HP');
+      }
       if (spell.lastFor > 0) {
         target.activeEffects.push({
           effectOn: spell.effectOn,
@@ -1231,14 +1296,17 @@ export class Game implements OnInit {
           remainingAE: spell.lastFor,
           sourceName: spell.name,
         });
+        this.triggerMonsterGlow(target.row, target.column);
         this.addCombatLog(`${spell.name} afflicts ${monsterName} for ${spell.lastFor} AE! (${spell.effectOn} -${spell.effectAmount}/AE)`);
       } else {
         if (spell.effectOn === 'HP') {
           const damage = Math.max(1, spell.effectAmount);
           target.currentHp -= damage;
           this.triggerBloodSplatter();
+          this.triggerMonsterGlow(target.row, target.column);
           this.addCombatLog(`${spell.name} hits ${monsterName} for ${damage} damage!`);
         } else {
+          this.triggerMonsterGlow(target.row, target.column);
           this.addCombatLog(`${spell.name} successfully affects ${monsterName}! (${spell.effectOn} −${spell.effectAmount})`);
         }
 
@@ -1268,6 +1336,135 @@ export class Game implements OnInit {
     if (this.playerAE() <= 0) {
       this.startMonsterTurns();
     }
+  }
+
+  executeMultiTargetSpell(): void {
+    const targetMode = this.spellTargetMode();
+    if (!targetMode || targetMode.targets.length === 0) return;
+    if (this.turnPhase() !== 'player') return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+
+    const spell = this.pcTresherSpellsById().get(targetMode.spellId);
+    if (!spell) return;
+
+    const mpCost = Math.max(1, spell.sp);
+    if (this.playerAE() < mpCost) {
+      this.addCombatLog(`Not enough AE to cast ${spell.name}. Need ${mpCost} AE.`);
+      return;
+    }
+
+    this.spellTargetMode.set(null);
+    this.selectedSpellId.set(null);
+
+    let anyHit = false;
+    for (const t of targetMode.targets) {
+      const instance = this.monsterInstances().find(m => !m.isDead && m.row === t.row && m.column === t.column);
+      if (!instance) continue;
+      const template = this.getMonstersByIdForDungon(preview.dungonId).get(instance.monsterId);
+      const monsterName = template?.name ?? 'monster';
+      const magicResistance = template?.magicResistance ?? 0;
+      const roll = this.rollD12(this.playerMind());
+      const dc = spell.successTestValue + magicResistance;
+      this.addCombatLog(`${spell.name} → ${monsterName}: rolled ${roll} vs DC ${dc}.`);
+      if (roll >= dc) {
+        anyHit = true;
+        const dist = Math.max(Math.abs(instance.row - preview.centerRow), Math.abs(instance.column - preview.centerColumn));
+        if (dist > 1) {
+          this.triggerSpellBeam(preview.centerRow, preview.centerColumn, instance.row, instance.column, spell.effectOn === 'HP');
+        }
+        if (spell.lastFor > 0) {
+          instance.activeEffects.push({
+            effectOn: spell.effectOn,
+            effectAmount: Math.max(1, spell.effectAmount),
+            remainingAE: spell.lastFor,
+            sourceName: spell.name,
+          });
+          this.triggerMonsterGlow(instance.row, instance.column);
+          this.addCombatLog(`${spell.name} afflicts ${monsterName} for ${spell.lastFor} AE!`);
+        } else {
+          if (spell.effectOn === 'HP') {
+            const damage = Math.max(1, spell.effectAmount);
+            instance.currentHp -= damage;
+            this.triggerMonsterGlow(instance.row, instance.column);
+            this.addCombatLog(`${spell.name} hits ${monsterName} for ${damage} damage!`);
+          } else {
+            this.triggerMonsterGlow(instance.row, instance.column);
+            this.addCombatLog(`${spell.name} affects ${monsterName}! (${spell.effectOn} −${spell.effectAmount})`);
+          }
+          if (instance.currentHp <= 0) {
+            instance.isDead = true;
+            instance.currentHp = 0;
+            this.addCombatLog(`${monsterName} is dead!`);
+            this.dropMonsterLoot(preview.dungonId, instance, template ?? null);
+            const spGain = template?.spReward ?? 0;
+            if (spGain > 0) {
+              this.playerSp.update((s) => s + spGain);
+              this.addCombatLog(`+${spGain} SP!`);
+              this.awardSpToPC(spGain);
+            }
+          }
+        }
+      } else {
+        this.addCombatLog(`${spell.name} fizzles — ${monsterName} resists!`);
+      }
+    }
+    if (anyHit) {
+      this.triggerBloodSplatter();
+      this.selectedCombatTarget.set(null);
+    }
+    this.monsterInstances.update((arr) => [...arr]);
+    this.consumePlayerAE(mpCost, preview.dungonId);
+    this.drawPreviewGridCanvas();
+    if (this.playerAE() <= 0) {
+      this.startMonsterTurns();
+    }
+  }
+
+  cancelSpellTargetMode(): void {
+    this.spellTargetMode.set(null);
+    this.selectedSpellId.set(null);
+    this.previewActionMessage.set(null);
+    this.drawPreviewGridCanvas();
+  }
+
+  private triggerSpellBeam(fromRow: number, fromCol: number, toRow: number, toCol: number, isHP: boolean): void {
+    this.spellBeamEffects.update(beams => [...beams, { fromRow, fromCol, toRow, toCol, isHP }]);
+    setTimeout(() => {
+      this.spellBeamEffects.update(beams => beams.filter(b => !(b.fromRow === fromRow && b.fromCol === fromCol && b.toRow === toRow && b.toCol === toCol && b.isHP === isHP)));
+    }, 1800);
+  }
+
+  private triggerMonsterGlow(row: number, col: number): void {
+    const key = `${row}_${col}`;
+    this.monsterGlowKeys.update(s => { const n = new Set(s); n.add(key); return n; });
+    setTimeout(() => {
+      this.monsterGlowKeys.update(s => { const n = new Set(s); n.delete(key); return n; });
+      this.drawPreviewGridCanvas();
+    }, 1500);
+  }
+
+  private triggerPlayerYellowHitFlash(): void {
+    this.playerYellowHitFlash.set(true);
+    setTimeout(() => this.playerYellowHitFlash.set(false), 1500);
+  }
+
+  getBeamFpvLine(beam: { fromRow: number; fromCol: number; toRow: number; toCol: number; isHP: boolean }): { x1: number; y1: number; x2: number; y2: number } | null {
+    const preview = this.gridPreviewContext();
+    if (!preview) return null;
+    const cheater = this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER;
+    const facing = cheater.facingDir;
+    const dr = beam.toRow - preview.centerRow;
+    const dc = beam.toCol - preview.centerColumn;
+    const monsterAngle = Math.atan2(dc, -dr);
+    const facingAngles: Record<FacingDirection, number> = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 };
+    let rel = monsterAngle - facingAngles[facing];
+    if (rel > Math.PI) rel -= 2 * Math.PI;
+    if (rel < -Math.PI) rel += 2 * Math.PI;
+    const halfFov = Math.PI / 3; // 60° FOV
+    const ratio = (rel / halfFov + 1) / 2;
+    const screenX = Math.max(0, Math.min(330, ratio * 330));
+    return { x1: 165, y1: 220, x2: screenX, y2: 30 };
   }
 
   drinkTresherInnerPotion(tresherIndex: number, potionId: number): void {
@@ -2484,6 +2681,7 @@ export class Game implements OnInit {
             this.playerSp.set(0);
             this.playerMind.set(typeof game.pcMind === 'number' ? Math.max(0, Math.floor(game.pcMind)) : 0);
             this.playerStamina.set(typeof game.pcStamina === 'number' ? Math.max(0, Math.floor(game.pcStamina)) : 0);
+            this.playerBaseAC.set(typeof game.pcAc === 'number' ? Math.max(1, game.pcAc) : 10);
             this.playerStrength.set(typeof game.pcStrength === 'number' ? Math.max(0, Math.floor(game.pcStrength)) : 0);
             this.playerMagicPower.set(typeof game.pcMagicPower === 'number' ? Math.max(0, Math.floor(game.pcMagicPower)) : 0);
             this.playerNOA.set(typeof game.pcNumberOfAttacks === 'number' ? Math.max(1, Math.floor(game.pcNumberOfAttacks)) : 1);
@@ -2529,6 +2727,7 @@ export class Game implements OnInit {
                     successTestValue: typeof s.successTestValue === 'number' ? s.successTestValue : 10,
                     sp: typeof s.sp === 'number' ? Math.max(1, s.sp) : 1,
                     lastFor: typeof s.lastFor === 'number' ? Math.max(0, s.lastFor) : 0,
+                    numberOfTargets: typeof s.numberOfTargets === 'number' ? Math.max(1, s.numberOfTargets) : 1,
                   });
                 }
               }
@@ -2592,6 +2791,7 @@ export class Game implements OnInit {
           this.playerSp.set(typeof game.pcSp === 'number' ? Math.max(0, Math.floor(game.pcSp)) : 0);
           this.playerMind.set(typeof game.pcMind === 'number' ? Math.max(0, Math.floor(game.pcMind)) : 0);
           this.playerStamina.set(typeof game.pcStamina === 'number' ? Math.max(0, Math.floor(game.pcStamina)) : 0);
+          this.playerBaseAC.set(typeof game.pcAc === 'number' ? Math.max(1, game.pcAc) : 10);
           this.playerStrength.set(typeof game.pcStrength === 'number' ? Math.max(0, Math.floor(game.pcStrength)) : 0);
           this.playerMagicPower.set(typeof game.pcMagicPower === 'number' ? Math.max(0, Math.floor(game.pcMagicPower)) : 0);
           this.playerNOA.set(typeof game.pcNumberOfAttacks === 'number' ? Math.max(1, Math.floor(game.pcNumberOfAttacks)) : 1);
@@ -2643,6 +2843,7 @@ export class Game implements OnInit {
                   successTestValue: typeof s.successTestValue === 'number' ? s.successTestValue : 10,
                   sp: typeof s.sp === 'number' ? Math.max(1, s.sp) : 1,
                   lastFor: typeof s.lastFor === 'number' ? Math.max(0, s.lastFor) : 0,
+                  numberOfTargets: typeof s.numberOfTargets === 'number' ? Math.max(1, s.numberOfTargets) : 1,
                 });
               }
             }
@@ -3582,6 +3783,75 @@ export class Game implements OnInit {
         this.previewGridCellSize,
         displayDirection
       );
+    }
+
+    // Draw spell target mode highlights (purple ring around each selected target)
+    const targetMode = this.spellTargetMode();
+    if (targetMode) {
+      for (const t of targetMode.targets) {
+        const tpRow = t.row - preview.startRow;
+        const tpCol = t.column - preview.startColumn;
+        if (tpRow >= 0 && tpCol >= 0 && tpRow < this.previewGridDimension && tpCol < this.previewGridDimension) {
+          const cx = tpCol * this.previewGridCellSize + this.previewGridCellSize / 2;
+          const cy = tpRow * this.previewGridCellSize + this.previewGridCellSize / 2;
+          context.beginPath();
+          context.arc(cx, cy, this.previewGridCellSize / 2 - 1, 0, Math.PI * 2);
+          context.strokeStyle = '#cc44ff';
+          context.lineWidth = 2.5;
+          context.stroke();
+        }
+      }
+    }
+
+    // Draw monster glow rings
+    const glowKeys = this.monsterGlowKeys();
+    if (glowKeys.size > 0) {
+      for (const inst of this.monsterInstances()) {
+        const key = `${inst.row}_${inst.column}`;
+        if (!glowKeys.has(key)) continue;
+        const gpRow = inst.row - preview.startRow;
+        const gpCol = inst.column - preview.startColumn;
+        if (gpRow >= 0 && gpCol >= 0 && gpRow < this.previewGridDimension && gpCol < this.previewGridDimension) {
+          const cx = gpCol * this.previewGridCellSize + this.previewGridCellSize / 2;
+          const cy = gpRow * this.previewGridCellSize + this.previewGridCellSize / 2;
+          context.save();
+          context.shadowColor = '#ffdd00';
+          context.shadowBlur = 8;
+          context.beginPath();
+          context.arc(cx, cy, this.previewGridCellSize / 2, 0, Math.PI * 2);
+          context.strokeStyle = '#ffdd00';
+          context.lineWidth = 3;
+          context.stroke();
+          context.restore();
+        }
+      }
+    }
+
+    // Draw spell beams on 2D map
+    const beams = this.spellBeamEffects();
+    if (beams.length > 0) {
+      for (const beam of beams) {
+        const startPRow = beam.fromRow - preview.startRow;
+        const startPCol = beam.fromCol - preview.startColumn;
+        const endPRow = beam.toRow - preview.startRow;
+        const endPCol = beam.toCol - preview.startColumn;
+        const x1 = startPCol * this.previewGridCellSize + this.previewGridCellSize / 2;
+        const y1 = startPRow * this.previewGridCellSize + this.previewGridCellSize / 2;
+        const x2 = endPCol * this.previewGridCellSize + this.previewGridCellSize / 2;
+        const y2 = endPRow * this.previewGridCellSize + this.previewGridCellSize / 2;
+        context.save();
+        const beamColor = beam.isHP ? '#ff3333' : '#3399ff';
+        context.shadowColor = beamColor;
+        context.shadowBlur = 10;
+        context.strokeStyle = beamColor;
+        context.lineWidth = 3;
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(x1, y1);
+        context.lineTo(x2, y2);
+        context.stroke();
+        context.restore();
+      }
     }
 
     this.drawFirstPersonViewCanvas();
@@ -6817,6 +7087,7 @@ export class Game implements OnInit {
       const widthPercent = typeof src['widthPercent'] === 'number' ? Math.max(1, Math.min(100, src['widthPercent'])) : 100;
       const widthAnchor: 'center' | 'east' | 'west' = src['widthAnchor'] === 'east' ? 'east' : src['widthAnchor'] === 'west' ? 'west' : 'center';
       const color = typeof src['color'] === 'string' && src['color'] ? src['color'] : null;
+      const shape: 'circle' | 'square' = src['shape'] === 'square' ? 'square' : 'circle';
       result.push({
         id,
         row,
@@ -6831,6 +7102,7 @@ export class Game implements OnInit {
         hp,
         isIndestructible: src['isIndestructible'] === true,
         containsItemId: typeof src['containsItemId'] === 'number' ? src['containsItemId'] : null,
+        shape,
         heightPercent,
         heightAnchor,
         widthPercent,
@@ -7312,6 +7584,46 @@ export class Game implements OnInit {
     } else if (this.showTavernModal()) {
       this.startTavernMusic();
     }
+  }
+
+  openReportBug(): void {
+    const username = this.account.getUsername() ?? '';
+    this.bugReportUsername.set(username);
+    this.bugReportMessage.set('');
+    this.bugReportSuccess.set(false);
+    this.bugReportError.set(null);
+    this.showReportBugModal.set(true);
+  }
+
+  closeReportBug(): void {
+    this.showReportBugModal.set(false);
+  }
+
+  submitBugReport(): void {
+    const comment = this.bugReportMessage().trim();
+    if (!comment) return;
+    this.bugReportSubmitting.set(true);
+    this.bugReportError.set(null);
+    const username = this.bugReportUsername().trim() || 'Anonymous';
+    const preview = this.gridPreviewContext();
+    const gameJson = preview ? JSON.stringify(this.buildDungenJsonForSave(preview.dungonId), null, 2) : '{}';
+    const message = `${comment}\n\n--- Game State ---\n${gameJson}`;
+    this.http.post(`${API_BASE_URL}/contact`, {
+      name: username,
+      email: 'noreply@tdodj.com',
+      problem: 'Report Bug',
+      username,
+      message,
+    }).subscribe({
+      next: () => {
+        this.bugReportSubmitting.set(false);
+        this.bugReportSuccess.set(true);
+      },
+      error: () => {
+        this.bugReportSubmitting.set(false);
+        this.bugReportError.set('Failed to send report. Please try again.');
+      },
+    });
   }
 
   private startTavernMusic(): void {
@@ -7897,13 +8209,13 @@ export class Game implements OnInit {
   }
 
   playerACForView(): number {
-    return this.getPlayerAC() + this.playerStamina();
+    return this.getPlayerAC();
   }
 
   private getPlayerAC(): number {
     const preview = this.gridPreviewContext();
     if (!preview) {
-      return this.playerBaseAC;
+      return this.playerBaseAC();
     }
     const equippedIndexes = this.equippedTresherIndexesByDungon()[preview.dungonId] ?? [];
     const cheater = this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER;
@@ -7925,7 +8237,7 @@ export class Game implements OnInit {
         }
       }
     }
-    return this.playerBaseAC + armorCount + armorItemBonus - this.playerBoostAttackACPenalty();
+    return this.playerBaseAC() + armorCount + armorItemBonus - this.playerBoostAttackACPenalty();
   }
 
   endPlayerTurnEarly(): void {
@@ -8075,7 +8387,7 @@ export class Game implements OnInit {
 
     const level = this.playerLevel();
     const boostDieSize = level >= 6 ? 6 : level >= 3 ? 4 : 3;
-    const boostDieRoll = this.randomInt(1, boostDieSize);
+    const boostDieRoll = this.rollWithBoost(boostDieSize);
 
     const rollBonus = isUnarmed ? -1 : weaponToHit;
     const hitRoll = this.rollD12(rollBonus + this.playerStamina() + comboBonus) + boostDieRoll;
@@ -8328,8 +8640,18 @@ export class Game implements OnInit {
     }
   }
 
+  private rollWithBoost(dieSize: number): number {
+    const boostDie: Record<number, number> = { 12: 6, 6: 4, 4: 3, 3: 2, 2: 2 };
+    const roll = this.randomInt(1, dieSize);
+    const boostCursed = this.playerActiveEffects().some(e => e.effectOn === 'Boost Dice');
+    if (!boostCursed && roll === dieSize && boostDie[dieSize] != null) {
+      return roll + this.rollWithBoost(boostDie[dieSize]);
+    }
+    return roll;
+  }
+
   private rollD12(bonus: number = 0): number {
-    return this.randomInt(1, 12) + bonus;
+    return this.rollWithBoost(12) + bonus;
   }
 
   private randomInt(min: number, max: number): number {
@@ -8882,7 +9204,7 @@ export class Game implements OnInit {
 
     const coverPenalty = this.getAttackCoverPenalty(dungonId, monster.row, monster.column, playerRow, playerCol);
     const hitRoll = this.rollD12(plusToHit + coverPenalty);
-    let playerAC = this.getPlayerAC() + this.playerStamina();
+    let playerAC = this.getPlayerAC();
     if (this.playerDefendStacks() > 0) {
       playerAC += 2;
       this.playerDefendStacks.update((s) => s - 1);

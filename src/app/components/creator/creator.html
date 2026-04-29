@@ -316,6 +316,15 @@
 									[disabled]="!hasAnyWhiteSpace()"
 									(click)="openPortalDialog(null)"
 								>+Portal</button>
+								<button
+									type="button"
+									class="open-block-btn"
+									[class.open-block-btn--active]="isImportPlacementMode()"
+									[disabled]="isImportingMap() || isSavingDungonJson()"
+									(click)="gridMapFileInput.click()"
+								>+Import</button>
+								<input #gridMapFileInput type="file" accept=".json" style="display:none"
+									(change)="importMapFromFile($event)" />
 							</div>
 							<div class="publish-actions-column">
 								<button
@@ -496,6 +505,12 @@
 							<span class="details-message">
 								click a white square to place trap copy
 								<button type="button" class="cancel-button" (click)="cancelCopyFloorTrapMode()">cancel</button>
+							</span>
+						}
+						@if (isImportPlacementMode()) {
+							<span class="details-message">
+								click a cell — top-right corner of the imported dungeon lands there
+								<button type="button" class="cancel-button" (click)="cancelImportPlacementMode()">cancel</button>
 							</span>
 						}
 					</div>
@@ -693,6 +708,31 @@
 					>
 						Edit Metadata
 					</button>
+
+					<div class="import-map-row">
+						<button
+							type="button"
+							class="edit-metadata-button"
+							[disabled]="isImportingMap() || isSavingDungonJson()"
+							(click)="mapFileInput.click()"
+						>
+							@if (isImportingMap() || isSavingDungonJson()) {
+								Importing...
+							} @else {
+								Import Map Layout
+							}
+						</button>
+						<input
+							#mapFileInput
+							type="file"
+							accept=".json"
+							style="display:none"
+							(change)="importMapFromFile($event)"
+						/>
+						@if (mapImportError()) {
+							<small class="form-error">{{ mapImportError() }}</small>
+						}
+					</div>
 
 					@if (isEditMetadataFormVisible()) {
 						<form class="edit-metadata-form" [formGroup]="editMetadataForm" (ngSubmit)="saveEditMetadataForm()">
@@ -986,6 +1026,7 @@
 						<label class="tresher-field"><span>Success Test Value</span><input type="number" formControlName="successTestValue" /></label>
 						<label class="tresher-field"><span>Magic Cost</span><input type="number" formControlName="magicCost" min="1" /></label>
 						<label class="tresher-field"><span>Cost to Learn (SP)</span><input type="number" formControlName="costToLearn" min="0" /></label>
+						<label class="tresher-field"><span>Number of Targets</span><input type="number" formControlName="numberOfTargets" min="1" /></label>
 						<label class="tresher-field"><span>Image</span>
 							<div style="display:flex;gap:0.4rem;align-items:center">
 								<select formControlName="imageId"><option [ngValue]="null">No Image</option>@for (img of libImageOptions(); track img.id) { <option [ngValue]="img.id">{{ img.name }}</option> }</select>
@@ -2417,6 +2458,16 @@
 						<option [value]="img.id">{{ img.name }}</option>
 					}
 				</select>
+
+				<label class="form-label">Shape</label>
+				<div class="form-radio-group">
+					<label class="form-radio-label">
+						<input type="radio" formControlName="shape" value="circle" /> Circle (pillar)
+					</label>
+					<label class="form-radio-label">
+						<input type="radio" formControlName="shape" value="square" /> Square (box fills tile)
+					</label>
+				</div>
 
 				<label class="form-label" for="obstacle-height">Height % (100 = floor to ceiling)</label>
 				<input id="obstacle-height" class="form-input" type="number" min="1" max="100" formControlName="heightPercent" />

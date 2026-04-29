@@ -8,6 +8,7 @@ export interface ObstaclePlacement {
   hp: number;
   isIndestructible: boolean;
   containsItemId: number | null;
+  shape: 'circle' | 'square';               // circle = pillar/cylinder; square = filled box
   heightPercent: number;                        // 1–100 (100 = floor to ceiling)
   heightAnchor: 'floor' | 'ceiling';            // only matters if heightPercent < 100
   widthPercent: number;                         // 1–100 (100 = fills tile view)

@@ -1233,8 +1233,11 @@ export class Dashboard implements OnInit {
     if (species === 'Elph' || species === 'DwarPh') poisonResist += this.rollDn(4);
     controls.poisonResest.setValue(poisonResist);
 
-    // AC: floor(d12/2) + (Fighter +4, others +2)
-    controls.ac.setValue(Math.floor(this.rollDn(12) / 2) + (type === 'Fighter' ? 4 : 2));
+    // AC: Fighter = 2 + min(floor(Strength/2), 5) + floor(1d6/2); others = 1
+    const ac = type === 'Fighter'
+      ? 2 + Math.min(Math.floor(strength / 2), 5) + Math.floor(this.rollDn(6) / 2)
+      : 1;
+    controls.ac.setValue(ac);
   }
 
   private normalizePcSpecies(value: string): PcSpeciesOption {
