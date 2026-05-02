@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe } from '@angular/common';
+import { DatePipe, SlicePipe } from '@angular/common';
 import { forkJoin } from 'rxjs';
 import { API_BASE_URL } from '../../api-config';
 import { Account } from '../../services/account';
@@ -55,7 +55,7 @@ interface ContactRequest {
 @Component({
   selector: 'app-admin',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe],
+  imports: [DatePipe, SlicePipe],
   templateUrl: './admin.html',
   styleUrl: './admin.css',
 })

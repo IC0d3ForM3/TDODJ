@@ -27,7 +27,7 @@
 							<li class="it-list-item">
 								<div class="it-item-info">
 									<span class="it-item-name">{{ item.name }}</span>
-									<small class="it-item-meta">ID {{ item.id }} | {{ item.type }}{{ item.armorSlot ? ' · ' + item.armorSlot : '' }}{{ item.effectOn ? ' · ' + item.effectOn : '' }}{{ item.effectToPc ? ' | To PC ' + item.effectToPc + ' ' + item.effectToPcValue : '' }}{{ item.type === 'weapon' ? ' | FX ' + item.weaponEffectType : '' }}{{ item.effectValue ? ' | Eff ' + item.effectValue : '' }}{{ item.value ? ' | Val ' + item.value : '' }}{{ curseNameForItem(item.curseId) ? ' | Curse: ' + curseNameForItem(item.curseId) : '' }}</small>
+									<small class="it-item-meta">ID {{ item.id }} | {{ itemTypeLabel(item.type) }}{{ item.armorSlot ? ' · ' + item.armorSlot : '' }}{{ item.effectOn ? ' · ' + item.effectOn : '' }}{{ item.effectToPc ? ' | To PC ' + item.effectToPc + ' ' + item.effectToPcValue : '' }}{{ item.type === 'weapon' || item.type === 'other' ? ' | FX ' + item.weaponEffectType : '' }}{{ item.effectValue ? ' | Eff ' + item.effectValue : '' }}{{ item.value ? ' | Val ' + item.value : '' }}{{ curseNameForItem(item.curseId) ? ' | Curse: ' + curseNameForItem(item.curseId) : '' }}</small>
 									@if (item.description) { <small class="it-item-desc">{{ item.description }}</small> }
 								</div>
 								<button type="button" class="it-edit-btn" (click)="editItem(item)">Edit</button>
@@ -43,51 +43,108 @@
 					<label class="it-field it-field-wide"><span>Name</span><input type="text" formControlName="name" placeholder="Item name" /></label>
 					<label class="it-field it-field-wide"><span>Description</span><input type="text" formControlName="description" placeholder="Description" /></label>
 					<label class="it-field"><span>Type</span>
-						<select formControlName="type">@for (option of itemTypeOptions; track option) { <option [value]="option">{{ option }}</option> }</select>
+						<select formControlName="type" (change)="onTypeChange()">@for (option of itemTypeOptions; track option.value) { <option [value]="option.value">{{ option.label }}</option> }</select>
 					</label>
-					@if (userItemForm.controls.type.value === 'armor') {
-						<label class="it-field"><span>Armor Slot</span>
-							<select formControlName="armorSlot"><option [ngValue]="null">-- Choose Slot --</option>@for (slot of armorSlotOptions; track slot.value) { <option [value]="slot.value">{{ slot.label }}</option> }</select>
+					@if (userItemForm.controls.type.value === 'weapon') {
+						<label class="it-field"><span>Damage (to target)</span>
+							<select formControlName="damage">
+								<option [ngValue]="6">d12/6 - 1d2</option>
+								<option [ngValue]="4">d12/4 - 1d3</option>
+								<option [ngValue]="3">d12/3 - 1d4</option>
+								<option [ngValue]="2">d12/2 - 1d6</option>
+							</select>
 						</label>
-					}
-					@if (showEffectOn()) {
-						<label class="it-field"><span>Effect</span>
-							<select formControlName="effectOn"><option [ngValue]="null">-- Choose Effect --</option>@for (opt of effectOnOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }</select>
-						</label>
-					}
-					@if (showEffectToPc()) {
+						<label class="it-field"><span>Range (squares)</span><input type="number" formControlName="range" min="0" /></label>
+						<label class="it-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
+						<div class="it-row-break"></div>
 						<label class="it-field"><span>Effect To PC</span>
 							<select formControlName="effectToPc"><option [ngValue]="null">-- Choose Stat --</option>@for (opt of effectToPcOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }</select>
 						</label>
 						<label class="it-field"><span>Effect To PC Value</span><input type="number" formControlName="effectToPcValue" /></label>
-					}
-					@if (showRange()) {
-						<label class="it-field"><span>Range</span><input type="number" formControlName="range" min="0" /></label>
-					}
-					@if (showEffectValue()) {
-						<label class="it-field"><span>{{ effectValueLabel() }}</span><input type="number" formControlName="effectValue" /></label>
-					}
-					@if (showDamage()) {
-						<label class="it-field"><span>Damage</span>
-							<select formControlName="damage">
-								<option [ngValue]="6">d12/6 — 1d2</option>
-								<option [ngValue]="4">d12/4 — 1d3</option>
-								<option [ngValue]="3">d12/3 — 1d4</option>
-								<option [ngValue]="2">d12/2 — 1d6</option>
-							</select>
-						</label>
-						<label class="it-field"><span>Two-Handed</span>
-							<input type="checkbox" formControlName="isTwoHanded" />
-						</label>
+						<label class="it-field"><span>Two-Handed</span><input type="checkbox" formControlName="isTwoHanded" /></label>
+						<div class="it-row-break"></div>
 						<label class="it-field"><span>Weapon Effect Type</span>
 							<select formControlName="weaponEffectType">@for (option of weaponEffectTypeOptions; track option) { <option [value]="option">{{ option }}</option> }</select>
 						</label>
-						<label class="it-field"><span>Weapon Effect Color</span>
-							<input type="color" formControlName="weaponEffectColor" />
-						</label>
+						<label class="it-field"><span>Color</span><input type="color" formControlName="weaponEffectColor" /></label>
+						<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
 					}
-					<label class="it-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
-					<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
+
+					@if (userItemForm.controls.type.value === 'armor') {
+						<label class="it-field"><span>Armor Slot</span>
+							<select formControlName="armorSlot"><option [ngValue]="null">-- Choose Slot --</option>@for (slot of armorSlotOptions; track slot.value) { <option [value]="slot.value">{{ slot.label }}</option> }</select>
+						</label>
+						<label class="it-field"><span>{{ effectValueLabel() }}</span><input type="number" formControlName="effectValue" /></label>
+						<div class="it-row-break"></div>
+						<label class="it-field"><span>Effect To PC</span>
+							<select formControlName="effectToPc"><option [ngValue]="null">-- Choose Stat --</option>@for (opt of effectToPcOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }</select>
+						</label>
+						<label class="it-field"><span>Effect To PC Value</span><input type="number" formControlName="effectToPcValue" /></label>
+						<label class="it-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
+						<div class="it-row-break"></div>
+						<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
+					}
+
+					@if (userItemForm.controls.type.value === 'pick') {
+						<label class="it-field"><span>Range (always 1)</span><input type="number" formControlName="range" min="1" max="1" readonly /></label>
+						<label class="it-field"><span>{{ effectValueLabel() }}</span><input type="number" formControlName="effectValue" /></label>
+						<div class="it-row-break"></div>
+						<label class="it-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
+						<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
+					}
+
+					@if (userItemForm.controls.type.value === 'ring' || userItemForm.controls.type.value === 'necklace') {
+						<label class="it-field"><span>Effect (to PC)</span>
+							<select formControlName="effectOn"><option [ngValue]="null">-- Choose Effect --</option>@for (opt of effectOnAccessoryOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }</select>
+						</label>
+						<label class="it-field"><span>{{ effectValueLabel() }}</span><input type="number" formControlName="effectValue" /></label>
+						<div class="it-row-break"></div>
+						<label class="it-field"><span>Effect To PC</span>
+							<select formControlName="effectToPc"><option [ngValue]="null">-- Choose Stat --</option>@for (opt of effectToPcOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }</select>
+						</label>
+						<label class="it-field"><span>Effect To PC Value</span><input type="number" formControlName="effectToPcValue" /></label>
+						<div class="it-row-break"></div>
+						<label class="it-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
+						<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
+					}
+
+					@if (userItemForm.controls.type.value === 'other') {
+						<label class="it-field"><span>Range</span><input type="number" formControlName="range" min="0" /></label>
+						<label class="it-field"><span>Damage</span>
+							<select formControlName="damage">
+								<option [ngValue]="6">d12/6 - 1d2</option>
+								<option [ngValue]="4">d12/4 - 1d3</option>
+								<option [ngValue]="3">d12/3 - 1d4</option>
+								<option [ngValue]="2">d12/2 - 1d6</option>
+							</select>
+						</label>
+						<div class="it-row-break"></div>
+						<label class="it-field"><span>Effect To PC</span>
+							<select formControlName="effectToPc"><option [ngValue]="null">-- Choose Stat --</option>@for (opt of effectToPcOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }</select>
+						</label>
+						<label class="it-field"><span>Effect To PC Value</span><input type="number" formControlName="effectToPcValue" /></label>
+						<label class="it-field"><span>Effect To</span>
+							<select formControlName="effectOn"><option [ngValue]="null">None</option>@for (opt of effectOnOtherOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }</select>
+						</label>
+						<div class="it-row-break"></div>
+						<label class="it-field"><span>{{ effectValueLabel() }}</span><input type="number" formControlName="effectValue" /></label>
+						<label class="it-field"><span>Equipped As</span>
+							<select formControlName="armorSlot">@for (slot of equippedAsOptions; track slot.value) { <option [value]="slot.value">{{ slot.label }}</option> }</select>
+						</label>
+						<label class="it-field"><span>Effect</span>
+							<select formControlName="weaponEffectType">@for (option of weaponEffectTypeOptions; track option) { <option [value]="option">{{ option }}</option> }</select>
+						</label>
+						<label class="it-field"><span>Effect Color</span><input type="color" formControlName="weaponEffectColor" /></label>
+						<div class="it-row-break"></div>
+						<label class="it-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
+						<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
+					}
+
+					@if (userItemForm.controls.type.value === 'gem') {
+						<label class="it-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
+						<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
+					}
+
 					<label class="it-field it-field-wide"><span>Curse</span>
 						<select formControlName="curseId"><option [ngValue]="null">No Curse</option>@for (curse of curseOptions(); track curse.id) { <option [ngValue]="curse.id">{{ curse.name }}</option> }</select>
 					</label>

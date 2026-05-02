@@ -38,7 +38,7 @@ export class Potions implements OnInit {
   readonly allSoundOptions = computed(() => [...this.soundOptions(), ...this._localSounds()]);
 
   readonly effectToOptions = [
-    'HP', 'AC', 'Stamina', 'Mind', '# of attacks #OA', 'Magic', 'Sight', 'Action Economy',
+    'HP', 'AC', 'Stamina', 'Mind', '# of Attacks', '# of attacks #OA', 'Magic', 'Sight', 'ROS', 'AE', 'Action Economy',
   ] as const;
 
   readonly isPotionSectionVisible = signal(true);

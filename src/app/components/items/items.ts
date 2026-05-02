@@ -43,7 +43,15 @@ export class Items implements OnInit {
   readonly allSoundOptions = computed(() => [...this.soundOptions(), ...this._localSounds()]);
   readonly curseOptions = input<CurseOption[]>([]);
 
-  readonly itemTypeOptions: ItemType[] = ['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'gem', 'other'];
+  readonly itemTypeOptions: Array<{ value: ItemType; label: string }> = [
+    { value: 'weapon', label: 'Weapon' },
+    { value: 'armor', label: 'Armor' },
+    { value: 'pick', label: 'Pick' },
+    { value: 'ring', label: 'Ring (4 Equipped)' },
+    { value: 'necklace', label: 'Ring (1 Equipped)' },
+    { value: 'gem', label: 'Gem' },
+    { value: 'other', label: 'Other' },
+  ];
   readonly armorSlotOptions = [
     { value: 'shield', label: 'Shield' },
     { value: 'head', label: 'Head' },
@@ -53,7 +61,7 @@ export class Items implements OnInit {
     { value: 'left-leg', label: 'Left Leg' },
     { value: 'right-leg', label: 'Right Leg' },
   ];
-  readonly effectOnOptions = [
+  readonly effectOnAccessoryOptions = [
     { value: 'HP', label: 'HP (Max Health)' },
     { value: 'AC', label: 'AC (Armor Class)' },
     { value: 'MP', label: 'MP (Magic Power)' },
@@ -61,6 +69,24 @@ export class Items implements OnInit {
     { value: 'Stamina', label: 'Stamina' },
     { value: 'Strength', label: 'Strength' },
     { value: 'SP', label: 'SP (Skill Points)' },
+    { value: 'AE', label: 'AE (Action Economy)' },
+    { value: 'NOA', label: '# of Attacks' },
+    { value: 'ROS', label: 'ROS (Range of Sight)' },
+  ];
+  readonly effectOnOtherOptions = [
+    { value: 'HP', label: 'HP' },
+    { value: 'AC', label: 'AC' },
+    { value: 'MP', label: 'MP' },
+    { value: 'Mind', label: 'Mind' },
+    { value: 'Stamina', label: 'Stamina' },
+    { value: 'Strength', label: 'Strength' },
+    { value: 'SP', label: 'SP' },
+    { value: 'AE', label: 'AE (Action Economy)' },
+    { value: 'NOA', label: '# of Attacks' },
+    { value: 'ROS', label: 'ROS (Range of Sight)' },
+    { value: 'Door Trap', label: 'Door Trap' },
+    { value: 'To Pick', label: 'To Pick' },
+    { value: 'Placed Trap', label: 'Placed Trap' },
   ];
   readonly effectToPcOptions = [
     { value: 'HP', label: 'HP' },
@@ -69,8 +95,22 @@ export class Items implements OnInit {
     { value: 'Stamina', label: 'Stamina' },
     { value: 'Strength', label: 'Strength' },
     { value: 'AC', label: 'AC' },
+    { value: 'AE', label: 'AE (Action Economy)' },
+    { value: 'NOA', label: '# of Attacks' },
+    { value: 'ROS', label: 'ROS (Range of Sight)' },
   ];
   readonly weaponEffectTypeOptions = ['Blood', 'Lightning', 'Fire', 'Cold'] as const;
+  readonly equippedAsOptions = [
+    { value: 'none', label: 'None' },
+    { value: 'hand', label: 'Hand' },
+    { value: 'shield', label: 'Shield' },
+    { value: 'head', label: 'Head' },
+    { value: 'body', label: 'Body' },
+    { value: 'left-arm', label: 'Left Arm' },
+    { value: 'right-arm', label: 'Right Arm' },
+    { value: 'left-leg', label: 'Left Leg' },
+    { value: 'right-leg', label: 'Right Leg' },
+  ];
 
   readonly isItemSectionVisible = signal(true);
   readonly isSavingUserItem = signal(false);
@@ -106,8 +146,8 @@ export class Items implements OnInit {
   effectValueLabel(): string {
     const type = this.userItemForm.controls.type.value;
     if (type === 'armor') return 'Effect Value (+AC)';
-    if (type === 'light') return 'Effect Value (ROS)';
     if (type === 'weapon') return 'Effect Value (+Hit)';
+    if (type === 'pick') return 'Effect Value (+Disarm / +Pick)';
     return 'Effect Value';
   }
 
@@ -121,17 +161,39 @@ export class Items implements OnInit {
   }
 
   showDamage(): boolean {
-    return this.userItemForm.controls.type.value === 'weapon';
+    const type = this.userItemForm.controls.type.value;
+    return type === 'weapon' || type === 'other';
   }
 
   showEffectOn(): boolean {
     const type = this.userItemForm.controls.type.value;
-    return type === 'ring' || type === 'necklace';
+    return type === 'ring' || type === 'necklace' || type === 'other';
   }
 
   showEffectToPc(): boolean {
     const type = this.userItemForm.controls.type.value;
-    return type === 'weapon' || type === 'armor' || type === 'ring' || type === 'necklace';
+    return type === 'weapon' || type === 'armor' || type === 'ring' || type === 'necklace' || type === 'other';
+  }
+
+  showEquippedAs(): boolean {
+    return this.userItemForm.controls.type.value === 'other';
+  }
+
+  itemTypeLabel(type: string | null | undefined): string {
+    if (!type) return 'Other';
+    const match = this.itemTypeOptions.find((opt) => opt.value === type);
+    if (match) return match.label;
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+
+  onTypeChange(): void {
+    const type = this.userItemForm.controls.type.value;
+    if (type === 'pick') {
+      this.userItemForm.controls.range.setValue(1);
+    }
+    if (type !== 'weapon') {
+      this.userItemForm.controls.isTwoHanded.setValue(false);
+    }
   }
 
   ngOnInit(): void {
@@ -264,23 +326,28 @@ export class Items implements OnInit {
     const c = this.userItemForm.controls;
     const type = c.type.value || 'other';
     const isAccessory = type === 'ring' || type === 'necklace';
-    const canApplyPcEffect = type === 'weapon' || type === 'armor' || isAccessory;
+    const canApplyPcEffect = type === 'weapon' || type === 'armor' || isAccessory || type === 'other';
+    const supportsEffectOn = isAccessory || type === 'other';
+    const supportsEffectVisuals = type === 'weapon' || type === 'other';
+    const normalizedRange = type === 'pick'
+      ? 1
+      : Math.max(0, this.normalizeNumber(c.range.value, 0));
     return {
       name: (c.name.value || '').trim() || 'Unnamed Item',
       description: (c.description.value || '').trim(),
       type,
-      armorSlot: type === 'armor' ? (c.armorSlot.value || null) : null,
-      effectOn: isAccessory ? (c.effectOn.value || null) : null,
+      armorSlot: type === 'armor' || type === 'other' ? (c.armorSlot.value || null) : null,
+      effectOn: supportsEffectOn ? (c.effectOn.value || null) : null,
       effectToPc: canApplyPcEffect ? (c.effectToPc.value || null) : null,
       effectToPcValue: canApplyPcEffect ? this.normalizeNumber(c.effectToPcValue.value, 0) : 0,
-      range: Math.max(0, this.normalizeNumber(c.range.value, 0)),
+      range: normalizedRange,
       value: Math.max(0, this.normalizeNumber(c.value.value, 0)),
       weight: Math.max(0, this.normalizeNumber(c.weight.value, 0)),
       curseId: this.normalizeNullableNumber(c.curseId.value),
       effectValue: this.normalizeNumber(c.effectValue.value, 0),
       damage: Math.max(0, this.normalizeNumber(c.damage.value, 6)),
-      weaponEffectType: type === 'weapon' ? (c.weaponEffectType.value || 'Blood') : 'Blood',
-      weaponEffectColor: type === 'weapon' ? (c.weaponEffectColor.value || '#cc0000') : '#cc0000',
+      weaponEffectType: supportsEffectVisuals ? (c.weaponEffectType.value || 'Blood') : 'Blood',
+      weaponEffectColor: supportsEffectVisuals ? (c.weaponEffectColor.value || '#cc0000') : '#cc0000',
       imageId: this.normalizeNullableNumber(c.imageId.value),
       soundId: this.normalizeNullableNumber(c.soundId.value),
       isPublic: this.isAdminUser() ? c.isPublic.value === true : false,

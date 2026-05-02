@@ -1750,9 +1750,10 @@ export class Game implements OnInit {
     const equippedIds = this.equippedItemIdsByDungon()[dungonId] ?? [];
     const prevEffectiveHpMax = this.getEffectivePlayerMaxHp();
     const prevEffectiveMpMax = this.getEffectivePlayerMagicPower();
+    const prevEffectiveAEMax = this.getEffectivePlayerMaxAE();
     if (equippedIds.includes(itemId)) {
       this.equippedItemIdsByDungon.update((all) => ({ ...all, [dungonId]: equippedIds.filter((id) => id !== itemId) }));
-      this.syncCurrentResourcesAfterEquipChange(prevEffectiveHpMax, prevEffectiveMpMax);
+      this.syncCurrentResourcesAfterEquipChange(prevEffectiveHpMax, prevEffectiveMpMax, prevEffectiveAEMax);
       this.addCombatLog(`${itemName} unequipped.`);
       this.previewActionMessage.set(`${itemName} unequipped.`);
     } else {
@@ -1778,7 +1779,7 @@ export class Game implements OnInit {
         }
       }
       this.equippedItemIdsByDungon.update((all) => ({ ...all, [dungonId]: [...equippedIds, itemId] }));
-      this.syncCurrentResourcesAfterEquipChange(prevEffectiveHpMax, prevEffectiveMpMax);
+      this.syncCurrentResourcesAfterEquipChange(prevEffectiveHpMax, prevEffectiveMpMax, prevEffectiveAEMax);
       this.addCombatLog(`${itemName} equipped.`);
       this.previewActionMessage.set(`${itemName} equipped.`);
     }
@@ -1816,12 +1817,13 @@ export class Game implements OnInit {
 
     const prevEffectiveHpMax = this.getEffectivePlayerMaxHp();
     const prevEffectiveMpMax = this.getEffectivePlayerMagicPower();
+    const prevEffectiveAEMax = this.getEffectivePlayerMaxAE();
     // Unequip the item if it was equipped
     this.equippedItemIdsByDungon.update((all) => ({
       ...all,
       [dungonId]: (all[dungonId] ?? []).filter((id) => id !== itemId),
     }));
-    this.syncCurrentResourcesAfterEquipChange(prevEffectiveHpMax, prevEffectiveMpMax);
+    this.syncCurrentResourcesAfterEquipChange(prevEffectiveHpMax, prevEffectiveMpMax, prevEffectiveAEMax);
 
     const itemName = this.pcTresherItemsById().get(itemId)?.name || 'Item';
     this.previewActionMessage.set(`${itemName} dropped.`);
@@ -1844,12 +1846,13 @@ export class Game implements OnInit {
 
     const prevEffectiveHpMax = this.getEffectivePlayerMaxHp();
     const prevEffectiveMpMax = this.getEffectivePlayerMagicPower();
+    const prevEffectiveAEMax = this.getEffectivePlayerMaxAE();
     // Unequip if equipped
     this.equippedItemIdsByDungon.update((all) => ({
       ...all,
       [dungonId]: (all[dungonId] ?? []).filter((id) => id !== itemId),
     }));
-    this.syncCurrentResourcesAfterEquipChange(prevEffectiveHpMax, prevEffectiveMpMax);
+    this.syncCurrentResourcesAfterEquipChange(prevEffectiveHpMax, prevEffectiveMpMax, prevEffectiveAEMax);
 
     // Place back on current floor square
     this.floorItemPlacementsByDungon.update((all) => ({
@@ -4514,7 +4517,7 @@ export class Game implements OnInit {
 
     const maxDepth = Math.max(
       1,
-      Math.min(this.firstPersonMaxDepth, Math.floor(Math.max(1, cheater.rangeOfSight + 1)))
+      Math.min(this.firstPersonMaxDepth, Math.floor(Math.max(1, this.getEffectiveRangeOfSight(preview.dungonId) + 1)))
     );
     let endBlock: FirstPersonBlock = this.toFirstPersonBlock('none', null);
 
@@ -5664,11 +5667,7 @@ export class Game implements OnInit {
   private getVisibleSquareKeysForPreview(preview: GridPreviewContext): Set<string> {
     const visibleSquareKeys = new Set<string>();
     const filledSquares = this.filledSquaresByDungon()[preview.dungonId] ?? {};
-    const cheater = this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER;
-    const range =
-      typeof cheater.rangeOfSight === 'number' && Number.isFinite(cheater.rangeOfSight)
-        ? Math.max(0, cheater.rangeOfSight)
-        : DEFAULT_CHEATER.rangeOfSight;
+    const range = this.getEffectiveRangeOfSight(preview.dungonId);
 
     const sourceSquareKey = this.getSquareKey(preview.centerRow, preview.centerColumn);
     if (filledSquares[sourceSquareKey]) {
@@ -8215,14 +8214,15 @@ export class Game implements OnInit {
       this.playerHp.set(
         this.resolvePlayerCurrentHp(saved.playerHp ?? this.playerStartingHp, this.playerMaxHp())
       );
-      const restoredAE = saved.playerAE ?? this.playerMaxAE;
+      const effectiveAEMax = this.getEffectivePlayerMaxAE();
+      const restoredAE = saved.playerAE ?? effectiveAEMax;
       this.turnPhase.set(saved.turnPhase!);
       this.playerAE.set(
-        saved.turnPhase === 'player' && restoredAE <= 0 ? this.playerMaxAE : restoredAE
+        Math.max(0, Math.min(saved.turnPhase === 'player' && restoredAE <= 0 ? effectiveAEMax : restoredAE, effectiveAEMax))
       );
     } else {
       this.playerHp.set(this.playerStartingHp);
-      this.playerAE.set(this.playerMaxAE);
+      this.playerAE.set(this.getEffectivePlayerMaxAE());
       this.playerAttacksThisTurn.set(0);
       this.playerSearchesThisTurn.set(0);
       this.turnPhase.set('player');
@@ -8290,7 +8290,7 @@ export class Game implements OnInit {
     this.combatLog.update((log) => [...log.slice(-49), { text }]);
   }
 
-  private normalizeEffectToPcStat(stat: string | null | undefined): 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | null {
+  private normalizeEffectToPcStat(stat: string | null | undefined): 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS' | null {
     if (!stat) return null;
     const s = stat.trim().toLowerCase();
     if (s === 'hp') return 'HP';
@@ -8299,10 +8299,13 @@ export class Game implements OnInit {
     if (s === 'mind') return 'Mind';
     if (s === 'stamina' || s === 'staman') return 'Stamina';
     if (s === 'strength' || s === 'strench') return 'Strength';
+    if (s === 'ae' || s === 'action economy') return 'AE';
+    if (s === 'noa' || s === '# of attacks' || s === '#oa' || s === 'number of attacks') return 'NOA';
+    if (s === 'ros' || s === 'sight' || s === 'range of sight') return 'ROS';
     return null;
   }
 
-  private getEquippedItemBonusForStat(dungonId: number, stat: 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength'): number {
+  private getEquippedItemBonusForStat(dungonId: number, stat: 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS'): number {
     const equippedItemIds = this.equippedItemIdsByDungon()[dungonId] ?? [];
     const itemsMap = this.pcTresherItemsById();
     let total = 0;
@@ -8318,6 +8321,15 @@ export class Game implements OnInit {
       total += value;
     }
     return total;
+  }
+
+  private getEffectiveRangeOfSight(dungonId: number): number {
+    const cheater = this.cheaterByDungon()[dungonId] ?? DEFAULT_CHEATER;
+    const baseRange =
+      typeof cheater.rangeOfSight === 'number' && Number.isFinite(cheater.rangeOfSight)
+        ? Math.max(0, cheater.rangeOfSight)
+        : DEFAULT_CHEATER.rangeOfSight;
+    return Math.max(0, baseRange + this.getEquippedItemBonusForStat(dungonId, 'ROS'));
   }
 
   private getEffectivePlayerMaxHp(): number {
@@ -8350,9 +8362,22 @@ export class Game implements OnInit {
     return this.playerMagicPower() + this.getEquippedItemBonusForStat(preview.dungonId, 'Magic');
   }
 
-  private syncCurrentResourcesAfterEquipChange(prevEffectiveHpMax: number, prevEffectiveMpMax: number): void {
+  private getEffectivePlayerMaxAE(): number {
+    const preview = this.gridPreviewContext();
+    if (!preview) return this.playerMaxAE;
+    return Math.max(0, this.playerMaxAE + this.getEquippedItemBonusForStat(preview.dungonId, 'AE'));
+  }
+
+  private getEffectivePlayerNOA(): number {
+    const preview = this.gridPreviewContext();
+    if (!preview) return this.playerNOA();
+    return Math.max(1, this.playerNOA() + this.getEquippedItemBonusForStat(preview.dungonId, 'NOA'));
+  }
+
+  private syncCurrentResourcesAfterEquipChange(prevEffectiveHpMax: number, prevEffectiveMpMax: number, prevEffectiveAEMax: number): void {
     const nextEffectiveHpMax = this.getEffectivePlayerMaxHp();
     const nextEffectiveMpMax = this.getEffectivePlayerMagicPower();
+    const nextEffectiveAEMax = this.getEffectivePlayerMaxAE();
 
     const hpDelta = nextEffectiveHpMax - prevEffectiveHpMax;
     if (hpDelta !== 0) {
@@ -8368,6 +8393,14 @@ export class Game implements OnInit {
       this.playerMp.set(Math.max(0, Math.min(adjustedMp, nextEffectiveMpMax)));
     } else {
       this.playerMp.set(Math.max(0, Math.min(this.playerMp(), nextEffectiveMpMax)));
+    }
+
+    const aeDelta = nextEffectiveAEMax - prevEffectiveAEMax;
+    if (aeDelta !== 0) {
+      const adjustedAE = this.playerAE() + aeDelta;
+      this.playerAE.set(Math.max(0, Math.min(adjustedAE, nextEffectiveAEMax)));
+    } else {
+      this.playerAE.set(Math.max(0, Math.min(this.playerAE(), nextEffectiveAEMax)));
     }
   }
 
@@ -8389,6 +8422,14 @@ export class Game implements OnInit {
 
   playerMagicPowerForView(): number {
     return this.getEffectivePlayerMagicPower();
+  }
+
+  playerMaxAEForView(): number {
+    return this.getEffectivePlayerMaxAE();
+  }
+
+  playerNOAForView(): number {
+    return this.getEffectivePlayerNOA();
   }
 
   playerACForView(): number {
@@ -8483,7 +8524,7 @@ export class Game implements OnInit {
   }
 
   canPlayerAttack(): boolean {
-    if (this.turnPhase() !== 'player' || this.playerAE() < 1 || this.playerAttacksThisTurn() >= this.playerNOA()) return false;
+    if (this.turnPhase() !== 'player' || this.playerAE() < 1 || this.playerAttacksThisTurn() >= this.getEffectivePlayerNOA()) return false;
     const preview = this.gridPreviewContext();
     if (!preview) return false;
     const equippedItemIds = this.equippedItemIdsByDungon()[preview.dungonId] ?? [];
@@ -9828,13 +9869,13 @@ export class Game implements OnInit {
     if (this.turnPhase() !== 'gameover') {
       this.playerDefendStacks.set(0);
       this.playerBoostAttackACPenalty.set(0);
-      this.playerAE.set(this.playerMaxAE);
+      this.playerAE.set(this.getEffectivePlayerMaxAE());
       this.playerMp.set(this.getEffectivePlayerMagicPower());
       this.playerAttacksThisTurn.set(0);
       this.playerDefendsThisTurn.set(0);
       this.playerSearchesThisTurn.set(0);
       this.turnPhase.set('player');
-      this.addCombatLog('Your turn. AE: ' + this.playerMaxAE);
+      this.addCombatLog('Your turn. AE: ' + this.getEffectivePlayerMaxAE());
     }
 
     this.saveGameState();

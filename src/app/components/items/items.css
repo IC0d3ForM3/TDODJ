@@ -125,6 +125,11 @@
 
 .it-field-wide { grid-column: 1 / -1; }
 
+.it-row-break {
+  grid-column: 1 / -1;
+  height: 0;
+}
+
 .it-field > span {
   font-size: 0.78rem;
   font-weight: 600;

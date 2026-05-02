@@ -85,6 +85,6 @@ export class CreatorLibraryService {
   readonly isLibSpellSectionVisible = signal(true);
 
   readonly libSpellEffectToOptions = [
-    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'Action Economy',
+    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'ROS', 'AE', 'Action Economy', '# of Attacks',
   ] as const;
 }
