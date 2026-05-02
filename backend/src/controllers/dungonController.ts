@@ -521,6 +521,8 @@ export const getGameById = async (req: Request, res: Response) => {
               range: Math.max(1, parseInt(String(it.range), 10) || 1),
               armorSlot: it.armorSlot ?? null,
               effectOn: it.effectOn ?? null,
+              effectToPc: it.effectToPc ?? null,
+              effectToPcValue: it.effectToPcValue ?? 0,
             }));
           }
 
@@ -600,6 +602,8 @@ export const getGameById = async (req: Request, res: Response) => {
             range: Math.max(1, parseInt(String(it.range), 10) || 1),
             armorSlot: it.armorSlot ?? null,
             effectOn: it.effectOn ?? null,
+            effectToPc: it.effectToPc ?? null,
+            effectToPcValue: it.effectToPcValue ?? 0,
           })),
         ];
       }
@@ -874,6 +878,8 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
           range: Math.max(1, parseInt(String(it.range), 10) || 1),
           armorSlot: it.armorSlot ?? null,
           effectOn: it.effectOn ?? null,
+          effectToPc: it.effectToPc ?? null,
+          effectToPcValue: it.effectToPcValue ?? 0,
         }));
       }
 
@@ -972,6 +978,8 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
             range: Math.max(1, parseInt(String(it.range), 10) || 1),
             armorSlot: it.armorSlot ?? null,
             effectOn: it.effectOn ?? null,
+            effectToPc: it.effectToPc ?? null,
+            effectToPcValue: it.effectToPcValue ?? 0,
           })),
         ];
       }

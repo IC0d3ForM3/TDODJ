@@ -8,6 +8,7 @@ import {
   PendingExitPlacement,
   PendingItemPlacement,
   PendingMonsterPlacement,
+  PendingSpellPlacement,
   PendingStartPointPlacement,
   PendingTresherPlacement,
   PortalPlacement,
@@ -109,7 +110,7 @@ export class CreatorPlacementService {
   readonly pendingPotionPlacement = signal<PendingItemPlacement | null>(null);
   readonly potionPlacementsByDungon = signal<Record<number, PotionPlacement[]>>({});
 
-  readonly pendingSpellPlacement = signal<PendingItemPlacement | null>(null);
+  readonly pendingSpellPlacement = signal<PendingSpellPlacement | null>(null);
   readonly spellPlacementsByDungon = signal<Record<number, SpellPlacement[]>>({});
 
   // ── Map import ───────────────────────────────────────────────────────────

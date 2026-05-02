@@ -27,7 +27,7 @@
 							<li class="it-list-item">
 								<div class="it-item-info">
 									<span class="it-item-name">{{ item.name }}</span>
-									<small class="it-item-meta">ID {{ item.id }} | {{ item.type }}{{ item.armorSlot ? ' · ' + item.armorSlot : '' }}{{ item.effectOn ? ' · ' + item.effectOn : '' }}{{ item.effectValue ? ' | Eff ' + item.effectValue : '' }}{{ item.value ? ' | Val ' + item.value : '' }}{{ curseNameForItem(item.curseId) ? ' | Curse: ' + curseNameForItem(item.curseId) : '' }}</small>
+									<small class="it-item-meta">ID {{ item.id }} | {{ item.type }}{{ item.armorSlot ? ' · ' + item.armorSlot : '' }}{{ item.effectOn ? ' · ' + item.effectOn : '' }}{{ item.effectToPc ? ' | To PC ' + item.effectToPc + ' ' + item.effectToPcValue : '' }}{{ item.type === 'weapon' ? ' | FX ' + item.weaponEffectType : '' }}{{ item.effectValue ? ' | Eff ' + item.effectValue : '' }}{{ item.value ? ' | Val ' + item.value : '' }}{{ curseNameForItem(item.curseId) ? ' | Curse: ' + curseNameForItem(item.curseId) : '' }}</small>
 									@if (item.description) { <small class="it-item-desc">{{ item.description }}</small> }
 								</div>
 								<button type="button" class="it-edit-btn" (click)="editItem(item)">Edit</button>
@@ -55,6 +55,12 @@
 							<select formControlName="effectOn"><option [ngValue]="null">-- Choose Effect --</option>@for (opt of effectOnOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }</select>
 						</label>
 					}
+					@if (showEffectToPc()) {
+						<label class="it-field"><span>Effect To PC</span>
+							<select formControlName="effectToPc"><option [ngValue]="null">-- Choose Stat --</option>@for (opt of effectToPcOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }</select>
+						</label>
+						<label class="it-field"><span>Effect To PC Value</span><input type="number" formControlName="effectToPcValue" /></label>
+					}
 					@if (showRange()) {
 						<label class="it-field"><span>Range</span><input type="number" formControlName="range" min="0" /></label>
 					}
@@ -72,6 +78,12 @@
 						</label>
 						<label class="it-field"><span>Two-Handed</span>
 							<input type="checkbox" formControlName="isTwoHanded" />
+						</label>
+						<label class="it-field"><span>Weapon Effect Type</span>
+							<select formControlName="weaponEffectType">@for (option of weaponEffectTypeOptions; track option) { <option [value]="option">{{ option }}</option> }</select>
+						</label>
+						<label class="it-field"><span>Weapon Effect Color</span>
+							<input type="color" formControlName="weaponEffectColor" />
 						</label>
 					}
 					<label class="it-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>

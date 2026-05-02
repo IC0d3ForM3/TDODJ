@@ -140,11 +140,11 @@ const SIDE_RULES: SideRule[] = [
 
 interface LibImageWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
 interface LibSoundWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
-interface LibSpellWritePayload { name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; costToLearn: number; imageId: number | null; soundId: number | null; isPublic: boolean; numberOfTargets: number; }
+interface LibSpellWritePayload { name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; costToLearn: number; imageId: number | null; soundId: number | null; isPublic: boolean; numberOfTargets: number; effectType: string; effectColor: string; }
 
 interface GridPlacedItem {
   key: string;
-  type: 'monster' | 'tresher' | 'door' | 'trap' | 'item' | 'obstacle';
+  type: 'monster' | 'tresher' | 'door' | 'trap' | 'item' | 'obstacle' | 'spell';
   label: string;
   row: number;
   column: number;
@@ -339,6 +339,11 @@ export class Creator implements OnInit {
   readonly placeMonsterWeaponChoices = computed(() =>
     this.libItems().filter((i) => this.placeMonsterDropItemIds().includes(i.id) && i.type === 'weapon')
   );
+  readonly placeMonsterDropTresherSelection = signal('');
+  readonly placeMonsterDropKeySelection = signal('');
+  readonly placeMonsterDropItemSelection = signal('');
+  readonly placeMonsterDropSpellSelection = signal('');
+  readonly placeMonsterDropPotionSelection = signal('');
   get placeMonsterSelectedId() { return this.placementService.placeMonsterSelectedId; }
   readonly placeMonsterSelectedInfo = computed(() => {
     const id = this.placeMonsterSelectedId();
@@ -441,6 +446,8 @@ export class Creator implements OnInit {
     soundId: new FormControl<number | null>(null),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
     numberOfTargets: new FormControl<number>(1, { nonNullable: true }),
+    effectType: new FormControl<string>('Other', { nonNullable: true }),
+    effectColor: new FormControl<string>('#ffffff', { nonNullable: true }),
   });
   readonly openBlockOptions: OpenBlockOption[] = [
      { key: 'wallTop', label: 'WT' },
@@ -1719,6 +1726,20 @@ export class Creator implements OnInit {
       });
     }
 
+    // Spells
+    const libSpells = this.libUserSpells();
+    for (const p of this.spellPlacementsByDungon()[dungonId] ?? []) {
+      const name = libSpells.find((s) => s.id === p.spellId)?.name ?? `Spell #${p.spellId}`;
+      items.push({
+        key: `spell-${p.spellId}-${p.row}-${p.column}`,
+        type: 'spell',
+        label: `Spell: ${name} (r${p.row},c${p.column})`,
+        row: p.row,
+        column: p.column,
+        refId: p.spellId,
+      });
+    }
+
     return items;
   }
 
@@ -1763,6 +1784,11 @@ export class Creator implements OnInit {
       this.markDungonJsonChanged();
       this.drawGridCanvas();
       this.startPlaceItemMode();
+    } else if (item.type === 'spell') {
+      this.removeSpellPlacementsAtSquare(dungonId, item.row, item.column);
+      this.markDungonJsonChanged();
+      this.drawGridCanvas();
+      this.startPlaceSpellMode();
     }
   }
 
@@ -1804,6 +1830,17 @@ export class Creator implements OnInit {
     if (!item || dungonId === null || item.type !== 'item') return;
     this.selectedPlacedItemKey.set(null);
     this.removeItemPlacementsAtSquare(dungonId, item.row, item.column);
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+  }
+
+  removeSelectedSpellPlacement(): void {
+    const item = this.selectedPlacedItem();
+    const dungonId = this.selectedDungonId();
+    if (!item || dungonId === null || item.type !== 'spell') return;
+    this.selectedPlacedItemKey.set(null);
+    this.removeSpellPlacementsAtSquare(dungonId, item.row, item.column);
     this.markDungonJsonChanged();
     this.drawGridCanvas();
     this.drawPreviewGridCanvas();
@@ -2461,6 +2498,31 @@ export class Creator implements OnInit {
     return this.placeMonsterDropTresherIds().includes(id);
   }
 
+  addMonsterDropTresher(value: string): void {
+    const id = Number(value);
+    if (!Number.isFinite(id) || id <= 0) {
+      return;
+    }
+    this.placeMonsterDropTresherIds.set([...this.placeMonsterDropTresherIds(), id]);
+    this.placeMonsterDropTresherSelection.set('');
+  }
+
+  removeMonsterDropTresherAt(index: number): void {
+    const current = this.placeMonsterDropTresherIds();
+    if (index < 0 || index >= current.length) {
+      return;
+    }
+    this.placeMonsterDropTresherIds.set(current.filter((_, i) => i !== index));
+  }
+
+  monsterDropTresherLabel(id: number): string {
+    const tresher = this.selectedDungonTreshers().find((t) => t.id === id);
+    if (!tresher) {
+      return `Unknown Tresher #${id}`;
+    }
+    return `${tresher.name || `Tresher #${id}`} (${tresher.type})`;
+  }
+
   toggleMonsterDropTresher(id: number): void {
     const current = this.placeMonsterDropTresherIds();
     if (current.includes(id)) {
@@ -2472,6 +2534,31 @@ export class Creator implements OnInit {
 
   isMonsterDropKeySelected(id: number): boolean {
     return this.placeMonsterDropKeyIds().includes(id);
+  }
+
+  addMonsterDropKey(value: string): void {
+    const id = Number(value);
+    if (!Number.isFinite(id) || id <= 0 || this.isKeyPlaced(id)) {
+      return;
+    }
+    this.placeMonsterDropKeyIds.set([...this.placeMonsterDropKeyIds(), id]);
+    this.placeMonsterDropKeySelection.set('');
+  }
+
+  removeMonsterDropKeyAt(index: number): void {
+    const current = this.placeMonsterDropKeyIds();
+    if (index < 0 || index >= current.length) {
+      return;
+    }
+    this.placeMonsterDropKeyIds.set(current.filter((_, i) => i !== index));
+  }
+
+  monsterDropKeyName(id: number): string {
+    const key = this.keyList.find((k) => k.id === id);
+    if (!key) {
+      return `Unknown Key #${id}`;
+    }
+    return key.name || `Key #${id}`;
   }
 
   toggleMonsterDropKey(id: number): void {
@@ -2758,6 +2845,36 @@ export class Creator implements OnInit {
     return this.placeMonsterDropItemIds().includes(id);
   }
 
+  addMonsterDropItem(value: string): void {
+    const id = Number(value);
+    if (!Number.isFinite(id) || id <= 0) {
+      return;
+    }
+    this.placeMonsterDropItemIds.set([...this.placeMonsterDropItemIds(), id]);
+    this.placeMonsterDropItemSelection.set('');
+  }
+
+  removeMonsterDropItemAt(index: number): void {
+    const current = this.placeMonsterDropItemIds();
+    if (index < 0 || index >= current.length) {
+      return;
+    }
+    const removedId = current[index];
+    const next = current.filter((_, i) => i !== index);
+    this.placeMonsterDropItemIds.set(next);
+    if (this.placeMonsterWeaponItemId() === removedId && !next.includes(removedId)) {
+      this.placeMonsterWeaponItemId.set(null);
+    }
+  }
+
+  monsterDropItemLabel(id: number): string {
+    const item = this.libItems().find((i) => i.id === id);
+    if (!item) {
+      return `Unknown Item #${id}`;
+    }
+    return `${item.name || `Item #${id}`} (${item.type})`;
+  }
+
   toggleMonsterDropItem(id: number): void {
     const current = this.placeMonsterDropItemIds();
     if (current.includes(id)) {
@@ -2774,6 +2891,31 @@ export class Creator implements OnInit {
     return this.placeMonsterDropSpellIds().includes(id);
   }
 
+  addMonsterDropSpell(value: string): void {
+    const id = Number(value);
+    if (!Number.isFinite(id) || id <= 0) {
+      return;
+    }
+    this.placeMonsterDropSpellIds.set([...this.placeMonsterDropSpellIds(), id]);
+    this.placeMonsterDropSpellSelection.set('');
+  }
+
+  removeMonsterDropSpellAt(index: number): void {
+    const current = this.placeMonsterDropSpellIds();
+    if (index < 0 || index >= current.length) {
+      return;
+    }
+    this.placeMonsterDropSpellIds.set(current.filter((_, i) => i !== index));
+  }
+
+  monsterDropSpellName(id: number): string {
+    const spell = this.libUserSpells().find((s) => s.id === id);
+    if (!spell) {
+      return `Unknown Spell #${id}`;
+    }
+    return spell.name || `Spell #${id}`;
+  }
+
   toggleMonsterDropSpell(id: number): void {
     const current = this.placeMonsterDropSpellIds();
     if (current.includes(id)) {
@@ -2785,6 +2927,31 @@ export class Creator implements OnInit {
 
   isMonsterDropPotionSelected(id: number): boolean {
     return this.placeMonsterDropPotionIds().includes(id);
+  }
+
+  addMonsterDropPotion(value: string): void {
+    const id = Number(value);
+    if (!Number.isFinite(id) || id <= 0) {
+      return;
+    }
+    this.placeMonsterDropPotionIds.set([...this.placeMonsterDropPotionIds(), id]);
+    this.placeMonsterDropPotionSelection.set('');
+  }
+
+  removeMonsterDropPotionAt(index: number): void {
+    const current = this.placeMonsterDropPotionIds();
+    if (index < 0 || index >= current.length) {
+      return;
+    }
+    this.placeMonsterDropPotionIds.set(current.filter((_, i) => i !== index));
+  }
+
+  monsterDropPotionName(id: number): string {
+    const potion = this.libPotions().find((p) => p.id === id);
+    if (!potion) {
+      return `Unknown Potion #${id}`;
+    }
+    return potion.name || `Potion #${id}`;
   }
 
   toggleMonsterDropPotion(id: number): void {
@@ -2805,6 +2972,11 @@ export class Creator implements OnInit {
     this.placeMonsterDropItemIds.set([]);
     this.placeMonsterDropSpellIds.set([]);
     this.placeMonsterDropPotionIds.set([]);
+    this.placeMonsterDropTresherSelection.set('');
+    this.placeMonsterDropKeySelection.set('');
+    this.placeMonsterDropItemSelection.set('');
+    this.placeMonsterDropSpellSelection.set('');
+    this.placeMonsterDropPotionSelection.set('');
     this.placeMonsterGold.set(0);
     this.placeMonsterSilver.set(0);
     this.placeMonsterCopper.set(0);
@@ -3884,7 +4056,18 @@ export class Creator implements OnInit {
   }
 
   hasCurrentSquarePickupItems(): boolean {
-    return this.currentSquareItemsForPreview().length > 0;
+    const current = this.getCurrentPreviewSquareContext();
+    if (!current) {
+      return false;
+    }
+
+    const hasKeys = this.getKeysAtSquare(current.row, current.column).length > 0;
+    const hasTreshers = this.getTresherPlacementsAtSquare(current.dungonId, current.row, current.column).length > 0;
+    const hasSpells = (this.spellPlacementsByDungon()[current.dungonId] ?? []).some(
+      (placement) => placement.row === current.row && placement.column === current.column
+    );
+
+    return hasKeys || hasTreshers || hasSpells;
   }
 
   canTakeSomeFromCurrentSquare(): boolean {
@@ -3934,9 +4117,12 @@ export class Creator implements OnInit {
       current.row,
       current.column
     );
+    const spellPlacements = (this.spellPlacementsByDungon()[current.dungonId] ?? []).filter(
+      (placement) => placement.row === current.row && placement.column === current.column
+    );
     const treshersAtSquare = this.getTreshersAtSquare(current.dungonId, current.row, current.column);
 
-    if (keysAtSquare.length === 0 && tresherPlacements.length === 0) {
+    if (keysAtSquare.length === 0 && tresherPlacements.length === 0 && spellPlacements.length === 0) {
       this.previewActionMessage.set('Nothing to take on this square.');
       return;
     }
@@ -3959,7 +4145,11 @@ export class Creator implements OnInit {
       this.removeTresherPlacementsAtSquare(current.dungonId, current.row, current.column);
     }
 
-    const totalItemCount = keysAtSquare.length + tresherPlacements.length;
+    if (spellPlacements.length > 0) {
+      this.removeSpellPlacementsAtSquare(current.dungonId, current.row, current.column);
+    }
+
+    const totalItemCount = keysAtSquare.length + tresherPlacements.length + spellPlacements.length;
     this.previewActionMessage.set(
       `Took ${totalItemCount} item${totalItemCount === 1 ? '' : 's'} into inventory.`
     );
@@ -4255,6 +4445,15 @@ export class Creator implements OnInit {
     }
 
     return this.potionPlacementsByDungon()[preview.dungonId] ?? [];
+  }
+
+  previewSpellPlacementsForModal(): SpellPlacement[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return [];
+    }
+
+    return this.spellPlacementsByDungon()[preview.dungonId] ?? [];
   }
 
   importMapFromFile(event: Event): void {
@@ -5792,6 +5991,7 @@ export class Creator implements OnInit {
 
     const allLibItems = this.libItems();
     const allLibPotions = this.libPotions();
+    const allLibUserSpells = this.libUserSpells();
     const placedItemIds = new Set(itemPlacements.map((p) => p.itemId));
     // Include items referenced by obstacles in floorItemList so the game can find them
     for (const obs of obstaclePlacements) {
@@ -5802,8 +6002,10 @@ export class Creator implements OnInit {
       for (const id of mp.itemIds ?? []) placedItemIds.add(id);
     }
     const placedPotionIds = new Set(potionPlacements.map((p) => p.potionId));
+    const placedSpellIds = new Set(spellPlacements.map((p) => p.spellId));
     for (const mp of monsterPlacements) {
       for (const id of mp.potionIds ?? []) placedPotionIds.add(id);
+      for (const id of mp.spellIds ?? []) placedSpellIds.add(id);
     }
     const floorItemList = allLibItems
       .filter((i) => placedItemIds.has(i.id))
@@ -5817,6 +6019,8 @@ export class Creator implements OnInit {
         range: i.range,
         armorSlot: i.armorSlot,
         effectOn: i.effectOn,
+        weaponEffectType: i.weaponEffectType,
+        weaponEffectColor: i.weaponEffectColor,
         isTwoHanded: i.isTwoHanded,
       }));
     const floorPotionList = allLibPotions
@@ -5828,6 +6032,21 @@ export class Creator implements OnInit {
         effectTo: p.effectTo,
         effectAmount: p.effectAmount,
         lastFor: p.lastFor,
+      }));
+    const floorSpellList = allLibUserSpells
+      .filter((s) => placedSpellIds.has(s.id))
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        range: Math.max(1, s.range),
+        effectOn: s.effectOn,
+        effectAmount: s.effectAmount,
+        successTestValue: s.successTestValue,
+        sp: Math.max(1, s.sp),
+        lastFor: Math.max(0, s.lastFor),
+        numberOfTargets: Math.max(1, s.numberOfTargets ?? 1),
+        magicCost: Math.max(1, s.magicCost ?? 1),
       }));
 
     return {
@@ -5856,6 +6075,9 @@ export class Creator implements OnInit {
       obstaclePlacements,
       floorItemList,
       floorPotionList,
+      floorSpellList,
+      // Keep legacy key for compatibility with older readers.
+      spellList: floorSpellList,
     };
   }
 
@@ -6417,12 +6639,29 @@ export class Creator implements OnInit {
       row: Math.floor(row),
       column: Math.floor(column),
       roam: this.normalizeBoolean(roamRaw),
+      tresherIds: this.normalizeIdList((source as Record<string, unknown>)['tresherIds']),
+      keyIds: this.normalizeIdList((source as Record<string, unknown>)['keyIds']),
       isDormant: source.isDormant === true || undefined,
       guardRow: typeof (source as Record<string, unknown>)['guardRow'] === 'number' ? Math.floor((source as Record<string, unknown>)['guardRow'] as number) : undefined,
       guardColumn: typeof (source as Record<string, unknown>)['guardColumn'] === 'number' ? Math.floor((source as Record<string, unknown>)['guardColumn'] as number) : undefined,
       itemIds: Array.isArray((source as Record<string, unknown>)['itemIds'])
         ? ((source as Record<string, unknown>)['itemIds'] as unknown[]).filter((v): v is number => typeof v === 'number')
         : undefined,
+      spellIds: this.normalizeIdList((source as Record<string, unknown>)['spellIds']),
+      potionIds: this.normalizeIdList((source as Record<string, unknown>)['potionIds']),
+      gold: Math.max(0, this.normalizeNumber(this.toFiniteNumber((source as Record<string, unknown>)['gold']), 0)),
+      silver: Math.max(0, this.normalizeNumber(this.toFiniteNumber((source as Record<string, unknown>)['silver']), 0)),
+      copper: Math.max(0, this.normalizeNumber(this.toFiniteNumber((source as Record<string, unknown>)['copper']), 0)),
+      zinc: Math.max(0, this.normalizeNumber(this.toFiniteNumber((source as Record<string, unknown>)['zinc']), 0)),
+      weaponItemId: this.normalizeNullableNumber(this.toFiniteNumber((source as Record<string, unknown>)['weaponItemId'])),
+      isStationary: (source as Record<string, unknown>)['isStationary'] === true || undefined,
+      stationaryTriggerRow: typeof (source as Record<string, unknown>)['stationaryTriggerRow'] === 'number'
+        ? Math.floor((source as Record<string, unknown>)['stationaryTriggerRow'] as number)
+        : undefined,
+      stationaryTriggerCol: typeof (source as Record<string, unknown>)['stationaryTriggerCol'] === 'number'
+        ? Math.floor((source as Record<string, unknown>)['stationaryTriggerCol'] as number)
+        : undefined,
+      noAttackUnlessAttacked: (source as Record<string, unknown>)['noAttackUnlessAttacked'] === true || undefined,
     };
   }
 
@@ -10617,8 +10856,20 @@ export class Creator implements OnInit {
       value: item.value ?? 0, sp: item.sp ?? 0, successTestValue: item.successTestValue ?? 0,
       magicCost: item.magicCost ?? 1, costToLearn: item.costToLearn ?? 0, imageId: item.imageId ?? null, soundId: item.soundId ?? null, isPublic: item.isPublic,
       numberOfTargets: item.numberOfTargets ?? 1,
+      effectType: item.effectType || 'Other',
+      effectColor: item.effectColor || this.spellEffectTypeDefaultColor(item.effectType || 'Other'),
     });
   }
+  onSpellEffectTypeChange(): void {
+    const type = this.libSpellForm.controls.effectType.value;
+    this.libSpellForm.controls.effectColor.setValue(this.spellEffectTypeDefaultColor(type));
+  }
+
+  private spellEffectTypeDefaultColor(type: string): string {
+    const defaults: Record<string, string> = { Fire: '#ee3300', Ice: '#88ddff', Lightning: '#4466ff', Other: '#ffffff' };
+    return defaults[type] ?? '#ffffff';
+  }
+
   cancelEditLibSpell(): void { this.editingLibSpellId.set(null); this.libSpellSaveMessage.set(null); this.resetLibSpellForm(); }
 
   onLibSpellImageUploaded(item: UploadedMediaItem): void {
@@ -10748,6 +10999,8 @@ export class Creator implements OnInit {
       soundId: c.soundId.value ?? null,
       isPublic: this.isAdminUser() ? c.isPublic.value : false,
       numberOfTargets: Math.max(1, c.numberOfTargets.value ?? 1),
+      effectType: c.effectType.value || 'Other',
+      effectColor: c.effectColor.value || '#ffffff',
     };
     const editingId = this.editingLibSpellId();
     const request$ = editingId
@@ -10770,7 +11023,7 @@ export class Creator implements OnInit {
 
   private resetLibSpellForm(): void {
     this.libSpellForm.reset({ name: '', description: '', range: 0, effectOn: 'HP', effectOn2: '',
-      lastFor: 0, effectAmount: 0, effectAmount2: 0, value: 0, sp: 0, successTestValue: 0, magicCost: 1, costToLearn: 0, imageId: null, soundId: null, isPublic: false, numberOfTargets: 1 });
+      lastFor: 0, effectAmount: 0, effectAmount2: 0, value: 0, sp: 0, successTestValue: 0, magicCost: 1, costToLearn: 0, imageId: null, soundId: null, isPublic: false, numberOfTargets: 1, effectType: 'Other', effectColor: '#ffffff' });
   }
 
   private libFileBaseName(fileName: string): string {

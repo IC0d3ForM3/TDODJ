@@ -14,6 +14,10 @@ export interface ItemRecord {
   damage: number;
   armorSlot: string | null;
   effectOn: string | null;
+  effectToPc: string | null;
+  effectToPcValue: number;
+  weaponEffectType: string;
+  weaponEffectColor: string;
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;
@@ -34,6 +38,10 @@ export interface UpsertItemPayload {
   damage: number;
   armorSlot: string | null;
   effectOn: string | null;
+  effectToPc: string | null;
+  effectToPcValue: number;
+  weaponEffectType: string;
+  weaponEffectColor: string;
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;
@@ -54,6 +62,10 @@ const SELECT_ITEM_FIELDS = `
   COALESCE(damage, 0) AS "damage",
   armorslot AS "armorSlot",
   effecton AS "effectOn",
+  effecttopc AS "effectToPc",
+  COALESCE(effecttopcvalue, 0) AS "effectToPcValue",
+  COALESCE(weaponeffecttype, 'Blood') AS "weaponEffectType",
+  COALESCE(weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
   imageid AS "imageId",
   soundid AS "soundId",
   ispublic AS "isPublic",
@@ -88,8 +100,8 @@ export const insertItemForUser = async (
   const { rows } = await pool.query<ItemRecord>(
     `INSERT INTO items
        (userguid, name, description, type, range, value, weight, curseid,
-        effectvalue, damage, armorslot, effecton, imageid, soundid, ispublic, istwohanded)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
      RETURNING ${SELECT_ITEM_FIELDS}`,
     [
       userguid,
@@ -104,6 +116,10 @@ export const insertItemForUser = async (
       payload.damage,
       payload.armorSlot,
       payload.effectOn,
+      payload.effectToPc,
+      payload.effectToPcValue,
+      payload.weaponEffectType,
+      payload.weaponEffectColor,
       payload.imageId,
       payload.soundId,
       payload.isPublic,
@@ -131,12 +147,16 @@ export const updateItemForUser = async (
          damage = $9,
          armorslot = $10,
          effecton = $11,
-         imageid = $12,
-         soundid = $13,
-         ispublic = $14,
-         istwohanded = $15,
+         effecttopc = $12,
+         effecttopcvalue = $13,
+         weaponeffecttype = $14,
+         weaponeffectcolor = $15,
+         imageid = $16,
+         soundid = $17,
+         ispublic = $18,
+         istwohanded = $19,
          updatedat = NOW()
-     WHERE id = $16 AND userguid = $17
+       WHERE id = $20 AND userguid = $21
      RETURNING ${SELECT_ITEM_FIELDS}`,
     [
       payload.name,
@@ -150,6 +170,10 @@ export const updateItemForUser = async (
       payload.damage,
       payload.armorSlot,
       payload.effectOn,
+      payload.effectToPc,
+      payload.effectToPcValue,
+      payload.weaponEffectType,
+      payload.weaponEffectColor,
       payload.imageId,
       payload.soundId,
       payload.isPublic,

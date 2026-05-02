@@ -8,6 +8,8 @@ const UUID_REGEX =
 const ITEM_TYPES = new Set(['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'other']);
 const ARMOR_SLOTS = new Set(['head', 'body', 'left-arm', 'right-arm', 'left-leg', 'right-leg']);
 const EFFECT_ON_OPTIONS = new Set(['HP', 'AC', 'MP', 'Mind', 'Stamina', 'Strength', 'SP']);
+const EFFECT_TO_PC_OPTIONS = new Set(['HP', 'AC', 'Magic', 'Mind', 'Stamina', 'Strength']);
+const COLOR_HEX_REGEX = /^#[0-9a-f]{6}$/i;
 
 interface ItemWriteRequestBody {
   userkey?: unknown;
@@ -30,6 +32,14 @@ interface ItemWriteInput {
   armorslot?: unknown;
   effectOn?: unknown;
   effecton?: unknown;
+  effectToPc?: unknown;
+  effecttopc?: unknown;
+  effectToPcValue?: unknown;
+  effecttopcvalue?: unknown;
+  weaponEffectType?: unknown;
+  weaponeffecttype?: unknown;
+  weaponEffectColor?: unknown;
+  weaponeffectcolor?: unknown;
   imageId?: unknown;
   imageid?: unknown;
   soundId?: unknown;
@@ -61,15 +71,53 @@ function normalizeNullableInt(value: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
 }
 
+function normalizeWeaponEffectType(value: unknown): string {
+  const raw = normalizeOptionalText(value).toLowerCase();
+  if (raw === 'fire') return 'Fire';
+  if (raw === 'cold') return 'Cold';
+  if (raw === 'lightning' || raw === 'lighing') return 'Lightning';
+  if (raw === 'blood') return 'Blood';
+  return 'Blood';
+}
+
+function normalizeWeaponEffectColor(value: unknown): string {
+  const raw = normalizeOptionalText(value);
+  if (COLOR_HEX_REGEX.test(raw)) {
+    return raw;
+  }
+  return '#cc0000';
+}
+
+function normalizeEffectToPc(value: unknown): string | null {
+  const raw = normalizeOptionalText(value);
+  if (!raw) return null;
+  if (raw.toLowerCase() === 'mp') return 'Magic';
+  if (raw.toLowerCase() === 'magic') return 'Magic';
+  if (raw.toLowerCase() === 'mind') return 'Mind';
+  if (raw.toLowerCase() === 'staman') return 'Stamina';
+  if (raw.toLowerCase() === 'stamina') return 'Stamina';
+  if (raw.toLowerCase() === 'strench') return 'Strength';
+  if (raw.toLowerCase() === 'strength') return 'Strength';
+  if (raw.toLowerCase() === 'hp') return 'HP';
+  if (raw.toLowerCase() === 'ac') return 'AC';
+  return EFFECT_TO_PC_OPTIONS.has(raw) ? raw : null;
+}
+
 function buildItemPayload(input: ItemWriteInput, isAdmin: boolean): UpsertItemPayload {
   const type = normalizeText(input.type, 'other');
   const rawArmorSlot = normalizeOptionalText(input.armorSlot ?? input.armorslot);
   const rawEffectOn = normalizeOptionalText(input.effectOn ?? input.effecton);
+  const effectToPc = normalizeEffectToPc(input.effectToPc ?? input.effecttopc);
+  const effectToPcValue = normalizeNumber(input.effectToPcValue ?? input.effecttopcvalue, 0);
+  const weaponEffectType = normalizeWeaponEffectType(input.weaponEffectType ?? input.weaponeffecttype);
+  const weaponEffectColor = normalizeWeaponEffectColor(input.weaponEffectColor ?? input.weaponeffectcolor);
+  const normalizedType = ITEM_TYPES.has(type) ? type : 'other';
+  const allowsPcEffect = normalizedType === 'weapon' || normalizedType === 'armor' || normalizedType === 'ring' || normalizedType === 'necklace';
 
   return {
     name: normalizeText(input.name, 'Unnamed Item'),
     description: normalizeText(input.description, ''),
-    type: ITEM_TYPES.has(type) ? type : 'other',
+    type: normalizedType,
     range: String(normalizeNumber(input.range, 0)),
     value: Math.max(0, normalizeNumber(input.value, 0)),
     weight: Math.max(0, normalizeNumber(input.weight, 0)),
@@ -78,6 +126,10 @@ function buildItemPayload(input: ItemWriteInput, isAdmin: boolean): UpsertItemPa
     damage: Math.max(0, normalizeNumber(input.damage, 0)),
     armorSlot: ARMOR_SLOTS.has(rawArmorSlot) ? rawArmorSlot : null,
     effectOn: EFFECT_ON_OPTIONS.has(rawEffectOn) ? rawEffectOn : null,
+    effectToPc: allowsPcEffect ? effectToPc : null,
+    effectToPcValue: allowsPcEffect ? effectToPcValue : 0,
+    weaponEffectType: normalizedType === 'weapon' ? weaponEffectType : 'Blood',
+    weaponEffectColor: normalizedType === 'weapon' ? weaponEffectColor : '#cc0000',
     imageId: normalizeNullableInt(input.imageId ?? input.imageid),
     soundId: normalizeNullableInt(input.soundId ?? input.soundid),
     isPublic: isAdmin ? input.isPublic === true || input.ispublic === true : false,

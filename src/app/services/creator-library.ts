@@ -30,7 +30,7 @@ export interface LibSpellItem {
   effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number;
   value: number; sp: number; successTestValue: number; magicCost: number;
   costToLearn: number; imageId: number | null; soundId: number | null;
-  isPublic: boolean; numberOfTargets?: number; createdAt: string; updatedAt: string;
+  isPublic: boolean; numberOfTargets?: number; effectType?: string; effectColor?: string; createdAt: string; updatedAt: string;
 }
 
 export type CreatorTabId = 'dungons' | 'treshers' | 'monsters' | 'images' | 'sounds' | 'spells' | 'potions' | 'items' | 'curses';

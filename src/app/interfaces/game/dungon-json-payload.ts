@@ -37,7 +37,9 @@ export interface DungonJsonPayload {
   itemPlacements?: ItemPlacement[];
   potionPlacements?: PotionPlacement[];
   spellPlacements?: SpellPlacement[];
-  floorItemList?: Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; isTwoHanded: boolean }>;
+  floorItemList?: Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>;
   floorPotionList?: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>;
+  floorSpellList?: Array<{ id: number; name: string; description: string; range: number; effectOn: string; effectAmount: number; successTestValue: number; sp: number; lastFor: number; numberOfTargets: number; magicCost?: number; effectType?: string; effectColor?: string }>;
+  spellList?: Array<{ id: number; name: string; description: string; range: number; effectOn: string; effectAmount: number; successTestValue: number; sp: number; lastFor: number; numberOfTargets: number; magicCost?: number; effectType?: string; effectColor?: string }>;
   obstaclePlacements?: ObstaclePlacement[];
 }

@@ -154,12 +154,16 @@
 									[squareTexts]="previewSquareTextsForView()"
 									[monsterImagesBySquare]="previewMonsterImagesBySquareForView()"
 									[exits]="previewExitsForView()"
-									[floorTrapPlacements]="previewDetectedFloorTrapsForView()"								[itemPlacements]="previewItemPlacementsForView()"
-							[potionPlacements]="previewPotionPlacementsForView()"
-							[obstaclePlacements]="previewObstaclePlacementsForView()"
+									[floorTrapPlacements]="previewDetectedFloorTrapsForView()"
+									[itemPlacements]="previewItemPlacementsForView()"
+									[potionPlacements]="previewPotionPlacementsForView()"
+									[spellPlacements]="previewSpellPlacementsForView()"
+									[obstaclePlacements]="previewObstaclePlacementsForView()"
+									[monsterImpactEffects]="monsterImpactEffects()"
+									[impactPulse]="monsterImpactPulse()"
 								[obstacleImagesBySquare]="previewObstacleImagesBySquareForView()"
 								[playerHp]="playerHp()"
-								[playerMaxHp]="playerMaxHp()"
+								[playerMaxHp]="playerMaxHpForView()"
 														></app-dungeon-first-person>
 								@if (bloodSplatter().length) {
 									<div class="fpv-blood-overlay">
@@ -173,19 +177,9 @@
 								}
 								@if (playerYellowHitFlash()) {
 									<div class="fpv-yellow-hit-flash"></div>
-								}
-								@for (beam of spellBeamEffects(); track $index) {
-									@if (getBeamFpvLine(beam); as line) {
-										<svg class="fpv-spell-beam-svg" width="330" height="220" style="position:absolute;top:0;left:0;pointer-events:none;">
-											<line [attr.x1]="line.x1" [attr.y1]="line.y1" [attr.x2]="line.x2" [attr.y2]="line.y2"
-												[attr.stroke]="beam.isHP ? '#ff2222' : '#2266ff'"
-												stroke-width="4" stroke-linecap="round"
-												[attr.filter]="beam.isHP ? 'drop-shadow(0 0 8px #ff0000)' : 'drop-shadow(0 0 8px #0055ff)'"
-												opacity="0.92" />
-										</svg>
-									}
-								}
-							</div>
+								}									@if (spellHitFlash(); as kind) {
+										<div [class]="'fpv-spell-hit-' + kind"></div>
+									}							</div>
 							<div class="fpv-move-row">
 							<button type="button" class="fpv-move-btn fpv-move-btn-turn" title="Turn Left" (click)="turnFacingLeft()">↺</button>
 							<button type="button" class="fpv-move-btn fpv-move-btn-forward" title="Move Forward" (click)="moveForward()">👟</button>
@@ -273,6 +267,7 @@
 								[selectedTargetColumn]="selectedCombatTarget()?.column ?? null"
 								[itemPlacements]="previewItemPlacementsForView()"
 								[potionPlacements]="previewPotionPlacementsForView()"
+								[spellPlacements]="previewSpellPlacementsForView()"
 								(cellClicked)="onMapCellClicked($event)"
 							></app-dungeon-preview-grid>
 						</div>
@@ -282,23 +277,23 @@
 							<svg class="body-outline-svg" viewBox="-12 0 104 165" xmlns="http://www.w3.org/2000/svg">
 							<rect x="-12" y="0" width="104" height="165" fill="white"/>
 								@if (slots.head) {
-								<ellipse cx="40" cy="16" rx="14" ry="15" fill="#ccc" stroke="#333" stroke-width="1"/>
-								<rect x="33" y="17" width="14" height="7" rx="1" fill="#aaa" stroke="#333" stroke-width="0.5"/>
+								<ellipse cx="40" cy="16" rx="14" ry="15" fill="#111" stroke="#333" stroke-width="1"/>
+								<rect x="33" y="17" width="14" height="7" rx="1" fill="#111" stroke="#333" stroke-width="0.5"/>
 							}
 							@if (slots.body) {
-								<polygon points="21,34 59,34 56,84 24,84" fill="#ccc" stroke="#333" stroke-width="1"/>
+								<polygon points="21,34 59,34 56,84 24,84" fill="#111" stroke="#333" stroke-width="1"/>
 							}
 							@if (slots.leftArm) {
-								<polygon points="9,34 21,34 19,84 7,84" fill="#ccc" stroke="#333" stroke-width="1"/>
+								<polygon points="9,34 21,34 19,84 7,84" fill="#111" stroke="#333" stroke-width="1"/>
 							}
 							@if (slots.rightArm) {
-								<polygon points="59,34 71,34 73,84 61,84" fill="#ccc" stroke="#333" stroke-width="1"/>
+								<polygon points="59,34 71,34 73,84 61,84" fill="#111" stroke="#333" stroke-width="1"/>
 								}
 								@if (slots.leftLeg) {
-									<polygon points="24,84 40,84 38,148 22,148" fill="#ccc" stroke="#333" stroke-width="1"/>
+									<polygon points="24,84 40,84 38,148 22,148" fill="#111" stroke="#333" stroke-width="1"/>
 								}
 								@if (slots.rightLeg) {
-									<polygon points="40,84 56,84 58,148 42,148" fill="#ccc" stroke="#333" stroke-width="1"/>
+									<polygon points="40,84 56,84 58,148 42,148" fill="#111" stroke="#333" stroke-width="1"/>
 								}
 								<ellipse cx="40" cy="16" rx="12" ry="13" fill="none" stroke="#333" stroke-width="1.5"/>
 								<rect x="37" y="28" width="6" height="6" fill="none" stroke="#333" stroke-width="1.2"/>
@@ -316,18 +311,44 @@
 									<circle cx="40" cy="42" r="2" fill="#886600"/>
 								}
 								@if (slots.mainHand && slots.mainHand.isTwoHanded) {
-									<rect x="38" y="40" width="4" height="54" rx="1" fill="#888" stroke="#333" stroke-width="0.8"/>
-									<rect x="9" y="84" width="62" height="3" rx="1" fill="#666" stroke="#333" stroke-width="0.5"/>
+									@if (slots.mainHand.kind === 'wand') {
+										<rect x="39" y="40" width="3" height="54" rx="1" fill="#6a4a2b" stroke="#333" stroke-width="0.8"/>
+										<circle cx="40.5" cy="37" r="5" fill="#7fd8ff" stroke="#333" stroke-width="0.8"/>
+										<circle cx="40.5" cy="37" r="2" fill="#ffffff"/>
+									} @else {
+										<rect x="38" y="40" width="4" height="54" rx="1" fill="#888" stroke="#333" stroke-width="0.8"/>
+										<rect x="9" y="84" width="62" height="3" rx="1" fill="#666" stroke="#333" stroke-width="0.5"/>
+									}
 								}
 								@if (slots.mainHand && !slots.mainHand.isTwoHanded) {
-									<rect x="67" y="55" width="3" height="30" rx="1" fill="#888" stroke="#333" stroke-width="0.8"/>
-									<rect x="62" y="82" width="13" height="3" rx="1" fill="#666" stroke="#333" stroke-width="0.5"/>
-									<polygon points="67,55 70,55 68.5,47" fill="#aaa" stroke="#333" stroke-width="0.5"/>
+									@if (slots.mainHand.kind === 'shield') {
+										<polygon points="65,78 79,78 79,97 72,106 65,97" fill="#ddd" stroke="#333" stroke-width="1.4"/>
+										<line x1="72" y1="79" x2="72" y2="105" stroke="#555" stroke-width="1"/>
+										<line x1="65" y1="88" x2="79" y2="88" stroke="#555" stroke-width="0.8"/>
+									} @else if (slots.mainHand.kind === 'wand') {
+										<rect x="68" y="55" width="2.5" height="31" rx="1" fill="#6a4a2b" stroke="#333" stroke-width="0.8"/>
+										<circle cx="69.25" cy="51" r="4.5" fill="#7fd8ff" stroke="#333" stroke-width="0.8"/>
+										<circle cx="69.25" cy="51" r="1.7" fill="#ffffff"/>
+									} @else {
+										<rect x="67" y="55" width="3" height="30" rx="1" fill="#888" stroke="#333" stroke-width="0.8"/>
+										<rect x="62" y="82" width="13" height="3" rx="1" fill="#666" stroke="#333" stroke-width="0.5"/>
+										<polygon points="67,55 70,55 68.5,47" fill="#aaa" stroke="#333" stroke-width="0.5"/>
+									}
 								}
-								@if (slots.hasShield && !slots.mainHand?.isTwoHanded) {
-									<polygon points="-10,78 4,78 4,97 -3,106 -10,97" fill="#ddd" stroke="#333" stroke-width="1.4"/>
-									<line x1="-3" y1="79" x2="-3" y2="105" stroke="#555" stroke-width="1"/>
-									<line x1="-10" y1="88" x2="4" y2="88" stroke="#555" stroke-width="0.8"/>
+								@if (slots.offHand && !slots.mainHand?.isTwoHanded) {
+									@if (slots.offHand.kind === 'shield') {
+										<polygon points="-10,78 4,78 4,97 -3,106 -10,97" fill="#ddd" stroke="#333" stroke-width="1.4"/>
+										<line x1="-3" y1="79" x2="-3" y2="105" stroke="#555" stroke-width="1"/>
+										<line x1="-10" y1="88" x2="4" y2="88" stroke="#555" stroke-width="0.8"/>
+									} @else if (slots.offHand.kind === 'wand') {
+										<rect x="9.5" y="55" width="2.5" height="31" rx="1" fill="#6a4a2b" stroke="#333" stroke-width="0.8"/>
+										<circle cx="10.75" cy="51" r="4.5" fill="#7fd8ff" stroke="#333" stroke-width="0.8"/>
+										<circle cx="10.75" cy="51" r="1.7" fill="#ffffff"/>
+									} @else {
+										<rect x="10" y="55" width="3" height="30" rx="1" fill="#888" stroke="#333" stroke-width="0.8"/>
+										<rect x="5" y="82" width="13" height="3" rx="1" fill="#666" stroke="#333" stroke-width="0.5"/>
+										<polygon points="10,55 13,55 11.5,47" fill="#aaa" stroke="#333" stroke-width="0.5"/>
+									}
 								}
 								@if (slots.hasRing) {
 									<circle cx="73" cy="96" r="4" fill="none" stroke="#886600" stroke-width="2"/>
@@ -350,18 +371,21 @@
 				<div class="combat-bar" aria-label="Combat status">
 					<div class="combat-stats">
 						<span class="stat-badge stat-hp">
-							HP: {{ playerHp() }} / {{ playerMaxHp() }}
+							HP: {{ playerHp() }} / {{ playerMaxHpForView() }}
 						</span>
 						<span class="stat-badge stat-ae">
 							AE: {{ playerAE() }} / {{ playerMaxAE }}
+						</span>
+						<span class="stat-badge stat-mp" title="Magic Power">
+							MP: {{ playerMp() }} / {{ playerMagicPowerForView() }}
 						</span>
 						<span class="stat-badge stat-secondary" title="Number of Attacks per round">ATK: {{ playerAttacksThisTurn() }} / {{ playerNOA() }}</span>
 						<span class="stat-badge stat-sp">
 							SP: {{ playerSp() }}
 						</span>
-						<span class="stat-badge stat-secondary" title="Strength">ST: {{ playerStrength() }}</span>
-						<span class="stat-badge stat-secondary" title="Mind">MN: {{ playerMind() }}</span>
-						<span class="stat-badge stat-secondary" title="Stamina (adds to AC)">STA: {{ playerStamina() }}</span>
+						<span class="stat-badge stat-secondary" title="Strength">ST: {{ playerStrengthForView() }}</span>
+						<span class="stat-badge stat-secondary" title="Mind">MN: {{ playerMindForView() }}</span>
+						<span class="stat-badge stat-secondary" title="Stamina (adds to AC)">STA: {{ playerStaminaForView() }}</span>
 						<span class="stat-badge stat-secondary" title="Armour Class">AC: {{ playerACForView() }}</span>
 						<span class="stat-badge stat-phase">
 							@if (turnPhase() === 'player') {
@@ -392,9 +416,11 @@
 							<button type="button" class="action-button action-button-ade" [disabled]="!canAde()" (click)="tryAde()" title="Attack + Defend + End Turn (requires 2 AE)">
 								ADE
 							</button>
+						@if (isFighterClass()) {
 							<button type="button" class="action-button action-button-boost" [class.action-button-disabled]="!canBoostAttack()" [disabled]="!canBoostAttack()" (click)="tryBoostAttack()" title="Boost Attack — +1d3/d4/d6 to hit, -4 AC until your next turn. Must be first action of your turn.">
 								Boost
 							</button>
+						}
 							@if (hasCurrencyInInventory()) {
 								<span class="currency-badge" title="Coins in inventory">
 									@if (totalInventoryCurrency().gold > 0) {<span class="currency-coin currency-gold">G:{{ totalInventoryCurrency().gold }}</span>}

@@ -4,6 +4,7 @@ import { DungeonStateService } from './dungeon-state';
 import {
   CheaterInventory,
   ItemPlacement,
+  SpellPlacement,
   PotionPlacement,
   Tresher,
 } from '../interfaces/game';
@@ -20,6 +21,9 @@ export interface PcTresherSpellData {
   sp: number;
   lastFor: number;
   numberOfTargets: number;
+  magicCost?: number;
+  effectType?: string;
+  effectColor?: string;
 }
 
 /** Item as stored in the PC's tresher lookup map — effectValue may be null from the server. */
@@ -33,6 +37,10 @@ export type PcTresherItemData = {
   range: number;
   armorSlot: string | null;
   effectOn: string | null;
+  effectToPc?: string | null;
+  effectToPcValue?: number;
+  weaponEffectType?: string;
+  weaponEffectColor?: string;
   isTwoHanded: boolean;
 };
 
@@ -47,6 +55,10 @@ export type FloorItemData = {
   range: number;
   armorSlot: string | null;
   effectOn: string | null;
+  effectToPc?: string | null;
+  effectToPcValue?: number;
+  weaponEffectType?: string;
+  weaponEffectColor?: string;
   isTwoHanded: boolean;
 };
 
@@ -89,10 +101,13 @@ export class GameInventoryService {
   // ── Floor inventory ──────────────────────────────────────────────────────
   readonly floorItemPlacementsByDungon = signal<Record<number, ItemPlacement[]>>({});
   readonly floorPotionPlacementsByDungon = signal<Record<number, PotionPlacement[]>>({});
+  readonly floorSpellPlacementsByDungon = signal<Record<number, SpellPlacement[]>>({});
   readonly floorItemListByDungon = signal<Record<number, FloorItemData[]>>({});
   readonly floorPotionListByDungon = signal<Record<number, PcTresherPotionData[]>>({});
+  readonly floorSpellListByDungon = signal<Record<number, PcTresherSpellData[]>>({});
   readonly collectedFloorItemsByDungon = signal<Record<number, FloorItemData[]>>({});
   readonly collectedFloorPotionsByDungon = signal<Record<number, PcTresherPotionData[]>>({});
+  readonly collectedFloorSpellsByDungon = signal<Record<number, PcTresherSpellData[]>>({});
 
   // ── Pure predicates / formatters ─────────────────────────────────────────
 

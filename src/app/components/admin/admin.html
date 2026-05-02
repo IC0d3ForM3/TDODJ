@@ -254,7 +254,7 @@
 						<td>{{ req.email }}</td>
 						<td>{{ req.problem }}</td>
 						<td>{{ req.username || '—' }}</td>
-						<td style="max-width: 300px; white-space: pre-wrap; word-break: break-word;">{{ req.message }}</td>
+						<td style="max-width: 300px; white-space: pre-wrap; word-break: break-word;">{{ req.message.length > 200 ? (req.message | slice:0:200) + '…' : req.message }}</td>
 						<td style="text-align: center;">
 							<input
 								type="checkbox"

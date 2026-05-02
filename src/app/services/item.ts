@@ -19,6 +19,10 @@ export interface UserItemListItem {
   damage: number;
   armorSlot: string | null;
   effectOn: string | null;
+  effectToPc: string | null;
+  effectToPcValue: number;
+  weaponEffectType: string;
+  weaponEffectColor: string;
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;
@@ -39,6 +43,10 @@ export interface UserItemWritePayload {
   damage: number;
   armorSlot: string | null;
   effectOn: string | null;
+  effectToPc: string | null;
+  effectToPcValue: number;
+  weaponEffectType: string;
+  weaponEffectColor: string;
   imageId: number | null;
   soundId: number | null;
   isPublic: boolean;

@@ -20,6 +20,8 @@ export interface SpellRecord {
   soundId: number | null;
   isPublic: boolean;
   numberOfTargets: number;
+  effectType: string;
+  effectColor: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +44,8 @@ export interface UpsertSpellPayload {
   soundId: number | null;
   isPublic: boolean;
   numberOfTargets: number;
+  effectType: string;
+  effectColor: string;
 }
 
 const SELECT_SPELL_FIELDS = `
@@ -64,6 +68,8 @@ const SELECT_SPELL_FIELDS = `
   soundid AS "soundId",
   ispublic AS "isPublic",
   COALESCE(numberoftargets, 1) AS "numberOfTargets",
+  COALESCE(effecttype, 'Other') AS "effectType",
+  COALESCE(effectcolor, '#ffffff') AS "effectColor",
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -115,8 +121,8 @@ export const insertSpellForUser = async (
   const { rows } = await pool.query<SpellRecord>(
     `INSERT INTO spells
        (userguid, name, description, range, effecton, effecton2, lastfor, damage,
-        effectamount2, effectto, value, sp, successtestvalue, magiccost, costtolearn, imageid, soundid, ispublic, numberoftargets)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        effectamount2, effectto, value, sp, successtestvalue, magiccost, costtolearn, imageid, soundid, ispublic, numberoftargets, effecttype, effectcolor)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
      RETURNING ${SELECT_SPELL_FIELDS}`,
     [
       userguid,
@@ -138,6 +144,8 @@ export const insertSpellForUser = async (
       payload.soundId,
       payload.isPublic,
       payload.numberOfTargets,
+      payload.effectType,
+      payload.effectColor,
     ]
   );
   return rows[0];
@@ -168,6 +176,8 @@ export const updateSpellForUser = async (
        soundid = $17,
        ispublic = $18,
        numberoftargets = $19,
+       effecttype = $20,
+       effectcolor = $21,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_SPELL_FIELDS}`,
@@ -191,6 +201,8 @@ export const updateSpellForUser = async (
       payload.soundId,
       payload.isPublic,
       payload.numberOfTargets,
+      payload.effectType,
+      payload.effectColor,
     ]
   );
   return rows[0] ?? null;

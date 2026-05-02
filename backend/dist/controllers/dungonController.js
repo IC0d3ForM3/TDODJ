@@ -449,6 +449,8 @@ const getGameById = async (req, res) => {
                             range: Math.max(1, parseInt(String(it.range), 10) || 1),
                             armorSlot: it.armorSlot ?? null,
                             effectOn: it.effectOn ?? null,
+                            effectToPc: it.effectToPc ?? null,
+                            effectToPcValue: it.effectToPcValue ?? 0,
                         }));
                     }
                     const allPotionIds = Array.from(new Set(treshers.flatMap((t) => [t.potion1Id, t.potion2Id, t.potion3Id]
@@ -518,6 +520,8 @@ const getGameById = async (req, res) => {
                         range: Math.max(1, parseInt(String(it.range), 10) || 1),
                         armorSlot: it.armorSlot ?? null,
                         effectOn: it.effectOn ?? null,
+                        effectToPc: it.effectToPc ?? null,
+                        effectToPcValue: it.effectToPcValue ?? 0,
                     })),
                 ];
             }
@@ -765,6 +769,8 @@ const getSampleGameSession = async (req, res) => {
                     range: Math.max(1, parseInt(String(it.range), 10) || 1),
                     armorSlot: it.armorSlot ?? null,
                     effectOn: it.effectOn ?? null,
+                    effectToPc: it.effectToPc ?? null,
+                    effectToPcValue: it.effectToPcValue ?? 0,
                 }));
             }
             const allPotionIds = Array.from(new Set(treshers.flatMap((t) => [t.potion1Id, t.potion2Id, t.potion3Id]
@@ -852,6 +858,8 @@ const getSampleGameSession = async (req, res) => {
                         range: Math.max(1, parseInt(String(it.range), 10) || 1),
                         armorSlot: it.armorSlot ?? null,
                         effectOn: it.effectOn ?? null,
+                        effectToPc: it.effectToPc ?? null,
+                        effectToPcValue: it.effectToPcValue ?? 0,
                     })),
                 ];
             }

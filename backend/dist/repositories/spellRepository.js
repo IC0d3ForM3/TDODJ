@@ -25,6 +25,8 @@ const SELECT_SPELL_FIELDS = `
   soundid AS "soundId",
   ispublic AS "isPublic",
   COALESCE(numberoftargets, 1) AS "numberOfTargets",
+  COALESCE(effecttype, 'Other') AS "effectType",
+  COALESCE(effectcolor, '#ffffff') AS "effectColor",
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -61,8 +63,8 @@ exports.getSpellsByUserGuid = getSpellsByUserGuid;
 const insertSpellForUser = async (userguid, payload) => {
     const { rows } = await db_1.default.query(`INSERT INTO spells
        (userguid, name, description, range, effecton, effecton2, lastfor, damage,
-        effectamount2, effectto, value, sp, successtestvalue, magiccost, costtolearn, imageid, soundid, ispublic, numberoftargets)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        effectamount2, effectto, value, sp, successtestvalue, magiccost, costtolearn, imageid, soundid, ispublic, numberoftargets, effecttype, effectcolor)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
      RETURNING ${SELECT_SPELL_FIELDS}`, [
         userguid,
         payload.name,
@@ -83,6 +85,8 @@ const insertSpellForUser = async (userguid, payload) => {
         payload.soundId,
         payload.isPublic,
         payload.numberOfTargets,
+        payload.effectType,
+        payload.effectColor,
     ]);
     return rows[0];
 };
@@ -107,6 +111,8 @@ const updateSpellForUser = async (id, userguid, payload) => {
        soundid = $17,
        ispublic = $18,
        numberoftargets = $19,
+       effecttype = $20,
+       effectcolor = $21,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_SPELL_FIELDS}`, [
@@ -129,6 +135,8 @@ const updateSpellForUser = async (id, userguid, payload) => {
         payload.soundId,
         payload.isPublic,
         payload.numberOfTargets,
+        payload.effectType,
+        payload.effectColor,
     ]);
     return rows[0] ?? null;
 };

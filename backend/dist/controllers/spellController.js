@@ -39,6 +39,24 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 const EFFECT_TO_OPTIONS = new Set([
     'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'Action Economy',
 ]);
+const EFFECT_TYPE_OPTIONS = new Set(['Fire', 'Ice', 'Lightning', 'Other']);
+const EFFECT_TYPE_DEFAULT_COLORS = {
+    Fire: '#ee3300',
+    Ice: '#88ddff',
+    Lightning: '#4466ff',
+    Other: '#ffffff',
+};
+const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{3,8}$/;
+function normalizeEffectType(value) {
+    if (typeof value === 'string' && EFFECT_TYPE_OPTIONS.has(value))
+        return value;
+    return 'Other';
+}
+function normalizeEffectColor(value, effectType) {
+    if (typeof value === 'string' && HEX_COLOR_REGEX.test(value))
+        return value.toLowerCase();
+    return EFFECT_TYPE_DEFAULT_COLORS[effectType] ?? '#ffffff';
+}
 function normalizeNumber(value, fallback) {
     const n = typeof value === 'number' ? value : Number(value);
     return Number.isFinite(n) ? Math.trunc(n) : fallback;
@@ -75,6 +93,8 @@ function buildSpellPayload(input, isAdmin) {
         soundId: normalizeNullableInt(input.soundId ?? input.soundid),
         isPublic: isAdmin ? input.isPublic === true || input.ispublic === true : false,
         numberOfTargets: Math.max(1, normalizeNumber(input.numberOfTargets ?? input.numberoftargets, 1)),
+        effectType: normalizeEffectType(input.effectType ?? input.effecttype),
+        effectColor: normalizeEffectColor(input.effectColor ?? input.effectcolor, normalizeEffectType(input.effectType ?? input.effecttype)),
     };
 }
 const getSpells = async (req, res) => {

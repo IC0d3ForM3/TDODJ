@@ -21,6 +21,9 @@ export interface GameMonsterInstance {
   attacksUsedThisTurn: number;
   dropTresherIds: number[];
   dropKeyIds: number[];
+  dropItemIds: number[];
+  dropSpellIds: number[];
+  dropPotionIds: number[];
   activeEffects: ActiveEffect[];
   isDormant: boolean;
   guardRow: number | null;
@@ -71,6 +74,7 @@ export class GameCombatService {
   readonly playerStamina = signal<number>(0);
   readonly playerStrength = signal<number>(0);
   readonly playerMagicPower = signal<number>(0);
+  readonly playerMp = signal<number>(0);
 
   // Monster state
   readonly monsterInstances = signal<GameMonsterInstance[]>([]);
@@ -91,6 +95,7 @@ export class GameCombatService {
   readonly bloodSplatter = signal<{ x: number; y: number; r: number }[]>([]);
   readonly playerHitFlash = signal(false);
   readonly playerYellowHitFlash = signal(false);
+  readonly spellHitFlash = signal<'blood' | 'arcane' | 'fire' | 'ice' | 'lightning' | 'mind' | null>(null);
   readonly spellBeamEffects = signal<{ fromRow: number; fromCol: number; toRow: number; toCol: number; isHP: boolean }[]>([]);
   readonly monsterGlowKeys = signal<Set<string>>(new Set());
   readonly spellTargetMode = signal<{ spellId: number; maxTargets: number; targets: { row: number; column: number }[] } | null>(null);

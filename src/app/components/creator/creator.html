@@ -565,6 +565,13 @@
 									(click)="removeSelectedItemPlacement()"
 								>Remove</button>
 							}
+							@if (selItem.type === 'spell') {
+								<button
+									type="button"
+									class="cancel-button remove-button"
+									(click)="removeSelectedSpellPlacement()"
+								>Remove</button>
+							}
 							<button
 								type="button"
 								class="cancel-button"
@@ -678,6 +685,16 @@
 							<option value="">--</option>
 							@for (item of placedItemsForCurrentDungon(); track item.key) {
 								@if (item.type === 'obstacle') {
+									<option [value]="item.key" [selected]="selectedPlacedItemKey() === item.key" [title]="item.label">{{ item.label }}</option>
+								}
+							}
+						</select>
+
+						<label class="placement-inspector-label" for="pi-spells">Spells</label>
+						<select id="pi-spells" class="placement-inspector-select" (change)="onPlacedItemSelect($event)">
+							<option value="">--</option>
+							@for (item of placedItemsForCurrentDungon(); track item.key) {
+								@if (item.type === 'spell') {
 									<option [value]="item.key" [selected]="selectedPlacedItemKey() === item.key" [title]="item.label">{{ item.label }}</option>
 								}
 							}
@@ -1015,6 +1032,8 @@
 					<div class="tresher-form-grid">
 						<label class="tresher-field"><span>Name</span><input type="text" formControlName="name" placeholder="Spell name" /></label>
 						<label class="tresher-field tresher-field-wide"><span>Description</span><input type="text" formControlName="description" /></label>
+						<label class="tresher-field"><span>Effect Type</span><select formControlName="effectType" (change)="onSpellEffectTypeChange()"><option value="Fire">Fire</option><option value="Ice">Ice</option><option value="Lightning">Lightning</option><option value="Other">Other</option></select></label>
+						<label class="tresher-field"><span>Effect Color</span><input type="color" formControlName="effectColor" style="width:3.5rem;height:2rem;padding:0.1rem;cursor:pointer" /></label>
 						<label class="tresher-field"><span>Range</span><input type="number" formControlName="range" min="0" /></label>
 						<label class="tresher-field"><span>Effect On 1</span><select formControlName="effectOn">@for (o of libSpellEffectToOptions; track o) { <option [value]="o">{{ o }}</option> }</select></label>
 						<label class="tresher-field"><span>Effect On 2</span><select formControlName="effectOn2"><option [ngValue]="null">None</option>@for (o of libSpellEffectToOptions; track o) { <option [value]="o">{{ o }}</option> }</select></label>
@@ -1554,6 +1573,7 @@
 							[showMonsters]="previewShowMonsters()"
 							[itemPlacements]="previewItemPlacementsForModal()"
 							[potionPlacements]="previewPotionPlacementsForModal()"
+							[spellPlacements]="previewSpellPlacementsForModal()"
 					[obstaclePlacements]="previewObstaclePlacementsForModal()"
 					[obstacleImagesBySquare]="previewObstacleImagesBySquareForModal()"
 						></app-dungeon-first-person>
@@ -1576,6 +1596,7 @@
 							[squareTexts]="previewSquareTextsForModal()"
 							[itemPlacements]="previewItemPlacementsForModal()"
 							[potionPlacements]="previewPotionPlacementsForModal()"
+							[spellPlacements]="previewSpellPlacementsForModal()"
 							[obstaclePlacements]="previewObstaclePlacementsForModal()"
 							[obstacleImagesBySquare]="previewObstacleImagesBySquareForModal()"
 						></app-dungeon-preview-grid>
@@ -2054,18 +2075,31 @@
 
 				@if (selectedDungonTreshers().length > 0) {
 					<p class="details-message" style="margin: 0 0 0.3rem">Drop Treshers</p>
+					<div style="display:flex; gap:0.4rem; align-items:center; margin-bottom:0.35rem;">
+						<select
+							class="form-input"
+							style="flex:1; min-width:0;"
+							[value]="placeMonsterDropTresherSelection()"
+							(change)="placeMonsterDropTresherSelection.set($any($event.target).value)"
+						>
+							<option value="">Select tresher...</option>
+							@for (tresher of selectedDungonTreshers(); track tresher.id) {
+								<option [value]="tresher.id">{{ tresher.name || 'Unnamed Tresher' }} ({{ tresher.type }})</option>
+							}
+						</select>
+						<button
+							type="button"
+							class="save-button"
+							style="padding:0.25rem 0.55rem;"
+							[disabled]="!placeMonsterDropTresherSelection()"
+							(click)="addMonsterDropTresher(placeMonsterDropTresherSelection())"
+						>Add</button>
+					</div>
 					<ul class="dungons-list" style="margin-bottom: 0.6rem">
-						@for (tresher of selectedDungonTreshers(); track tresher.id) {
-							<li class="dungons-list-item">
-								<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box">
-									<input
-										type="checkbox"
-										[checked]="isMonsterDropTresherSelected(tresher.id)"
-										(change)="toggleMonsterDropTresher(tresher.id)"
-									/>
-									{{ tresher.name || 'Unnamed Tresher' }}
-									<small style="margin-left: 0.4rem; opacity: 0.7">({{ tresher.type }})</small>
-								</label>
+						@for (tresherId of placeMonsterDropTresherIds(); track $index) {
+							<li class="dungons-list-item" style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.35rem 0.5rem;">
+								<span>{{ monsterDropTresherLabel(tresherId) }}</span>
+								<button type="button" class="cancel-button" style="padding:0.08rem 0.4rem; line-height:1" (click)="removeMonsterDropTresherAt($index)">x</button>
 							</li>
 						}
 					</ul>
@@ -2073,18 +2107,33 @@
 
 				@if (keyList.length > 0) {
 					<p class="details-message" style="margin: 0 0 0.3rem">Drop Keys</p>
+					<div style="display:flex; gap:0.4rem; align-items:center; margin-bottom:0.35rem;">
+						<select
+							class="form-input"
+							style="flex:1; min-width:0;"
+							[value]="placeMonsterDropKeySelection()"
+							(change)="placeMonsterDropKeySelection.set($any($event.target).value)"
+						>
+							<option value="">Select key...</option>
+							@for (key of keyList; track key.id) {
+								@if (!isKeyPlaced(key.id)) {
+									<option [value]="key.id">{{ key.name || 'Unnamed Key' }}</option>
+								}
+							}
+						</select>
+						<button
+							type="button"
+							class="save-button"
+							style="padding:0.25rem 0.55rem;"
+							[disabled]="!placeMonsterDropKeySelection()"
+							(click)="addMonsterDropKey(placeMonsterDropKeySelection())"
+						>Add</button>
+					</div>
 					<ul class="dungons-list" style="margin-bottom: 0.6rem">
-						@for (key of keyList; track key.id) {
-							<li class="dungons-list-item">
-								<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box" [style.opacity]="isKeyPlaced(key.id) ? '0.45' : '1'">
-									<input
-										type="checkbox"
-										[checked]="isMonsterDropKeySelected(key.id)"
-										[disabled]="isKeyPlaced(key.id)"
-										(change)="toggleMonsterDropKey(key.id)"
-									/>
-									{{ key.name || 'Unnamed Key' }}{{ isKeyPlaced(key.id) ? ' (placed)' : '' }}
-								</label>
+						@for (keyId of placeMonsterDropKeyIds(); track $index) {
+							<li class="dungons-list-item" style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.35rem 0.5rem;">
+								<span>{{ monsterDropKeyName(keyId) }}</span>
+								<button type="button" class="cancel-button" style="padding:0.08rem 0.4rem; line-height:1" (click)="removeMonsterDropKeyAt($index)">x</button>
 							</li>
 						}
 					</ul>
@@ -2092,18 +2141,31 @@
 
 				@if (libItems().length > 0) {
 					<p class="details-message" style="margin: 0 0 0.3rem">Drop Items</p>
+					<div style="display:flex; gap:0.4rem; align-items:center; margin-bottom:0.35rem;">
+						<select
+							class="form-input"
+							style="flex:1; min-width:0;"
+							[value]="placeMonsterDropItemSelection()"
+							(change)="placeMonsterDropItemSelection.set($any($event.target).value)"
+						>
+							<option value="">Select item...</option>
+							@for (item of libItems(); track item.id) {
+								<option [value]="item.id">{{ item.name || 'Unnamed Item' }} ({{ item.type }})</option>
+							}
+						</select>
+						<button
+							type="button"
+							class="save-button"
+							style="padding:0.25rem 0.55rem;"
+							[disabled]="!placeMonsterDropItemSelection()"
+							(click)="addMonsterDropItem(placeMonsterDropItemSelection())"
+						>Add</button>
+					</div>
 					<ul class="dungons-list" style="margin-bottom: 0.6rem">
-						@for (item of libItems(); track item.id) {
-							<li class="dungons-list-item">
-								<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box">
-									<input
-										type="checkbox"
-										[checked]="isMonsterDropItemSelected(item.id)"
-										(change)="toggleMonsterDropItem(item.id)"
-									/>
-									{{ item.name || 'Unnamed Item' }}
-									<small style="margin-left: 0.4rem; opacity: 0.7">({{ item.type }})</small>
-								</label>
+						@for (itemId of placeMonsterDropItemIds(); track $index) {
+							<li class="dungons-list-item" style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.35rem 0.5rem;">
+								<span>{{ monsterDropItemLabel(itemId) }}</span>
+								<button type="button" class="cancel-button" style="padding:0.08rem 0.4rem; line-height:1" (click)="removeMonsterDropItemAt($index)">x</button>
 							</li>
 						}
 					</ul>
@@ -2136,17 +2198,31 @@
 
 				@if (libUserSpells().length > 0) {
 					<p class="details-message" style="margin: 0 0 0.3rem">Drop Spells</p>
+					<div style="display:flex; gap:0.4rem; align-items:center; margin-bottom:0.35rem;">
+						<select
+							class="form-input"
+							style="flex:1; min-width:0;"
+							[value]="placeMonsterDropSpellSelection()"
+							(change)="placeMonsterDropSpellSelection.set($any($event.target).value)"
+						>
+							<option value="">Select spell...</option>
+							@for (spell of libUserSpells(); track spell.id) {
+								<option [value]="spell.id">{{ spell.name || 'Unnamed Spell' }}</option>
+							}
+						</select>
+						<button
+							type="button"
+							class="save-button"
+							style="padding:0.25rem 0.55rem;"
+							[disabled]="!placeMonsterDropSpellSelection()"
+							(click)="addMonsterDropSpell(placeMonsterDropSpellSelection())"
+						>Add</button>
+					</div>
 					<ul class="dungons-list" style="margin-bottom: 0.6rem">
-						@for (spell of libUserSpells(); track spell.id) {
-							<li class="dungons-list-item">
-								<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box">
-									<input
-										type="checkbox"
-										[checked]="isMonsterDropSpellSelected(spell.id)"
-										(change)="toggleMonsterDropSpell(spell.id)"
-									/>
-									{{ spell.name || 'Unnamed Spell' }}
-								</label>
+						@for (spellId of placeMonsterDropSpellIds(); track $index) {
+							<li class="dungons-list-item" style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.35rem 0.5rem;">
+								<span>{{ monsterDropSpellName(spellId) }}</span>
+								<button type="button" class="cancel-button" style="padding:0.08rem 0.4rem; line-height:1" (click)="removeMonsterDropSpellAt($index)">x</button>
 							</li>
 						}
 					</ul>
@@ -2154,17 +2230,31 @@
 
 				@if (libPotions().length > 0) {
 					<p class="details-message" style="margin: 0 0 0.3rem">Drop Potions</p>
+					<div style="display:flex; gap:0.4rem; align-items:center; margin-bottom:0.35rem;">
+						<select
+							class="form-input"
+							style="flex:1; min-width:0;"
+							[value]="placeMonsterDropPotionSelection()"
+							(change)="placeMonsterDropPotionSelection.set($any($event.target).value)"
+						>
+							<option value="">Select potion...</option>
+							@for (potion of libPotions(); track potion.id) {
+								<option [value]="potion.id">{{ potion.name || 'Unnamed Potion' }}</option>
+							}
+						</select>
+						<button
+							type="button"
+							class="save-button"
+							style="padding:0.25rem 0.55rem;"
+							[disabled]="!placeMonsterDropPotionSelection()"
+							(click)="addMonsterDropPotion(placeMonsterDropPotionSelection())"
+						>Add</button>
+					</div>
 					<ul class="dungons-list" style="margin-bottom: 0.6rem">
-						@for (potion of libPotions(); track potion.id) {
-							<li class="dungons-list-item">
-								<label class="door-locked-toggle" style="padding: 0.35rem 0.5rem; width: 100%; box-sizing: border-box">
-									<input
-										type="checkbox"
-										[checked]="isMonsterDropPotionSelected(potion.id)"
-										(change)="toggleMonsterDropPotion(potion.id)"
-									/>
-									{{ potion.name || 'Unnamed Potion' }}
-								</label>
+						@for (potionId of placeMonsterDropPotionIds(); track $index) {
+							<li class="dungons-list-item" style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.35rem 0.5rem;">
+								<span>{{ monsterDropPotionName(potionId) }}</span>
+								<button type="button" class="cancel-button" style="padding:0.08rem 0.4rem; line-height:1" (click)="removeMonsterDropPotionAt($index)">x</button>
 							</li>
 						}
 					</ul>

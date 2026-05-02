@@ -26,11 +26,15 @@ import {
   MonsterPlacement,
   ObstaclePlacement,
   PathBlockType,
+  SpellPlacement,
   PotionPlacement,
   SquareSide,
   SquareText,
   TresherPlacement,
 } from '../../interfaces/game';
+
+type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind';
+type MonsterImpactState = { kind: MonsterImpactKind; color?: string | null; startedAt: number; expiresAt: number };
 
 @Component({
   selector: 'app-dungeon-first-person',
@@ -61,8 +65,11 @@ export class DungeonFirstPersonComponent {
   readonly floorTrapPlacements = input<FloorTrapPlacement[]>([]);
   readonly itemPlacements = input<ItemPlacement[]>([]);
   readonly potionPlacements = input<PotionPlacement[]>([]);
+  readonly spellPlacements = input<SpellPlacement[]>([]);
   readonly obstaclePlacements = input<ObstaclePlacement[]>([]);
   readonly obstacleImagesBySquare = input<Map<string, HTMLImageElement | null>>(new Map());
+  readonly monsterImpactEffects = input<Record<string, MonsterImpactState>>({});
+  readonly impactPulse = input<number>(0);
   readonly playerHp = input<number>(20);
   readonly playerMaxHp = input<number>(20);
 
@@ -92,8 +99,11 @@ export class DungeonFirstPersonComponent {
       this.floorTrapPlacements();
       this.itemPlacements();
       this.potionPlacements();
+      this.spellPlacements();
       this.obstaclePlacements();
       this.obstacleImagesBySquare();
+      this.monsterImpactEffects();
+      this.impactPulse();
       this.playerHp();
       this.playerMaxHp();
       untracked(() => this.drawCanvas());
@@ -168,6 +178,9 @@ export class DungeonFirstPersonComponent {
       bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
     }
     for (const placement of this.potionPlacements()) {
+      bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
+    }
+    for (const placement of this.spellPlacements()) {
       bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
     }
 
@@ -448,6 +461,7 @@ export class DungeonFirstPersonComponent {
     // Pass 3: draw floor markers and monsters last so they stay visible.
     const showMonsters = this.showMonsters();
     const monsterImages = this.monsterImagesBySquare();
+    const monsterImpactEffects = this.monsterImpactEffects();
     const detectedTraps = this.floorTrapPlacements();
     const pitTrapSquareKeys = new Set(
       detectedTraps
@@ -540,7 +554,8 @@ export class DungeonFirstPersonComponent {
               nearFrame,
               farFrame,
               image,
-              slot.lateralOffset < 0 ? 'left' : 'right'
+              slot.lateralOffset < 0 ? 'left' : 'right',
+              monsterImpactEffects[slot.squareKey] ?? null
             );
           } else {
             this.drawFirstPersonMonster(
@@ -549,7 +564,8 @@ export class DungeonFirstPersonComponent {
               farFrame,
               image,
               slot.lateralOffset,
-              lateralRange
+              lateralRange,
+              monsterImpactEffects[slot.squareKey] ?? null
             );
           }
         }
@@ -1124,7 +1140,8 @@ export class DungeonFirstPersonComponent {
     farFrame: { left: number; right: number; top: number; bottom: number },
     image: HTMLImageElement | null,
     lateralOffset: number,
-    lateralRange: number
+    lateralRange: number,
+    impact: MonsterImpactState | null
   ): void {
     const midLeft = nearFrame.left * 0.65 + farFrame.left * 0.35;
     const midRight = nearFrame.right * 0.65 + farFrame.right * 0.35;
@@ -1154,12 +1171,22 @@ export class DungeonFirstPersonComponent {
       drawHeight = Math.max(8, drawHeight);
       const drawX = centerX - drawWidth / 2;
       const drawY = midBottom - drawHeight;
+
       context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      this.drawMonsterImpactEffect(
+        context,
+        centerX,
+        drawY + drawHeight * 0.56,
+        drawWidth,
+        drawHeight,
+        impact
+      );
       return;
     }
 
     const centerY = midTop + tileHeight * 0.55;
     const size = Math.max(4, Math.min(tileWidth, tileHeight) * 0.25 * scale);
+    this.drawMonsterImpactEffect(context, centerX, centerY, size * 2.1, size * 2.1, impact);
     context.fillStyle = '#d63031';
     context.beginPath();
     context.moveTo(centerX, centerY - size);
@@ -1179,7 +1206,8 @@ export class DungeonFirstPersonComponent {
     nearFrame: { left: number; right: number; top: number; bottom: number },
     farFrame: { left: number; right: number; top: number; bottom: number },
     image: HTMLImageElement | null,
-    side: 'left' | 'right'
+    side: 'left' | 'right',
+    impact: MonsterImpactState | null
   ): void {
     const midLeft = nearFrame.left * 0.65 + farFrame.left * 0.35;
     const midRight = nearFrame.right * 0.65 + farFrame.right * 0.35;
@@ -1212,9 +1240,11 @@ export class DungeonFirstPersonComponent {
       drawWidth = Math.max(8, drawWidth);
       drawHeight = Math.max(8, drawHeight);
       context.drawImage(image, edgeX - drawWidth / 2, midBottom - drawHeight, drawWidth, drawHeight);
+      this.drawMonsterImpactEffect(context, edgeX, midBottom - drawHeight * 0.45, drawWidth, drawHeight, impact);
     } else {
       const centerY = midTop + tileHeight * 0.55;
       const size = Math.max(4, Math.min(tileWidth, tileHeight) * 0.25);
+      this.drawMonsterImpactEffect(context, edgeX, centerY, size * 2.1, size * 2.1, impact);
       context.fillStyle = '#d63031';
       context.beginPath();
       context.moveTo(edgeX, centerY - size);
@@ -1230,6 +1260,270 @@ export class DungeonFirstPersonComponent {
 
     context.globalAlpha = 1;
     context.restore();
+  }
+
+  private drawMonsterImpactEffect(
+    context: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    width: number,
+    height: number,
+    impact: MonsterImpactState | null
+  ): void {
+    if (!impact) return;
+    const now = Date.now();
+    if (now > impact.expiresAt) return;
+
+    const life = Math.max(0, Math.min(1, (now - impact.startedAt) / Math.max(1, impact.expiresAt - impact.startedAt)));
+    const fade = 1 - life;
+    const pulse = (Math.sin(this.impactPulse() * 0.72) + 1) / 2;
+    const radius = Math.max(width, height) * (0.46 + pulse * 0.14);
+    const accentColor = impact.color || this.getDefaultImpactColor(impact.kind);
+
+    if (impact.kind === 'blood') {
+      context.save();
+      context.globalAlpha = 0.92 * fade;
+      context.shadowColor = accentColor;
+      context.shadowBlur = 14 + pulse * 12;
+      const grad = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius * 1.02);
+      grad.addColorStop(0, 'rgba(255, 168, 168, 0.22)');
+      grad.addColorStop(0.5, 'rgba(198, 29, 45, 0.28)');
+      grad.addColorStop(1, 'rgba(115, 0, 12, 0)');
+      context.fillStyle = grad;
+      context.beginPath();
+      context.arc(centerX, centerY, radius * 0.92, 0, Math.PI * 2);
+      context.fill();
+
+      const dripCount = 4;
+      const dripTop = centerY - height * 0.28;
+      const spread = width * 0.22;
+      for (let i = 0; i < dripCount; i += 1) {
+        const x = centerX + ((i - 1.5) / 1.5) * spread + (i % 2 === 0 ? -1 : 1) * pulse * 4;
+        const length = height * (0.16 + i * 0.035 + life * 0.12);
+        const radiusPx = Math.max(3, Math.min(width, height) * (0.045 + (i % 2) * 0.01));
+        context.strokeStyle = accentColor;
+        context.lineWidth = Math.max(2.8, radiusPx * 0.9);
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(x, dripTop - radiusPx * 0.4);
+        context.quadraticCurveTo(x + (i % 2 === 0 ? -5 : 5), dripTop + length * 0.42, x, dripTop + length);
+        context.stroke();
+
+        context.fillStyle = accentColor;
+        context.beginPath();
+        context.arc(x, dripTop + length + radiusPx * 0.45, radiusPx, 0, Math.PI * 2);
+        context.fill();
+
+        context.strokeStyle = `rgba(255, 235, 235, ${0.28 * fade})`;
+        context.lineWidth = 1.1;
+        context.beginPath();
+        context.arc(x - radiusPx * 0.22, dripTop + length + radiusPx * 0.2, radiusPx * 0.32, Math.PI * 1.05, Math.PI * 1.75);
+        context.stroke();
+      }
+      context.restore();
+      return;
+    }
+
+    if (impact.kind === 'fire') {
+      context.save();
+      context.globalAlpha = 0.88 * fade;
+      context.shadowColor = accentColor;
+      context.shadowBlur = 16 + pulse * 16;
+      const grad = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+      grad.addColorStop(0, 'rgba(255, 212, 120, 0.85)');
+      grad.addColorStop(0.5, 'rgba(255, 88, 36, 0.72)');
+      grad.addColorStop(1, 'rgba(255, 40, 20, 0)');
+      context.fillStyle = grad;
+      context.beginPath();
+      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      context.fill();
+
+      const flameCount = 5;
+      const flameBottom = centerY + height * 0.16;
+      for (let i = 0; i < flameCount; i += 1) {
+        const offset = ((i - 2) / 2) * width * 0.17;
+        const flameHeight = height * (0.28 + (i % 2) * 0.07 + pulse * 0.06);
+        const flameWidth = width * (0.12 + (i % 3) * 0.02);
+        context.beginPath();
+        context.moveTo(centerX + offset, flameBottom);
+        context.quadraticCurveTo(
+          centerX + offset - flameWidth * 0.95,
+          flameBottom - flameHeight * 0.42,
+          centerX + offset,
+          flameBottom - flameHeight
+        );
+        context.quadraticCurveTo(
+          centerX + offset + flameWidth * 0.95,
+          flameBottom - flameHeight * 0.38,
+          centerX + offset,
+          flameBottom
+        );
+        context.fillStyle = i % 2 === 0 ? 'rgba(255, 130, 34, 0.82)' : 'rgba(255, 204, 96, 0.74)';
+        context.fill();
+      }
+      context.restore();
+      return;
+    }
+
+    if (impact.kind === 'lightning') {
+      context.save();
+      context.globalAlpha = 0.94 * fade;
+      context.shadowColor = accentColor;
+      context.shadowBlur = 16 + pulse * 18;
+      const grad = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius * 1.06);
+      grad.addColorStop(0, 'rgba(230, 248, 255, 0.56)');
+      grad.addColorStop(0.45, 'rgba(145, 232, 255, 0.28)');
+      grad.addColorStop(1, 'rgba(80, 180, 255, 0)');
+      context.fillStyle = grad;
+      context.beginPath();
+      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      context.fill();
+
+      const arcs = 7;
+      for (let i = 0; i < arcs; i += 1) {
+        const base = (Math.PI * 2 * i) / arcs + pulse * 1.15;
+        const sx = centerX + Math.cos(base) * radius * 0.36;
+        const sy = centerY + Math.sin(base) * radius * 0.32;
+        const ex = centerX + Math.cos(base + 0.62) * radius * 0.92;
+        const ey = centerY + Math.sin(base + 0.62) * radius * 0.86;
+        this.drawLightningSegment(context, sx, sy, ex, ey, fade, pulse, accentColor);
+      }
+
+      for (let i = 0; i < 10; i += 1) {
+        const sparkAngle = pulse * 2.4 + i * 0.63;
+        const sparkRadius = radius * (0.25 + (i % 4) * 0.12);
+        const sparkX = centerX + Math.cos(sparkAngle) * sparkRadius;
+        const sparkY = centerY + Math.sin(sparkAngle) * sparkRadius;
+        context.fillStyle = i % 2 === 0 ? '#ffffff' : accentColor;
+        context.beginPath();
+        context.arc(sparkX, sparkY, 1.6 + (i % 3) * 0.45, 0, Math.PI * 2);
+        context.fill();
+      }
+      context.restore();
+      return;
+    }
+
+    if (impact.kind === 'ice') {
+      context.save();
+      context.globalAlpha = 0.9 * fade;
+      context.shadowColor = accentColor;
+      context.shadowBlur = 16 + pulse * 15;
+      const grad = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius * 1.08);
+      grad.addColorStop(0, 'rgba(180, 240, 255, 0.76)');
+      grad.addColorStop(0.55, 'rgba(90, 180, 255, 0.62)');
+      grad.addColorStop(1, 'rgba(60, 130, 255, 0)');
+      context.fillStyle = grad;
+      context.beginPath();
+      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      context.fill();
+
+      const fallOffset = life * height * 0.22;
+      const flakes = 8;
+      for (let i = 0; i < flakes; i += 1) {
+        const drift = Math.sin(pulse * 2.2 + i * 0.8) * 6;
+        const fx = centerX + ((i - (flakes - 1) / 2) / ((flakes - 1) / 2)) * width * 0.32 + drift;
+        const fy = centerY - height * 0.4 + (i % 4) * height * 0.12 + fallOffset;
+        this.drawSnowflake(context, fx, fy, Math.max(4, width * 0.045), fade);
+      }
+      context.restore();
+      return;
+    }
+
+    if (impact.kind === 'mind') {
+      context.save();
+      context.globalAlpha = 0.9 * fade;
+      context.shadowColor = '#44dd77';
+      context.shadowBlur = 15 + pulse * 14;
+      const grad = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius * 1.05);
+      grad.addColorStop(0, 'rgba(198, 255, 210, 0.76)');
+      grad.addColorStop(0.55, 'rgba(90, 225, 135, 0.62)');
+      grad.addColorStop(1, 'rgba(35, 170, 85, 0)');
+      context.fillStyle = grad;
+      context.beginPath();
+      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      context.fill();
+
+      // Psychic ripples that pulse outward.
+      const rings = 3;
+      for (let i = 0; i < rings; i += 1) {
+        const ringScale = 0.45 + i * 0.18 + pulse * 0.05;
+        context.beginPath();
+        context.arc(centerX, centerY, radius * ringScale, 0, Math.PI * 2);
+        context.strokeStyle = `rgba(120, 245, 160, ${0.7 - i * 0.18})`;
+        context.lineWidth = 1.6;
+        context.stroke();
+      }
+      context.restore();
+      return;
+    }
+
+    context.save();
+    context.globalAlpha = 0.6 * fade;
+    context.shadowColor = accentColor;
+    context.shadowBlur = 8 + pulse * 8;
+    context.strokeStyle = accentColor;
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(centerX, centerY, radius * 0.9, 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  }
+
+  private getDefaultImpactColor(kind: MonsterImpactKind): string {
+    if (kind === 'blood') return '#c61d2d';
+    if (kind === 'fire') return '#ff5b2a';
+    if (kind === 'lightning') return '#8de8ff';
+    if (kind === 'ice') return '#71d6ff';
+    if (kind === 'mind') return '#44dd77';
+    return '#f0d169';
+  }
+
+  private drawSnowflake(
+    context: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    size: number,
+    fade: number
+  ): void {
+    context.save();
+    context.strokeStyle = `rgba(235, 250, 255, ${0.82 * fade})`;
+    context.lineWidth = 1.2;
+    for (let i = 0; i < 3; i += 1) {
+      const angle = (Math.PI / 3) * i;
+      const dx = Math.cos(angle) * size * 0.5;
+      const dy = Math.sin(angle) * size * 0.5;
+      context.beginPath();
+      context.moveTo(centerX - dx, centerY - dy);
+      context.lineTo(centerX + dx, centerY + dy);
+      context.stroke();
+    }
+    context.restore();
+  }
+
+  private drawLightningSegment(
+    context: CanvasRenderingContext2D,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    fade: number,
+    pulse: number,
+    color: string
+  ): void {
+    const segments = 7;
+    const dx = (x2 - x1) / segments;
+    const dy = (y2 - y1) / segments;
+
+    context.beginPath();
+    context.moveTo(x1, y1);
+    for (let i = 1; i < segments; i += 1) {
+      const jitter = (i % 2 === 0 ? -1 : 1) * (4 + pulse * 2.5);
+      context.lineTo(x1 + dx * i + jitter, y1 + dy * i - jitter * 0.45);
+    }
+    context.lineTo(x2, y2);
+    context.strokeStyle = color;
+    context.lineWidth = 2.3;
+    context.stroke();
   }
 
   private drawFirstPersonPeekObstacle(

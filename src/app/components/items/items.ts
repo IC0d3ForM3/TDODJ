@@ -62,6 +62,15 @@ export class Items implements OnInit {
     { value: 'Strength', label: 'Strength' },
     { value: 'SP', label: 'SP (Skill Points)' },
   ];
+  readonly effectToPcOptions = [
+    { value: 'HP', label: 'HP' },
+    { value: 'Mind', label: 'Mind' },
+    { value: 'Magic', label: 'Magic' },
+    { value: 'Stamina', label: 'Stamina' },
+    { value: 'Strength', label: 'Strength' },
+    { value: 'AC', label: 'AC' },
+  ];
+  readonly weaponEffectTypeOptions = ['Blood', 'Lightning', 'Fire', 'Cold'] as const;
 
   readonly isItemSectionVisible = signal(true);
   readonly isSavingUserItem = signal(false);
@@ -78,12 +87,16 @@ export class Items implements OnInit {
     type: new FormControl<ItemType>('other', { nonNullable: true }),
     armorSlot: new FormControl<string | null>(null),
     effectOn: new FormControl<string | null>(null),
+    effectToPc: new FormControl<string | null>(null),
+    effectToPcValue: new FormControl<number>(0, { nonNullable: true }),
     range: new FormControl<number>(0, { nonNullable: true }),
     value: new FormControl<number>(0, { nonNullable: true }),
     weight: new FormControl<number>(0, { nonNullable: true }),
     curseId: new FormControl<number | null>(null),
     effectValue: new FormControl<number>(0, { nonNullable: true }),
     damage: new FormControl<number>(6, { nonNullable: true }),
+    weaponEffectType: new FormControl<string>('Blood', { nonNullable: true }),
+    weaponEffectColor: new FormControl<string>('#cc0000', { nonNullable: true }),
     imageId: new FormControl<number | null>(null),
     soundId: new FormControl<number | null>(null),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
@@ -114,6 +127,11 @@ export class Items implements OnInit {
   showEffectOn(): boolean {
     const type = this.userItemForm.controls.type.value;
     return type === 'ring' || type === 'necklace';
+  }
+
+  showEffectToPc(): boolean {
+    const type = this.userItemForm.controls.type.value;
+    return type === 'weapon' || type === 'armor' || type === 'ring' || type === 'necklace';
   }
 
   ngOnInit(): void {
@@ -179,12 +197,16 @@ export class Items implements OnInit {
       type: item.type || 'other',
       armorSlot: item.armorSlot ?? null,
       effectOn: item.effectOn ?? null,
+      effectToPc: item.effectToPc ?? null,
+      effectToPcValue: this.normalizeNumber(item.effectToPcValue, 0),
       range: Math.max(0, Math.trunc(Number(item.range)) || 0),
       value: Math.max(0, this.normalizeNumber(item.value, 0)),
       weight: Math.max(0, this.normalizeNumber(item.weight, 0)),
       curseId: this.normalizeNullableNumber(item.curseId),
       effectValue: this.normalizeNumber(item.effectValue, 0),
       damage: this.normalizeNumber(item.damage, 6),
+      weaponEffectType: item.weaponEffectType || 'Blood',
+      weaponEffectColor: item.weaponEffectColor || '#cc0000',
       imageId: this.normalizeNullableNumber(item.imageId),
       soundId: this.normalizeNullableNumber(item.soundId),
       isPublic: item.isPublic,
@@ -242,18 +264,23 @@ export class Items implements OnInit {
     const c = this.userItemForm.controls;
     const type = c.type.value || 'other';
     const isAccessory = type === 'ring' || type === 'necklace';
+    const canApplyPcEffect = type === 'weapon' || type === 'armor' || isAccessory;
     return {
       name: (c.name.value || '').trim() || 'Unnamed Item',
       description: (c.description.value || '').trim(),
       type,
       armorSlot: type === 'armor' ? (c.armorSlot.value || null) : null,
       effectOn: isAccessory ? (c.effectOn.value || null) : null,
+      effectToPc: canApplyPcEffect ? (c.effectToPc.value || null) : null,
+      effectToPcValue: canApplyPcEffect ? this.normalizeNumber(c.effectToPcValue.value, 0) : 0,
       range: Math.max(0, this.normalizeNumber(c.range.value, 0)),
       value: Math.max(0, this.normalizeNumber(c.value.value, 0)),
       weight: Math.max(0, this.normalizeNumber(c.weight.value, 0)),
       curseId: this.normalizeNullableNumber(c.curseId.value),
       effectValue: this.normalizeNumber(c.effectValue.value, 0),
       damage: Math.max(0, this.normalizeNumber(c.damage.value, 6)),
+      weaponEffectType: type === 'weapon' ? (c.weaponEffectType.value || 'Blood') : 'Blood',
+      weaponEffectColor: type === 'weapon' ? (c.weaponEffectColor.value || '#cc0000') : '#cc0000',
       imageId: this.normalizeNullableNumber(c.imageId.value),
       soundId: this.normalizeNullableNumber(c.soundId.value),
       isPublic: this.isAdminUser() ? c.isPublic.value === true : false,
@@ -268,12 +295,16 @@ export class Items implements OnInit {
       type: 'other',
       armorSlot: null,
       effectOn: null,
+      effectToPc: null,
+      effectToPcValue: 0,
       range: 0,
       value: 0,
       weight: 0,
       curseId: null,
       effectValue: 0,
       damage: 6,
+      weaponEffectType: 'Blood',
+      weaponEffectColor: '#cc0000',
       imageId: null,
       soundId: null,
       isPublic: false,

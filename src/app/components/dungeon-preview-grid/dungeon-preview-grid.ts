@@ -23,6 +23,7 @@ import {
   ItemPlacement,
   MonsterPlacement,
   ObstaclePlacement,
+  SpellPlacement,
   PotionPlacement,
   SquareSide,
   SquareText,
@@ -67,6 +68,7 @@ export class DungeonPreviewGridComponent {
   readonly obstacleImagesBySquare = input<Map<string, HTMLImageElement | null>>(new Map());
   readonly itemPlacements = input<ItemPlacement[]>([]);
   readonly potionPlacements = input<PotionPlacement[]>([]);
+  readonly spellPlacements = input<SpellPlacement[]>([]);
   /** Chebyshev range for combat targeting overlay (0 = no overlay). */
   readonly combatRange = input<number>(0);
   /** Row of the currently selected combat target (null = none). */
@@ -105,6 +107,7 @@ export class DungeonPreviewGridComponent {
       this.obstacleImagesBySquare();
       this.itemPlacements();
       this.potionPlacements();
+      this.spellPlacements();
       this.combatRange();
       this.selectedTargetRow();
       this.selectedTargetColumn();
@@ -289,6 +292,17 @@ export class DungeonPreviewGridComponent {
     }
 
     for (const placement of this.potionPlacements()) {
+      const squareKey = this.getSquareKey(placement.row, placement.column);
+      if (!visibleSquareKeys.has(squareKey)) continue;
+      const previewRow = placement.row - preview.startRow;
+      const previewColumn = placement.column - preview.startColumn;
+      if (previewRow < 0 || previewColumn < 0 || previewRow >= this.dimension || previewColumn >= this.dimension) continue;
+      const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+      const centerY = previewRow * this.cellSize + this.cellSize / 2;
+      this.drawItemMarker(context, centerX, centerY, 3.5);
+    }
+
+    for (const placement of this.spellPlacements()) {
       const squareKey = this.getSquareKey(placement.row, placement.column);
       if (!visibleSquareKeys.has(squareKey)) continue;
       const previewRow = placement.row - preview.startRow;
