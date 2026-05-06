@@ -17,6 +17,7 @@ interface SamplePc {
   name: string;
   species: string;
   type: string;
+  imagePath?: string | null;
   maxHP: number;
   currentHP: number;
   ac: number;
@@ -73,7 +74,7 @@ export class SampleGame implements OnInit {
       image: 'images/taren1.jpg',
       speaker: 'Cellen',
       title: 'Action Economy',
-      text: "Every round you have a pool of Action Economy — AE for short. Moving costs 1 AE. Attacking costs 1 AE. Drinking a potion or casting a spell? Also 1 AE each. When your AE hits zero, it's the monsters' turn. Spend your points wisely — getting caught flat-footed is how adventurers end up as wall decorations.",
+      text: "Every round you have a pool of Action Economy — AE for short. Moving costs 1 AE. Attacking costs 1 AE. Drinking a potion costs 1 AE. Casting a spell also costs 1 AE — but spells additionally spend their Magic Cost from your MP pool, so keep an eye on both. When your AE hits zero, it's the monsters' turn. Spend your points wisely — getting caught flat-footed is how adventurers end up as wall decorations.",
     },
     {
       image: 'images/taren2.jpg',
@@ -85,7 +86,7 @@ export class SampleGame implements OnInit {
       image: 'images/taren2.jpg',
       speaker: 'Reanna',
       title: 'Loot & the Exit',
-      text: "Treshers — those containers scattered through the dungeon — are stuffed with weapons, armor, potions, and coin. Check your Inventory tab to grab what you find before moving on. Your goal is the Exit square on the mini-map. Step onto it to finish the dungeon and earn your Skill Point reward. Now get in there — the first round's on the house when you return!",
+      text: "Treshers — those containers scattered through the dungeon — hold weapons, armor, potions, spells, and coin. Hit the Take All button in the side panel to scoop up everything on your current square, or grab items one at a time. Your Inventory panel shows what you're carrying — equip weapons and armor from there. Your goal is the Exit square on the mini-map. Step onto it to finish the dungeon and earn your Skill Point reward. Now get in there — the first round's on the house when you return!",
     },
   ];
 
@@ -156,5 +157,20 @@ export class SampleGame implements OnInit {
     const pc = this.selectedPc();
     if (!pc) return;
     this.router.navigate(['/sample-play'], { queryParams: { pcId: pc.id } });
+  }
+
+  resolveImageUrl(imagePath: string | null | undefined): string {
+    const trimmed = typeof imagePath === 'string' ? imagePath.trim() : '';
+    if (!trimmed) {
+      return '';
+    }
+
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+
+    return trimmed.startsWith('/')
+      ? `${API_BASE_URL}${trimmed}`
+      : `${API_BASE_URL}/${trimmed}`;
   }
 }

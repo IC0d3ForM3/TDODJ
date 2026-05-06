@@ -82,6 +82,7 @@ interface GameSessionPayload {
   pcType?: string | null;
   pcSpecies?: string | null;
   pcName?: string | null;
+  pcImagePath?: string | null;
   currentPcId?: number | null;
   isMainGame?: boolean;
   resettablePerPc?: boolean;
@@ -90,6 +91,11 @@ interface GameSessionPayload {
 }
 
 interface ImageRecordPayload {
+  id: number;
+  path: string;
+}
+
+interface SoundRecordPayload {
   id: number;
   path: string;
 }
@@ -145,6 +151,7 @@ export class Game implements OnInit {
   readonly gameLoadError = signal<string | null>(null);
   readonly gameName = signal('Game');
   readonly gameLastUpdated = signal<string | null>(null);
+  readonly playerPortraitUrl = signal<string | null>(null);
   get previewActionMessage() { return this.interactionService.previewActionMessage; }
 
   readonly playerDeadName = computed(() => {
@@ -162,6 +169,7 @@ export class Game implements OnInit {
   get activeInfoPanelTab() { return this.interactionService.activeInfoPanelTab; }
   get equippedTresherIndexesByDungon() { return this.inventoryService.equippedTresherIndexesByDungon; }
   get equippedItemIdsByDungon() { return this.inventoryService.equippedItemIdsByDungon; }
+  get equippedSpellIdsByDungon() { return this.inventoryService.equippedSpellIdsByDungon; }
 
   get gridPreviewContext() { return this.movementService.gridPreviewContext; }
   get cheaterByDungon() { return this.dungeonState.cheaterByDungon; }
@@ -179,7 +187,10 @@ export class Game implements OnInit {
   private readonly obstacleImageCache = new Map<number, HTMLImageElement>();
   private readonly obstacleImageCacheVersion = signal(0);
   private readonly spellCatalogById = signal<Map<number, PcTresherSpellData>>(new Map());
+  private readonly soundPathById = signal<Map<number, string>>(new Map());
+  private readonly learnedFloorSpellIdsByDungon = signal<Record<number, number[]>>({});
   private readonly doorImageCache = new Map<string, HTMLImageElement>();
+  private readonly defaultSpellSoundPath = '/sounds/sfx-glowing-magic-default-01.wav';
   readonly monsterImpactEffects = signal<Record<string, MonsterImpactState>>({});
   readonly monsterImpactPulse = signal(0);
   private monsterImpactPulseTimer: ReturnType<typeof setInterval> | null = null;
@@ -285,14 +296,22 @@ export class Game implements OnInit {
   get dungonSpReward() { return this.interactionService.dungonSpReward; }
   get dungonWon() { return this.interactionService.dungonWon; }
   get showTavernModal() { return this.interactionService.showTavernModal; }
-  readonly soundMuted = signal<boolean>(localStorage.getItem('soundMuted') === 'true');
+  readonly soundMuted = signal<boolean>((() => {
+    const stored = localStorage.getItem('soundMuted');
+    if (stored === 'true') return true;
+    if (stored === 'false') return false;
+    // Default to muted until player explicitly chooses.
+    localStorage.setItem('soundMuted', 'true');
+    return true;
+  })());
   readonly showReportBugModal = signal<boolean>(false);
   readonly bugReportUsername = signal<string>('');
   readonly bugReportMessage = signal<string>('');
   readonly bugReportSubmitting = signal<boolean>(false);
   readonly bugReportSuccess = signal<boolean>(false);
   readonly bugReportError = signal<string | null>(null);
-  private tavernMusicCtx: AudioContext | null = null;
+  private tavernMusicAudio: HTMLAudioElement | null = null;
+  private readonly tavernWindowSoundPaths = ['/sounds/game sounds/1.mp3', '/sounds/game sounds/2.mp3'];
 
   get questItemsForTavern(): Tresher[] {
     const result: Tresher[] = [];
@@ -351,8 +370,28 @@ export class Game implements OnInit {
   private playerStartingHp = 20;
 
   ngOnInit(): void {
+    this.promptForSoundPreference();
     this.loadGame();
     this.loadDoorImages();
+  }
+
+  private promptForSoundPreference(): void {
+    if (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent || '')) {
+      return;
+    }
+    try {
+      const enableSound = window.confirm('Enable sound?\nOK = Sound ON\nCancel = Sound OFF');
+      const muted = !enableSound;
+      this.soundMuted.set(muted);
+      localStorage.setItem('soundMuted', muted ? 'true' : 'false');
+      if (muted) {
+        this.stopTavernMusic();
+      } else if (this.showTavernModal() || this.npcDialog()) {
+        this.startTavernMusic();
+      }
+    } catch {
+      // Ignore environments where confirm dialogs are unavailable.
+    }
   }
 
   @HostListener('window:keydown', ['$event'])
@@ -550,6 +589,55 @@ export class Game implements OnInit {
     return this.collectedFloorPotionsByDungon()[preview.dungonId] ?? [];
   }
 
+  collectedFloorSpellsForPreview(): PcTresherSpellData[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) return [];
+    return this.collectedFloorSpellsByDungon()[preview.dungonId] ?? [];
+  }
+
+  nearbyMonstersForPreview(): NearbyDiscoveryItem[] {
+    return this.nearbyItemsForPreview().filter((item) => item.kind === 'Monster');
+  }
+
+  currentSquarePickupItemsForPreview(): NearbyDiscoveryItem[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return [];
+    }
+
+    return this.nearbyItemsForPreview().filter(
+      (item) =>
+        item.row === preview.centerRow &&
+        item.column === preview.centerColumn &&
+        this.isPickupDiscoveryKind(item.kind)
+    );
+  }
+
+  otherNearbyItemsForPreview(): NearbyDiscoveryItem[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return [];
+    }
+
+    return this.nearbyItemsForPreview().filter(
+      (item) =>
+        item.kind !== 'Monster' &&
+        !(item.row === preview.centerRow && item.column === preview.centerColumn && this.isPickupDiscoveryKind(item.kind))
+    );
+  }
+
+  collectedWeaponItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean }> {
+    return this.collectedFloorItemsForPreview().filter((item) => this.isWeaponItemType(item.type));
+  }
+
+  collectedArmorItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean }> {
+    return this.collectedFloorItemsForPreview().filter((item) => this.isArmorItemType(item.type));
+  }
+
+  collectedOtherItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean }> {
+    return this.collectedFloorItemsForPreview().filter((item) => !this.isWeaponItemType(item.type) && !this.isArmorItemType(item.type));
+  }
+
   previewDetectedFloorTrapsForView(): FloorTrapPlacement[] {
     const preview = this.gridPreviewContext();
     if (!preview) return [];
@@ -565,7 +653,7 @@ export class Game implements OnInit {
 
   previewLiveMonsterPlacementsForView(): MonsterPlacement[] {
     return this.monsterInstances()
-      .filter((instance) => !instance.isDead)
+      .filter((instance) => this.shouldRenderMonsterInstance(instance))
       .map((instance) => ({
         monsterId: instance.monsterId,
         row: instance.row,
@@ -613,7 +701,7 @@ export class Game implements OnInit {
     this.monsterImageCacheVersion();
     const monstersById = this.getMonstersByIdForDungon(preview.dungonId);
     const imageBySquare = new Map<string, HTMLImageElement | null>();
-    for (const instance of this.monsterInstances().filter((monster) => !monster.isDead)) {
+    for (const instance of this.monsterInstances().filter((monster) => this.shouldRenderMonsterInstance(monster))) {
       const squareKey = this.getSquareKey(instance.row, instance.column);
       const monster = monstersById.get(instance.monsterId);
       const imageId = monster?.imageId ?? null;
@@ -1137,6 +1225,9 @@ export class Game implements OnInit {
     const treshers = this.inventoryTreshersForPreview();
     const spellsMap = this.pcTresherSpellsById();
     const preview = this.gridPreviewContext();
+    const learnedFloorSpellIds = new Set<number>(
+      preview ? (this.learnedFloorSpellIdsByDungon()[preview.dungonId] ?? []) : []
+    );
     const flat: PcTresherSpellData[] = [];
     const seen = new Set<number>();
     for (let i = 0; i < treshers.length; i++) {
@@ -1151,7 +1242,7 @@ export class Game implements OnInit {
 
     if (preview) {
       for (const spell of this.collectedFloorSpellsByDungon()[preview.dungonId] ?? []) {
-        if (!seen.has(spell.id)) {
+        if (!seen.has(spell.id) && learnedFloorSpellIds.has(spell.id)) {
           flat.push(spell);
           seen.add(spell.id);
         }
@@ -1170,11 +1261,11 @@ export class Game implements OnInit {
   }
 
   isInnerPotionDrinkable(potion: { effectTo: string }): boolean {
-    return potion.effectTo === 'HP';
+    return this.normalizePotionEffectToPcStat(potion.effectTo) !== null;
   }
 
   canDrinkInnerPotion(): boolean {
-    return this.turnPhase() === 'player' && this.playerHp() > 0;
+    return this.turnPhase() === 'player' && this.playerHp() > 0 && this.playerAE() >= 1;
   }
 
   getTresherInnerSpells(tresher: Tresher): PcTresherSpellData[] {
@@ -1185,14 +1276,143 @@ export class Game implements OnInit {
     return Math.floor(this.getEffectivePlayerMind() / 2);
   }
 
+  private getKnownSpellIdsForDungon(dungonId: number): Set<number> {
+    const known = new Set<number>(this.learnedFloorSpellIdsByDungon()[dungonId] ?? []);
+    for (const tresher of this.inventoryTreshersForPreview()) {
+      for (const spellId of [tresher.spell1Id, tresher.spell2Id, tresher.spell3Id, tresher.spell4Id]) {
+        if (spellId != null) {
+          known.add(spellId);
+        }
+      }
+    }
+    return known;
+  }
+
+  isSpellLearned(spellId: number): boolean {
+    const preview = this.gridPreviewContext();
+    if (!preview) return false;
+    return this.getKnownSpellIdsForDungon(preview.dungonId).has(spellId);
+  }
+
+  isSpellEquippedById(spellId: number): boolean {
+    const preview = this.gridPreviewContext();
+    if (!preview) return false;
+    return (this.equippedSpellIdsByDungon()[preview.dungonId] ?? []).includes(spellId);
+  }
+
+  equippedSpellMagicCostForPreview(): number {
+    const preview = this.gridPreviewContext();
+    if (!preview) return 0;
+    const spellIds = this.equippedSpellIdsByDungon()[preview.dungonId] ?? [];
+    const spells = this.pcTresherSpellsById();
+    return spellIds.reduce((sum, spellId) => sum + Math.max(1, spells.get(spellId)?.magicCost ?? 1), 0);
+  }
+
+  toggleSpellEquipped(spellId: number): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    if (!this.isSpellLearned(spellId)) {
+      this.previewActionMessage.set('You must learn this spell first.');
+      return;
+    }
+
+    const spell = this.pcTresherSpellsById().get(spellId);
+    if (!spell) return;
+    const equipped = this.equippedSpellIdsByDungon()[preview.dungonId] ?? [];
+
+    if (equipped.includes(spellId)) {
+      this.equippedSpellIdsByDungon.update((all) => ({
+        ...all,
+        [preview.dungonId]: equipped.filter((id) => id !== spellId),
+      }));
+      this.previewActionMessage.set(`${spell.name} unequipped.`);
+      this.addCombatLog(`${spell.name} unequipped.`);
+      this.saveGameState();
+      return;
+    }
+
+    const currentCost = this.equippedSpellMagicCostForPreview();
+    const nextCost = currentCost + Math.max(1, spell.magicCost ?? 1);
+    const maxMind = Math.max(0, this.getEffectivePlayerMind());
+    if (nextCost > maxMind) {
+      this.previewActionMessage.set(`Cannot equip ${spell.name}: spell loadout ${nextCost}/${maxMind} exceeds Mind.`);
+      return;
+    }
+
+    this.equippedSpellIdsByDungon.update((all) => ({
+      ...all,
+      [preview.dungonId]: [...equipped, spellId],
+    }));
+    this.previewActionMessage.set(`${spell.name} equipped.`);
+    this.addCombatLog(`${spell.name} equipped.`);
+    this.saveGameState();
+  }
+
+  canLearnCollectedSpell(spell: PcTresherSpellData): boolean {
+    if (!spell) return false;
+    if (this.isSpellLearned(spell.id)) return false;
+    return this.playerSp() >= Math.max(1, spell.sp);
+  }
+
+  learnCollectedFloorSpell(spellId: number): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const spell = this.collectedFloorSpellsByDungon()[preview.dungonId]?.find((s) => s.id === spellId);
+    if (!spell) return;
+    if (this.isSpellLearned(spellId)) {
+      this.previewActionMessage.set(`${spell.name} is already learned.`);
+      return;
+    }
+
+    const spCost = Math.max(1, spell.sp);
+    if (this.playerSp() < spCost) {
+      this.previewActionMessage.set(`Not enough SP to learn ${spell.name}. Need ${spCost} SP.`);
+      return;
+    }
+
+    this.playerSp.update((sp) => Math.max(0, sp - spCost));
+    const mindBonus = Math.floor(this.getEffectivePlayerMind() / 2);
+    const classModifier = this.getSpellLearningClassModifier();
+    const totalBonus = mindBonus + classModifier;
+    const roll = this.randomInt(1, 12) + totalBonus;
+    const dc = Math.max(1, spell.successTestValue);
+    this.addCombatLog(`Learn ${spell.name}: rolled ${roll} (1d12${this.formatSignedModifier(totalBonus)}) vs TN ${dc}.`);
+
+    if (roll < dc) {
+      this.previewActionMessage.set(`You failed to learn ${spell.name}.`);
+      this.addCombatLog(`You fail to decipher ${spell.name}.`);
+      this.saveGameState();
+      return;
+    }
+
+    this.learnedFloorSpellIdsByDungon.update((all) => {
+      const existing = all[preview.dungonId] ?? [];
+      if (existing.includes(spellId)) {
+        return all;
+      }
+      return {
+        ...all,
+        [preview.dungonId]: [...existing, spellId],
+      };
+    });
+
+    this.previewActionMessage.set(`You learned ${spell.name}!`);
+    this.addCombatLog(`You learned ${spell.name}.`);
+    this.saveGameState();
+  }
+
   canCastSpell(spell: PcTresherSpellData): boolean {
     if (this.turnPhase() !== 'player' || this.playerHp() <= 0) return false;
-    if (this.playerAE() < Math.max(1, spell.sp)) return false;
+    if (!this.isSpellLearned(spell.id)) return false;
+    if (!this.isSpellEquippedById(spell.id)) return false;
+    if (this.equippedSpellMagicCostForPreview() > Math.max(0, this.getEffectivePlayerMind())) return false;
+    if (this.playerAE() < 1) return false;
     if (this.playerMp() < Math.max(1, spell.magicCost ?? 1)) return false;
     const preview = this.gridPreviewContext();
     if (!preview) return false;
-    if (spell.range === 0) return true;
-    return this.findAdjacentLiveMonster(preview.centerRow, preview.centerColumn, spell.range, preview.dungonId) !== null;
+    const maxTargetRange = this.getSpellMaxMonsterRange(spell);
+    if (maxTargetRange <= 0) return true;
+    return this.findAdjacentLiveMonster(preview.centerRow, preview.centerColumn, maxTargetRange, preview.dungonId) !== null;
   }
 
   initSpellCast(spellId: number): void {
@@ -1201,8 +1421,12 @@ export class Game implements OnInit {
     if (!preview) return;
     const spell = this.pcTresherSpellsById().get(spellId);
     if (!spell) return;
+    if (!this.isSpellLearned(spellId) || !this.isSpellEquippedById(spellId)) {
+      this.previewActionMessage.set(`${spell.name} must be learned and equipped before casting.`);
+      return;
+    }
 
-    if (spell.numberOfTargets > 1) {
+    if (spell.numberOfTargets > 1 && this.hasMonsterTargetEffect(spell)) {
       this.spellTargetMode.set({ spellId, maxTargets: spell.numberOfTargets, targets: [] });
       this.selectedSpellId.set(spellId);
       this.previewActionMessage.set(`${spell.name}: click up to ${spell.numberOfTargets} monsters on the map, then press Cast.`);
@@ -1219,10 +1443,19 @@ export class Game implements OnInit {
 
     const spell = this.pcTresherSpellsById().get(spellId);
     if (!spell) return;
+    if (!this.isSpellLearned(spellId) || !this.isSpellEquippedById(spellId)) {
+      this.addCombatLog(`${spell.name} must be learned and equipped before casting.`);
+      return;
+    }
+    const effectSlots = this.getSpellEffectSlots(spell);
+    if (effectSlots.length === 0) {
+      this.addCombatLog(`${spell.name} has no configured effects.`);
+      return;
+    }
 
-    const mpCost = Math.max(1, spell.sp);
-    if (this.playerAE() < mpCost) {
-      this.addCombatLog(`Not enough AE to cast ${spell.name}. Need ${mpCost} AE.`);
+    const actionCost = 1;
+    if (this.playerAE() < actionCost) {
+      this.addCombatLog(`Not enough AE to cast ${spell.name}. Need ${actionCost} AE.`);
       return;
     }
     const spellMpCost = Math.max(1, spell.magicCost ?? 1);
@@ -1231,79 +1464,73 @@ export class Game implements OnInit {
       return;
     }
 
-    // Range 0 = self-cast on the PC
-    if (spell.range === 0) {
-      this.castSpellOnSelf(spell);
-      this.consumePlayerAE(mpCost, preview.dungonId);
+    if (!this.hasMonsterTargetEffect(spell)) {
+      const spellFlavor = this.formatSpellFlavor(spell);
+      this.playSpellSound(spell);
+      for (const slot of effectSlots) {
+        this.applySpellEffectToPlayer(spell, slot, spellFlavor);
+      }
+      this.consumePlayerAE(actionCost, preview.dungonId);
       this.playerMp.update(v => Math.max(0, v - spellMpCost));
+      if (this.playerAE() <= 0) {
+        this.startMonsterTurns();
+      }
       return;
     }
 
-    const target = this.getTargetMonster(preview.dungonId, preview.centerRow, preview.centerColumn, spell.range);
+    const maxMonsterRange = this.getSpellMaxMonsterRange(spell);
+    const target = this.getTargetMonster(preview.dungonId, preview.centerRow, preview.centerColumn, maxMonsterRange);
     if (!target) {
-      this.addCombatLog(`No target in range (${spell.range}) for ${spell.name}.`);
+      this.addCombatLog(`No target in range (${maxMonsterRange}) for ${spell.name}.`);
       return;
     }
+
+    this.playSpellSound(spell);
 
     const template = this.getMonstersByIdForDungon(preview.dungonId).get(target.monsterId);
     const monsterName = template?.name ?? 'monster';
-    const magicResistance = template?.magicResistance ?? 0;
+    const magicResistance = template ? this.getEffectiveMonsterMagicResistance(target, template) : 0;
 
     this.selectedSpellId.set(null);
 
-    const roll = this.rollD12(this.getEffectivePlayerMind());
+    const spellCastBonus = this.getEffectivePlayerMind() + this.getSpellCastingClassModifier();
+    const roll = this.rollD12(spellCastBonus);
     const dc = spell.successTestValue + magicResistance;
     const spellFlavor = this.formatSpellFlavor(spell);
-    this.addCombatLog(`Cast ${spell.name}${spellFlavor} — rolled ${roll} (1d12+${this.getEffectivePlayerMind()}) vs DC ${dc} (TN ${spell.successTestValue} + MR ${magicResistance}).`);
+    this.addCombatLog(`Cast ${spell.name}${spellFlavor} — rolled ${roll} (1d12${this.formatSignedModifier(spellCastBonus)}) vs DC ${dc} (TN ${spell.successTestValue} + MR ${magicResistance}).`);
 
     if (roll >= dc) {
       const dist = Math.max(Math.abs(target.row - preview.centerRow), Math.abs(target.column - preview.centerColumn));
-      if (dist > 1) {
-        this.triggerSpellBeam(preview.centerRow, preview.centerColumn, target.row, target.column, spell.effectOn === 'HP');
+      const hasRangedMonsterHit = effectSlots.some((slot) => !slot.effectOnPc && slot.effectOn === 'HP' && slot.range > 1 && dist > 1 && dist <= slot.range);
+      if (hasRangedMonsterHit) {
+        this.triggerSpellBeam(preview.centerRow, preview.centerColumn, target.row, target.column, true);
       }
-      if (spell.lastFor > 0) {
-        target.activeEffects.push({
-          effectOn: spell.effectOn,
-          effectAmount: spell.effectAmount,
-          remainingAE: spell.lastFor,
-          sourceName: spell.name,
-        });
-        this.triggerMonsterGlow(target.row, target.column, spell.name, spell.effectOn, spell.effectType ?? '');
-        this.addCombatLog(`${spell.name}${spellFlavor} afflicts ${monsterName} for ${spell.lastFor} AE! (${spell.effectOn} -${spell.effectAmount}/AE)`);
-      } else {
-        if (spell.effectOn === 'HP') {
-          const calc = this.calculateSpellHpDamage(spell.effectAmount, magicResistance);
-          const damage = calc.damage;
-          target.currentHp -= damage;
-          this.triggerSpellHitFlash(spell.name, spell.effectOn, spell.effectType ?? '');
-          this.triggerMonsterGlow(target.row, target.column, spell.name, spell.effectOn, spell.effectType ?? '');
-          this.addCombatLog(`${spell.name}${spellFlavor} hits ${monsterName} for ${damage} damage! (Base ${spell.effectAmount} + Mind ${calc.mindBonus} (${calc.mindDiceCount}d4) - MR ${calc.mrReduction})`);
-        } else {
-          this.triggerMonsterGlow(target.row, target.column, spell.name, spell.effectOn, spell.effectType ?? '');
-          this.addCombatLog(`${spell.name}${spellFlavor} successfully affects ${monsterName}! (${spell.effectOn} −${spell.effectAmount})`);
+
+      for (const slot of effectSlots) {
+        if (slot.effectOnPc) {
+          this.applySpellEffectToPlayer(spell, slot, spellFlavor);
+          continue;
         }
 
-        if (target.currentHp <= 0) {
-          target.isDead = true;
-          target.currentHp = 0;
-          this.addCombatLog(`${monsterName} is dead!`);
-          this.selectedCombatTarget.set(null); // clear target after kill
-          this.dropMonsterLoot(preview.dungonId, target, template ?? null);
-          const spGain = template?.spReward ?? 0;
-          if (spGain > 0) {
-            this.playerSp.update((s) => s + spGain);
-            this.addCombatLog(`+${spGain} SP!`);
-            this.awardSpToPC(spGain);
-          }
+        if (dist > slot.range) {
+          this.addCombatLog(`${spell.name}${spellFlavor} ${slot.effectOn} effect is out of range (${slot.range}).`);
+          continue;
         }
+
+        if (target.isDead) {
+          break;
+        }
+
+        this.applySpellEffectToMonster(spell, slot, target, monsterName, magicResistance, spellFlavor, preview.dungonId, template ?? null);
       }
+
       this.monsterInstances.update((arr) => [...arr]);
     } else {
       this.addCombatLog(`${spell.name}${spellFlavor} fizzles — ${monsterName} resists!`);
     }
 
     // consumePlayerAE ticks all active effects (including any just applied) once per AE point
-    this.consumePlayerAE(mpCost, preview.dungonId);
+    this.consumePlayerAE(actionCost, preview.dungonId);
     this.playerMp.update(v => Math.max(0, v - spellMpCost));
     this.drawPreviewGridCanvas();
 
@@ -1321,10 +1548,17 @@ export class Game implements OnInit {
 
     const spell = this.pcTresherSpellsById().get(targetMode.spellId);
     if (!spell) return;
+    if (!this.isSpellLearned(spell.id) || !this.isSpellEquippedById(spell.id)) {
+      this.addCombatLog(`${spell.name} must be learned and equipped before casting.`);
+      this.cancelSpellTargetMode();
+      return;
+    }
+    const effectSlots = this.getSpellEffectSlots(spell);
+    if (effectSlots.length === 0) return;
 
-    const mpCost = Math.max(1, spell.sp);
-    if (this.playerAE() < mpCost) {
-      this.addCombatLog(`Not enough AE to cast ${spell.name}. Need ${mpCost} AE.`);
+    const actionCost = 1;
+    if (this.playerAE() < actionCost) {
+      this.addCombatLog(`Not enough AE to cast ${spell.name}. Need ${actionCost} AE.`);
       return;
     }
     const spellMpCost = Math.max(1, spell.magicCost ?? 1);
@@ -1333,9 +1567,17 @@ export class Game implements OnInit {
       return;
     }
 
+    this.playSpellSound(spell);
+
     this.spellTargetMode.set(null);
     this.selectedSpellId.set(null);
     const spellFlavor = this.formatSpellFlavor(spell);
+
+    for (const slot of effectSlots) {
+      if (slot.effectOnPc) {
+        this.applySpellEffectToPlayer(spell, slot, spellFlavor);
+      }
+    }
 
     let anyHit = false;
     for (const t of targetMode.targets) {
@@ -1343,49 +1585,29 @@ export class Game implements OnInit {
       if (!instance) continue;
       const template = this.getMonstersByIdForDungon(preview.dungonId).get(instance.monsterId);
       const monsterName = template?.name ?? 'monster';
-      const magicResistance = template?.magicResistance ?? 0;
-      const roll = this.rollD12(this.getEffectivePlayerMind());
+      const magicResistance = template ? this.getEffectiveMonsterMagicResistance(instance, template) : 0;
+      const spellCastBonus = this.getEffectivePlayerMind() + this.getSpellCastingClassModifier();
+      const roll = this.rollD12(spellCastBonus);
       const dc = spell.successTestValue + magicResistance;
       this.addCombatLog(`${spell.name}${spellFlavor} → ${monsterName}: rolled ${roll} vs DC ${dc}.`);
       if (roll >= dc) {
         anyHit = true;
         const dist = Math.max(Math.abs(instance.row - preview.centerRow), Math.abs(instance.column - preview.centerColumn));
-        if (dist > 1) {
-          this.triggerSpellBeam(preview.centerRow, preview.centerColumn, instance.row, instance.column, spell.effectOn === 'HP');
+        const hasRangedMonsterHit = effectSlots.some((slot) => !slot.effectOnPc && slot.effectOn === 'HP' && slot.range > 1 && dist > 1 && dist <= slot.range);
+        if (hasRangedMonsterHit) {
+          this.triggerSpellBeam(preview.centerRow, preview.centerColumn, instance.row, instance.column, true);
         }
-        if (spell.lastFor > 0) {
-          instance.activeEffects.push({
-            effectOn: spell.effectOn,
-            effectAmount: spell.effectAmount,
-            remainingAE: spell.lastFor,
-            sourceName: spell.name,
-          });
-          this.triggerMonsterGlow(instance.row, instance.column, spell.name, spell.effectOn, spell.effectType ?? '');
-          this.addCombatLog(`${spell.name}${spellFlavor} afflicts ${monsterName} for ${spell.lastFor} AE!`);
-        } else {
-          if (spell.effectOn === 'HP') {
-            const calc = this.calculateSpellHpDamage(spell.effectAmount, magicResistance);
-            const damage = calc.damage;
-            instance.currentHp -= damage;
-            this.triggerSpellHitFlash(spell.name, spell.effectOn, spell.effectType ?? '');
-            this.triggerMonsterGlow(instance.row, instance.column, spell.name, spell.effectOn, spell.effectType ?? '');
-            this.addCombatLog(`${spell.name}${spellFlavor} hits ${monsterName} for ${damage} damage! (Base ${spell.effectAmount} + Mind ${calc.mindBonus} (${calc.mindDiceCount}d4) - MR ${calc.mrReduction})`);
-          } else {
-            this.triggerMonsterGlow(instance.row, instance.column, spell.name, spell.effectOn, spell.effectType ?? '');
-            this.addCombatLog(`${spell.name}${spellFlavor} affects ${monsterName}! (${spell.effectOn} −${spell.effectAmount})`);
+
+        for (const slot of effectSlots) {
+          if (slot.effectOnPc) continue;
+          if (dist > slot.range) {
+            this.addCombatLog(`${spell.name}${spellFlavor} ${slot.effectOn} effect is out of range (${slot.range}) on ${monsterName}.`);
+            continue;
           }
-          if (instance.currentHp <= 0) {
-            instance.isDead = true;
-            instance.currentHp = 0;
-            this.addCombatLog(`${monsterName} is dead!`);
-            this.dropMonsterLoot(preview.dungonId, instance, template ?? null);
-            const spGain = template?.spReward ?? 0;
-            if (spGain > 0) {
-              this.playerSp.update((s) => s + spGain);
-              this.addCombatLog(`+${spGain} SP!`);
-              this.awardSpToPC(spGain);
-            }
+          if (instance.isDead) {
+            break;
           }
+          this.applySpellEffectToMonster(spell, slot, instance, monsterName, magicResistance, spellFlavor, preview.dungonId, template ?? null);
         }
       } else {
         this.addCombatLog(`${spell.name}${spellFlavor} fizzles — ${monsterName} resists!`);
@@ -1395,7 +1617,7 @@ export class Game implements OnInit {
       this.selectedCombatTarget.set(null);
     }
     this.monsterInstances.update((arr) => [...arr]);
-    this.consumePlayerAE(mpCost, preview.dungonId);
+    this.consumePlayerAE(actionCost, preview.dungonId);
     this.playerMp.update(v => Math.max(0, v - spellMpCost));
     this.drawPreviewGridCanvas();
     if (this.playerAE() <= 0) {
@@ -1403,47 +1625,242 @@ export class Game implements OnInit {
     }
   }
 
-  private castSpellOnSelf(spell: PcTresherSpellData): void {
-    const spellFlavor = this.formatSpellFlavor(spell);
+  private getSpellEffectSlots(spell: PcTresherSpellData): Array<{
+    effectOn: string;
+    effectAmount: number;
+    effectOnPc: boolean;
+    range: number;
+    lastFor: number;
+  }> {
+    const range1 = Math.max(0, spell.range1 ?? spell.range ?? 0);
+    const range2 = Math.max(0, spell.range2 ?? spell.range ?? 0);
+    const lastFor1 = Math.max(0, spell.lastFor1 ?? spell.lastFor ?? 0);
+    const lastFor2 = Math.max(0, spell.lastFor2 ?? spell.lastFor ?? 0);
+    const effectAmount2 = typeof spell.effectAmount2 === 'number' ? spell.effectAmount2 : 0;
+    const effectOn2 = (spell.effectOn2 ?? '').trim();
 
-    if (spell.lastFor > 0) {
-      // Persistent effect on the PC
+    const slots: Array<{ effectOn: string; effectAmount: number; effectOnPc: boolean; range: number; lastFor: number }> = [];
+
+    const effectOn1 = (spell.effectOn ?? '').trim();
+    if (effectOn1) {
+      slots.push({
+        effectOn: effectOn1,
+        effectAmount: spell.effectAmount,
+        effectOnPc: (spell.effectOnPc1 === true) || range1 === 0,
+        range: range1,
+        lastFor: lastFor1,
+      });
+    }
+
+    if (effectOn2) {
+      slots.push({
+        effectOn: effectOn2,
+        effectAmount: effectAmount2,
+        effectOnPc: (spell.effectOnPc2 === true) || range2 === 0,
+        range: range2,
+        lastFor: lastFor2,
+      });
+    }
+
+    return slots;
+  }
+
+  private hasMonsterTargetEffect(spell: PcTresherSpellData): boolean {
+    return this.getSpellEffectSlots(spell).some((slot) => !slot.effectOnPc);
+  }
+
+  private getSpellMaxMonsterRange(spell: PcTresherSpellData): number {
+    return this.getSpellEffectSlots(spell)
+      .filter((slot) => !slot.effectOnPc)
+      .reduce((max, slot) => Math.max(max, slot.range), 0);
+  }
+
+  private spellEffectRemainingAE(lastFor: number): number {
+    return Math.max(1, lastFor);
+  }
+
+  private spellEffectDurationLabel(lastFor: number): string {
+    return lastFor === 0 ? 'permanently' : `for ${lastFor} rounds`;
+  }
+
+  private applyPermanentPlayerSpellEffect(effectOn: string, amount: number): void {
+    const target = this.normalizeEffectToPcStat(effectOn);
+    const preview = this.gridPreviewContext();
+    if (target === 'HP') {
+      const nextHp = Math.max(0, Math.min(this.playerHp() + amount, this.getEffectivePlayerMaxHp()));
+      this.playerHp.set(nextHp);
+      return;
+    }
+    if (target === 'Magic') {
+      this.playerMagicPower.update((v) => Math.max(0, v + amount));
+      this.playerMp.set(Math.max(0, Math.min(this.playerMp() + amount, this.getEffectivePlayerMagicPower())));
+      return;
+    }
+    if (target === 'Mind') {
+      this.playerMind.update((v) => Math.max(0, v + amount));
+      return;
+    }
+    if (target === 'Stamina') {
+      this.playerStamina.update((v) => Math.max(0, v + amount));
+      return;
+    }
+    if (target === 'Strength') {
+      this.playerStrength.update((v) => Math.max(0, v + amount));
+      return;
+    }
+    if (target === 'AE') {
+      this.playerAE.set(Math.max(0, Math.min(this.playerAE() + amount, this.getEffectivePlayerMaxAE())));
+      return;
+    }
+    if (target === 'NOA') {
+      this.playerNOA.update((v) => Math.max(1, v + amount));
+      return;
+    }
+    if (target === 'AC') {
+      this.playerBaseAC.update((v) => Math.max(0, v + amount));
+      return;
+    }
+    if (target === 'ROS' && preview) {
+      const cheater = this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER;
+      const baseRos = Number.isFinite(cheater.rangeOfSight) ? cheater.rangeOfSight : DEFAULT_CHEATER.rangeOfSight;
+      this.cheaterByDungon.update((all) => ({
+        ...all,
+        [preview.dungonId]: {
+          ...cheater,
+          rangeOfSight: Math.max(0, Math.floor(baseRos + amount)),
+        },
+      }));
+    }
+  }
+
+  private applySpellEffectToPlayer(
+    spell: PcTresherSpellData,
+    slot: { effectOn: string; effectAmount: number; effectOnPc: boolean; range: number; lastFor: number },
+    spellFlavor: string
+  ): void {
+    const amount = this.rollSpellEffectDelta(this.getSpellEffectAmountWithMagicBonus(slot.effectAmount));
+    if (slot.lastFor === 0) {
+      this.applyPermanentPlayerSpellEffect(slot.effectOn, amount);
+      this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '');
+      this.addCombatLog(`${spell.name}${spellFlavor} permanently affects you. (${slot.effectOn} ${amount >= 0 ? '+' : ''}${amount})`);
+      return;
+    }
+
+    const target = this.normalizeEffectToPcStat(slot.effectOn);
+    if (target === 'HP') {
       this.playerActiveEffects.update((effects) => [
         ...effects,
         {
-          effectOn: spell.effectOn,
-          effectAmount: spell.effectAmount,
-          remainingAE: spell.lastFor,
+          effectOn: slot.effectOn,
+          effectAmount: amount,
+          remainingAE: this.spellEffectRemainingAE(slot.lastFor),
           sourceName: spell.name,
+          behavior: 'tick',
         },
       ]);
-      this.triggerSpellHitFlash(spell.name, spell.effectOn, spell.effectType ?? '');
-      const per = Math.abs(spell.effectAmount);
-      this.addCombatLog(`${spell.name}${spellFlavor} afflicts you for ${spell.lastFor} AE! (${spell.effectOn} ${spell.effectAmount > 0 ? '-' : '+'}${per}/AE)`);
     } else {
-      // Instant effect on the PC
-      if (spell.effectOn === 'HP') {
-        const amount = spell.effectAmount;
-        // For instant self-cast: negative values heal, positive values damage the caster
-        // (This is unusual, but matches the neg-value-is-heal pattern)
-        const oldHp = this.playerHp();
-        const newHp = Math.max(0, Math.min(this.getEffectivePlayerMaxHp(), oldHp - amount));
-        this.playerHp.set(newHp);
-        this.triggerSpellHitFlash(spell.name, spell.effectOn, spell.effectType ?? '');
-        if (amount > 0) {
-          this.addCombatLog(`${spell.name}${spellFlavor} damages you for ${amount} HP!`);
-        } else {
-          this.addCombatLog(`${spell.name}${spellFlavor} restores ${Math.abs(amount)} HP!`);
-        }
-        if (newHp <= 0) {
-          this.playerDeathCause.set(`Killed by ${spell.name}`);
-          this.turnPhase.set('gameover');
-          setTimeout(() => this.goHome(), 3500);
-        }
-      } else {
-        this.triggerSpellHitFlash(spell.name, spell.effectOn, spell.effectType ?? '');
-        this.addCombatLog(`${spell.name}${spellFlavor} affects you! (${spell.effectOn} ${spell.effectAmount})`);
+      this.playerActiveEffects.update((effects) => [
+        ...effects,
+        {
+          effectOn: slot.effectOn,
+          effectAmount: amount,
+          remainingAE: this.spellEffectRemainingAE(slot.lastFor),
+          sourceName: spell.name,
+          behavior: 'modifier',
+        },
+      ]);
+      if (target === 'Magic' && amount > 0) {
+        this.playerMp.set(Math.max(0, Math.min(this.playerMp() + amount, this.getEffectivePlayerMagicPower())));
       }
+    }
+    this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '');
+    this.addCombatLog(`${spell.name}${spellFlavor} affects you ${this.spellEffectDurationLabel(slot.lastFor)}. (${slot.effectOn} ${amount >= 0 ? '+' : ''}${amount})`);
+  }
+
+  private applySpellEffectToMonster(
+    spell: PcTresherSpellData,
+    slot: { effectOn: string; effectAmount: number; effectOnPc: boolean; range: number; lastFor: number },
+    target: GameMonsterInstance,
+    monsterName: string,
+    magicResistance: number,
+    spellFlavor: string,
+    dungonId: number,
+    template: Monster | null
+  ): void {
+    const amount = this.rollSpellEffectDelta(this.getSpellEffectAmountWithMagicBonus(slot.effectAmount));
+    const detrimentalAmount = amount >= 0 ? -amount : amount;
+
+    if (slot.lastFor === 0 && slot.effectOn !== 'HP') {
+      if ((slot.effectOn ?? '').trim().toLowerCase() === 'magic') {
+        target.currentMagic = target.currentMagic + detrimentalAmount;
+        this.addCombatLog(`${spell.name}${spellFlavor} permanently alters ${monsterName} magic by ${detrimentalAmount}.`);
+      } else {
+        const statKey = (slot.effectOn ?? '').trim() || slot.effectOn;
+        if (statKey) {
+          const current = target.permanentStatModifiers[statKey] ?? 0;
+          const next = current + detrimentalAmount;
+          if (next === 0) {
+            delete target.permanentStatModifiers[statKey];
+          } else {
+            target.permanentStatModifiers[statKey] = next;
+          }
+        }
+        this.addCombatLog(`${spell.name}${spellFlavor} weakens ${monsterName}: ${slot.effectOn} ${detrimentalAmount}.`);
+      }
+      this.triggerMonsterGlow(target.row, target.column, spell.name, slot.effectOn, spell.effectType ?? '');
+      return;
+    }
+
+    if (slot.effectOn === 'HP') {
+      const calc = this.calculateSpellHpDamage(Math.max(1, Math.abs(amount)), magicResistance);
+      const damagePerTick = calc.damage;
+      if (slot.lastFor === 0) {
+        target.currentHp = Math.max(0, target.currentHp - damagePerTick);
+      } else {
+        target.activeEffects.push({
+          effectOn: slot.effectOn,
+          effectAmount: damagePerTick,
+          remainingAE: this.spellEffectRemainingAE(slot.lastFor),
+          sourceName: spell.name,
+          behavior: 'tick',
+        });
+      }
+      this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '');
+      this.triggerMonsterGlow(target.row, target.column, spell.name, slot.effectOn, spell.effectType ?? '');
+      this.addCombatLog(`${spell.name}${spellFlavor} afflicts ${monsterName} ${this.spellEffectDurationLabel(slot.lastFor)}. (${slot.effectOn} -${damagePerTick})`);
+    } else {
+      target.activeEffects.push({
+        effectOn: slot.effectOn,
+        effectAmount: detrimentalAmount,
+        remainingAE: this.spellEffectRemainingAE(slot.lastFor),
+        sourceName: spell.name,
+        behavior: 'modifier',
+      });
+      this.triggerMonsterGlow(target.row, target.column, spell.name, slot.effectOn, spell.effectType ?? '');
+      this.addCombatLog(`${spell.name}${spellFlavor} weakens ${monsterName} ${this.spellEffectDurationLabel(slot.lastFor)}. (${slot.effectOn} ${detrimentalAmount})`);
+    }
+
+    if (target.currentHp <= 0) {
+      target.isDead = true;
+      target.currentHp = 0;
+      this.addCombatLog(`${monsterName} is dead!`);
+      this.selectedCombatTarget.set(null);
+      this.dropMonsterLoot(dungonId, target, template ?? null);
+      const spGain = template?.spReward ?? 0;
+      if (spGain > 0) {
+        this.playerSp.update((s) => s + spGain);
+        this.addCombatLog(`+${spGain} SP!`);
+        this.awardSpToPC(spGain);
+      }
+    }
+  }
+
+  private castSpellOnSelf(spell: PcTresherSpellData, spellEffectAmount: number): void {
+    void spellEffectAmount;
+    const spellFlavor = this.formatSpellFlavor(spell);
+    const slots = this.getSpellEffectSlots(spell);
+    for (const slot of slots) {
+      this.applySpellEffectToPlayer(spell, slot, spellFlavor);
     }
     this.drawPreviewGridCanvas();
   }
@@ -1470,6 +1887,17 @@ export class Game implements OnInit {
 
   private triggerWeaponMonsterImpact(row: number, col: number, effectType: string, effectColor: string | null): void {
     this.triggerMonsterImpact(row, col, this.getMonsterImpactKind('', '', effectType), effectColor);
+  }
+
+  private shouldRenderMonsterInstance(instance: GameMonsterInstance): boolean {
+    if (!instance.isDead) {
+      return true;
+    }
+
+    const impactByKey = this.monsterImpactEffects();
+    const previewKey = `${instance.row}_${instance.column}`;
+    const firstPersonKey = `${instance.row}:${instance.column}`;
+    return !!impactByKey[previewKey] || !!impactByKey[firstPersonKey];
   }
 
   private triggerMonsterImpact(row: number, col: number, kind: MonsterImpactKind, color: string | null): void {
@@ -1667,6 +2095,85 @@ export class Game implements OnInit {
     return { x1: sourcePoint.x, y1: sourcePoint.y, x2: targetPoint.x, y2: targetPoint.y };
   }
 
+  private applyPotionEffectToPlayer(potion: { name: string; effectTo: string; effectAmount: number; lastFor: number }): boolean {
+    const potionName = potion.name?.trim() || 'Potion';
+    const target = this.normalizePotionEffectToPcStat(potion.effectTo);
+    if (!target) {
+      this.previewActionMessage.set(`${potionName} has no drinkable effect.`);
+      return false;
+    }
+
+    const amount = potion.effectAmount;
+    if (potion.lastFor > 1) {
+      if (target === 'HP' || target === 'Magic') {
+        const effectOn = target === 'Magic' ? 'Magic' : 'HP';
+        this.playerActiveEffects.update((effects) => [
+          ...effects,
+          { effectOn, effectAmount: amount, remainingAE: potion.lastFor, sourceName: potionName, behavior: 'tick' },
+        ]);
+      } else {
+        const effectOn =
+          target === 'TempHP'
+            ? 'HP'
+            : target === 'PoisonResistance'
+              ? 'Poison Resistance'
+              : target;
+        this.playerActiveEffects.update((effects) => [
+          ...effects,
+          { effectOn, effectAmount: amount, remainingAE: potion.lastFor, sourceName: potionName, behavior: 'modifier' },
+        ]);
+
+        if (target === 'TempHP') {
+          const maxHp = this.getEffectivePlayerMaxHp();
+          this.playerHp.set(Math.max(0, Math.min(this.playerHp() + amount, maxHp)));
+        }
+      }
+
+      this.addCombatLog(`You drink ${potionName}. ${potion.effectTo} ${amount >= 0 ? '+' : ''}${amount} for ${potion.lastFor} AE.`);
+      this.previewActionMessage.set(`${potionName}: ${potion.effectTo} ${amount >= 0 ? '+' : ''}${amount} for ${potion.lastFor} AE.`);
+      return true;
+    }
+
+    if (target === 'HP' || target === 'TempHP') {
+      const currentHp = this.playerHp();
+      const maxHp = this.getEffectivePlayerMaxHp();
+      const newHp = Math.max(0, Math.min(currentHp + amount, maxHp));
+      const change = newHp - currentHp;
+      this.playerHp.set(newHp);
+      const changeText = change >= 0 ? `restored ${change} HP` : `lost ${Math.abs(change)} HP`;
+      this.previewActionMessage.set(`${potionName}: ${changeText}.`);
+      this.addCombatLog(`You drink ${potionName} and ${changeText}.`);
+      return true;
+    }
+
+    if (target === 'Magic') {
+      const currentMp = this.playerMp();
+      const maxMp = this.getEffectivePlayerMagicPower();
+      const newMp = Math.max(0, Math.min(currentMp + amount, maxMp));
+      const change = newMp - currentMp;
+      this.playerMp.set(newMp);
+      const changeText = change >= 0 ? `restored ${change} MP` : `lost ${Math.abs(change)} MP`;
+      this.previewActionMessage.set(`${potionName}: ${changeText}.`);
+      this.addCombatLog(`You drink ${potionName} and ${changeText}.`);
+      return true;
+    }
+
+    if (target === 'PoisonResistance') {
+      this.playerActiveEffects.update((effects) => [
+        ...effects,
+        { effectOn: 'Poison Resistance', effectAmount: amount, remainingAE: 1, sourceName: potionName, behavior: 'modifier' },
+      ]);
+      this.previewActionMessage.set(`${potionName}: Poison Resistance ${amount >= 0 ? '+' : ''}${amount}.`);
+      this.addCombatLog(`You drink ${potionName}. Poison Resistance ${amount >= 0 ? '+' : ''}${amount}.`);
+      return true;
+    }
+
+    this.applyPermanentPlayerSpellEffect(target, amount);
+    this.previewActionMessage.set(`${potionName}: ${potion.effectTo} ${amount >= 0 ? '+' : ''}${amount}.`);
+    this.addCombatLog(`You drink ${potionName}. ${potion.effectTo} ${amount >= 0 ? '+' : ''}${amount}.`);
+    return true;
+  }
+
   drinkTresherInnerPotion(tresherIndex: number, potionId: number): void {
     const inventoryContext = this.getInventoryContextForPreview();
     if (!inventoryContext) return;
@@ -1678,42 +2185,25 @@ export class Game implements OnInit {
       this.previewActionMessage.set('Potions can only be used during your turn.');
       return;
     }
+    if (this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to drink potion.');
+      return;
+    }
 
     const potion = this.pcTresherPotionsById().get(potionId);
     if (!potion) return;
-
-    if (potion.effectTo !== 'HP') {
-      this.previewActionMessage.set(`${potion.name} does not affect health.`);
+    if (this.normalizePotionEffectToPcStat(potion.effectTo) === null) {
+      this.previewActionMessage.set(`${potion.name} has no drinkable effect.`);
       return;
     }
 
     this.removeInnerPotionSlotFromInventoryTresher(dungonId, tresherIndex, potionId);
-
-    if (potion.lastFor > 1) {
-      // Lasting regeneration: ticks once per AE spent by anyone
-      this.playerActiveEffects.update((effects) => [
-        ...effects,
-        { effectOn: 'HP', effectAmount: potion.effectAmount, remainingAE: potion.lastFor, sourceName: potion.name },
-      ]);
-      this.addCombatLog(`You drink ${potion.name}. Regenerating +${potion.effectAmount} HP for ${potion.lastFor} AE.`);
-      this.previewActionMessage.set(`${potion.name}: +${potion.effectAmount} HP for ${potion.lastFor} AE.`);
-    } else {
-      const variance = Math.floor(Math.random() * 3) + 1;
-      const sign = Math.random() < 0.5 ? 1 : -1;
-      const delta = potion.effectAmount + sign * variance;
-
-      const currentHp = this.playerHp();
-      const maxHp = this.getEffectivePlayerMaxHp();
-      const newHp = Math.max(0, Math.min(currentHp + delta, maxHp));
-      const change = newHp - currentHp;
-
-      this.playerHp.set(newHp);
-
-      const changeText = change >= 0 ? `restored ${change} HP` : `lost ${Math.abs(change)} HP`;
-      this.previewActionMessage.set(`${potion.name}: ${changeText}.`);
-      this.addCombatLog(`You drink ${potion.name} and ${changeText}.`);
-    }
+    this.applyPotionEffectToPlayer(potion);
+    this.consumePlayerAE(1, dungonId);
     this.saveGameState();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
+    }
   }
 
   isItemEquipable(type: string): boolean {
@@ -1792,6 +2282,14 @@ export class Game implements OnInit {
   dropInventoryInnerItem(tresherIndex: number, itemId: number): void {
     const inventoryContext = this.getInventoryContextForPreview();
     if (!inventoryContext) return;
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0) {
+      this.previewActionMessage.set('You can only drop items during your turn.');
+      return;
+    }
+    if (this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to drop item.');
+      return;
+    }
     const { dungonId, inventory } = inventoryContext;
     if (tresherIndex < 0 || tresherIndex >= inventory.treshers.length) return;
 
@@ -1827,12 +2325,24 @@ export class Game implements OnInit {
 
     const itemName = this.pcTresherItemsById().get(itemId)?.name || 'Item';
     this.previewActionMessage.set(`${itemName} dropped.`);
+    this.consumePlayerAE(1, dungonId);
     this.saveGameState();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
+    }
   }
 
   dropCollectedFloorItem(itemId: number): void {
     const preview = this.gridPreviewContext();
     if (!preview) return;
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0) {
+      this.previewActionMessage.set('You can only drop items during your turn.');
+      return;
+    }
+    if (this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to drop item.');
+      return;
+    }
     const { dungonId } = preview;
     const items = this.collectedFloorItemsByDungon()[dungonId] ?? [];
     const item = items.find((it) => it.id === itemId);
@@ -1861,8 +2371,12 @@ export class Game implements OnInit {
     }));
 
     this.previewActionMessage.set(`${item.name || 'Item'} dropped on the floor.`);
+    this.consumePlayerAE(1, dungonId);
     this.drawPreviewGridCanvas();
     this.saveGameState();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
+    }
   }
 
   drinkCollectedFloorPotion(potionId: number): void {
@@ -1874,13 +2388,16 @@ export class Game implements OnInit {
       this.previewActionMessage.set('Potions can only be used during your turn.');
       return;
     }
+    if (this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to drink potion.');
+      return;
+    }
 
     const potions = this.collectedFloorPotionsByDungon()[dungonId] ?? [];
     const potion = potions.find((p) => p.id === potionId);
     if (!potion) return;
-
-    if (potion.effectTo !== 'HP') {
-      this.previewActionMessage.set(`${potion.name || 'Potion'} does not affect health.`);
+    if (this.normalizePotionEffectToPcStat(potion.effectTo) === null) {
+      this.previewActionMessage.set(`${potion.name || 'Potion'} has no drinkable effect.`);
       return;
     }
 
@@ -1891,27 +2408,12 @@ export class Game implements OnInit {
       [dungonId]: (all[dungonId] ?? []).filter((_, i) => i !== potionIdx),
     }));
 
-    if (potion.lastFor > 1) {
-      this.playerActiveEffects.update((effects) => [
-        ...effects,
-        { effectOn: 'HP', effectAmount: potion.effectAmount, remainingAE: potion.lastFor, sourceName: potion.name },
-      ]);
-      this.addCombatLog(`You drink ${potion.name}. Regenerating +${potion.effectAmount} HP for ${potion.lastFor} AE.`);
-      this.previewActionMessage.set(`${potion.name}: +${potion.effectAmount} HP for ${potion.lastFor} AE.`);
-    } else {
-      const variance = Math.floor(Math.random() * 3) + 1;
-      const sign = Math.random() < 0.5 ? 1 : -1;
-      const delta = potion.effectAmount + sign * variance;
-      const currentHp = this.playerHp();
-      const maxHp = this.getEffectivePlayerMaxHp();
-      const newHp = Math.max(0, Math.min(currentHp + delta, maxHp));
-      const change = newHp - currentHp;
-      this.playerHp.set(newHp);
-      const changeText = change >= 0 ? `restored ${change} HP` : `lost ${Math.abs(change)} HP`;
-      this.previewActionMessage.set(`${potion.name}: ${changeText}.`);
-      this.addCombatLog(`You drink ${potion.name} and ${changeText}.`);
-    }
+    this.applyPotionEffectToPlayer(potion);
+    this.consumePlayerAE(1, dungonId);
     this.saveGameState();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
+    }
   }
 
   nearbyItemsForPreview(): NearbyDiscoveryItem[] {
@@ -2223,10 +2725,19 @@ export class Game implements OnInit {
     if (!preview) {
       return;
     }
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0 || this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to open door.');
+      return;
+    }
     this.setDoorState(preview.dungonId, doorInfo, 'open');
+    this.playDoorOpenClickSound();
     this.previewActionMessage.set(`You open the ${doorInfo.door.name || 'door'} to the ${doorInfo.direction}.`);
+    this.consumePlayerAE(1, preview.dungonId);
     this.drawPreviewGridCanvas();
     this.drawFirstPersonViewCanvas();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
+    }
   }
 
   closeAdjacentDoor(doorInfo: NearbyDoorInfo): void {
@@ -2244,17 +2755,26 @@ export class Game implements OnInit {
     if (!doorInfo.canPassWithItem) return;
     const preview = this.gridPreviewContext();
     if (!preview) return;
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0 || this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to open door.');
+      return;
+    }
     const req = doorInfo.door.itemRequirement;
     if (!req) return;
     if (req.consume) {
       this.removeItemFromInventory(preview.dungonId, req.itemId);
     }
     this.setDoorState(preview.dungonId, doorInfo, 'open');
+    this.playDoorOpenClickSound();
     const doorName = doorInfo.door.name || 'door';
     const consumed = req.consume ? ` You gave up the ${req.itemName}.` : '';
     this.previewActionMessage.set(`You use the ${req.itemName} to open the ${doorName}.${consumed}`);
+    this.consumePlayerAE(1, preview.dungonId);
     this.drawPreviewGridCanvas();
     this.drawFirstPersonViewCanvas();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
+    }
   }
 
   private playerHasItem(itemId: number): boolean {
@@ -2295,6 +2815,10 @@ export class Game implements OnInit {
     if (!preview) {
       return;
     }
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0 || this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to unlock door.');
+      return;
+    }
 
     const inventoryKeys = this.inventoryKeysForPreview();
     const key = inventoryKeys[doorInfo.matchingKeyIndex];
@@ -2303,8 +2827,12 @@ export class Game implements OnInit {
     this.previewActionMessage.set(
       `You use ${key.name || 'the key'} to unlock the ${doorInfo.door.name || 'door'} to the ${doorInfo.direction}.`
     );
+    this.consumePlayerAE(1, preview.dungonId);
     this.drawPreviewGridCanvas();
     this.drawFirstPersonViewCanvas();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
+    }
   }
 
   private setDoorState(dungonId: number, doorInfo: NearbyDoorInfo, state: Door['state']): void {
@@ -2418,6 +2946,10 @@ export class Game implements OnInit {
     if (!doorInfo.canPick) return;
     const preview = this.gridPreviewContext();
     if (!preview) return;
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0 || this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to pick lock.');
+      return;
+    }
     const dc = doorInfo.door.toPick ?? 10;
     const roll = this.randomInt(1, 12) + this.getEffectivePlayerMind();
     const doorName = doorInfo.door.name || 'door';
@@ -2432,9 +2964,13 @@ export class Game implements OnInit {
         this.triggerTrap(doorInfo.door.trap);
       }
     }
+    this.consumePlayerAE(1, preview.dungonId);
     this.saveGameState();
     this.drawPreviewGridCanvas();
     this.drawFirstPersonViewCanvas();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
+    }
   }
 
   searchForTraps(): void {
@@ -2643,6 +3179,10 @@ export class Game implements OnInit {
   takeItemFromObstacle(obstacleId: number): void {
     const preview = this.gridPreviewContext();
     if (!preview) return;
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0 || this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to pick up item.');
+      return;
+    }
 
     const obstacles = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
     const obs = obstacles.find((o) => o.id === obstacleId);
@@ -2663,7 +3203,9 @@ export class Game implements OnInit {
     const itemName = (this.floorItemListByDungon()[preview.dungonId] ?? []).find((i) => i.id === obs.containsItemId)?.name ?? 'an item';
     this.addCombatLog(`You take ${itemName} from ${obs.name || 'the obstacle'}.`);
     this.previewActionMessage.set(`Found ${itemName}!`);
+    this.consumePlayerAE(1, preview.dungonId);
     this.saveGameState();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
   }
 
   tryDisarmTrap(): void {
@@ -2671,6 +3213,10 @@ export class Game implements OnInit {
     if (!found) return;
     const preview = this.gridPreviewContext();
     if (!preview) return;
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0 || this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to disarm trap.');
+      return;
+    }
     const dc = found.trap.toDisarm;
     const roll = this.randomInt(1, 12) + this.getEffectivePlayerMind();
     if (roll >= dc) {
@@ -2692,6 +3238,10 @@ export class Game implements OnInit {
       this.triggerTrap(found.trap);
       this.foundTrap.set(null);
       this.saveGameState();
+    }
+    this.consumePlayerAE(1, preview.dungonId);
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
     }
   }
 
@@ -2741,6 +3291,10 @@ export class Game implements OnInit {
   takeAllFromCurrentSquare(): void {
     const current = this.getCurrentPreviewSquareContext();
     if (!current) {
+      return;
+    }
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0 || this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to pick up items.');
       return;
     }
 
@@ -2876,7 +3430,11 @@ export class Game implements OnInit {
     this.previewActionMessage.set(
       `Took ${totalItemCount} item${totalItemCount === 1 ? '' : 's'} into inventory.`
     );
+    this.consumePlayerAE(1, current.dungonId);
     this.drawPreviewGridCanvas();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
+    }
   }
 
   takeSomeFromCurrentSquare(): void {
@@ -2924,13 +3482,145 @@ export class Game implements OnInit {
     this.drawPreviewGridCanvas();
   }
 
+  takeSinglePickupItem(item: NearbyDiscoveryItem): void {
+    const current = this.getCurrentPreviewSquareContext();
+    if (!current) return;
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0 || this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to pick up item.');
+      return;
+    }
+
+    switch (item.kind) {
+      case 'Key': {
+        const keysAtSquare = this.getKeysAtSquare(current.row, current.column);
+        const keyToTake =
+          keysAtSquare.find((k) => k.name.trim() === item.name.trim()) ?? keysAtSquare[0];
+        if (!keyToTake) { this.previewActionMessage.set('Could not find key.'); return; }
+        this.addItemsToCheaterInventory(current.dungonId, [keyToTake], []);
+        let taken = false;
+        this.keyList = this.keyList.map((k) => {
+          if (!taken && k.id === keyToTake.id) { taken = true; return { ...k, rownId: null, columnId: null }; }
+          return k;
+        });
+        this.previewActionMessage.set(`Took ${keyToTake.name || 'Key'}.`);
+        break;
+      }
+      case 'Tresher': {
+        const placements = this.getTresherPlacementsAtSquare(current.dungonId, current.row, current.column);
+        const treshersById = this.getTreshersByIdForDungon(current.dungonId);
+        const placement =
+          placements.find((p) => { const t = treshersById.get(p.tresherId); return t && t.name.trim() === item.name.trim(); }) ??
+          placements[0];
+        if (!placement) { this.previewActionMessage.set('Could not find tresher.'); return; }
+        const tresher = treshersById.get(placement.tresherId);
+        if (!tresher) return;
+        this.addItemsToCheaterInventory(current.dungonId, [], [tresher]);
+        this.removeSingleTresherPlacement(current.dungonId, current.row, current.column, placement.tresherId);
+        this.activateTresherGuards(current.dungonId, current.row, current.column);
+        this.previewActionMessage.set(`Took ${tresher.name || 'Tresher'}.`);
+        break;
+      }
+      case 'Item': {
+        const floorItemsHere = (this.floorItemPlacementsByDungon()[current.dungonId] ?? []).filter(
+          (p) => p.row === current.row && p.column === current.column
+        );
+        const itemsById = new Map((this.floorItemListByDungon()[current.dungonId] ?? []).map((it) => [it.id, it]));
+        const placement =
+          floorItemsHere.find((p) => { const it = itemsById.get(p.itemId); return it && it.name.trim() === item.name.trim(); }) ??
+          floorItemsHere[0];
+        if (!placement) { this.previewActionMessage.set('Could not find item.'); return; }
+        const itemToCollect = itemsById.get(placement.itemId);
+        if (!itemToCollect) return;
+        this.pcTresherItemsById.update((map) => {
+          const updated = new Map(map);
+          updated.set(itemToCollect.id, { ...itemToCollect, effectValue: itemToCollect.effectValue ?? 0 });
+          return updated;
+        });
+        this.collectedFloorItemsByDungon.update((all) => ({
+          ...all,
+          [current.dungonId]: [...(all[current.dungonId] ?? []), itemToCollect],
+        }));
+        const pickedItemId = placement.itemId;
+        this.floorItemPlacementsByDungon.update((all) => ({
+          ...all,
+          [current.dungonId]: (all[current.dungonId] ?? []).filter(
+            (p) => !(p.row === current.row && p.column === current.column && p.itemId === pickedItemId)
+          ),
+        }));
+        this.previewActionMessage.set(`Took ${itemToCollect.name || 'Item'}.`);
+        break;
+      }
+      case 'Potion': {
+        const floorPotionsHere = (this.floorPotionPlacementsByDungon()[current.dungonId] ?? []).filter(
+          (p) => p.row === current.row && p.column === current.column
+        );
+        const potionsById = new Map((this.floorPotionListByDungon()[current.dungonId] ?? []).map((p) => [p.id, p]));
+        const placement =
+          floorPotionsHere.find((p) => { const pot = potionsById.get(p.potionId); return pot && pot.name.trim() === item.name.trim(); }) ??
+          floorPotionsHere[0];
+        if (!placement) { this.previewActionMessage.set('Could not find potion.'); return; }
+        const potionToCollect = potionsById.get(placement.potionId);
+        if (!potionToCollect) return;
+        this.collectedFloorPotionsByDungon.update((all) => ({
+          ...all,
+          [current.dungonId]: [...(all[current.dungonId] ?? []), potionToCollect],
+        }));
+        const pickedPotionId = placement.potionId;
+        this.floorPotionPlacementsByDungon.update((all) => ({
+          ...all,
+          [current.dungonId]: (all[current.dungonId] ?? []).filter(
+            (p) => !(p.row === current.row && p.column === current.column && p.potionId === pickedPotionId)
+          ),
+        }));
+        this.previewActionMessage.set(`Took ${potionToCollect.name || 'Potion'}.`);
+        break;
+      }
+      case 'Spell': {
+        const floorSpellsHere = (this.floorSpellPlacementsByDungon()[current.dungonId] ?? []).filter(
+          (p) => p.row === current.row && p.column === current.column
+        );
+        const placement =
+          floorSpellsHere.find((p) => { const s = this.resolveSpellData(current.dungonId, p.spellId); return s && s.name.trim() === item.name.trim(); }) ??
+          floorSpellsHere[0];
+        if (!placement) { this.previewActionMessage.set('Could not find spell.'); return; }
+        const spellToCollect = this.resolveSpellData(current.dungonId, placement.spellId);
+        if (!spellToCollect) return;
+        this.pcTresherSpellsById.update((map) => {
+          const updated = new Map(map);
+          updated.set(spellToCollect.id, spellToCollect);
+          return updated;
+        });
+        this.collectedFloorSpellsByDungon.update((all) => ({
+          ...all,
+          [current.dungonId]: [...(all[current.dungonId] ?? []), spellToCollect],
+        }));
+        const pickedSpellId = placement.spellId;
+        this.floorSpellPlacementsByDungon.update((all) => ({
+          ...all,
+          [current.dungonId]: (all[current.dungonId] ?? []).filter(
+            (p) => !(p.row === current.row && p.column === current.column && p.spellId === pickedSpellId)
+          ),
+        }));
+        this.previewActionMessage.set(`Took ${spellToCollect.name || 'Spell'}.`);
+        break;
+      }
+      default:
+        this.previewActionMessage.set('Cannot take this item directly.');
+    }
+    this.consumePlayerAE(1, current.dungonId);
+    this.drawPreviewGridCanvas();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
+    }
+  }
+
   private loadGame(): void {
     const gameId = Number.parseInt(this.route.snapshot.paramMap.get('gameId') ?? '', 10);
     const isSample = !Number.isInteger(gameId) || gameId <= 0;
 
     if (isSample) {
       // Sample play mode — no auth required
-      const pcIdRaw = this.route.snapshot.queryParamMap.get('pcId') ?? '';
+      const pcIdRaw = this.route.snapshot.queryParamMap?.get('pcId') ?? '';
       const pcId = Number.parseInt(pcIdRaw, 10);
       if (!Number.isInteger(pcId) || pcId <= 0) {
         this.gameLoadError.set('Invalid sample game parameters.');
@@ -2992,21 +3682,9 @@ export class Game implements OnInit {
             if (Array.isArray(game.pcTresherSpells)) {
               const spellMap = new Map<number, PcTresherSpellData>();
               for (const raw of game.pcTresherSpells) {
-                const s = raw as PcTresherSpellData;
-                if (typeof s.id === 'number') {
-                  spellMap.set(s.id, {
-                    id: s.id,
-                    name: typeof s.name === 'string' && s.name ? s.name : 'Unnamed Spell',
-                    description: typeof s.description === 'string' ? s.description : '',
-                    range: typeof s.range === 'number' ? Math.max(1, s.range) : 1,
-                    effectOn: typeof s.effectOn === 'string' ? s.effectOn : 'HP',
-                    effectAmount: typeof s.effectAmount === 'number' ? s.effectAmount : 0,
-                    successTestValue: typeof s.successTestValue === 'number' ? s.successTestValue : 10,
-                    sp: typeof s.sp === 'number' ? Math.max(1, s.sp) : 1,
-                    lastFor: typeof s.lastFor === 'number' ? Math.max(0, s.lastFor) : 0,
-                    numberOfTargets: typeof s.numberOfTargets === 'number' ? Math.max(1, s.numberOfTargets) : 1,
-                    magicCost: typeof s.magicCost === 'number' ? Math.max(1, s.magicCost) : 1,
-                  });
+                const spell = this.normalizeSpellRecord(raw);
+                if (spell !== null) {
+                  spellMap.set(spell.id, spell);
                 }
               }
               this.pcTresherSpellsById.update((existingMap) => {
@@ -3040,6 +3718,7 @@ export class Game implements OnInit {
             this.playerType.set(typeof game.pcType === 'string' ? game.pcType : null);
             this.playerSpecies.set(typeof game.pcSpecies === 'string' ? game.pcSpecies : null);
             this.playerName.set(typeof game.pcName === 'string' ? game.pcName : null);
+            this.playerPortraitUrl.set(typeof game.pcImagePath === 'string' ? (this.resolveImageUrl(game.pcImagePath) || null) : null);
             this.initializeCombatState(game.dungonid);
           },
         });
@@ -3053,6 +3732,7 @@ export class Game implements OnInit {
     }
 
     this.loadSpellCatalog(userKey);
+    this.loadSoundCatalog(userKey);
 
     this.isLoadingGame.set(true);
     this.gameLoadError.set(null);
@@ -3087,6 +3767,7 @@ export class Game implements OnInit {
           this.playerType.set(typeof game.pcType === 'string' ? game.pcType : null);
           this.playerSpecies.set(typeof game.pcSpecies === 'string' ? game.pcSpecies : null);
           this.playerName.set(typeof game.pcName === 'string' ? game.pcName : null);
+          this.playerPortraitUrl.set(typeof game.pcImagePath === 'string' ? (this.resolveImageUrl(game.pcImagePath) || null) : null);
           this.isMainGame.set(game.isMainGame === true);
           this.resettablePerPc.set(game.resettablePerPc === true);
           if (game.isMainGame === true) {
@@ -3119,11 +3800,16 @@ export class Game implements OnInit {
             const spellMap = new Map<number, PcTresherSpellData>();
             for (const raw of game.pcTresherSpells) {
               const s = raw as PcTresherSpellData;
+              const sRaw = raw as Record<string, unknown>;
               if (typeof s.id === 'number') {
                 spellMap.set(s.id, {
                   id: s.id,
                   name: typeof s.name === 'string' && s.name ? s.name : 'Unnamed Spell',
                   description: typeof s.description === 'string' ? s.description : '',
+                    soundId: typeof s.soundId === 'number' ? s.soundId : (typeof sRaw['soundid'] === 'number' ? sRaw['soundid'] as number : null),
+                    soundPath: typeof sRaw['soundPath'] === 'string'
+                      ? (sRaw['soundPath'] as string)
+                      : (typeof sRaw['path'] === 'string' ? (sRaw['path'] as string) : null),
                   range: typeof s.range === 'number' ? Math.max(1, s.range) : 1,
                   effectOn: typeof s.effectOn === 'string' ? s.effectOn : 'HP',
                   effectAmount: typeof s.effectAmount === 'number' ? s.effectAmount : 0,
@@ -3230,8 +3916,8 @@ export class Game implements OnInit {
       });
   }
 
-  private loadSpellCatalog(userKey: string): void {
-    if (this.spellCatalogById().size > 0) {
+  private loadSpellCatalog(userKey: string, forceRefresh = false): void {
+    if (this.spellCatalogById().size > 0 && !forceRefresh) {
       return;
     }
 
@@ -3245,22 +3931,10 @@ export class Game implements OnInit {
 
           const catalog = new Map<number, PcTresherSpellData>();
           for (const raw of items) {
-            if (!raw || typeof raw !== 'object') continue;
-            const src = raw as Record<string, unknown>;
-            const id = typeof src['id'] === 'number' ? src['id'] : null;
-            if (id === null) continue;
-            catalog.set(id, {
-              id,
-              name: typeof src['name'] === 'string' && src['name'] ? src['name'] : 'Unnamed Spell',
-              description: typeof src['description'] === 'string' ? src['description'] : '',
-              range: typeof src['range'] === 'number' ? Math.max(1, src['range']) : 1,
-              effectOn: typeof src['effectOn'] === 'string' ? src['effectOn'] : 'HP',
-              effectAmount: typeof src['effectAmount'] === 'number' ? src['effectAmount'] : 0,
-              successTestValue: typeof src['successTestValue'] === 'number' ? src['successTestValue'] : 10,
-              sp: typeof src['sp'] === 'number' ? Math.max(1, src['sp']) : 1,
-              lastFor: typeof src['lastFor'] === 'number' ? Math.max(0, src['lastFor']) : 0,
-              numberOfTargets: typeof src['numberOfTargets'] === 'number' ? Math.max(1, src['numberOfTargets']) : 1,
-            });
+            const spell = this.normalizeSpellRecord(raw);
+            if (spell !== null) {
+              catalog.set(spell.id, spell);
+            }
           }
 
           if (catalog.size === 0) {
@@ -3271,12 +3945,61 @@ export class Game implements OnInit {
           this.pcTresherSpellsById.update((existingMap) => {
             const merged = new Map(existingMap);
             for (const [id, spell] of catalog) {
-              if (!merged.has(id)) {
+              const existing = merged.get(id);
+              if (!existing) {
                 merged.set(id, spell);
+                continue;
               }
+
+              merged.set(id, { ...existing, ...spell });
             }
             return merged;
           });
+        },
+        error: () => {
+          // Best-effort lookup source only.
+        },
+      });
+  }
+
+  private loadSoundCatalog(userKey: string, forceRefresh = false): void {
+    if (this.soundPathById().size > 0 && !forceRefresh) {
+      return;
+    }
+
+    this.http
+      .get<SoundRecordPayload[]>(`${API_BASE_URL}/sounds`, {
+        params: { userkey: userKey, scope: 'library' },
+      })
+      .subscribe({
+        next: (items) => {
+          if (!Array.isArray(items) || items.length === 0) {
+            return;
+          }
+
+          const map = new Map<number, string>();
+          for (const item of items) {
+            if (typeof item?.id !== 'number' || typeof item?.path !== 'string') {
+              continue;
+            }
+
+            const trimmedPath = item.path.trim();
+            if (!trimmedPath) {
+              continue;
+            }
+
+            map.set(item.id, trimmedPath);
+          }
+
+          if (map.size > 0) {
+            this.soundPathById.update((existingMap) => {
+              const merged = new Map(existingMap);
+              for (const [id, path] of map) {
+                merged.set(id, path);
+              }
+              return merged;
+            });
+          }
         },
         error: () => {
           // Best-effort lookup source only.
@@ -3361,6 +4084,174 @@ export class Game implements OnInit {
     return trimmed.startsWith('/')
       ? `${API_BASE_URL}${trimmed}`
       : `${API_BASE_URL}/${trimmed}`;
+  }
+
+  private resolveSoundUrl(soundPath: string): string {
+    const trimmed = typeof soundPath === 'string' ? soundPath.trim() : '';
+    if (!trimmed) {
+      return '';
+    }
+
+    if (/^https?:\/\//i.test(trimmed)) {
+      return encodeURI(trimmed);
+    }
+
+    const baseUrl = trimmed.startsWith('/')
+      ? `${API_BASE_URL}${trimmed}`
+      : `${API_BASE_URL}/${trimmed}`;
+    return encodeURI(baseUrl);
+  }
+
+  private resolveClientAssetUrl(assetPath: string): string {
+    const trimmed = typeof assetPath === 'string' ? assetPath.trim() : '';
+    if (!trimmed) {
+      return '';
+    }
+
+    if (/^https?:\/\//i.test(trimmed)) {
+      return encodeURI(trimmed);
+    }
+
+    // Keep path relative to the current site origin (tdodj.com in production).
+    return encodeURI(trimmed.startsWith('/') ? trimmed : `/${trimmed}`);
+  }
+
+  private playSpellSound(spell: PcTresherSpellData): void {
+    if (this.soundMuted()) {
+      return;
+    }
+
+    const latestCatalogSpell = this.spellCatalogById().get(spell.id);
+    const directPath = typeof spell.soundPath === 'string' && spell.soundPath.trim()
+      ? spell.soundPath.trim()
+      : typeof latestCatalogSpell?.soundPath === 'string' && latestCatalogSpell.soundPath.trim()
+        ? latestCatalogSpell.soundPath.trim()
+      : null;
+    const soundId = typeof spell.soundId === 'number'
+      ? spell.soundId
+      : typeof latestCatalogSpell?.soundId === 'number'
+        ? latestCatalogSpell.soundId
+        : null;
+    const selectedPath = soundId !== null ? this.soundPathById().get(soundId) ?? null : null;
+    if (!directPath && soundId == null) {
+      const userKey = this.account.getKey();
+      if (userKey) {
+        this.loadSpellCatalog(userKey, true);
+      }
+    }
+    if (!selectedPath && soundId !== null) {
+      const userKey = this.account.getKey();
+      if (userKey) {
+        this.loadSoundCatalog(userKey, true);
+      }
+    }
+    const soundPath = directPath ?? selectedPath ?? this.defaultSpellSoundPath;
+    this.playSoundPath(soundPath);
+  }
+
+  private playSoundPath(soundPath: string): void {
+    if (this.soundMuted()) {
+      return;
+    }
+
+    const soundUrls = this.buildSoundUrlCandidates(soundPath);
+    if (soundUrls.length === 0) {
+      return;
+    }
+
+    this.playSoundFromUrls(soundUrls, 0);
+  }
+
+  private buildSoundUrlCandidates(soundPath: string): string[] {
+    const trimmed = typeof soundPath === 'string' ? soundPath.trim() : '';
+    if (!trimmed) {
+      return [];
+    }
+
+    if (/^https?:\/\//i.test(trimmed)) {
+      return [encodeURI(trimmed)];
+    }
+
+    const apiUrl = this.resolveSoundUrl(trimmed);
+    const clientUrl = this.resolveClientAssetUrl(trimmed);
+    const looksLikeHostedSound = /^\/?sounds\//i.test(trimmed);
+    const preferClientFirst = this.isSampleMode() || !this.account.getKey();
+
+    if (!looksLikeHostedSound) {
+      return apiUrl ? [apiUrl] : [];
+    }
+
+    const ordered = preferClientFirst
+      ? [clientUrl, apiUrl]
+      : [apiUrl, clientUrl];
+
+    const unique: string[] = [];
+    for (const url of ordered) {
+      if (!url || unique.includes(url)) {
+        continue;
+      }
+      unique.push(url);
+    }
+    return unique;
+  }
+
+  private playSoundFromUrls(soundUrls: string[], index: number): void {
+    if (index >= soundUrls.length || this.soundMuted()) {
+      return;
+    }
+
+    const soundUrl = soundUrls[index];
+
+    try {
+      const audio = new Audio(soundUrl);
+      audio.volume = 0.55;
+
+      let advanced = false;
+      const tryNext = () => {
+        if (advanced) {
+          return;
+        }
+        advanced = true;
+        this.playSoundFromUrls(soundUrls, index + 1);
+      };
+
+      audio.addEventListener('error', tryNext, { once: true });
+      void audio.play().catch(tryNext);
+    } catch {
+      this.playSoundFromUrls(soundUrls, index + 1);
+    }
+  }
+
+  private playDoorOpenClickSound(): void {
+    if (this.soundMuted()) {
+      return;
+    }
+
+    try {
+      const ctx = new AudioContext();
+      const now = ctx.currentTime;
+
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(620, now);
+      osc.frequency.exponentialRampToValueAtTime(380, now + 0.05);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.065);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.07);
+      osc.onended = () => {
+        void ctx.close();
+      };
+    } catch {
+      // Audio API unavailable.
+    }
   }
 
   private setInitialPreviewContext(dungonId: number): void {
@@ -3466,6 +4357,18 @@ export class Game implements OnInit {
     return this.nearbyItemsForPreview().filter(
       (item) => item.row === preview.centerRow && item.column === preview.centerColumn
     );
+  }
+
+  private isPickupDiscoveryKind(kind: NearbyDiscoveryItem['kind']): boolean {
+    return kind === 'Key' || kind === 'Tresher' || kind === 'Item' || kind === 'Potion' || kind === 'Spell';
+  }
+
+  private isArmorItemType(type: string): boolean {
+    return type === 'armor' || type === 'ring' || type === 'necklace';
+  }
+
+  private isWeaponItemType(type: string): boolean {
+    return type === 'weapon' || type === 'shield' || type === 'wand';
   }
 
   private getInventoryContextForPreview():
@@ -3899,7 +4802,7 @@ export class Game implements OnInit {
       this.drawFloorItemMarker(context, centerX, centerY, 3.5);
     }
 
-    const liveMonsterInstancesForMap = this.monsterInstances().filter((m) => !m.isDead);
+    const liveMonsterInstancesForMap = this.monsterInstances().filter((m) => this.shouldRenderMonsterInstance(m));
     for (const inst of liveMonsterInstancesForMap) {
       const placementSquareKey = this.getSquareKey(inst.row, inst.column);
       if (!visibleSquareKeys.has(placementSquareKey)) {
@@ -4164,7 +5067,7 @@ export class Game implements OnInit {
       bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
     }
 
-    const liveMonsterInstances = this.monsterInstances().filter((m) => !m.isDead);
+    const liveMonsterInstances = this.monsterInstances().filter((m) => this.shouldRenderMonsterInstance(m));
     const monstersById = this.getMonstersByIdForDungon(preview.dungonId);
     const monsterImageBySquare = new Map<string, HTMLImageElement | null>();
     for (const inst of liveMonsterInstances) {
@@ -6741,6 +7644,22 @@ export class Game implements OnInit {
       [dungonId]: parsed.collectedFloorSpells,
     }));
 
+    this.learnedFloorSpellIdsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.learnedFloorSpellIds,
+    }));
+
+    const knownSpellIds = new Set<number>(parsed.learnedFloorSpellIds);
+    for (const tresher of (this.cheaterByDungon()[dungonId]?.inventory.treshers ?? [])) {
+      for (const spellId of [tresher.spell1Id, tresher.spell2Id, tresher.spell3Id, tresher.spell4Id]) {
+        if (spellId != null) knownSpellIds.add(spellId);
+      }
+    }
+    this.equippedSpellIdsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.equippedSpellIds.filter((id) => knownSpellIds.has(id)),
+    }));
+
     if (parsed.collectedFloorSpells.length > 0 || parsed.floorSpellList.length > 0) {
       this.pcTresherSpellsById.update((map) => {
         const updated = new Map(map);
@@ -6822,6 +7741,8 @@ export class Game implements OnInit {
     collectedFloorItems: Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>;
     collectedFloorPotions: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>;
     collectedFloorSpells: PcTresherSpellData[];
+    learnedFloorSpellIds: number[];
+    equippedSpellIds: number[];
     pcInventoryInitialized: boolean;
     savedPlayerHp: number | null;
     savedPlayerAE: number | null;
@@ -6855,6 +7776,8 @@ export class Game implements OnInit {
         collectedFloorItems: [],
         collectedFloorPotions: [],
         collectedFloorSpells: [],
+        learnedFloorSpellIds: [],
+        equippedSpellIds: [],
         pcInventoryInitialized: false,
         savedPlayerHp: null,
         savedPlayerAE: null,
@@ -6904,6 +7827,8 @@ export class Game implements OnInit {
       collectedFloorItems?: unknown[];
       collectedFloorPotions?: unknown[];
       collectedFloorSpells?: unknown[];
+      learnedFloorSpellIds?: unknown[];
+      equippedSpellIds?: unknown[];
       npcTradesPurchased?: unknown[];
       cheaterByPcId?: unknown;
     };
@@ -7246,6 +8171,7 @@ export class Game implements OnInit {
             id,
             name: typeof x['name'] === 'string' ? x['name'] : '',
             description: typeof x['description'] === 'string' ? x['description'] : '',
+            soundId: typeof x['soundId'] === 'number' ? x['soundId'] : null,
             range: typeof x['range'] === 'number' ? x['range'] : 1,
             effectOn: typeof x['effectOn'] === 'string' ? x['effectOn'] : 'HP',
             effectAmount: typeof x['effectAmount'] === 'number' ? x['effectAmount'] : 0,
@@ -7267,6 +8193,18 @@ export class Game implements OnInit {
     const collectedFloorItems = Array.isArray(source.collectedFloorItems) ? parseItemArray(source.collectedFloorItems) : [];
     const collectedFloorPotions = Array.isArray(source.collectedFloorPotions) ? parsePotionArray(source.collectedFloorPotions) : [];
     const collectedFloorSpells = Array.isArray(source.collectedFloorSpells) ? parseSpellArray(source.collectedFloorSpells) : [];
+    const learnedFloorSpellIds = Array.isArray(source.learnedFloorSpellIds)
+      ? source.learnedFloorSpellIds
+          .map((x) => this.toFiniteNumber(x))
+          .filter((x): x is number => x !== null)
+          .map((x) => Math.max(0, Math.floor(x)))
+      : [];
+    const equippedSpellIds = Array.isArray(source.equippedSpellIds)
+      ? source.equippedSpellIds
+          .map((x) => this.toFiniteNumber(x))
+          .filter((x): x is number => x !== null)
+          .map((x) => Math.max(0, Math.floor(x)))
+      : [];
 
     const cheaterByPcId: Record<number, Cheater> = {};
     if (source.cheaterByPcId && typeof source.cheaterByPcId === 'object') {
@@ -7306,6 +8244,8 @@ export class Game implements OnInit {
       collectedFloorItems,
       collectedFloorPotions,
       collectedFloorSpells,
+      learnedFloorSpellIds,
+      equippedSpellIds,
       pcInventoryInitialized,
       savedPlayerHp: savedPlayerHpRaw,
       savedPlayerAE: savedPlayerAERaw,
@@ -7444,6 +8384,23 @@ export class Game implements OnInit {
     const savedHp = this.toFiniteNumber(source.currentHp);
     if (savedHp !== null) {
       result.currentHp = savedHp;
+    }
+    const savedMagic = this.toFiniteNumber((source as Record<string, unknown>)['currentMagic']);
+    if (savedMagic !== null) {
+      result.currentMagic = savedMagic;
+    }
+    const rawPermanentMods = (source as Record<string, unknown>)['permanentStatModifiers'];
+    if (rawPermanentMods && typeof rawPermanentMods === 'object' && !Array.isArray(rawPermanentMods)) {
+      const normalized: Record<string, number> = {};
+      for (const [rawKey, rawValue] of Object.entries(rawPermanentMods as Record<string, unknown>)) {
+        const key = typeof rawKey === 'string' ? rawKey.trim() : '';
+        const value = this.toFiniteNumber(rawValue);
+        if (!key || value === null || !Number.isFinite(value) || value === 0) continue;
+        normalized[key] = value;
+      }
+      if (Object.keys(normalized).length > 0) {
+        result.permanentStatModifiers = normalized;
+      }
     }
     if (Array.isArray(source.tresherIds)) {
       result.tresherIds = source.tresherIds
@@ -7594,6 +8551,63 @@ export class Game implements OnInit {
     return Math.floor(value);
   }
 
+  private normalizeSpellRecord(raw: unknown): PcTresherSpellData | null {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const source = raw as Record<string, unknown>;
+    const id = this.toFiniteNumber(source['id']);
+    if (id === null) {
+      return null;
+    }
+
+    const effectType = source['effectType'] === 'Fire' || source['effectType'] === 'Ice' || source['effectType'] === 'Lightning' || source['effectType'] === 'Other'
+      ? source['effectType'] as string
+      : source['effecttype'] === 'Fire' || source['effecttype'] === 'Ice' || source['effecttype'] === 'Lightning' || source['effecttype'] === 'Other'
+        ? source['effecttype'] as string
+        : 'Other';
+    const effectColorSource = source['effectColor'] ?? source['effectcolor'];
+    const effectColor = typeof effectColorSource === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(effectColorSource.trim())
+      ? effectColorSource.trim().toLowerCase()
+      : undefined;
+    const soundPath = typeof source['soundPath'] === 'string'
+      ? source['soundPath'].trim()
+      : typeof source['path'] === 'string'
+        ? source['path'].trim()
+        : '';
+
+    return {
+      id: Math.floor(id),
+      name: typeof source['name'] === 'string' && source['name'].trim() ? source['name'].trim() : 'Unnamed Spell',
+      description: typeof source['description'] === 'string' ? source['description'] : '',
+      soundId: this.normalizeNullableNumber(this.toFiniteNumber(source['soundId'] ?? source['soundid'])),
+      soundPath: soundPath || null,
+      range: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['range']), 1)),
+      effectOn: typeof source['effectOn'] === 'string'
+        ? source['effectOn']
+        : (typeof source['effecton'] === 'string' ? source['effecton'] : 'HP'),
+      effectOn2: typeof source['effectOn2'] === 'string'
+        ? source['effectOn2']
+        : (typeof source['effecton2'] === 'string' ? source['effecton2'] : ''),
+      effectAmount: this.normalizeNumber(this.toFiniteNumber(source['effectAmount'] ?? source['damage']), 0),
+      effectAmount2: this.normalizeNumber(this.toFiniteNumber(source['effectAmount2'] ?? source['effectamount2']), 0),
+      successTestValue: this.normalizeNumber(this.toFiniteNumber(source['successTestValue'] ?? source['successtestvalue']), 10),
+      sp: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['sp']), 1)),
+      lastFor: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['lastFor'] ?? source['lastfor']), 0)),
+      numberOfTargets: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['numberOfTargets'] ?? source['numberoftargets']), 1)),
+      magicCost: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['magicCost'] ?? source['magiccost']), 1)),
+      effectType,
+      effectColor,
+      effectOnPc1: source['effectOnPc1'] === true || source['effectonpc1'] === true,
+      effectOnPc2: source['effectOnPc2'] === true || source['effectonpc2'] === true,
+      range1: this.normalizeNumber(this.toFiniteNumber(source['range1']), 0),
+      range2: this.normalizeNumber(this.toFiniteNumber(source['range2']), 0),
+      lastFor1: this.normalizeNumber(this.toFiniteNumber(source['lastFor1'] ?? source['lastfor1']), 0),
+      lastFor2: this.normalizeNumber(this.toFiniteNumber(source['lastFor2'] ?? source['lastfor2']), 0),
+    };
+  }
+
   private parseExitItem(item: unknown): DungonExit | null {
     if (!item || typeof item !== 'object') {
       return null;
@@ -7650,7 +8664,9 @@ export class Game implements OnInit {
 
   closeTavernModal(): void {
     this.showTavernModal.set(false);
-    this.stopTavernMusic();
+    if (!this.npcDialog()) {
+      this.stopTavernMusic();
+    }
   }
 
   toggleMute(): void {
@@ -7659,7 +8675,7 @@ export class Game implements OnInit {
     localStorage.setItem('soundMuted', muted ? 'true' : 'false');
     if (muted) {
       this.stopTavernMusic();
-    } else if (this.showTavernModal()) {
+    } else if (this.showTavernModal() || this.npcDialog()) {
       this.startTavernMusic();
     }
   }
@@ -7705,69 +8721,37 @@ export class Game implements OnInit {
   }
 
   private startTavernMusic(): void {
-    if (this.soundMuted() || this.tavernMusicCtx) return;
+    if (this.soundMuted() || this.tavernMusicAudio) return;
+    const candidates = this.tavernWindowSoundPaths.filter((path) => typeof path === 'string' && path.trim().length > 0);
+    if (candidates.length === 0) return;
+
+    const randomIndex = Math.floor(Math.random() * candidates.length);
+    const selectedPath = candidates[randomIndex] ?? candidates[0];
+    const soundUrl = this.resolveClientAssetUrl(selectedPath);
+    if (!soundUrl) return;
+
     try {
-      const ctx = new AudioContext();
-      this.tavernMusicCtx = ctx;
-      const masterGain = ctx.createGain();
-      masterGain.gain.setValueAtTime(0.18, ctx.currentTime);
-      masterGain.connect(ctx.destination);
-
-      // Simple medieval tavern melody: pentatonic loop
-      const bpm = 112;
-      const beat = 60 / bpm;
-      // Notes as frequencies: D4, F4, G4, A4, C5, D5
-      const notes = [293.66, 349.23, 392.0, 440.0, 523.25, 587.33, 392.0, 440.0,
-                      349.23, 392.0, 329.63, 293.66, 349.23, 392.0, 440.0, 523.25];
-      const durations = [1, 0.5, 0.5, 1, 0.5, 0.5, 0.5, 0.5, 1, 0.5, 0.5, 1, 0.5, 0.5, 0.5, 1];
-
-      const schedule = (loopOffset: number): void => {
-        if (!this.tavernMusicCtx || this.soundMuted()) return;
-        let t = ctx.currentTime + loopOffset;
-        let totalDuration = 0;
-        for (let i = 0; i < notes.length; i++) {
-          const dur = durations[i] * beat;
-          const osc = ctx.createOscillator();
-          const env = ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(notes[i], t);
-          env.gain.setValueAtTime(0.001, t);
-          env.gain.linearRampToValueAtTime(1, t + 0.02);
-          env.gain.setValueAtTime(1, t + dur * 0.75);
-          env.gain.linearRampToValueAtTime(0.001, t + dur * 0.98);
-          osc.connect(env);
-          env.connect(masterGain);
-          osc.start(t);
-          osc.stop(t + dur);
-          t += dur;
-          totalDuration += dur;
+      const audio = new Audio(soundUrl);
+      audio.loop = true;
+      audio.volume = 0.38;
+      this.tavernMusicAudio = audio;
+      void audio.play().catch(() => {
+        if (this.tavernMusicAudio === audio) {
+          this.tavernMusicAudio = null;
         }
-        // Also add a simple drum/thump pulse on beats 1 & 3
-        t = ctx.currentTime + loopOffset;
-        for (let beat2 = 0; beat2 < totalDuration; beat2 += beat * 2) {
-          const drum = ctx.createOscillator();
-          const drumGain = ctx.createGain();
-          drum.type = 'sine';
-          drum.frequency.setValueAtTime(120, t + beat2);
-          drum.frequency.exponentialRampToValueAtTime(40, t + beat2 + 0.08);
-          drumGain.gain.setValueAtTime(0.6, t + beat2);
-          drumGain.gain.exponentialRampToValueAtTime(0.001, t + beat2 + 0.12);
-          drum.connect(drumGain);
-          drumGain.connect(masterGain);
-          drum.start(t + beat2);
-          drum.stop(t + beat2 + 0.12);
-        }
-        // Schedule next loop
-        setTimeout(() => schedule(0), totalDuration * 1000 - 100);
-      };
-      schedule(0);
+      });
     } catch { /* audio not supported */ }
   }
 
   private stopTavernMusic(): void {
-    if (this.tavernMusicCtx) {
-      try { this.tavernMusicCtx.close(); } catch { /* ignore */ }
-      this.tavernMusicCtx = null;
+    if (this.tavernMusicAudio) {
+      try {
+        this.tavernMusicAudio.pause();
+        this.tavernMusicAudio.currentTime = 0;
+      } catch {
+        // Ignore media cleanup issues.
+      }
+      this.tavernMusicAudio = null;
     }
   }
 
@@ -7974,6 +8958,9 @@ export class Game implements OnInit {
 
   dismissNpcDialog(): void {
     this.npcDialog.set(null);
+    if (!this.showTavernModal()) {
+      this.stopTavernMusic();
+    }
   }
 
   canTalkToNpc(): boolean {
@@ -8030,6 +9017,7 @@ export class Game implements OnInit {
       ? this.npcWrapSpeech(template.name, template.type, template.npcGreeting)
       : undefined;
     this.npcDialog.set({ instance: target, template, creativeGreeting });
+    this.startTavernMusic();
   }
 
   npcShareInfo(): void {
@@ -8185,9 +9173,12 @@ export class Game implements OnInit {
         column: placement.column,
         roam: placement.roam,
         currentHp: hasSavedCombat && placement.currentHp != null ? placement.currentHp : templateHp,
+        currentMagic: hasSavedCombat && placement.currentMagic != null ? placement.currentMagic : (template?.magic ?? 0),
+        permanentStatModifiers: placement.permanentStatModifiers ? { ...placement.permanentStatModifiers } : {},
         isDead: hasSavedCombat && placement.isDead === true,
         remainingAE: 0,
         attacksUsedThisTurn: 0,
+        hasCastSpellThisTurn: false,
         dropTresherIds: Array.isArray(placement.tresherIds) ? placement.tresherIds : [],
         dropKeyIds: Array.isArray(placement.keyIds) ? placement.keyIds : [],
         dropItemIds: Array.isArray(placement.itemIds) ? placement.itemIds : [],
@@ -8281,6 +9272,7 @@ export class Game implements OnInit {
       const creativeGreeting = this.npcWrapSpeech(template.name, template.type, template.npcGreeting);
       this.addCombatLog(creativeGreeting);
       this.npcDialog.set({ instance: inst, template, creativeGreeting });
+      this.startTavernMusic();
       this.monsterInstances.update((arr) => [...arr]);
       break; // one greeting per move
     }
@@ -8305,6 +9297,59 @@ export class Game implements OnInit {
     return null;
   }
 
+  private normalizeEffectToMonsterStat(stat: string | null | undefined): 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'NOA' | 'MR' | 'THN' | null {
+    if (!stat) return null;
+    const s = stat.trim().toLowerCase();
+    if (s === 'hp') return 'HP';
+    if (s === 'ac') return 'AC';
+    if (s === 'magic' || s === 'mp') return 'Magic';
+    if (s === 'mind') return 'Mind';
+    if (s === 'stamina' || s === 'staman') return 'Stamina';
+    if (s === 'strength' || s === 'strench') return 'Strength';
+    if (s === 'noa' || s === '# of attacks' || s === '#oa' || s === 'number of attacks') return 'NOA';
+    if (s === 'mr' || s === 'magic resistance' || s === 'magicresistance') return 'MR';
+    if (s === 'thn' || s === 'to hit needed' || s === 'tohitneeded' || s === 'to hit plus needed' || s === 'tohitplusneeded') return 'THN';
+    return null;
+  }
+
+  private getMonsterPermanentStatModifier(instance: GameMonsterInstance, stat: 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'NOA' | 'MR' | 'THN'): number {
+    return Object.entries(instance.permanentStatModifiers).reduce((sum, [rawKey, value]) => {
+      if (this.normalizeEffectToMonsterStat(rawKey) !== stat) return sum;
+      return sum + value;
+    }, 0);
+  }
+
+  private getMonsterModifierEffectBonus(instance: GameMonsterInstance, stat: 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'NOA' | 'MR' | 'THN'): number {
+    return instance.activeEffects.reduce((sum, eff) => {
+      if (eff.behavior !== 'modifier') return sum;
+      return this.normalizeEffectToMonsterStat(eff.effectOn) === stat ? sum + eff.effectAmount : sum;
+    }, 0);
+  }
+
+  private getEffectiveMonsterAC(instance: GameMonsterInstance, template: Monster): number {
+    return Math.max(0, template.ac + this.getMonsterPermanentStatModifier(instance, 'AC') + this.getMonsterModifierEffectBonus(instance, 'AC'));
+  }
+
+  private getEffectiveMonsterMagicResistance(instance: GameMonsterInstance, template: Monster): number {
+    return Math.max(0, template.magicResistance + this.getMonsterPermanentStatModifier(instance, 'MR') + this.getMonsterModifierEffectBonus(instance, 'MR'));
+  }
+
+  private getEffectiveMonsterToHitPlusNeeded(instance: GameMonsterInstance, template: Monster): number {
+    return Math.max(0, template.toHitPlusNeeded + this.getMonsterPermanentStatModifier(instance, 'THN') + this.getMonsterModifierEffectBonus(instance, 'THN'));
+  }
+
+  private getEffectiveMonsterNumberOfAttacks(instance: GameMonsterInstance, template: Monster): number {
+    return Math.max(0, template.numberOfAttacks + this.getMonsterPermanentStatModifier(instance, 'NOA') + this.getMonsterModifierEffectBonus(instance, 'NOA'));
+  }
+
+  private getEffectiveMonsterStamina(instance: GameMonsterInstance, template: Monster): number {
+    return template.movementEconomy + this.getMonsterPermanentStatModifier(instance, 'Stamina') + this.getMonsterModifierEffectBonus(instance, 'Stamina');
+  }
+
+  private getEffectiveMonsterStrength(instance: GameMonsterInstance, template: Monster): number {
+    return this.getMonsterPermanentStatModifier(instance, 'Strength') + this.getMonsterModifierEffectBonus(instance, 'Strength');
+  }
+
   private getEquippedItemBonusForStat(dungonId: number, stat: 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS'): number {
     const equippedItemIds = this.equippedItemIdsByDungon()[dungonId] ?? [];
     const itemsMap = this.pcTresherItemsById();
@@ -8323,55 +9368,95 @@ export class Game implements OnInit {
     return total;
   }
 
+  private getPlayerModifierEffectBonus(stat: 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS'): number {
+    return this.playerActiveEffects().reduce((sum, eff) => {
+      if (eff.behavior !== 'modifier') {
+        return sum;
+      }
+      return this.normalizeEffectToPcStat(eff.effectOn) === stat ? sum + eff.effectAmount : sum;
+    }, 0);
+  }
+
   private getEffectiveRangeOfSight(dungonId: number): number {
     const cheater = this.cheaterByDungon()[dungonId] ?? DEFAULT_CHEATER;
     const baseRange =
       typeof cheater.rangeOfSight === 'number' && Number.isFinite(cheater.rangeOfSight)
         ? Math.max(0, cheater.rangeOfSight)
         : DEFAULT_CHEATER.rangeOfSight;
-    return Math.max(0, baseRange + this.getEquippedItemBonusForStat(dungonId, 'ROS'));
+    return Math.max(0, baseRange + this.getEquippedItemBonusForStat(dungonId, 'ROS') + this.getPlayerModifierEffectBonus('ROS'));
   }
 
   private getEffectivePlayerMaxHp(): number {
     const preview = this.gridPreviewContext();
     if (!preview) return this.playerMaxHp();
-    return Math.max(1, this.playerMaxHp() + this.getEquippedItemBonusForStat(preview.dungonId, 'HP'));
+    return Math.max(1, this.playerMaxHp() + this.getEquippedItemBonusForStat(preview.dungonId, 'HP') + this.getPlayerModifierEffectBonus('HP'));
   }
 
   private getEffectivePlayerStrength(): number {
     const preview = this.gridPreviewContext();
     if (!preview) return this.playerStrength();
-    return this.playerStrength() + this.getEquippedItemBonusForStat(preview.dungonId, 'Strength');
+    return this.playerStrength() + this.getEquippedItemBonusForStat(preview.dungonId, 'Strength') + this.getPlayerModifierEffectBonus('Strength');
   }
 
   private getEffectivePlayerStamina(): number {
     const preview = this.gridPreviewContext();
     if (!preview) return this.playerStamina();
-    return this.playerStamina() + this.getEquippedItemBonusForStat(preview.dungonId, 'Stamina');
+    return this.playerStamina() + this.getEquippedItemBonusForStat(preview.dungonId, 'Stamina') + this.getPlayerModifierEffectBonus('Stamina');
   }
 
   private getEffectivePlayerMind(): number {
     const preview = this.gridPreviewContext();
     if (!preview) return this.playerMind();
-    return this.playerMind() + this.getEquippedItemBonusForStat(preview.dungonId, 'Mind');
+    return this.playerMind() + this.getEquippedItemBonusForStat(preview.dungonId, 'Mind') + this.getPlayerModifierEffectBonus('Mind');
   }
 
   private getEffectivePlayerMagicPower(): number {
     const preview = this.gridPreviewContext();
     if (!preview) return this.playerMagicPower();
-    return this.playerMagicPower() + this.getEquippedItemBonusForStat(preview.dungonId, 'Magic');
+    return this.playerMagicPower() + this.getEquippedItemBonusForStat(preview.dungonId, 'Magic') + this.getPlayerModifierEffectBonus('Magic');
+  }
+
+  private isMagicPotionEffect(effectTo: string | null | undefined): boolean {
+    const normalized = (effectTo ?? '').trim().toLowerCase();
+    return normalized === 'magic' || normalized === 'mp' || normalized === 'magic power';
+  }
+
+  private isHpPotionEffect(effectTo: string | null | undefined): boolean {
+    return (effectTo ?? '').trim().toLowerCase() === 'hp';
+  }
+
+  private normalizePotionEffectToPcStat(effectTo: string | null | undefined):
+    'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS' | 'TempHP' | 'PoisonResistance' | null {
+    const normalized = (effectTo ?? '').trim().toLowerCase();
+    if (!normalized) return null;
+    if (normalized === 'temp hp' || normalized === 'temporary hp') return 'TempHP';
+    if (normalized === 'poison resistance' || normalized === 'poisonresistance') return 'PoisonResistance';
+    if (normalized === 'magic power') return 'Magic';
+    if (normalized === 'range of view' || normalized === 'range of sight' || normalized === 'view range') return 'ROS';
+    if (normalized === 'number of attacts per round(noa)' || normalized === 'number of attacks per round(noa)' || normalized === 'noa') return 'NOA';
+    return this.normalizeEffectToPcStat(effectTo);
+  }
+
+  private getSpellEffectAmountWithMagicBonus(baseEffectAmount: number): number {
+    const magicBonus = this.playerActiveEffects().reduce((sum, eff) => {
+      if (!this.isMagicPotionEffect(eff.effectOn)) {
+        return sum;
+      }
+      return sum + eff.effectAmount;
+    }, 0);
+    return baseEffectAmount + magicBonus;
   }
 
   private getEffectivePlayerMaxAE(): number {
     const preview = this.gridPreviewContext();
     if (!preview) return this.playerMaxAE;
-    return Math.max(0, this.playerMaxAE + this.getEquippedItemBonusForStat(preview.dungonId, 'AE'));
+    return Math.max(0, this.playerMaxAE + this.getEquippedItemBonusForStat(preview.dungonId, 'AE') + this.getPlayerModifierEffectBonus('AE'));
   }
 
   private getEffectivePlayerNOA(): number {
     const preview = this.gridPreviewContext();
     if (!preview) return this.playerNOA();
-    return Math.max(1, this.playerNOA() + this.getEquippedItemBonusForStat(preview.dungonId, 'NOA'));
+    return Math.max(1, this.playerNOA() + this.getEquippedItemBonusForStat(preview.dungonId, 'NOA') + this.getPlayerModifierEffectBonus('NOA'));
   }
 
   private syncCurrentResourcesAfterEquipChange(prevEffectiveHpMax: number, prevEffectiveMpMax: number, prevEffectiveAEMax: number): void {
@@ -8461,7 +9546,7 @@ export class Game implements OnInit {
         armorItemBonus += item.effectValue;
       }
     }
-    return this.playerBaseAC() + armorCount + armorItemBonus - this.playerBoostAttackACPenalty();
+    return this.playerBaseAC() + armorCount + armorItemBonus + this.getPlayerModifierEffectBonus('AC') - this.playerBoostAttackACPenalty();
   }
 
   endPlayerTurnEarly(): void {
@@ -8577,7 +9662,7 @@ export class Game implements OnInit {
     }
 
     const template = this.getMonstersByIdForDungon(preview.dungonId).get(adjacentMonster.monsterId);
-    const toHitRequired = template?.toHitPlusNeeded ?? 0;
+    const toHitRequired = template ? this.getEffectiveMonsterToHitPlusNeeded(adjacentMonster, template) : 0;
     if (isUnarmed && toHitRequired > 0) {
       this.addCombatLog(`Your bare hands cannot hit ${template?.name ?? 'this monster'}! Need a +${toHitRequired} weapon.`);
       return;
@@ -8592,7 +9677,7 @@ export class Game implements OnInit {
     if (this.turnPhase() === 'gameover') return;
     this.playerAttacksThisTurn.update(n => n + 1);
     this.playClangSound();
-    const monsterAC = template?.ac ?? 10;
+    const monsterAC = template ? this.getEffectiveMonsterAC(adjacentMonster, template) : 10;
 
     const prevCombo = this.comboTracker();
     const isSameTarget = prevCombo?.placementIndex === adjacentMonster.placementIndex;
@@ -8644,6 +9729,7 @@ export class Game implements OnInit {
       } else if (template?.npcGivesInfoAfterDamaged && !adjacentMonster.isSpared) {
         this.addCombatLog(`${template.name} staggers — you can spare it and ask for information.`);
         this.npcDialog.set({ instance: adjacentMonster, template });
+        this.startTavernMusic();
       }
       this.monsterInstances.update((arr) => [...arr]);
     } else {
@@ -8659,6 +9745,10 @@ export class Game implements OnInit {
 
   tryPlayerAttack(): void {
     if (this.turnPhase() !== 'player') {
+      return;
+    }
+    if (this.playerAttacksThisTurn() >= this.getEffectivePlayerNOA()) {
+      this.addCombatLog('No attacks remaining this turn.');
       return;
     }
     if (this.playerAE() < 1) {
@@ -8691,7 +9781,7 @@ export class Game implements OnInit {
     }
 
     const template = this.getMonstersByIdForDungon(preview.dungonId).get(adjacentMonster.monsterId);
-    const toHitRequired = template?.toHitPlusNeeded ?? 0;
+    const toHitRequired = template ? this.getEffectiveMonsterToHitPlusNeeded(adjacentMonster, template) : 0;
     if (isUnarmed && toHitRequired > 0) {
       this.addCombatLog(`Your bare hands cannot hit ${template?.name ?? 'this monster'}! Need a +${toHitRequired} weapon.`);
       return;
@@ -8704,7 +9794,7 @@ export class Game implements OnInit {
     this.consumePlayerAE(1, preview.dungonId);
     this.playerAttacksThisTurn.update(n => n + 1);
     this.playClangSound();
-    const monsterAC = template?.ac ?? 10;
+    const monsterAC = template ? this.getEffectiveMonsterAC(adjacentMonster, template) : 10;
 
     const prevCombo = this.comboTracker();
     const isSameTarget = prevCombo?.placementIndex === adjacentMonster.placementIndex;
@@ -8758,6 +9848,7 @@ export class Game implements OnInit {
       } else if (template?.npcGivesInfoAfterDamaged && !adjacentMonster.isSpared) {
         this.addCombatLog(`${template.name} staggers — you can spare it and ask for information.`);
         this.npcDialog.set({ instance: adjacentMonster, template });
+        this.startTavernMusic();
       }
       this.monsterInstances.update((arr) => [...arr]);
     } else {
@@ -8831,6 +9922,21 @@ export class Game implements OnInit {
     if (pEffects.length > 0) {
       const pRemaining: ActiveEffect[] = [];
       for (const eff of pEffects) {
+        if (eff.behavior === 'modifier') {
+          const roundsLeft = eff.remainingAE - 1;
+          const sign = eff.effectAmount >= 0 ? '+' : '';
+          this.addCombatLog(`${eff.sourceName}: ${eff.effectOn} ${sign}${eff.effectAmount} active (${Math.max(0, roundsLeft)} rounds left).`);
+          if (eff.remainingAE - 1 > 0) {
+            pRemaining.push({ ...eff, remainingAE: eff.remainingAE - 1 });
+          } else {
+            this.addCombatLog(`${eff.sourceName} wears off. (${eff.effectOn} modifier ends)`);
+            this.playerHp.set(Math.max(0, Math.min(this.playerHp(), this.getEffectivePlayerMaxHp())));
+            this.playerMp.set(Math.max(0, Math.min(this.playerMp(), this.getEffectivePlayerMagicPower())));
+            this.playerAE.set(Math.max(0, Math.min(this.playerAE(), this.getEffectivePlayerMaxAE())));
+          }
+          continue;
+        }
+
         if (eff.effectOn === 'HP') {
           const newHp = Math.min(this.getEffectivePlayerMaxHp(), Math.max(0, this.playerHp() + eff.effectAmount));
           this.playerHp.set(newHp);
@@ -8841,6 +9947,14 @@ export class Game implements OnInit {
             this.turnPhase.set('gameover');
             setTimeout(() => this.goHome(), 3500);
           }
+        } else if (this.isMagicPotionEffect(eff.effectOn)) {
+          const currentMp = this.playerMp();
+          const maxMp = this.getEffectivePlayerMagicPower();
+          const newMp = Math.max(0, Math.min(currentMp + eff.effectAmount, maxMp));
+          this.playerMp.set(newMp);
+          const delta = newMp - currentMp;
+          const sign = delta >= 0 ? '+' : '';
+          this.addCombatLog(`${eff.sourceName}: ${sign}${delta} MP (${eff.remainingAE - 1} AE left).`);
         } else {
           this.addCombatLog(`${eff.sourceName}: ${eff.effectOn} ${eff.effectAmount} (${eff.remainingAE - 1} AE left).`);
         }
@@ -8864,6 +9978,18 @@ export class Game implements OnInit {
       const mRemaining: ActiveEffect[] = [];
       let monsterDied = false;
       for (const eff of instance.activeEffects) {
+        if (eff.behavior === 'modifier') {
+          const roundsLeft = eff.remainingAE - 1;
+          const sign = eff.effectAmount >= 0 ? '+' : '';
+          this.addCombatLog(`${eff.sourceName}: ${eff.effectOn} ${sign}${eff.effectAmount} on ${template?.name ?? 'monster'} (${Math.max(0, roundsLeft)} rounds left).`);
+          if (eff.remainingAE - 1 > 0) {
+            mRemaining.push({ ...eff, remainingAE: eff.remainingAE - 1 });
+          } else {
+            this.addCombatLog(`${eff.sourceName} on ${template?.name ?? 'monster'} wears off. (${eff.effectOn} modifier ends)`);
+          }
+          continue;
+        }
+
         if (eff.effectOn === 'HP') {
           instance.currentHp -= eff.effectAmount;
           this.triggerBloodSplatter();
@@ -8926,6 +10052,38 @@ export class Game implements OnInit {
 
   private rollD12(bonus: number = 0): number {
     return this.rollWithBoost(12) + bonus;
+  }
+
+  private getSpellLearningClassModifier(): number {
+    const type = (this.playerType() ?? '').trim().toLowerCase();
+    if (type === 'fighter' || type === 'figher') {
+      return -2;
+    }
+    if (type === 'thieph') {
+      return -1;
+    }
+    return 0;
+  }
+
+  private getSpellCastingClassModifier(): number {
+    const type = (this.playerType() ?? '').trim().toLowerCase();
+    return type === 'fighter' || type === 'figher' ? -1 : 0;
+  }
+
+  private formatSignedModifier(value: number): string {
+    if (value > 0) {
+      return `+${value}`;
+    }
+    if (value < 0) {
+      return `${value}`;
+    }
+    return '+0';
+  }
+
+  private rollSpellEffectDelta(baseEffectAmount: number): number {
+    const magnitude = Math.abs(baseEffectAmount);
+    const rolled = this.randomInt(1, 12) + magnitude;
+    return baseEffectAmount >= 0 ? rolled : -rolled;
   }
 
 
@@ -9460,11 +10618,13 @@ export class Game implements OnInit {
       if (monster.isDead || monster.isDormant) {
         monster.remainingAE = 0;
         monster.attacksUsedThisTurn = 0;
+        monster.hasCastSpellThisTurn = false;
         continue;
       }
       const template = monstersById.get(monster.monsterId);
-      monster.remainingAE = (template?.movementEconomy ?? 0) + (template?.numberOfAttacks ?? 0);
+      monster.remainingAE = template ? Math.max(0, this.getEffectiveMonsterStamina(monster, template) + this.getEffectiveMonsterNumberOfAttacks(monster, template)) : 0;
       monster.attacksUsedThisTurn = 0;
+      monster.hasCastSpellThisTurn = false;
     }
     this.monsterInstances.update((arr) => [...arr]);
 
@@ -9497,7 +10657,8 @@ export class Game implements OnInit {
           const t = monstersById.get(m.monsterId);
           this.addCombatLog(`${t?.name ?? 'Monster'} guards this spot and attacks!`);
           const tpl = monstersById.get(m.monsterId);
-          m.remainingAE = (tpl?.movementEconomy ?? 0) + (tpl?.numberOfAttacks ?? 0);
+          m.remainingAE = tpl ? Math.max(0, this.getEffectiveMonsterStamina(m, tpl) + this.getEffectiveMonsterNumberOfAttacks(m, tpl)) : 0;
+          m.hasCastSpellThisTurn = false;
         }
       }
       if (!m.isDead && m.isStationary && m.stationaryTriggerRow !== null && m.stationaryTriggerCol !== null) {
@@ -9520,7 +10681,7 @@ export class Game implements OnInit {
         continue;
       }
 
-      const maxAttacks = template.numberOfAttacks;
+      const maxAttacks = this.getEffectiveMonsterNumberOfAttacks(monster, template);
       const isAdjacent = this.canUseAdjacentMeleeAttack(dungonId, monster.row, monster.column, playerRow, playerCol);
       const canDetectPlayer = isAdjacent || this.isMonsterWithinRangeOfPlayer(monster, playerRow, playerCol, 5, dungonId);
       const shouldFlee = monster.currentHp <= template.runAt && template.runAt > 0;
@@ -9535,7 +10696,8 @@ export class Game implements OnInit {
           if (other !== monster && !other.isDead && other.isDormant) {
             other.isDormant = false;
             const otherTpl = monstersById.get(other.monsterId);
-            other.remainingAE = (otherTpl?.movementEconomy ?? 0) + (otherTpl?.numberOfAttacks ?? 0);
+            other.remainingAE = otherTpl ? Math.max(0, this.getEffectiveMonsterStamina(other, otherTpl) + this.getEffectiveMonsterNumberOfAttacks(other, otherTpl)) : 0;
+            other.hasCastSpellThisTurn = false;
           }
         }
         continue;
@@ -9543,20 +10705,25 @@ export class Game implements OnInit {
 
       if (shouldFlee) {
         this.monsterTryFlee(monster, dungonId, playerRow, playerCol);
-      } else if (isAdjacent && monster.attacksUsedThisTurn < maxAttacks) {
-        // Won't attack unless attacked first (template or per-placement flag)
-        if (isPassive) {
-          monster.remainingAE = 0;
-        } else {
+      } else if (isPassive) {
+        monster.remainingAE = 0;
+      } else if (monster.attacksUsedThisTurn < maxAttacks && !monster.hasCastSpellThisTurn) {
+        const spellAttack = this.selectMonsterSpellAttack(monster, template, dungonId, playerRow, playerCol);
+        if (spellAttack !== null) {
+          this.monsterCastSpellOnPlayer(monster, template, spellAttack, dungonId, playerRow, playerCol);
+        } else if (isAdjacent) {
           this.monsterAttackPlayer(monster, template, dungonId, playerRow, playerCol);
-        }
-      } else if (!isAdjacent && canDetectPlayer && !monster.isStationary) {
-        // Peaceful or stationary NPCs don't move toward the player
-        if (isPassive) {
-          monster.remainingAE = 0;
-        } else {
+        } else if (canDetectPlayer && !monster.isStationary) {
           this.monsterMoveToward(monster, dungonId, playerRow, playerCol);
+        } else if (monster.roam && !monster.isStationary) {
+          this.monsterMoveRandom(monster, dungonId);
+        } else {
+          monster.remainingAE = 0;
         }
+      } else if (isAdjacent && monster.attacksUsedThisTurn < maxAttacks) {
+        this.monsterAttackPlayer(monster, template, dungonId, playerRow, playerCol);
+      } else if (!isAdjacent && canDetectPlayer && !monster.isStationary) {
+        this.monsterMoveToward(monster, dungonId, playerRow, playerCol);
       } else if (monster.roam && !monster.isStationary) {
         this.monsterMoveRandom(monster, dungonId);
       } else {
@@ -9575,6 +10742,128 @@ export class Game implements OnInit {
     setTimeout(() => this.processMonsterRound(dungonId), 300);
   }
 
+  private selectMonsterSpellAttack(
+    monster: GameMonsterInstance,
+    template: Monster,
+    dungonId: number,
+    playerRow: number,
+    playerCol: number
+  ): { attack: MonsterAttack; spell: PcTresherSpellData } | null {
+    if (monster.remainingAE < 1 || monster.currentMagic <= 0) {
+      return null;
+    }
+
+    const candidates = template.attacks
+      .map((attack) => {
+        if (attack.spellId == null) {
+          return null;
+        }
+        const spell = this.resolveSpellData(dungonId, attack.spellId);
+        if (!spell) {
+          return null;
+        }
+        const spellCost = Math.max(1, spell.magicCost ?? 1);
+        if (monster.currentMagic < spellCost) {
+          return null;
+        }
+        const monsterRange = Math.max(Math.abs(monster.row - playerRow), Math.abs(monster.column - playerCol));
+        const maxSpellRange = this.getSpellMaxMonsterRange(spell);
+        if (maxSpellRange <= 0 || monsterRange > maxSpellRange) {
+          return null;
+        }
+        if (!this.hasLineOfSight(dungonId, monster.row, monster.column, playerRow, playerCol)) {
+          return null;
+        }
+        return { attack, spell };
+      })
+      .filter((entry): entry is { attack: MonsterAttack; spell: PcTresherSpellData } => entry !== null);
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    candidates.sort((a, b) => {
+      const aPower = Math.max(Math.abs(a.spell.effectAmount), Math.abs(a.spell.effectAmount2 ?? 0));
+      const bPower = Math.max(Math.abs(b.spell.effectAmount), Math.abs(b.spell.effectAmount2 ?? 0));
+      return bPower - aPower;
+    });
+    return candidates[0];
+  }
+
+  private monsterCastSpellOnPlayer(
+    monster: GameMonsterInstance,
+    template: Monster,
+    spellAttack: { attack: MonsterAttack; spell: PcTresherSpellData },
+    dungonId: number,
+    playerRow: number,
+    playerCol: number
+  ): void {
+    const { attack, spell } = spellAttack;
+    const spellCost = Math.max(1, spell.magicCost ?? 1);
+    if (monster.currentMagic < spellCost) {
+      return;
+    }
+
+    this.consumeMonsterAE(monster, 1, dungonId);
+    if (monster.isDead) {
+      return;
+    }
+    monster.attacksUsedThisTurn += 1;
+    monster.hasCastSpellThisTurn = true;
+    monster.currentMagic = Math.max(0, monster.currentMagic - spellCost);
+
+    const coverPenalty = this.getAttackCoverPenalty(dungonId, monster.row, monster.column, playerRow, playerCol);
+    const hitRoll = this.rollD12((attack.plusToHit ?? 0) + coverPenalty);
+    const dc = spell.successTestValue + this.getPlayerMagicResistance();
+    if (hitRoll < dc) {
+      this.addCombatLog(`${template.name} casts ${spell.name}, but you resist. (${hitRoll} vs DC ${dc})`);
+      return;
+    }
+
+    const slots = this.getSpellEffectSlots(spell).filter((slot) => !slot.effectOnPc);
+    if (slots.length === 0) {
+      this.addCombatLog(`${template.name} casts ${spell.name}, but nothing happens.`);
+      return;
+    }
+
+    for (const slot of slots) {
+      const distance = Math.max(Math.abs(monster.row - playerRow), Math.abs(monster.column - playerCol));
+      if (distance > slot.range) {
+        continue;
+      }
+      const rolledAmount = this.rollSpellEffectDelta(slot.effectAmount);
+      const detrimentalAmount = rolledAmount >= 0 ? -rolledAmount : rolledAmount;
+      if (slot.lastFor === 0) {
+        this.applyPermanentPlayerSpellEffect(slot.effectOn, detrimentalAmount);
+      } else if ((slot.effectOn ?? '').trim().toLowerCase() === 'hp') {
+        this.playerActiveEffects.update((effects) => [
+          ...effects,
+          {
+            effectOn: 'HP',
+            effectAmount: detrimentalAmount,
+            remainingAE: this.spellEffectRemainingAE(slot.lastFor),
+            sourceName: `${template.name} / ${spell.name}`,
+            behavior: 'tick',
+          },
+        ]);
+      } else {
+        this.playerActiveEffects.update((effects) => [
+          ...effects,
+          {
+            effectOn: slot.effectOn,
+            effectAmount: detrimentalAmount,
+            remainingAE: this.spellEffectRemainingAE(slot.lastFor),
+            sourceName: `${template.name} / ${spell.name}`,
+            behavior: 'modifier',
+          },
+        ]);
+      }
+    }
+
+    this.addCombatLog(`${template.name} casts ${spell.name} on you.`);
+    this.triggerSpellHitFlash(spell.name, spell.effectOn, spell.effectType ?? '');
+  }
+
   private monsterAttackPlayer(
     monster: GameMonsterInstance,
     template: Monster,
@@ -9587,8 +10876,9 @@ export class Game implements OnInit {
     monster.attacksUsedThisTurn += 1;
 
     const attack = template.attacks[monster.attacksUsedThisTurn - 1] ?? template.attacks[0];
-    const plusToHit = attack?.plusToHit ?? 0;
-    const maxDamage = attack?.damage ?? 1;
+    const monsterStrength = this.getEffectiveMonsterStrength(monster, template);
+    const plusToHit = (attack?.plusToHit ?? 0) + monsterStrength;
+    const maxDamage = Math.max(1, (attack?.damage ?? 1) + monsterStrength);
     const attackLabel = this.getMonsterAttackLabel(attack);
 
     if (attack?.type === 'Weapon') {
@@ -9849,6 +11139,8 @@ export class Game implements OnInit {
       row: inst.row,
       column: inst.column,
       roam: inst.roam,
+      currentMagic: inst.currentMagic,
+      ...(Object.keys(inst.permanentStatModifiers).length > 0 ? { permanentStatModifiers: { ...inst.permanentStatModifiers } } : {}),
     }));
 
     this.monsterPlacementsByDungon.update((all) => ({
@@ -9892,11 +11184,13 @@ export class Game implements OnInit {
       if (monster.isDead) {
         monster.remainingAE = 0;
         monster.attacksUsedThisTurn = 0;
+        monster.hasCastSpellThisTurn = false;
         continue;
       }
       const template = monstersById.get(monster.monsterId);
-      monster.remainingAE = (template?.movementEconomy ?? 0) + (template?.numberOfAttacks ?? 0);
+      monster.remainingAE = template ? Math.max(0, this.getEffectiveMonsterStamina(monster, template) + this.getEffectiveMonsterNumberOfAttacks(monster, template)) : 0;
       monster.attacksUsedThisTurn = 0;
+      monster.hasCastSpellThisTurn = false;
     }
     this.monsterInstances.update((arr) => [...arr]);
   }
@@ -9987,6 +11281,8 @@ export class Game implements OnInit {
       roam: inst.roam,
       isDead: inst.isDead,
       currentHp: inst.currentHp,
+      currentMagic: inst.currentMagic,
+      ...(Object.keys(inst.permanentStatModifiers).length > 0 ? { permanentStatModifiers: { ...inst.permanentStatModifiers } } : {}),
       ...(inst.dropTresherIds.length > 0 ? { tresherIds: inst.dropTresherIds } : {}),
       ...(inst.dropKeyIds.length > 0 ? { keyIds: inst.dropKeyIds } : {}),
       ...(inst.dropItemIds.length > 0 ? { itemIds: inst.dropItemIds } : {}),
@@ -10029,6 +11325,8 @@ export class Game implements OnInit {
       collectedFloorItems: this.collectedFloorItemsByDungon()[dungonId] ?? [],
       collectedFloorPotions: this.collectedFloorPotionsByDungon()[dungonId] ?? [],
       collectedFloorSpells: this.collectedFloorSpellsByDungon()[dungonId] ?? [],
+      learnedFloorSpellIds: this.learnedFloorSpellIdsByDungon()[dungonId] ?? [],
+      equippedSpellIds: this.equippedSpellIdsByDungon()[dungonId] ?? [],
     };
   }
 }

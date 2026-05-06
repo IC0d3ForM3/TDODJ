@@ -115,6 +115,11 @@
           <button type="button" class="sg-pc-choice" (click)="selectPc(pc)">
             <span class="sg-pc-choice-name">{{ pc.name }}</span>
             <span class="sg-pc-choice-meta">{{ pc.species }} · {{ pc.type }}</span>
+            @if (resolveImageUrl(pc.imagePath); as portraitUrl) {
+              @if (portraitUrl) {
+                <img class="sg-pc-choice-img" [src]="portraitUrl" [alt]="pc.name + ' portrait'" />
+              }
+            }
             <span class="sg-pc-choice-stats">
               HP {{ pc.maxHP }} &nbsp;·&nbsp; AC {{ pc.ac }} &nbsp;·&nbsp; AE {{ pc.actionEconomy }}
             </span>

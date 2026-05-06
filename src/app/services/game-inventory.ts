@@ -14,9 +14,13 @@ export interface PcTresherSpellData {
   id: number;
   name: string;
   description: string;
+  soundId?: number | null;
+  soundPath?: string | null;
   range: number;
   effectOn: string;
+  effectOn2?: string;
   effectAmount: number;
+  effectAmount2?: number;
   successTestValue: number;
   sp: number;
   lastFor: number;
@@ -24,6 +28,12 @@ export interface PcTresherSpellData {
   magicCost?: number;
   effectType?: string;
   effectColor?: string;
+  effectOnPc1?: boolean;
+  effectOnPc2?: boolean;
+  range1?: number;
+  range2?: number;
+  lastFor1?: number;
+  lastFor2?: number;
 }
 
 /** Item as stored in the PC's tresher lookup map — effectValue may be null from the server. */
@@ -89,6 +99,7 @@ export class GameInventoryService {
   // ── Equip state (ephemeral — not serialized to dungeon JSON) ─────────────
   readonly equippedTresherIndexesByDungon = signal<Record<number, number[]>>({});
   readonly equippedItemIdsByDungon = signal<Record<number, number[]>>({});
+  readonly equippedSpellIdsByDungon = signal<Record<number, number[]>>({});
 
   // ── Initialization guard ─────────────────────────────────────────────────
   readonly pcInventoryInitializedByDungon = signal<Record<number, boolean>>({});

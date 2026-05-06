@@ -44,9 +44,9 @@ if (-not $SkipBuild) {
 Write-Host "`n[2/3] Uploading to EC2 ($EC2_HOST)..." -ForegroundColor Yellow
 
 # Ensure remote dist dir exists, then upload compiled JS
-# Note: scp -r uploads the *contents* of backend/dist into the remote dist/ dir
+# FIX: Use -r src/. to copy contents (not src/ which creates nested dir on Windows)
 ssh -i $KEY_PATH -o StrictHostKeyChecking=no "${EC2_USER}@${EC2_HOST}" "mkdir -p ${REMOTE_DIR}/dist"
-scp -i $KEY_PATH -r backend/dist/ "${EC2_USER}@${EC2_HOST}:${REMOTE_DIR}/dist/"
+scp -i $KEY_PATH -r "backend/dist/." "${EC2_USER}@${EC2_HOST}:${REMOTE_DIR}/dist/"
 
 # Upload package.json (prod deps only)
 scp -i $KEY_PATH backend\package.json "${EC2_USER}@${EC2_HOST}:${REMOTE_DIR}/package.json"

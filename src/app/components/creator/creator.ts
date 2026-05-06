@@ -140,7 +140,33 @@ const SIDE_RULES: SideRule[] = [
 
 interface LibImageWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
 interface LibSoundWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
-interface LibSpellWritePayload { name: string; description: string; range: number; effectOn: string; effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number; value: number; sp: number; successTestValue: number; magicCost: number; costToLearn: number; imageId: number | null; soundId: number | null; isPublic: boolean; numberOfTargets: number; effectType: string; effectColor: string; }
+interface LibSpellWritePayload {
+  name: string;
+  description: string;
+  range: number;
+  effectOn: string;
+  effectOn2: string;
+  lastFor: number;
+  effectAmount: number;
+  effectAmount2: number;
+  value: number;
+  sp: number;
+  successTestValue: number;
+  magicCost: number;
+  costToLearn: number;
+  imageId: number | null;
+  soundId: number | null;
+  isPublic: boolean;
+  numberOfTargets: number;
+  effectType: string;
+  effectColor: string;
+  effectOnPc1: boolean;
+  effectOnPc2: boolean;
+  range1: number;
+  range2: number;
+  lastFor1: number;
+  lastFor2: number;
+}
 
 interface GridPlacedItem {
   key: string;
@@ -433,7 +459,13 @@ export class Creator implements OnInit {
     description: new FormControl<string>('', { nonNullable: true }),
     range: new FormControl<number>(0, { nonNullable: true }),
     effectOn: new FormControl<string>('HP', { nonNullable: true }),
+    effectOnPc1: new FormControl<boolean>(false, { nonNullable: true }),
+    range1: new FormControl<number>(0, { nonNullable: true }),
+    lastFor1: new FormControl<number>(0, { nonNullable: true }),
     effectOn2: new FormControl<string>('', { nonNullable: true }),
+    effectOnPc2: new FormControl<boolean>(false, { nonNullable: true }),
+    range2: new FormControl<number>(0, { nonNullable: true }),
+    lastFor2: new FormControl<number>(0, { nonNullable: true }),
     lastFor: new FormControl<number>(0, { nonNullable: true }),
     effectAmount: new FormControl<number>(0, { nonNullable: true }),
     effectAmount2: new FormControl<number>(0, { nonNullable: true }),
@@ -978,6 +1010,14 @@ export class Creator implements OnInit {
     const editingId = this.editingDoorId();
 
     if (editingId !== null) {
+      if (settings.isLocked) {
+        const hasDoorKey = this.keyList.some((key) => key.doorId === editingId);
+        if (!hasDoorKey) {
+          const newDoorKey = this.buildKey(editingId, pending.row, pending.column, settings.name);
+          this.keyList = [...this.keyList, newDoorKey];
+        }
+      }
+
       this.squaresByDungon.update((allSquares) => ({
         ...allSquares,
         [dungonId]: this.updateDoorPropertiesInPlace(allSquares[dungonId] ?? {}, editingId, settings),
@@ -2013,6 +2053,196 @@ export class Creator implements OnInit {
     }
 
     return Object.keys(this.filledSquaresByDungon()[dungonId] ?? {}).length > 0;
+  }
+
+  canClearCurrentDungonContent(): boolean {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) {
+      return false;
+    }
+
+    if ((this.startPointByDungon()[dungonId] ?? null) !== null) {
+      return true;
+    }
+
+    if ((this.exitsByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    if ((this.tresherPlacementsByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    if ((this.monsterPlacementsByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    if ((this.squareTextsByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    if ((this.floorTrapPlacementsByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    if ((this.obstaclePlacementsByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    if ((this.portalPlacementsByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    if ((this.itemPlacementsByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    if ((this.potionPlacementsByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    if ((this.spellPlacementsByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    if ((this.tresherListByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    if ((this.monsterListByDungon()[dungonId] ?? []).length > 0) {
+      return true;
+    }
+
+    return this.keyList.length > 0;
+  }
+
+  clearCurrentDungonContent(): void {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null || !this.canClearCurrentDungonContent()) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Clear this dungeon? This removes placements, monsters, treshers, keys, start/exit, and text, but keeps open spaces.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.startPointByDungon.update((allStartPoints) => ({
+      ...allStartPoints,
+      [dungonId]: null,
+    }));
+
+    this.exitsByDungon.update((allExits) => ({
+      ...allExits,
+      [dungonId]: [],
+    }));
+
+    this.tresherListByDungon.update((all) => ({
+      ...all,
+      [dungonId]: [],
+    }));
+
+    this.tresherPlacementsByDungon.update((allPlacements) => ({
+      ...allPlacements,
+      [dungonId]: [],
+    }));
+
+    this.monsterListByDungon.update((all) => ({
+      ...all,
+      [dungonId]: [],
+    }));
+
+    this.monsterPlacementsByDungon.update((allPlacements) => ({
+      ...allPlacements,
+      [dungonId]: [],
+    }));
+
+    this.squareTextsByDungon.update((allTexts) => ({
+      ...allTexts,
+      [dungonId]: [],
+    }));
+
+    this.floorTrapPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: [],
+    }));
+
+    this.obstaclePlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: [],
+    }));
+
+    this.portalPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: [],
+    }));
+
+    this.itemPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: [],
+    }));
+
+    this.potionPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: [],
+    }));
+
+    this.spellPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: [],
+    }));
+
+    this.keyList = [];
+    this.selectedPlacedItemKey.set(null);
+    this.selectedKeyIdForPlacement.set(null);
+    this.pendingStartPointPlacement.set(null);
+    this.pendingExitPlacement.set(null);
+    this.pendingTresherPlacement.set(null);
+    this.pendingMonsterPlacement.set(null);
+    this.pendingFloorTrapPlacement.set(null);
+    this.pendingObstaclePlacement.set(null);
+    this.pendingItemPlacement.set(null);
+    this.pendingPotionPlacement.set(null);
+    this.pendingSpellPlacement.set(null);
+    this.isStartPointMode.set(false);
+    this.isExitMode.set(false);
+    this.isPlaceTresherMode.set(false);
+    this.isPlaceMonsterMode.set(false);
+    this.isPlaceFloorTrapMode.set(false);
+    this.isPlaceObstacleMode.set(false);
+    this.isPlaceItemMode.set(false);
+    this.isPlacePotionMode.set(false);
+    this.isPlaceSpellMode.set(false);
+    this.isAddTextMode.set(false);
+    this.isImportPlacementMode.set(false);
+    this.isCopyMonsterMode.set(false);
+    this.isCopyFloorTrapMode.set(false);
+    this.isCopyObstacleMode.set(false);
+    this.copyMonsterSource.set(null);
+    this.copyFloorTrapSource.set(null);
+    this.copyObstacleSource.set(null);
+    this.portalPickMode.set(null);
+    this.portalPickingId.set(null);
+    this.isWhiteSpacePreviewPickMode.set(false);
+    this.isTextDialogVisible.set(false);
+    this.isStartPointDialogVisible.set(false);
+    this.isExitDialogVisible.set(false);
+    this.isPlaceTresherDialogVisible.set(false);
+    this.isPlaceMonsterDialogVisible.set(false);
+    this.isFloorTrapDialogVisible.set(false);
+    this.isObstacleDialogVisible.set(false);
+    this.isPortalDialogVisible.set(false);
+    this.isPlaceItemDialogVisible.set(false);
+    this.isPlacePotionDialogVisible.set(false);
+    this.isPlaceSpellDialogVisible.set(false);
+
+    this.syncIdsFromLoadedData(this.squaresByDungon()[dungonId] ?? {}, [], [], [], [], [], []);
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
   }
 
   startWhiteSpacePreviewPickMode(): void {
@@ -3681,6 +3911,27 @@ export class Creator implements OnInit {
 
   setMonsterDialogSoundId(value: string): void {
     this.editingMonsterSoundId.set(value ? (parseInt(value, 10) || null) : null);
+  }
+
+  selectedMonsterDialogSoundUrl(): string {
+    const soundId = this.editingMonsterSoundId();
+    if (soundId === null) return '';
+    const sound = this.monsterDialogSounds().find((s) => s.id === soundId);
+    return sound ? this.libResolveSoundUrl(sound.path) : '';
+  }
+
+  playSelectedMonsterDialogSound(): void {
+    const soundUrl = this.selectedMonsterDialogSoundUrl();
+    if (!soundUrl) return;
+    try {
+      const audio = new Audio(soundUrl);
+      audio.volume = 0.75;
+      void audio.play().catch(() => {
+        // Ignore browser playback failures.
+      });
+    } catch {
+      // Audio API unavailable.
+    }
   }
 
   toggleMonsterTresher(tresherId: number): void {
@@ -6760,6 +7011,72 @@ export class Creator implements OnInit {
     }
 
     return Math.floor(value);
+  }
+
+  private normalizeSpellEffectType(value: unknown): string {
+    return value === 'Fire' || value === 'Ice' || value === 'Lightning' || value === 'Other'
+      ? value
+      : 'Other';
+  }
+
+  private normalizeSpellEffectColor(value: unknown, effectType: string): string {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (/^#[0-9a-fA-F]{3,8}$/.test(trimmed)) {
+        return trimmed.toLowerCase();
+      }
+    }
+
+    return this.spellEffectTypeDefaultColor(effectType);
+  }
+
+  private normalizeLibSpellItem(item: unknown): LibSpellItem | null {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+
+    const source = item as Record<string, unknown>;
+    const id = this.toFiniteNumber(source['id']);
+    if (id === null) {
+      return null;
+    }
+
+    const effectType = this.normalizeSpellEffectType(source['effectType'] ?? source['effecttype']);
+
+    return {
+      id: Math.floor(id),
+      name: typeof source['name'] === 'string' && source['name'].trim() ? source['name'].trim() : 'Unnamed Spell',
+      description: typeof source['description'] === 'string' ? source['description'] : '',
+      range: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['range']), 0)),
+      effectOn: typeof source['effectOn'] === 'string'
+        ? source['effectOn']
+        : (typeof source['effecton'] === 'string' ? source['effecton'] : 'HP'),
+      effectOn2: typeof source['effectOn2'] === 'string'
+        ? source['effectOn2']
+        : (typeof source['effecton2'] === 'string' ? source['effecton2'] : ''),
+      lastFor: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['lastFor'] ?? source['lastfor']), 0)),
+      effectAmount: this.normalizeNumber(this.toFiniteNumber(source['effectAmount'] ?? source['damage']), 0),
+      effectAmount2: this.normalizeNumber(this.toFiniteNumber(source['effectAmount2'] ?? source['effectamount2']), 0),
+      value: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['value']), 0)),
+      sp: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['sp']), 0)),
+      successTestValue: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['successTestValue'] ?? source['successtestvalue']), 0)),
+      magicCost: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['magicCost'] ?? source['magiccost']), 1)),
+      costToLearn: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['costToLearn'] ?? source['costtolearn']), 0)),
+      imageId: this.normalizeNullableNumber(this.toFiniteNumber(source['imageId'] ?? source['imageid'])),
+      soundId: this.normalizeNullableNumber(this.toFiniteNumber(source['soundId'] ?? source['soundid'])),
+      isPublic: this.normalizeBoolean(source['isPublic'] ?? source['ispublic']),
+      numberOfTargets: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['numberOfTargets'] ?? source['numberoftargets']), 1)),
+      effectType,
+      effectColor: this.normalizeSpellEffectColor(source['effectColor'] ?? source['effectcolor'], effectType),
+      effectOnPc1: this.normalizeBoolean(source['effectOnPc1'] ?? source['effectonpc1']),
+      effectOnPc2: this.normalizeBoolean(source['effectOnPc2'] ?? source['effectonpc2']),
+      range1: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['range1']), 0)),
+      range2: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['range2']), 0)),
+      lastFor1: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['lastFor1'] ?? source['lastfor1']), 0)),
+      lastFor2: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['lastFor2'] ?? source['lastfor2']), 0)),
+      createdAt: typeof source['createdAt'] === 'string' ? source['createdAt'] : '',
+      updatedAt: typeof source['updatedAt'] === 'string' ? source['updatedAt'] : '',
+    };
   }
 
   private normalizeBoolean(value: unknown): boolean {
@@ -10490,6 +10807,7 @@ export class Creator implements OnInit {
       for (const side of sides) {
         const conn = square[side];
         if (this.isDoorConnection(conn) && conn.id === doorId) {
+          const doorKey = this.keyList.find((key) => key.doorId === doorId) ?? null;
           const updated: Door = {
             ...conn,
             name: settings.name,
@@ -10497,6 +10815,7 @@ export class Creator implements OnInit {
             state: settings.state,
             HP: settings.hp,
             isLocked: settings.isLocked,
+            keyLock: settings.isLocked ? (conn.keyLock ?? doorKey) : null,
             toPick: settings.toPick,
             isHidden: settings.isHidden,
             toFind: settings.toFind,
@@ -10800,7 +11119,12 @@ export class Creator implements OnInit {
       .get<LibSpellItem[]>(`${API_BASE_URL}/spells`, { params: { userkey } })
       .pipe(finalize(() => this.isLoadingLibSpells.set(false)))
       .subscribe({
-        next: (items) => { this.libUserSpells.set(items); },
+        next: (items) => {
+          const normalized = items
+            .map((item) => this.normalizeLibSpellItem(item))
+            .filter((item): item is LibSpellItem => item !== null);
+          this.libUserSpells.set(normalized);
+        },
         error: () => { this.libUserSpells.set([]); this.libSpellsError.set('Failed to load your spells.'); },
       });
   }
@@ -10849,9 +11173,19 @@ export class Creator implements OnInit {
   editLibSpell(item: LibSpellItem): void {
     this.editingLibSpellId.set(item.id);
     this.libSpellSaveMessage.set(null);
+    const range1 = item.range1 ?? item.range ?? 0;
+    const range2 = item.range2 ?? item.range ?? 0;
+    const lastFor1 = item.lastFor1 ?? item.lastFor ?? 0;
+    const lastFor2 = item.lastFor2 ?? item.lastFor ?? 0;
     this.libSpellForm.reset({
       name: item.name || '', description: item.description || '', range: item.range ?? 0,
+      effectOnPc1: item.effectOnPc1 ?? range1 === 0,
+      range1,
+      lastFor1,
       effectOn: item.effectOn || 'HP', effectOn2: item.effectOn2 || '',
+      effectOnPc2: item.effectOnPc2 ?? range2 === 0,
+      range2,
+      lastFor2,
       lastFor: item.lastFor ?? 0, effectAmount: item.effectAmount ?? 0, effectAmount2: item.effectAmount2 ?? 0,
       value: item.value ?? 0, sp: item.sp ?? 0, successTestValue: item.successTestValue ?? 0,
       magicCost: item.magicCost ?? 1, costToLearn: item.costToLearn ?? 0, imageId: item.imageId ?? null, soundId: item.soundId ?? null, isPublic: item.isPublic,
@@ -10886,6 +11220,26 @@ export class Creator implements OnInit {
     const id = this.libSpellForm.controls.imageId.value;
     const img = id !== null ? this.libImageOptions().find((i) => i.id === id) : null;
     return img ? this.libResolveImageUrl(img.path) : '';
+  }
+
+  libSelectedSpellSoundUrl(): string {
+    const id = this.libSpellForm.controls.soundId.value;
+    const sound = id !== null ? this.libSoundOptions().find((s) => s.id === id) : null;
+    return sound ? this.libResolveSoundUrl(sound.path) : '';
+  }
+
+  playLibSelectedSpellSound(): void {
+    const soundUrl = this.libSelectedSpellSoundUrl();
+    if (!soundUrl) return;
+    try {
+      const audio = new Audio(soundUrl);
+      audio.volume = 0.75;
+      void audio.play().catch(() => {
+        // Ignore browser playback failures.
+      });
+    } catch {
+      // Audio API unavailable.
+    }
   }
 
   imageUrlById(imageId: number | null): string {
@@ -10981,13 +11335,18 @@ export class Creator implements OnInit {
     const userkey = this.account.getKey();
     if (!userkey) { this.libSpellSaveMessage.set('Please log in to save spells.'); return; }
     const c = this.libSpellForm.controls;
+    const range1 = Math.max(0, c.range1.value ?? 0);
+    const range2 = Math.max(0, c.range2.value ?? 0);
+    const effectOnPc1 = (c.effectOnPc1.value ?? false) || range1 === 0;
+    const effectOnPc2 = (c.effectOnPc2.value ?? false) || range2 === 0;
     const payload: LibSpellWritePayload = {
       name: (c.name.value || '').trim() || 'Unnamed Spell',
       description: (c.description.value || '').trim(),
-      range: Math.max(0, c.range.value ?? 0),
+      // Backward compatibility: primary effect still populates legacy range/lastFor.
+      range: effectOnPc1 ? 0 : range1,
       effectOn: (c.effectOn.value || 'HP').trim(),
       effectOn2: (c.effectOn2.value || '').trim(),
-      lastFor: Math.max(0, c.lastFor.value ?? 0),
+      lastFor: Math.max(0, c.lastFor1.value ?? 0),
       effectAmount: c.effectAmount.value ?? 0,
       effectAmount2: c.effectAmount2.value ?? 0,
       value: Math.max(0, c.value.value ?? 0),
@@ -11001,6 +11360,12 @@ export class Creator implements OnInit {
       numberOfTargets: Math.max(1, c.numberOfTargets.value ?? 1),
       effectType: c.effectType.value || 'Other',
       effectColor: c.effectColor.value || '#ffffff',
+      effectOnPc1,
+      effectOnPc2,
+      range1,
+      range2,
+      lastFor1: Math.max(0, c.lastFor1.value ?? 0),
+      lastFor2: Math.max(0, c.lastFor2.value ?? 0),
     };
     const editingId = this.editingLibSpellId();
     const request$ = editingId
@@ -11022,8 +11387,33 @@ export class Creator implements OnInit {
   }
 
   private resetLibSpellForm(): void {
-    this.libSpellForm.reset({ name: '', description: '', range: 0, effectOn: 'HP', effectOn2: '',
-      lastFor: 0, effectAmount: 0, effectAmount2: 0, value: 0, sp: 0, successTestValue: 0, magicCost: 1, costToLearn: 0, imageId: null, soundId: null, isPublic: false, numberOfTargets: 1, effectType: 'Other', effectColor: '#ffffff' });
+    this.libSpellForm.reset({
+      name: '',
+      description: '',
+      range: 0,
+      effectOn: 'HP',
+      effectOnPc1: false,
+      range1: 0,
+      lastFor1: 0,
+      effectOn2: '',
+      effectOnPc2: false,
+      range2: 0,
+      lastFor2: 0,
+      lastFor: 0,
+      effectAmount: 0,
+      effectAmount2: 0,
+      value: 0,
+      sp: 0,
+      successTestValue: 0,
+      magicCost: 1,
+      costToLearn: 0,
+      imageId: null,
+      soundId: null,
+      isPublic: false,
+      numberOfTargets: 1,
+      effectType: 'Other',
+      effectColor: '#ffffff',
+    });
   }
 
   private libFileBaseName(fileName: string): string {

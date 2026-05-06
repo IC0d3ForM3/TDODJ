@@ -5,6 +5,8 @@ export interface MonsterPlacement extends BasePlacement {
   roam: boolean;
   isDead?: boolean;
   currentHp?: number;
+  currentMagic?: number;
+  permanentStatModifiers?: Record<string, number>;
   tresherIds?: number[];
   keyIds?: number[];
   itemIds?: number[];

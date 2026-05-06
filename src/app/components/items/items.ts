@@ -239,6 +239,30 @@ export class Items implements OnInit {
     return this.selectedImageOption()?.name ?? null;
   }
 
+  selectedSoundOption(): SoundOption | null {
+    const id = this.userItemForm.controls.soundId.value;
+    return id !== null ? (this.allSoundOptions().find((s) => s.id === id) ?? null) : null;
+  }
+
+  selectedSoundUrl(): string {
+    const sound = this.selectedSoundOption();
+    return sound ? this.resolveSoundUrl(sound.path) : '';
+  }
+
+  playSelectedSound(): void {
+    const soundUrl = this.selectedSoundUrl();
+    if (!soundUrl) return;
+    try {
+      const audio = new Audio(soundUrl);
+      audio.volume = 0.75;
+      void audio.play().catch(() => {
+        // Ignore browser playback failures.
+      });
+    } catch {
+      // Audio API unavailable.
+    }
+  }
+
   curseNameForItem(curseId: number | null): string | null {
     if (curseId === null) return null;
     return this.curseOptions().find((c) => c.id === curseId)?.name ?? null;
@@ -317,6 +341,12 @@ export class Items implements OnInit {
   }
 
   resolveImageUrl(path: string): string {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+  }
+
+  resolveSoundUrl(path: string): string {
     if (!path) return '';
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;

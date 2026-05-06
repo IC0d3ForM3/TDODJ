@@ -474,22 +474,24 @@ const upgradeNod = async (id, userguid, spCost, goldCost, tresherId) => {
 exports.upgradeNod = upgradeNod;
 const getSamplePcsFromDb = async () => {
     const { rows } = await db_1.default.query(`SELECT
-       id,
-       name,
-       species,
-       type,
-       maxhp AS "maxHP",
-       currenthp AS "currentHP",
-       ac,
-       actioneconomy AS "actionEconomy",
-       strength,
-       stamina,
-       mind,
-       mp AS "magicPower",
-       rangeofview AS "rangeOfView"
-     FROM pcs
-     WHERE issample = TRUE
-     ORDER BY id ASC`);
+       p.id,
+       p.name,
+       p.species,
+       p.type,
+       i.path AS "imagePath",
+       p.maxhp AS "maxHP",
+       p.currenthp AS "currentHP",
+       p.ac,
+       p.actioneconomy AS "actionEconomy",
+       p.strength,
+       p.stamina,
+       p.mind,
+       p.mp AS "magicPower",
+       p.rangeofview AS "rangeOfView"
+     FROM pcs p
+     LEFT JOIN images i ON i.id = p.imageid AND i.isactive = true
+     WHERE p.issample = TRUE
+     ORDER BY p.id ASC`);
     return rows;
 };
 exports.getSamplePcsFromDb = getSamplePcsFromDb;

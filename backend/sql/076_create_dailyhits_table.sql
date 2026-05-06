@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS dailyhits (
+  id SERIAL PRIMARY KEY,
+  homehits INTEGER NOT NULL DEFAULT 0,
+  logins INTEGER NOT NULL DEFAULT 0,
+  datetime DATE NOT NULL UNIQUE DEFAULT CURRENT_DATE
+);
+
+CREATE INDEX IF NOT EXISTS idx_dailyhits_datetime ON dailyhits(datetime);

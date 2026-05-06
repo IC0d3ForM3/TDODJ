@@ -619,6 +619,7 @@ export interface SamplePcRecord {
   name: string;
   species: string;
   type: string;
+  imagePath: string | null;
   maxHP: number;
   currentHP: number;
   ac: number;
@@ -642,22 +643,24 @@ export interface AdminPcRecord {
 export const getSamplePcsFromDb = async (): Promise<SamplePcRecord[]> => {
   const { rows } = await pool.query<SamplePcRecord>(
     `SELECT
-       id,
-       name,
-       species,
-       type,
-       maxhp AS "maxHP",
-       currenthp AS "currentHP",
-       ac,
-       actioneconomy AS "actionEconomy",
-       strength,
-       stamina,
-       mind,
-       mp AS "magicPower",
-       rangeofview AS "rangeOfView"
-     FROM pcs
-     WHERE issample = TRUE
-     ORDER BY id ASC`
+       p.id,
+       p.name,
+       p.species,
+       p.type,
+       i.path AS "imagePath",
+       p.maxhp AS "maxHP",
+       p.currenthp AS "currentHP",
+       p.ac,
+       p.actioneconomy AS "actionEconomy",
+       p.strength,
+       p.stamina,
+       p.mind,
+       p.mp AS "magicPower",
+       p.rangeofview AS "rangeOfView"
+     FROM pcs p
+     LEFT JOIN images i ON i.id = p.imageid AND i.isactive = true
+     WHERE p.issample = TRUE
+     ORDER BY p.id ASC`
   );
   return rows;
 };

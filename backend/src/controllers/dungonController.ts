@@ -446,6 +446,7 @@ export const getGameById = async (req: Request, res: Response) => {
     let pcType: string | null = null;
     let pcSpecies: string | null = null;
     let pcName: string | null = null;
+    let pcImagePath: string | null = null;
     const currentPcId: number | null = game.pcid ?? null;
     if (game.pcid !== null && game.pcid > 0) {
       const pc = await pcService.fetchPcByIdForUser(game.pcid, userkey.trim());
@@ -463,6 +464,14 @@ export const getGameById = async (req: Request, res: Response) => {
         pcType = pc.type ?? null;
         pcSpecies = pc.species ?? null;
         pcName = pc.name ?? null;
+        if (typeof pc.imageId === 'number' && pc.imageId > 0) {
+          const canAccessPcImage = await imageService.checkImageAccessibleByIdForUser(pc.imageId, userkey.trim());
+          if (canAccessPcImage) {
+            const pcImages = await imageService.fetchImagesByIds([pc.imageId]);
+            const pcImage = pcImages.find((img) => img.id === pc.imageId && typeof img.path === 'string' && img.path.trim().length > 0);
+            pcImagePath = pcImage?.path ?? null;
+          }
+        }
 
         const allPcTresherIds = Array.from(new Set([
           ...(Array.isArray(pc.tresherIds) ? pc.tresherIds : []),
@@ -552,12 +561,25 @@ export const getGameById = async (req: Request, res: Response) => {
               id: s.id,
               name: s.name,
               description: s.description,
+              soundId: s.soundId,
               range: s.range,
               effectOn: s.effectOn,
+              effectOn2: s.effectOn2,
               effectAmount: s.effectAmount,
+              effectAmount2: s.effectAmount2,
               successTestValue: s.successTestValue,
               sp: s.sp,
               lastFor: s.lastFor,
+              numberOfTargets: s.numberOfTargets,
+              magicCost: s.magicCost,
+              effectType: s.effectType,
+              effectColor: s.effectColor,
+              effectOnPc1: s.effectOnPc1,
+              effectOnPc2: s.effectOnPc2,
+              range1: s.range1,
+              range2: s.range2,
+              lastFor1: s.lastFor1,
+              lastFor2: s.lastFor2,
             }));
           }
         }
@@ -611,7 +633,7 @@ export const getGameById = async (req: Request, res: Response) => {
       // non-fatal — proceed without dungeon tresher items
     }
 
-    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false });
+    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, pcImagePath, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false });
   } catch (error) {
     console.error('Error fetching game by id:', error);
     return res.status(500).json({ error: 'Failed to fetch game' });
@@ -820,6 +842,13 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
     let pcTresherItems: object[] = [];
     let pcTresherPotions: object[] = [];
     let pcTresherSpells: object[] = [];
+    let pcImagePath: string | null = null;
+
+    if (typeof pc.imageId === 'number' && pc.imageId > 0) {
+      const pcImages = await imageService.fetchImagesByIds([pc.imageId]);
+      const pcImage = pcImages.find((img) => img.id === pc.imageId && typeof img.path === 'string' && img.path.trim().length > 0);
+      pcImagePath = pcImage?.path ?? null;
+    }
 
     const allPcTresherIds = Array.from(new Set([
       ...(Array.isArray(pc.tresherIds) ? pc.tresherIds : []),
@@ -909,12 +938,25 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
           id: s.id,
           name: s.name,
           description: s.description,
+          soundId: s.soundId,
           range: s.range,
           effectOn: s.effectOn,
+          effectOn2: s.effectOn2,
           effectAmount: s.effectAmount,
+          effectAmount2: s.effectAmount2,
           successTestValue: s.successTestValue,
           sp: s.sp,
           lastFor: s.lastFor,
+          numberOfTargets: s.numberOfTargets,
+          magicCost: s.magicCost,
+          effectType: s.effectType,
+          effectColor: s.effectColor,
+          effectOnPc1: s.effectOnPc1,
+          effectOnPc2: s.effectOnPc2,
+          range1: s.range1,
+          range2: s.range2,
+          lastFor1: s.lastFor1,
+          lastFor2: s.lastFor2,
         }));
       }
     }
@@ -1012,6 +1054,7 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
       pcType: pc.type ?? null,
       pcSpecies: pc.species ?? null,
       pcName: pc.name ?? null,
+      pcImagePath,
       currentPcId: null,
       dungonSpReward: dungon.spreward,
       monsterImages,

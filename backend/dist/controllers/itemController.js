@@ -36,10 +36,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateItem = exports.createItem = exports.getItems = void 0;
 const itemService = __importStar(require("../services/itemService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ITEM_TYPES = new Set(['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'other']);
-const ARMOR_SLOTS = new Set(['head', 'body', 'left-arm', 'right-arm', 'left-leg', 'right-leg']);
-const EFFECT_ON_OPTIONS = new Set(['HP', 'AC', 'MP', 'Mind', 'Stamina', 'Strength', 'SP']);
-const EFFECT_TO_PC_OPTIONS = new Set(['HP', 'AC', 'Magic', 'Mind', 'Stamina', 'Strength']);
+const ITEM_TYPES = new Set(['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'gem', 'other']);
+const ARMOR_SLOTS = new Set(['none', 'hand', 'shield', 'head', 'body', 'left-arm', 'right-arm', 'left-leg', 'right-leg']);
+const EFFECT_ON_OPTIONS = new Set(['HP', 'AC', 'MP', 'Mind', 'Stamina', 'Strength', 'SP', 'AE', 'NOA', 'ROS', 'Door Trap', 'To Pick', 'Placed Trap']);
+const EFFECT_TO_PC_OPTIONS = new Set(['HP', 'AC', 'Magic', 'Mind', 'Stamina', 'Strength', 'AE', 'NOA', 'ROS']);
 const COLOR_HEX_REGEX = /^#[0-9a-f]{6}$/i;
 function normalizeText(value, fallback) {
     if (typeof value === 'string')
@@ -98,10 +98,16 @@ function normalizeEffectToPc(value) {
         return 'Strength';
     if (raw.toLowerCase() === 'strength')
         return 'Strength';
+    if (raw.toLowerCase() === 'ae' || raw.toLowerCase() === 'action economy')
+        return 'AE';
+    if (raw.toLowerCase() === 'noa' || raw.toLowerCase() === '# of attacks' || raw.toLowerCase() === '#oa' || raw.toLowerCase() === 'number of attacks')
+        return 'NOA';
     if (raw.toLowerCase() === 'hp')
         return 'HP';
     if (raw.toLowerCase() === 'ac')
         return 'AC';
+    if (raw.toLowerCase() === 'ros' || raw.toLowerCase() === 'sight' || raw.toLowerCase() === 'range of sight')
+        return 'ROS';
     return EFFECT_TO_PC_OPTIONS.has(raw) ? raw : null;
 }
 function buildItemPayload(input, isAdmin) {
@@ -113,7 +119,7 @@ function buildItemPayload(input, isAdmin) {
     const weaponEffectType = normalizeWeaponEffectType(input.weaponEffectType ?? input.weaponeffecttype);
     const weaponEffectColor = normalizeWeaponEffectColor(input.weaponEffectColor ?? input.weaponeffectcolor);
     const normalizedType = ITEM_TYPES.has(type) ? type : 'other';
-    const allowsPcEffect = normalizedType === 'weapon' || normalizedType === 'armor' || normalizedType === 'ring' || normalizedType === 'necklace';
+    const allowsPcEffect = normalizedType === 'weapon' || normalizedType === 'armor' || normalizedType === 'ring' || normalizedType === 'necklace' || normalizedType === 'other';
     return {
         name: normalizeText(input.name, 'Unnamed Item'),
         description: normalizeText(input.description, ''),

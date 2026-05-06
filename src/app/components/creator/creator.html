@@ -323,6 +323,12 @@
 									[disabled]="isImportingMap() || isSavingDungonJson()"
 									(click)="gridMapFileInput.click()"
 								>+Import</button>
+								<button
+									type="button"
+									class="open-block-btn open-block-btn--clear"
+									[disabled]="!canClearCurrentDungonContent() || isSavingDungonJson() || isPublishingDungon()"
+									(click)="clearCurrentDungonContent()"
+								>Clear</button>
 								<input #gridMapFileInput type="file" accept=".json" style="display:none"
 									(change)="importMapFromFile($event)" />
 							</div>
@@ -1032,14 +1038,22 @@
 					<div class="tresher-form-grid">
 						<label class="tresher-field"><span>Name</span><input type="text" formControlName="name" placeholder="Spell name" /></label>
 						<label class="tresher-field tresher-field-wide"><span>Description</span><input type="text" formControlName="description" /></label>
+						<label class="tresher-field"><span>Effect On 1</span><select formControlName="effectOn">@for (o of libSpellEffectToOptions; track o) { <option [value]="o">{{ o }}</option> }</select></label>
+						<label class="tresher-field-checkbox"><input type="checkbox" formControlName="effectOnPc1" /><span>Effect On PC 1</span></label>
+						<label class="tresher-field"><span>Effect Value 1</span><input type="number" formControlName="effectAmount" /></label>
+						<label class="tresher-field"><span>Range 1</span><input type="number" formControlName="range1" min="0" /></label>
+						<label class="tresher-field"><span>Last For 1 (0 = Indefinite)</span><input type="number" formControlName="lastFor1" min="0" /></label>
+						<div class="spell-effect-divider" aria-hidden="true"></div>
+
+						<label class="tresher-field"><span>Effect On 2</span><select formControlName="effectOn2"><option [ngValue]="null">None</option>@for (o of libSpellEffectToOptions; track o) { <option [value]="o">{{ o }}</option> }</select></label>
+						<label class="tresher-field-checkbox"><input type="checkbox" formControlName="effectOnPc2" /><span>Effect On PC 2</span></label>
+						<label class="tresher-field"><span>Effect Value 2</span><input type="number" formControlName="effectAmount2" /></label>
+						<label class="tresher-field"><span>Range 2</span><input type="number" formControlName="range2" min="0" /></label>
+						<label class="tresher-field"><span>Last For 2 (0 = Indefinite)</span><input type="number" formControlName="lastFor2" min="0" /></label>
+						<div class="spell-effect-divider" aria-hidden="true"></div>
+
 						<label class="tresher-field"><span>Effect Type</span><select formControlName="effectType" (change)="onSpellEffectTypeChange()"><option value="Fire">Fire</option><option value="Ice">Ice</option><option value="Lightning">Lightning</option><option value="Other">Other</option></select></label>
 						<label class="tresher-field"><span>Effect Color</span><input type="color" formControlName="effectColor" style="width:3.5rem;height:2rem;padding:0.1rem;cursor:pointer" /></label>
-						<label class="tresher-field"><span>Range</span><input type="number" formControlName="range" min="0" /></label>
-						<label class="tresher-field"><span>Effect On 1</span><select formControlName="effectOn">@for (o of libSpellEffectToOptions; track o) { <option [value]="o">{{ o }}</option> }</select></label>
-						<label class="tresher-field"><span>Effect On 2</span><select formControlName="effectOn2"><option [ngValue]="null">None</option>@for (o of libSpellEffectToOptions; track o) { <option [value]="o">{{ o }}</option> }</select></label>
-						<label class="tresher-field"><span>Effect Amount 1</span><input type="number" formControlName="effectAmount" /></label>
-						<label class="tresher-field"><span>Effect Amount 2</span><input type="number" formControlName="effectAmount2" /></label>
-						<label class="tresher-field"><span>Last For (rounds)</span><input type="number" formControlName="lastFor" min="0" /></label>
 						<label class="tresher-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
 						<label class="tresher-field"><span>Skill Points</span><input type="number" formControlName="sp" min="0" /></label>
 						<label class="tresher-field"><span>Success Test Value</span><input type="number" formControlName="successTestValue" /></label>
@@ -1051,11 +1065,12 @@
 								<select formControlName="imageId"><option [ngValue]="null">No Image</option>@for (img of libImageOptions(); track img.id) { <option [ngValue]="img.id">{{ img.name }}</option> }</select>
 								<app-upload-popup mediaType="image" (mediaUploaded)="onLibSpellImageUploaded($event)" />
 							</div>
+							@if (libSelectedSpellImageUrl()) { <div class="monster-selected-image-wrap spell-image-preview"><img class="dashboard-image-thumb" [src]="libSelectedSpellImageUrl()" alt="spell image" /></div> }
 						</label>
-						@if (libSelectedSpellImageUrl()) { <div class="monster-selected-image-wrap"><img class="dashboard-image-thumb" [src]="libSelectedSpellImageUrl()" alt="spell image" /></div> }
 						<label class="tresher-field"><span>Sound</span>
 							<div style="display:flex;gap:0.4rem;align-items:center">
 								<select formControlName="soundId"><option [ngValue]="null">No Sound</option>@for (snd of libSoundOptions(); track snd.id) { <option [ngValue]="snd.id">{{ snd.name }}</option> }</select>
+								<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="playLibSelectedSpellSound()" [disabled]="!libSelectedSpellSoundUrl()">Play</button>
 								<app-upload-popup mediaType="sound" (mediaUploaded)="onLibSpellSoundUploaded($event)" />
 							</div>
 						</label>
@@ -1828,12 +1843,15 @@
 				</select>
 
 				<label class="form-label" for="monster-sound-id">Sound</label>
-				<select id="monster-sound-id" class="form-input" (change)="setMonsterDialogSoundId($any($event.target).value)">
-					<option value="">None</option>
-					@for (snd of monsterDialogSounds(); track snd.id) {
-						<option [value]="snd.id" [attr.selected]="editingMonsterSoundId() === snd.id ? true : null">{{ snd.name }}</option>
-					}
-				</select>
+				<div style="display:flex;gap:0.4rem;align-items:center">
+					<select id="monster-sound-id" class="form-input" (change)="setMonsterDialogSoundId($any($event.target).value)">
+						<option value="">None</option>
+						@for (snd of monsterDialogSounds(); track snd.id) {
+							<option [value]="snd.id" [attr.selected]="editingMonsterSoundId() === snd.id ? true : null">{{ snd.name }}</option>
+						}
+					</select>
+					<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="playSelectedMonsterDialogSound()" [disabled]="!selectedMonsterDialogSoundUrl()">Play</button>
+				</div>
 
 				<p class="form-label" style="margin-top: 0.6rem">Attacks</p>
 				@for (attack of editingMonsterAttacks(); track $index; let i = $index) {

@@ -37,7 +37,7 @@ exports.updatePotion = exports.createPotion = exports.getPotions = void 0;
 const potionService = __importStar(require("../services/potionService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EFFECT_TO_OPTIONS = new Set([
-    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'Action Economy',
+    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'ROS', 'AE', 'Action Economy', '# of Attacks', '# of attacks #OA',
 ]);
 function normalizeNumber(value, fallback) {
     const n = typeof value === 'number' ? value : Number(value);

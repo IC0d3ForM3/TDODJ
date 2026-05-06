@@ -1,11 +1,21 @@
 import * as userRepo from '../repositories/userRepository';
 import { LoginUserRecord, NewUser, UserFlagUpdate } from '../repositories/userRepository';
+import * as dailyHitsService from './dailyHitsService';
 
 export const getAllUsers = async () => {
   return await userRepo.getAllUsers();
 };
 export const loginUser = async (username: string, password: string): Promise<LoginUserRecord | null> => {
-  return await userRepo.getActiveUserByCredentials(username, password);
+  const user = await userRepo.getActiveUserByCredentials(username, password);
+  if (user) {
+    try {
+      await dailyHitsService.recordLoginHit();
+    } catch (error) {
+      // Do not block valid logins if stats tracking has a transient issue.
+      console.error('Failed to record login hit:', error);
+    }
+  }
+  return user;
 };
 
 export const fetchUser = async (id: number) => {

@@ -141,6 +141,30 @@ export class Monsters implements OnInit {
     return this.selectedImage()?.name ?? null;
   }
 
+  selectedSound(): SoundOption | null {
+    const id = this.userMonsterForm.controls.soundId.value;
+    return id !== null ? (this.allSoundOptions().find((s) => s.id === id) ?? null) : null;
+  }
+
+  selectedSoundUrl(): string {
+    const sound = this.selectedSound();
+    return sound ? this.resolveSoundUrl(sound.path) : '';
+  }
+
+  playSelectedSound(): void {
+    const soundUrl = this.selectedSoundUrl();
+    if (!soundUrl) return;
+    try {
+      const audio = new Audio(soundUrl);
+      audio.volume = 0.75;
+      void audio.play().catch(() => {
+        // Ignore browser playback failures.
+      });
+    } catch {
+      // Audio API unavailable.
+    }
+  }
+
   tresherControls(): MonsterTresherControl[] {
     return this.monsterTresherIdsArray.controls;
   }
@@ -296,6 +320,12 @@ export class Monsters implements OnInit {
   }
 
   resolveImageUrl(path: string): string {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+  }
+
+  resolveSoundUrl(path: string): string {
     if (!path) return '';
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;

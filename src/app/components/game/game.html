@@ -201,6 +201,7 @@
 								class="fpv-icon-btn"
 								[class.fpv-icon-btn-active]="canPlayerAttack() || canAttackUnarmed()"
 								title="{{ hasWeaponEquipped() ? 'Attack' : 'Unarmed Attack' }}"
+								[disabled]="!canPlayerAttack()"
 								(click)="tryPlayerAttack()"
 								>{{ hasWeaponEquipped() ? '⚔' : '✊' }}</button>							<button
 							type="button"
@@ -387,15 +388,6 @@
 						<span class="stat-badge stat-secondary" title="Mind">MN: {{ playerMindForView() }}</span>
 						<span class="stat-badge stat-secondary" title="Stamina (adds to AC)">STA: {{ playerStaminaForView() }}</span>
 						<span class="stat-badge stat-secondary" title="Armour Class">AC: {{ playerACForView() }}</span>
-						<span class="stat-badge stat-phase">
-							@if (turnPhase() === 'player') {
-								Your Turn
-							} @else if (turnPhase() === 'monsters') {
-								Monster Turn...
-							} @else {
-								Game Over
-							}
-						</span>
 					</div>
 					@if (playerActiveEffects().length > 0) {
 						<div class="active-effects-bar">
@@ -416,6 +408,7 @@
 							<button type="button" class="action-button action-button-ade" [disabled]="!canAde()" (click)="tryAde()" title="Attack + Defend + End Turn (requires 2 AE)">
 								ADE
 							</button>
+							<span class="stat-badge stat-phase turn-phase-inline">Your Turn</span>
 						@if (isFighterClass()) {
 							<button type="button" class="action-button action-button-boost" [class.action-button-disabled]="!canBoostAttack()" [disabled]="!canBoostAttack()" (click)="tryBoostAttack()" title="Boost Attack — +1d3/d4/d6 to hit, -4 AC until your next turn. Must be first action of your turn.">
 								Boost
@@ -448,7 +441,48 @@
 						</div>
 					}
 					<div class="info-col nearby-col">
-						<h3 class="panel-title panel-title-light">Nearby</h3>
+						<h3 class="panel-title panel-title-light">Place Inventory</h3>
+						<p class="inventory-section-title">Monsters (if any)</p>
+						@if (nearbyMonstersForPreview().length > 0) {
+							<ul class="discovery-list">
+								@for (monster of nearbyMonstersForPreview(); track monster.kind + ':' + monster.row + ':' + monster.column + ':' + monster.name) {
+									<li class="discovery-item">
+										<span class="discovery-kind">Monster</span>
+										<p class="discovery-name">{{ monster.name }}</p>
+										<p class="discovery-description">{{ monster.description }}</p>
+									</li>
+								}
+							</ul>
+						} @else {
+							<p class="discovery-empty">No monsters nearby.</p>
+						}
+
+						<p class="inventory-section-title">Things You Can Pick Up</p>
+						@if (currentSquarePickupItemsForPreview().length > 0) {
+							<ul class="discovery-list">
+								@for (item of currentSquarePickupItemsForPreview(); track item.kind + ':' + item.row + ':' + item.column + ':' + item.name) {
+									<li class="discovery-item">
+										<span class="discovery-kind">{{ item.kind }}</span>
+										<p class="discovery-name">{{ item.name }}</p>
+										<p class="discovery-description">{{ item.description }}</p>
+										<div class="inventory-item-actions">
+											<button type="button" class="action-button action-button-strong" (click)="takeSinglePickupItem(item)">
+												Take
+											</button>
+										</div>
+									</li>
+								}
+							</ul>
+							<div class="action-buttons">
+								<button type="button" class="action-button action-button-strong" (click)="takeAllFromCurrentSquare()">
+									Take All
+								</button>
+							</div>
+						} @else {
+							<p class="discovery-empty">Nothing to pick up on this square.</p>
+						}
+
+						<p class="inventory-section-title">Things Nearby</p>
 
 						@if (nearbyDoorsForPreview().length > 0) {
 						<ul class="discovery-list">
@@ -500,9 +534,9 @@
 						</ul>
 					}
 
-					@if (nearbyItemsForPreview().length > 0) {
+					@if (otherNearbyItemsForPreview().length > 0) {
 						<ul class="discovery-list">
-							@for (item of nearbyItemsForPreview(); track item.kind + ':' + item.row + ':' + item.column + ':' + item.name) {
+							@for (item of otherNearbyItemsForPreview(); track item.kind + ':' + item.row + ':' + item.column + ':' + item.name) {
 							<li class="discovery-item" [class.discovery-item-wall-note]="item.kind === 'Text'">
 									<span class="discovery-kind">{{ item.kind }}</span>
 									<p class="discovery-name">{{ item.name }}</p>
@@ -510,8 +544,8 @@
 								</li>
 							}
 						</ul>
-					} @else {
-						<p class="discovery-empty">No key or tresher in your current or front square.</p>
+					} @else if (nearbyDoorsForPreview().length === 0) {
+						<p class="discovery-empty">Nothing else nearby right now.</p>
 					}
 
 					@if (hasCurrentSquarePickupItems()) {
@@ -522,14 +556,6 @@
 							@if (foundTrap()) {
 								<button type="button" class="action-button action-button-strong" (click)="tryDisarmTrap()">
 									Disarm Trap
-								</button>
-							}
-							<button type="button" class="action-button action-button-strong" (click)="takeAllFromCurrentSquare()">
-								Take All
-							</button>
-							@if (canTakeSomeFromCurrentSquare()) {
-								<button type="button" class="action-button" (click)="takeSomeFromCurrentSquare()">
-									Take Some
 								</button>
 							}
 						</div>
@@ -569,6 +595,7 @@
 
 					<div class="info-col inventory-col">
 						<h3 class="panel-title panel-title-light">Inventory</h3>
+						<div class="inventory-scroll">
 						<div class="inventory-summary">
 							<p class="inventory-summary-line">
 								Hands Equipped: {{ inventoryHandsUsedForPreview() }} / {{ maxEquippableHands }}
@@ -617,9 +644,6 @@
 													>
 														{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
 													</button>
-													@if (isItemEquippedById(item.id)) {
-														<span class="inventory-equipped-status">Equipped</span>
-													}
 												}
 												<button
 													type="button"
@@ -636,6 +660,7 @@
 
 							@if (allTresherPotionsFlat().length > 0) {
 								<p class="inventory-section-label">Potions</p>
+								<p class="tresher-item-desc">Hint: "Magic"/"MP" potions apply Arcane Infusion: +MP and +spell effect while active.</p>
 								<ul class="tresher-items-list">
 									@for (potion of allTresherPotionsFlat(); track potion.id) {
 										<li class="tresher-inner-item">
@@ -662,6 +687,7 @@
 
 							@if (allTresherSpellsFlat().length > 0) {
 								<p class="inventory-section-label">Spells</p>
+								<p class="tresher-item-desc">Spell Loadout: {{ equippedSpellMagicCostForPreview() }} / {{ playerMindForView() }} Mind</p>
 								@if (spellTargetMode(); as targetMode) {
 									<div class="spell-target-banner">
 										<span class="spell-target-banner-text">
@@ -673,7 +699,7 @@
 											<button type="button" class="action-button action-button-strong"
 												[disabled]="targetMode.targets.length === 0"
 												(click)="executeMultiTargetSpell()">
-												Cast ({{ pcTresherSpellsById().get(targetMode.spellId)?.sp ?? 0 }} AE)
+												Cast (1 AE)
 											</button>
 											<button type="button" class="action-button" (click)="cancelSpellTargetMode()">Cancel</button>
 										</div>
@@ -687,17 +713,53 @@
 												<span class="tresher-item-desc">{{ spell.description }}</span>
 											}
 											<span class="tresher-item-desc">
-												Cost: {{ spell.sp }} MP (AE) | Range: {{ spell.range }} | Effect: {{ spell.effectOn }}@if (spell.numberOfTargets > 1) { | Targets: {{ spell.numberOfTargets }}}
+												AE: {{ spell.sp }} | Magic Cost: {{ spell.magicCost ?? 1 }} | Range: {{ spell.range }} | Effect: {{ spell.effectOn }}@if (spell.numberOfTargets > 1) { | Targets: {{ spell.numberOfTargets }}}
 											</span>
 											<div class="inventory-item-actions">
+												<button
+													type="button"
+													class="action-button"
+													[class.action-button-strong]="isSpellEquippedById(spell.id)"
+													(click)="toggleSpellEquipped(spell.id)"
+												>
+													{{ isSpellEquippedById(spell.id) ? 'Unequip' : 'Equip' }}
+												</button>
 												<button
 													type="button"
 													class="action-button action-button-strong"
 													[disabled]="!canCastSpell(spell) || spellTargetMode() !== null"
 													(click)="initSpellCast(spell.id)"
 												>
-													Cast ({{ spell.sp }} AE)
+													Cast (1 AE)
 												</button>
+											</div>
+										</li>
+									}
+								</ul>
+							}
+
+							@if (collectedFloorSpellsForPreview().length > 0) {
+								<p class="inventory-section-title">Spells</p>
+								<ul class="tresher-items-list">
+									@for (spell of collectedFloorSpellsForPreview(); track spell.id + ':' + $index) {
+										<li class="tresher-inner-item">
+											<span class="tresher-item-name">{{ spell.name }}</span>
+											@if (spell.description) {
+												<span class="tresher-item-desc">{{ spell.description }}</span>
+											}
+											<span class="tresher-item-desc">Learn Cost: {{ spell.sp }} SP | Learn TN: {{ spell.successTestValue }}</span>
+											<div class="inventory-item-actions">
+												<button
+													type="button"
+													class="action-button action-button-strong"
+													[disabled]="!canLearnCollectedSpell(spell)"
+													(click)="learnCollectedFloorSpell(spell.id)"
+												>
+													Learn
+												</button>
+												@if (isSpellLearned(spell.id)) {
+													<span class="inventory-equipped-status">Learned</span>
+												}
 											</div>
 										</li>
 									}
@@ -708,10 +770,10 @@
 						<p class="discovery-empty">Inventory is empty.</p>
 					}
 
-					@if (collectedFloorItemsForPreview().length > 0) {
-						<p class="inventory-section-title">Floor Items</p>
+					@if (collectedWeaponItemsForPreview().length > 0) {
+						<p class="inventory-section-title">Weapons</p>
 						<ul class="tresher-items-list">
-							@for (item of collectedFloorItemsForPreview(); track item.id) {
+							@for (item of collectedWeaponItemsForPreview(); track item.id) {
 								<li class="tresher-inner-item">
 									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
 									@if (item.type === 'weapon' && item.damage > 0) {
@@ -730,9 +792,6 @@
 											>
 												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
 											</button>
-											@if (isItemEquippedById(item.id)) {
-												<span class="inventory-equipped-status">Equipped</span>
-											}
 										}
 										<button
 											type="button"
@@ -747,8 +806,62 @@
 						</ul>
 					}
 
+					@if (collectedArmorItemsForPreview().length > 0) {
+						<p class="inventory-section-title">Armor</p>
+						<ul class="tresher-items-list">
+							@for (item of collectedArmorItemsForPreview(); track item.id) {
+								<li class="tresher-inner-item">
+									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+									@if ((item.type === 'armor' || item.type === 'ring' || item.type === 'necklace') && item.effectValue) {
+										<span class="tresher-item-stat">+{{ item.effectValue }} AC</span>
+									}
+									<div class="inventory-item-actions">
+										@if (isItemEquipable(item.type)) {
+											<button
+												type="button"
+												class="action-button"
+												[class.action-button-strong]="isItemEquippedById(item.id)"
+												(click)="toggleItemEquipped(item.id)"
+											>
+												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
+											</button>
+										}
+										<button
+											type="button"
+											class="action-button action-button-danger"
+											(click)="dropCollectedFloorItem(item.id)"
+										>
+											Drop
+										</button>
+									</div>
+								</li>
+							}
+						</ul>
+					}
+
+					@if (collectedOtherItemsForPreview().length > 0) {
+						<p class="inventory-section-title">Items</p>
+						<ul class="tresher-items-list">
+							@for (item of collectedOtherItemsForPreview(); track item.id) {
+								<li class="tresher-inner-item">
+									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+									<div class="inventory-item-actions">
+										<button
+											type="button"
+											class="action-button action-button-danger"
+											(click)="dropCollectedFloorItem(item.id)"
+										>
+											Drop
+										</button>
+									</div>
+								</li>
+							}
+						</ul>
+					}
+
 					@if (collectedFloorPotionsForPreview().length > 0) {
-						<p class="inventory-section-title">Floor Potions</p>
+						<p class="inventory-section-title">Potions</p>
+						<p class="tresher-item-desc">Hint: "Magic"/"MP" potions apply Arcane Infusion: +MP and +spell effect while active.</p>
 						<ul class="tresher-items-list">
 							@for (potion of collectedFloorPotionsForPreview(); track potion.id + ':' + $index) {
 								<li class="tresher-inner-item">
@@ -770,6 +883,28 @@
 							}
 						</ul>
 					}
+					</div>
+					<div class="inventory-pc-card">
+						@if (playerPortraitUrl(); as portraitUrl) {
+							<img class="inventory-pc-img" [src]="portraitUrl" [alt]="(playerName() || 'Player') + ' portrait'" />
+						} @else {
+							<svg class="inventory-pc-svg" viewBox="-12 0 104 165" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Player character silhouette">
+								<rect x="-12" y="0" width="104" height="165" fill="white"/>
+								<ellipse cx="40" cy="16" rx="12" ry="13" fill="none" stroke="#333" stroke-width="1.5"/>
+								<rect x="37" y="28" width="6" height="6" fill="none" stroke="#333" stroke-width="1.2"/>
+								<polygon points="21,34 59,34 56,84 24,84" fill="none" stroke="#333" stroke-width="1.5"/>
+								<polygon points="9,34 21,34 19,84 7,84" fill="none" stroke="#333" stroke-width="1.5"/>
+								<polygon points="59,34 71,34 73,84 61,84" fill="none" stroke="#333" stroke-width="1.5"/>
+								<ellipse cx="12" cy="90" rx="5" ry="6" fill="none" stroke="#333" stroke-width="1.2"/>
+								<ellipse cx="68" cy="90" rx="5" ry="6" fill="none" stroke="#333" stroke-width="1.2"/>
+								<polygon points="24,84 40,84 38,148 22,148" fill="none" stroke="#333" stroke-width="1.5"/>
+								<polygon points="40,84 56,84 58,148 42,148" fill="none" stroke="#333" stroke-width="1.5"/>
+								<ellipse cx="27" cy="153" rx="9" ry="5" fill="none" stroke="#333" stroke-width="1.2"/>
+								<ellipse cx="53" cy="153" rx="9" ry="5" fill="none" stroke="#333" stroke-width="1.2"/>
+							</svg>
+						}
+						<p class="inventory-pc-name">{{ playerName() || 'Player' }}</p>
+					</div>
 					</div>
 
 			</aside>

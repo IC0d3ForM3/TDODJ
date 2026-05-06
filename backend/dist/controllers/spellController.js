@@ -37,7 +37,7 @@ exports.updateSpell = exports.createSpell = exports.getSpells = void 0;
 const spellService = __importStar(require("../services/spellService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EFFECT_TO_OPTIONS = new Set([
-    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'Action Economy',
+    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'ROS', 'AE', 'Action Economy', '# of Attacks', '# of attacks #OA',
 ]);
 const EFFECT_TYPE_OPTIONS = new Set(['Fire', 'Ice', 'Lightning', 'Other']);
 const EFFECT_TYPE_DEFAULT_COLORS = {
@@ -75,13 +75,19 @@ function normalizeNullableInt(value) {
 function buildSpellPayload(input, isAdmin) {
     const effectOn = normalizeText(input.effectOn ?? input.effecton, '');
     const effectOn2 = normalizeText(input.effectOn2 ?? input.effecton2, '');
+    const range1 = Math.max(0, normalizeNumber(input.range1 ?? input.range, 0));
+    const range2 = Math.max(0, normalizeNumber(input.range2 ?? input.range, 0));
+    const lastFor1 = Math.max(0, normalizeNumber(input.lastFor1 ?? input.lastfor1 ?? input.lastFor ?? input.lastfor, 0));
+    const lastFor2 = Math.max(0, normalizeNumber(input.lastFor2 ?? input.lastfor2 ?? input.lastFor ?? input.lastfor, 0));
+    const effectOnPc1 = (input.effectOnPc1 === true || input.effectonpc1 === true) || range1 === 0;
+    const effectOnPc2 = (input.effectOnPc2 === true || input.effectonpc2 === true) || range2 === 0;
     return {
         name: normalizeText(input.name, 'Unnamed Spell'),
         description: normalizeText(input.description, ''),
-        range: Math.max(0, normalizeNumber(input.range, 0)),
+        range: effectOnPc1 ? 0 : range1,
         effectOn: EFFECT_TO_OPTIONS.has(effectOn) ? effectOn : '',
         effectOn2: EFFECT_TO_OPTIONS.has(effectOn2) ? effectOn2 : '',
-        lastFor: Math.max(0, normalizeNumber(input.lastFor ?? input.lastfor, 0)),
+        lastFor: lastFor1,
         effectAmount: normalizeNumber(input.effectAmount, 0),
         effectAmount2: normalizeNumber(input.effectAmount2, 0),
         value: Math.max(0, normalizeNumber(input.value, 0)),
@@ -95,6 +101,12 @@ function buildSpellPayload(input, isAdmin) {
         numberOfTargets: Math.max(1, normalizeNumber(input.numberOfTargets ?? input.numberoftargets, 1)),
         effectType: normalizeEffectType(input.effectType ?? input.effecttype),
         effectColor: normalizeEffectColor(input.effectColor ?? input.effectcolor, normalizeEffectType(input.effectType ?? input.effecttype)),
+        effectOnPc1,
+        effectOnPc2,
+        range1,
+        range2,
+        lastFor1,
+        lastFor2,
     };
 }
 const getSpells = async (req, res) => {

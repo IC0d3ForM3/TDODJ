@@ -7,6 +7,7 @@ export interface ActiveEffect {
   effectAmount: number;
   remainingAE: number;
   sourceName: string;
+  behavior?: 'tick' | 'modifier';
 }
 
 export interface GameMonsterInstance {
@@ -16,9 +17,12 @@ export interface GameMonsterInstance {
   column: number;
   roam: boolean;
   currentHp: number;
+  currentMagic: number;
+  permanentStatModifiers: Record<string, number>;
   isDead: boolean;
   remainingAE: number;
   attacksUsedThisTurn: number;
+  hasCastSpellThisTurn: boolean;
   dropTresherIds: number[];
   dropKeyIds: number[];
   dropItemIds: number[];

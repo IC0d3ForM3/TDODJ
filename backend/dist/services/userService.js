@@ -35,12 +35,23 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateUserFlags = exports.createUser = exports.fetchUser = exports.loginUser = exports.getAllUsers = void 0;
 const userRepo = __importStar(require("../repositories/userRepository"));
+const dailyHitsService = __importStar(require("./dailyHitsService"));
 const getAllUsers = async () => {
     return await userRepo.getAllUsers();
 };
 exports.getAllUsers = getAllUsers;
 const loginUser = async (username, password) => {
-    return await userRepo.getActiveUserByCredentials(username, password);
+    const user = await userRepo.getActiveUserByCredentials(username, password);
+    if (user) {
+        try {
+            await dailyHitsService.recordLoginHit();
+        }
+        catch (error) {
+            // Do not block valid logins if stats tracking has a transient issue.
+            console.error('Failed to record login hit:', error);
+        }
+    }
+    return user;
 };
 exports.loginUser = loginUser;
 const fetchUser = async (id) => {

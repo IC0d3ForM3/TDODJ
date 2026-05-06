@@ -36,8 +36,8 @@
         <tr><th>Class</th><th>Max HP</th><th>AC Bonus</th><th>Magic Power</th><th>Role</th></tr>
       </thead>
       <tbody>
-        <tr><td>Fighter</td><td>d12 + 4</td><td>2 + Str÷2 (max 5) + 1d6÷2</td><td>0</td><td>Front-line brawler</td></tr>
-        <tr><td>Thieph</td><td>d12 + 2</td><td>1</td><td>2</td><td>Stealth, picking locks</td></tr>
+        <tr><td>Fighter</td><td>d12 + 4</td><td>2 + Str÷2 (max 5) + 1d6÷2</td><td>0</td><td>Front-line brawler, −2 to spell learning, −1 to spell cast rolls</td></tr>
+        <tr><td>Thieph</td><td>d12 + 2</td><td>1</td><td>2</td><td>Stealth, picking locks, −1 to spell learning</td></tr>
         <tr><td>Mage</td><td>d12÷2 + 2</td><td>1</td><td>8 +</td><td>Spell power, fragile</td></tr>
         <tr><td>Healer</td><td>d12÷2 + 2</td><td>1</td><td>6 +</td><td>Support, recovery</td></tr>
       </tbody>
@@ -51,7 +51,7 @@
       <li><strong>Strength</strong> — Adds to weapon damage.</li>
       <li><strong>Stamina</strong> — Adds to your attack roll.</li>
       <li><strong>Mind</strong> — Used for trap detection, lock picking, finding hidden doors, and casting spells. Also determines your Magic Resistance (Mind ÷ 2, rounded down).</li>
-      <li><strong>Magic Power (MP)</strong> — How many magic points you have available to fuel spells. Each magic point costs 1 AE to spend.</li>
+      <li><strong>Magic Power (MP)</strong> — How many magic points you have available to fuel spells. Casting a spell costs 1 AE and also spends that spell's Magic Cost from your MP pool.</li>
       <li><strong>Range of View</strong> — How far you can see in the first-person view.</li>
     </ul>
   </section>
@@ -108,7 +108,7 @@
       </li>
       <li>
         <span class="htp-icon">💰</span>
-        <span><strong>Take All</strong> — Pick up every tresher and key on your current square in one tap. Lights up gold when there is loot to grab.</span>
+        <span><strong>Take All</strong> — Pick up every key, tresher, item, potion, and spell on your current square in one tap. Lights up gold when there is loot to grab.</span>
       </li>
       <li>
         <span class="htp-icon">🚪</span>
@@ -248,8 +248,8 @@
   <section class="how-to-play-section">
     <h3>The Info Panel</h3>
     <p>
-      The right-hand side of the screen holds your <strong>Combat Log</strong>, an
-      <strong>Inventory</strong> panel, and a <strong>Nearby</strong> panel showing what is around you.
+      The side panel holds your <strong>Combat Log</strong>, a <strong>Place Inventory</strong>
+      panel showing what is around you, and your <strong>Inventory</strong> panel.
     </p>
     <p class="htp-subsection-title">Combat Log</p>
     <ul>
@@ -257,10 +257,10 @@
     </ul>
     <p class="htp-subsection-title">Nearby</p>
     <ul>
-      <li>Lists every <strong>door</strong> adjacent to you with its state (open, closed, locked) and action buttons — Open Door, Use Key, Pick Lock.</li>
-      <li>Shows <strong>treshers</strong> and <strong>keys</strong> on your current or front square.</li>
+      <li>Lists nearby <strong>monsters</strong>, then what you can pick up on your current square, then nearby doors, text, and other objects.</li>
+      <li>Doors still show their state (open, closed, locked) and action buttons — Open Door, Use Key, Pick Lock.</li>
       <li>Has a <strong>Search for Traps</strong> button. Thieph and Shorties can search <strong>twice per turn</strong>; other classes once. If a trap is found a <strong>Disarm Trap</strong> button appears.</li>
-      <li>Shows a <strong>Take All</strong> button (and <strong>Take Some</strong> if there are multiple treshers).</li>
+      <li>Pickup items show their own <strong>Take</strong> button, plus a <strong>Take All</strong> button for the whole square.</li>
       <li>Shows <strong>Defend</strong> and <strong>Boost Attack</strong> (Fighter only) buttons for spending AE defensively or offensively mid-turn.</li>
     </ul>
     <p class="htp-subsection-title">Inventory</p>
@@ -271,7 +271,7 @@
       <li>Rings and necklaces equip to their own slots and provide passive bonuses.</li>
       <li>Magic gems equip and add to your Magic Power.</li>
       <li>Potions show a <strong>Drink</strong> button (costs 1 AE, cannot be used on monster turns). Some potions have a lasting effect that ticks over multiple turns.</li>
-      <li>Spells show a <strong>Cast (N AE)</strong> button that lights up when a valid target is in range.</li>
+      <li>Spells show a <strong>Cast (1 AE)</strong> button that lights up when a valid target is in range and you have enough MP.</li>
     </ul>
   </section>
 
@@ -329,18 +329,19 @@
     <h3>Magic</h3>
     <p>
       If your PC has spells in their inventory (inside a tresher), those spells appear in the
-      <strong>Inventory</strong> tab with a <strong>Cast (N AE)</strong> button.
+      <strong>Inventory</strong> tab with a <strong>Cast (1 AE)</strong> button.
     </p>
     <p class="htp-subsection-title">Casting a Spell</p>
     <ul>
-      <li>Each spell costs <strong>N AE</strong> (magic points) — the cost is shown on the Cast button.</li>
+      <li>Each spell cast costs <strong>1 AE</strong>. It also spends the spell's <strong>Magic Cost</strong> from your MP pool.</li>
       <li>You must have a live monster within the spell's <strong>range</strong> to cast it.</li>
       <li>
-        <strong>Spell hit roll:</strong> 1d12 + Mind vs the spell's Target Number + monster's Magic Resistance.
+        <strong>Spell hit roll:</strong> 1d12 + Mind + class modifier vs the spell's Target Number + monster's Magic Resistance.
         Roll equal to or above the total to succeed.
       </li>
       <li>On a success the spell applies its effect (e.g. HP damage, stat reduction).</li>
       <li>On a failure the spell fizzles — AE is still spent.</li>
+      <li><strong>Class penalties:</strong> Fighters take −1 on spell cast rolls. Thiephs have no casting penalty.</li>
     </ul>
     <p class="htp-subsection-title">Magic Resistance</p>
     <ul>
@@ -356,6 +357,7 @@
     <p class="htp-subsection-title">Tips</p>
     <ul>
       <li>Mage and Healer classes start with higher Magic Power, making them better spellcasters.</li>
+      <li>Learning a spell uses <strong>1d12 + Mind ÷ 2 + class modifier</strong> vs the spell's TN. Fighters take −2; Thiephs take −1.</li>
       <li>A higher Mind stat improves both your spell accuracy and your resistance to enemy magic.</li>
       <li>Spells can hit from range — useful when you want to avoid melee.</li>
     </ul>

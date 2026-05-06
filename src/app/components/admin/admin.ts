@@ -52,6 +52,13 @@ interface ContactRequest {
   isresponded: boolean;
 }
 
+interface DailyHitsRecord {
+  id: number;
+  homehits: number;
+  logins: number;
+  datetime: string;
+}
+
 @Component({
   selector: 'app-admin',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -88,6 +95,12 @@ export class Admin implements OnInit {
   readonly contactRequests = signal<ContactRequest[]>([]);
   readonly isContactsLoading = signal(false);
   readonly contactError = signal<string | null>(null);
+
+  // Daily hits stats
+  readonly dailyHits = signal<DailyHitsRecord[]>([]);
+  readonly isDailyHitsLoading = signal(false);
+  readonly dailyHitsError = signal<string | null>(null);
+
   readonly contactSortDir = signal<'desc' | 'asc'>('desc');
   readonly contactSortedRequests = computed(() => {
     const dir = this.contactSortDir();
@@ -108,6 +121,7 @@ export class Admin implements OnInit {
     this.loadUsers();
     this.loadDungons();
     this.loadAllPcs();
+    this.loadDailyHits();
     this.loadContactRequests();
   }
 
@@ -309,6 +323,21 @@ export class Admin implements OnInit {
       error: () => {
         this.pcError.set('Failed to update sample pc.');
         this.pcSaving.set(null);
+      },
+    });
+  }
+
+  private loadDailyHits(): void {
+    this.isDailyHitsLoading.set(true);
+    this.dailyHitsError.set(null);
+    this.http.get<DailyHitsRecord[]>(`${API_BASE_URL}/stats/daily-hits?limit=30`).subscribe({
+      next: (hits) => {
+        this.dailyHits.set(hits);
+        this.isDailyHitsLoading.set(false);
+      },
+      error: () => {
+        this.dailyHitsError.set('Failed to load daily hits.');
+        this.isDailyHitsLoading.set(false);
       },
     });
   }

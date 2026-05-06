@@ -22,6 +22,12 @@ export interface SpellRecord {
   numberOfTargets: number;
   effectType: string;
   effectColor: string;
+  effectOnPc1: boolean;
+  effectOnPc2: boolean;
+  range1: number;
+  range2: number;
+  lastFor1: number;
+  lastFor2: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +52,12 @@ export interface UpsertSpellPayload {
   numberOfTargets: number;
   effectType: string;
   effectColor: string;
+  effectOnPc1: boolean;
+  effectOnPc2: boolean;
+  range1: number;
+  range2: number;
+  lastFor1: number;
+  lastFor2: number;
 }
 
 const SELECT_SPELL_FIELDS = `
@@ -53,10 +65,10 @@ const SELECT_SPELL_FIELDS = `
   userguid::text AS userguid,
   name,
   description,
-  range,
+  COALESCE(range1, range, 0) AS range,
   effecton AS "effectOn",
   COALESCE(effecton2, '') AS "effectOn2",
-  lastfor AS "lastFor",
+  COALESCE(lastfor1, lastfor, 0) AS "lastFor",
   damage AS "effectAmount",
   COALESCE(effectamount2, 0) AS "effectAmount2",
   COALESCE(value, 0) AS value,
@@ -70,6 +82,12 @@ const SELECT_SPELL_FIELDS = `
   COALESCE(numberoftargets, 1) AS "numberOfTargets",
   COALESCE(effecttype, 'Other') AS "effectType",
   COALESCE(effectcolor, '#ffffff') AS "effectColor",
+  COALESCE(effectonpc1, FALSE) AS "effectOnPc1",
+  COALESCE(effectonpc2, FALSE) AS "effectOnPc2",
+  COALESCE(range1, range, 0) AS "range1",
+  COALESCE(range2, range, 0) AS "range2",
+  COALESCE(lastfor1, lastfor, 0) AS "lastFor1",
+  COALESCE(lastfor2, lastfor, 0) AS "lastFor2",
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -121,8 +139,9 @@ export const insertSpellForUser = async (
   const { rows } = await pool.query<SpellRecord>(
     `INSERT INTO spells
        (userguid, name, description, range, effecton, effecton2, lastfor, damage,
-        effectamount2, effectto, value, sp, successtestvalue, magiccost, costtolearn, imageid, soundid, ispublic, numberoftargets, effecttype, effectcolor)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        effectamount2, effectto, value, sp, successtestvalue, magiccost, costtolearn, imageid, soundid, ispublic, numberoftargets, effecttype, effectcolor,
+        effectonpc1, effectonpc2, range1, range2, lastfor1, lastfor2)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
      RETURNING ${SELECT_SPELL_FIELDS}`,
     [
       userguid,
@@ -146,6 +165,12 @@ export const insertSpellForUser = async (
       payload.numberOfTargets,
       payload.effectType,
       payload.effectColor,
+      payload.effectOnPc1,
+      payload.effectOnPc2,
+      payload.range1,
+      payload.range2,
+      payload.lastFor1,
+      payload.lastFor2,
     ]
   );
   return rows[0];
@@ -178,6 +203,12 @@ export const updateSpellForUser = async (
        numberoftargets = $19,
        effecttype = $20,
        effectcolor = $21,
+       effectonpc1 = $22,
+       effectonpc2 = $23,
+       range1 = $24,
+       range2 = $25,
+       lastfor1 = $26,
+       lastfor2 = $27,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_SPELL_FIELDS}`,
@@ -203,6 +234,12 @@ export const updateSpellForUser = async (
       payload.numberOfTargets,
       payload.effectType,
       payload.effectColor,
+      payload.effectOnPc1,
+      payload.effectOnPc2,
+      payload.range1,
+      payload.range2,
+      payload.lastFor1,
+      payload.lastFor2,
     ]
   );
   return rows[0] ?? null;

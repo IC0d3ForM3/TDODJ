@@ -62,6 +62,7 @@
 					<label class="pt-field pt-field-wide"><span>Sound</span>
 						<div class="pt-upload-row">
 							<select formControlName="soundId"><option [ngValue]="null">No Sound</option>@for (sound of allSoundOptions(); track sound.id) { <option [ngValue]="sound.id">{{ sound.name }}</option> }</select>
+							<button type="button" class="pt-btn-muted" (click)="playSelectedSound()" [disabled]="!selectedSoundUrl()">Play</button>
 							<app-upload-popup mediaType="sound" (mediaUploaded)="onSoundUploaded($event)" />
 						</div>
 					</label>

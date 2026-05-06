@@ -1,0 +1,23 @@
+ALTER TABLE spells
+  ADD COLUMN IF NOT EXISTS effectonpc1 BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS effectonpc2 BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS range1 INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS range2 INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS lastfor1 INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS lastfor2 INTEGER NOT NULL DEFAULT 0;
+
+UPDATE spells
+SET
+  range1 = COALESCE(range, 0),
+  range2 = COALESCE(range, 0),
+  lastfor1 = COALESCE(lastfor, 0),
+  lastfor2 = COALESCE(lastfor, 0),
+  effectonpc1 = CASE WHEN COALESCE(range, 0) = 0 THEN TRUE ELSE effectonpc1 END,
+  effectonpc2 = CASE WHEN COALESCE(range, 0) = 0 THEN TRUE ELSE effectonpc2 END
+WHERE
+  range1 = 0
+  AND range2 = 0
+  AND lastfor1 = 0
+  AND lastfor2 = 0
+  AND effectonpc1 = FALSE
+  AND effectonpc2 = FALSE;

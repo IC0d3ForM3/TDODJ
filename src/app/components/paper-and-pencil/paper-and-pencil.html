@@ -70,8 +70,8 @@
         <tr><th>Class</th><th>Max HP</th><th>AC Bonus</th><th>Magic Power</th><th>Special</th></tr>
       </thead>
       <tbody>
-        <tr><td>Fighter</td><td>d12 + 4</td><td>2 + Str÷2 (max 5) + 1d6÷2</td><td>0</td><td>Boost Attack ability</td></tr>
-        <tr><td>Thieph</td><td>d12 + 2</td><td>1</td><td>2</td><td>Search twice per turn</td></tr>
+        <tr><td>Fighter</td><td>d12 + 4</td><td>2 + Str÷2 (max 5) + 1d6÷2</td><td>0</td><td>Boost Attack ability; −2 to spell learning, −1 to spell cast rolls</td></tr>
+        <tr><td>Thieph</td><td>d12 + 2</td><td>1</td><td>2</td><td>Search twice per turn; −1 to spell learning</td></tr>
         <tr><td>Mage</td><td>d12 ÷ 2 + 2</td><td>1</td><td>8+</td><td>Powerful spells</td></tr>
         <tr><td>Healer</td><td>d12 ÷ 2 + 2</td><td>1</td><td>6+</td><td>Recovery focus</td></tr>
       </tbody>
@@ -111,10 +111,10 @@
         <tr><td>Defend</td><td>1</td><td>+2 AC until your next turn; up to NOD times</td></tr>
         <tr><td>Search</td><td>1</td><td>Thieph / Shorties may do this twice per turn</td></tr>
         <tr><td>Pick Lock / Disarm Trap</td><td>1</td><td>Mind + d12 vs DC</td></tr>
-        <tr><td>Open door</td><td>1</td><td>Free if already unlocked and adjacent</td></tr>
+        <tr><td>Open door</td><td>1</td><td>Adjacent closed door</td></tr>
         <tr><td>Take loot</td><td>1</td><td>Pick up items on your square</td></tr>
         <tr><td>Drink potion</td><td>1</td><td>Only on your turn</td></tr>
-        <tr><td>Cast spell</td><td>Spell cost</td><td>Minimum 1 AE; target must be in range</td></tr>
+        <tr><td>Cast spell</td><td>1</td><td>Also spend the spell's Magic Cost from MP; target must be in range</td></tr>
         <tr><td>Boost Attack (Fighter)</td><td>All remaining AE</td><td>First action only; see below</td></tr>
         <tr><td>End Turn</td><td>—</td><td>Voluntarily end before AE runs out</td></tr>
       </tbody>
@@ -253,7 +253,7 @@
       <li><strong>Rings / Necklaces:</strong> note passive effects; equip to their slots</li>
       <li><strong>Magic Gems:</strong> add gem's value to your Magic Power when equipped</li>
       <li><strong>Potions:</strong> note healing amount; drink for 1 AE (your turn only)</li>
-      <li><strong>Spells:</strong> note the spell's TN, AE cost, range, and damage</li>
+      <li><strong>Spells:</strong> note the spell's TN, Magic Cost, range, and damage</li>
     </ul>
     <p>
       A tresher with a <strong>✕</strong> mark is trapped — Search before taking it.
@@ -265,12 +265,16 @@
     <h3>Magic</h3>
     <p class="pnp-subsection-title">Casting a Spell</p>
     <ol>
-      <li>Choose a spell in your inventory; check its AE cost and range</li>
-      <li>Spend the AE cost</li>
-      <li>Roll <strong>d12 + Mind</strong> vs the spell's <strong>Target Number + monster Magic Resistance</strong></li>
+      <li>Choose a spell in your inventory; check its Magic Cost and range</li>
+      <li>Spend <strong>1 AE</strong> and the spell's <strong>Magic Cost</strong> from MP</li>
+      <li>Roll <strong>d12 + Mind + class modifier</strong> vs the spell's <strong>Target Number + monster Magic Resistance</strong></li>
       <li>On success: apply the spell's damage or effect to the target</li>
       <li>On failure: spell fizzles — AE is still spent</li>
     </ol>
+    <ul>
+      <li><strong>Spell learning:</strong> roll <strong>d12 + Mind ÷ 2 + class modifier</strong> vs the spell's TN.</li>
+      <li><strong>Class modifiers:</strong> Fighter −2 to learning and −1 to cast rolls; Thieph −1 to learning; Mage and Healer no penalty.</li>
+    </ul>
     <p class="pnp-subsection-title">Magic Resistance</p>
     <ul>
       <li><strong>Your resistance:</strong> Mind ÷ 2 (round down) — monsters must beat this when casting at you</li>
@@ -366,7 +370,7 @@
       <div class="pnp-sheet-section-title">Spells</div>
       <table class="pnp-table pnp-spell-table">
         <thead>
-          <tr><th>Spell Name</th><th>AE Cost</th><th>Range</th><th>TN</th><th>Damage</th></tr>
+          <tr><th>Spell Name</th><th>Magic Cost</th><th>Range</th><th>TN</th><th>Damage</th></tr>
         </thead>
         <tbody>
           <tr><td></td><td></td><td></td><td></td><td></td></tr>

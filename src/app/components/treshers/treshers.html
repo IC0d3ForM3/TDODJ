@@ -107,6 +107,7 @@
                   <option [ngValue]="sound.id">{{ sound.name }} (ID {{ sound.id }})</option>
                 }
               </select>
+              <button type="button" class="tr-btn-muted" (click)="playSelectedSound()" [disabled]="!selectedSoundUrl()">Play</button>
               <app-upload-popup mediaType="sound" (mediaUploaded)="onSoundUploaded($event)" />
             </div>
           </label>

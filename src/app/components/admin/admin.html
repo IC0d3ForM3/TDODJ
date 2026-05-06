@@ -1,3 +1,42 @@
+<!-- ── Daily Stats ────────────────────────────────────────── -->
+<div class="container mt-4">
+	<h2 class="mb-4">Daily Stats</h2>
+
+	@if (dailyHitsError()) {
+		<p class="text-danger">{{ dailyHitsError() }}</p>
+	}
+
+	@if (isDailyHitsLoading()) {
+		<p>Loading daily stats…</p>
+	}
+
+	@if (!isDailyHitsLoading() && dailyHits().length === 0 && !dailyHitsError()) {
+		<p class="text-muted">No daily stats available.</p>
+	}
+
+	@if (!isDailyHitsLoading() && dailyHits().length > 0) {
+		<table class="table table-bordered table-striped">
+			<thead>
+				<tr>
+					<th>Date</th>
+					<th>Home Page Hits</th>
+					<th>Logins</th>
+				</tr>
+			</thead>
+			<tbody>
+				@for (hit of dailyHits(); track hit.id) {
+					<tr>
+						<td>{{ hit.datetime | date: 'MMM d, yyyy' }}</td>
+						<td>{{ hit.homehits }}</td>
+						<td>{{ hit.logins }}</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+</div>
+
+<!-- ── Users Management ───────────────────────────────────────────────– -->
 <div class="container mt-4">
 	<div class="d-flex justify-content-between align-items-center mb-3">
 		<h2 class="mb-0">All Users</h2>
@@ -232,41 +271,41 @@
 		<p class="text-muted">No contact requests yet.</p>
 	}
 
-	@if (!isContactsLoading() && contactRequests().length > 0) {
-		<table class="table table-bordered table-striped">
+	@if (!isContactsLoading() && contactSortedRequests().length > 0) {
+		<table class="table table-bordered table-hover">
 			<thead>
 				<tr>
-					<th>Date</th>
 					<th>Name</th>
 					<th>Email</th>
 					<th>Problem</th>
-					<th>Username</th>
 					<th>Message</th>
+					<th>Username</th>
+					<th>Date</th>
 					<th>Read</th>
 					<th>Responded</th>
 				</tr>
 			</thead>
 			<tbody>
-				@for (req of contactSortedRequests(); track req.id) {
-					<tr [class.table-secondary]="req.isread && req.isresponded">
-						<td style="white-space: nowrap; font-size: 0.85rem;">{{ req.createdat | date:'short' }}</td>
-						<td>{{ req.name }}</td>
-						<td>{{ req.email }}</td>
-						<td>{{ req.problem }}</td>
-						<td>{{ req.username || '—' }}</td>
-						<td style="max-width: 300px; white-space: pre-wrap; word-break: break-word;">{{ req.message.length > 200 ? (req.message | slice:0:200) + '…' : req.message }}</td>
-						<td style="text-align: center;">
+				@for (contact of contactSortedRequests(); track contact.id) {
+					<tr>
+						<td>{{ contact.name }}</td>
+						<td><small>{{ contact.email }}</small></td>
+						<td><small>{{ contact.problem }}</small></td>
+						<td><small>{{ contact.message | slice: 0:50 }}{{ contact.message.length > 50 ? '...' : '' }}</small></td>
+						<td><small>{{ contact.username || '—' }}</small></td>
+						<td><small>{{ contact.createdat | date: 'short' }}</small></td>
+						<td>
 							<input
 								type="checkbox"
-								[checked]="req.isread"
-								(change)="updateContactFlags(req, !req.isread, req.isresponded)"
+								[checked]="contact.isread"
+								(change)="updateContactFlags(contact, !contact.isread, contact.isresponded)"
 							/>
 						</td>
-						<td style="text-align: center;">
+						<td>
 							<input
 								type="checkbox"
-								[checked]="req.isresponded"
-								(change)="updateContactFlags(req, req.isread, !req.isresponded)"
+								[checked]="contact.isresponded"
+								(change)="updateContactFlags(contact, contact.isread, !contact.isresponded)"
 							/>
 						</td>
 					</tr>

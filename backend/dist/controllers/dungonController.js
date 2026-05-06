@@ -379,6 +379,7 @@ const getGameById = async (req, res) => {
         let pcType = null;
         let pcSpecies = null;
         let pcName = null;
+        let pcImagePath = null;
         const currentPcId = game.pcid ?? null;
         if (game.pcid !== null && game.pcid > 0) {
             const pc = await pcService.fetchPcByIdForUser(game.pcid, userkey.trim());
@@ -396,6 +397,14 @@ const getGameById = async (req, res) => {
                 pcType = pc.type ?? null;
                 pcSpecies = pc.species ?? null;
                 pcName = pc.name ?? null;
+                if (typeof pc.imageId === 'number' && pc.imageId > 0) {
+                    const canAccessPcImage = await imageService.checkImageAccessibleByIdForUser(pc.imageId, userkey.trim());
+                    if (canAccessPcImage) {
+                        const pcImages = await imageService.fetchImagesByIds([pc.imageId]);
+                        const pcImage = pcImages.find((img) => img.id === pc.imageId && typeof img.path === 'string' && img.path.trim().length > 0);
+                        pcImagePath = pcImage?.path ?? null;
+                    }
+                }
                 const allPcTresherIds = Array.from(new Set([
                     ...(Array.isArray(pc.tresherIds) ? pc.tresherIds : []),
                     pc.weaponTresherId,
@@ -474,12 +483,25 @@ const getGameById = async (req, res) => {
                             id: s.id,
                             name: s.name,
                             description: s.description,
+                            soundId: s.soundId,
                             range: s.range,
                             effectOn: s.effectOn,
+                            effectOn2: s.effectOn2,
                             effectAmount: s.effectAmount,
+                            effectAmount2: s.effectAmount2,
                             successTestValue: s.successTestValue,
                             sp: s.sp,
                             lastFor: s.lastFor,
+                            numberOfTargets: s.numberOfTargets,
+                            magicCost: s.magicCost,
+                            effectType: s.effectType,
+                            effectColor: s.effectColor,
+                            effectOnPc1: s.effectOnPc1,
+                            effectOnPc2: s.effectOnPc2,
+                            range1: s.range1,
+                            range2: s.range2,
+                            lastFor1: s.lastFor1,
+                            lastFor2: s.lastFor2,
                         }));
                     }
                 }
@@ -529,7 +551,7 @@ const getGameById = async (req, res) => {
         catch {
             // non-fatal — proceed without dungeon tresher items
         }
-        return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false });
+        return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, pcImagePath, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false });
     }
     catch (error) {
         console.error('Error fetching game by id:', error);
@@ -716,6 +738,12 @@ const getSampleGameSession = async (req, res) => {
         let pcTresherItems = [];
         let pcTresherPotions = [];
         let pcTresherSpells = [];
+        let pcImagePath = null;
+        if (typeof pc.imageId === 'number' && pc.imageId > 0) {
+            const pcImages = await imageService.fetchImagesByIds([pc.imageId]);
+            const pcImage = pcImages.find((img) => img.id === pc.imageId && typeof img.path === 'string' && img.path.trim().length > 0);
+            pcImagePath = pcImage?.path ?? null;
+        }
         const allPcTresherIds = Array.from(new Set([
             ...(Array.isArray(pc.tresherIds) ? pc.tresherIds : []),
             pc.weaponTresherId,
@@ -794,12 +822,25 @@ const getSampleGameSession = async (req, res) => {
                     id: s.id,
                     name: s.name,
                     description: s.description,
+                    soundId: s.soundId,
                     range: s.range,
                     effectOn: s.effectOn,
+                    effectOn2: s.effectOn2,
                     effectAmount: s.effectAmount,
+                    effectAmount2: s.effectAmount2,
                     successTestValue: s.successTestValue,
                     sp: s.sp,
                     lastFor: s.lastFor,
+                    numberOfTargets: s.numberOfTargets,
+                    magicCost: s.magicCost,
+                    effectType: s.effectType,
+                    effectColor: s.effectColor,
+                    effectOnPc1: s.effectOnPc1,
+                    effectOnPc2: s.effectOnPc2,
+                    range1: s.range1,
+                    range2: s.range2,
+                    lastFor1: s.lastFor1,
+                    lastFor2: s.lastFor2,
                 }));
             }
         }
@@ -892,6 +933,7 @@ const getSampleGameSession = async (req, res) => {
             pcType: pc.type ?? null,
             pcSpecies: pc.species ?? null,
             pcName: pc.name ?? null,
+            pcImagePath,
             currentPcId: null,
             dungonSpReward: dungon.spreward,
             monsterImages,
