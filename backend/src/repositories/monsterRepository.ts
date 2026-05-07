@@ -42,6 +42,7 @@ export interface MonsterRecord {
   npcGivesInfoAfterDamaged: boolean;
   npcAttacksAfterInfo: boolean;
   npcCanTrade: boolean;
+  awareness: number;
 }
 
 export interface UpsertMonsterPayload {
@@ -72,6 +73,7 @@ export interface UpsertMonsterPayload {
   npcGivesInfoAfterDamaged: boolean;
   npcAttacksAfterInfo: boolean;
   npcCanTrade: boolean;
+  awareness: number;
 }
 
 export const isAdminUserByGuid = async (userguid: string): Promise<boolean> => {
@@ -118,7 +120,8 @@ const SELECT_MONSTER_FIELDS = `
   COALESCE(npc_only_attack_when_attacked, FALSE) AS "npcOnlyAttackWhenAttacked",
   COALESCE(npc_gives_info_after_damaged, FALSE) AS "npcGivesInfoAfterDamaged",
   COALESCE(npc_attacks_after_info, FALSE) AS "npcAttacksAfterInfo",
-  COALESCE(npc_can_trade, FALSE) AS "npcCanTrade"
+  COALESCE(npc_can_trade, FALSE) AS "npcCanTrade",
+  COALESCE(awareness, 5) AS awareness
 `;
 
 export const getMonstersByUserGuid = async (userguid: string): Promise<MonsterRecord[]> => {
@@ -184,6 +187,7 @@ export const insertMonsterForUser = async (
        npc_gives_info_after_damaged,
        npc_attacks_after_info,
        npc_can_trade,
+       awareness,
        updatedat
      )
      VALUES (
@@ -191,6 +195,7 @@ export const insertMonsterForUser = async (
        $11::jsonb, $12::jsonb, $13::jsonb,
        $14, $15, $16, $17, $18, $19, $20,
        $21, $22, $23, $24, $25, $26, $27, $28,
+       $29,
        NOW()
      )
      RETURNING ${SELECT_MONSTER_FIELDS}`,
@@ -223,6 +228,7 @@ export const insertMonsterForUser = async (
       payload.npcGivesInfoAfterDamaged,
       payload.npcAttacksAfterInfo,
       payload.npcCanTrade,
+      payload.awareness,
     ]
   );
 
@@ -264,6 +270,7 @@ export const updateMonsterForUser = async (
        npc_gives_info_after_damaged = $27,
        npc_attacks_after_info = $28,
        npc_can_trade = $29,
+       awareness = $30,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_MONSTER_FIELDS}`,
@@ -297,6 +304,7 @@ export const updateMonsterForUser = async (
       payload.npcGivesInfoAfterDamaged,
       payload.npcAttacksAfterInfo,
       payload.npcCanTrade,
+      payload.awareness,
     ]
   );
 

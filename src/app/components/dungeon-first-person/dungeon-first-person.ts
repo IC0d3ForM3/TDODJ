@@ -68,6 +68,7 @@ export class DungeonFirstPersonComponent {
   readonly spellPlacements = input<SpellPlacement[]>([]);
   readonly obstaclePlacements = input<ObstaclePlacement[]>([]);
   readonly obstacleImagesBySquare = input<Map<string, HTMLImageElement | null>>(new Map());
+  readonly bagImagesBySquare = input<Map<string, HTMLImageElement | null>>(new Map());
   readonly monsterImpactEffects = input<Record<string, MonsterImpactState>>({});
   readonly impactPulse = input<number>(0);
   readonly playerHp = input<number>(20);
@@ -81,6 +82,8 @@ export class DungeonFirstPersonComponent {
   private readonly stairsUpSquareAssignment = new Map<string, 1 | 2 | 3>();
   private readonly stairsDownImageCache = new Map<string, HTMLImageElement>();
   private readonly stairsDownSquareAssignment = new Map<string, number>();
+  private genericTresherImage: HTMLImageElement | null = null;
+  private genericTresherImageLoading = false;
 
   constructor() {
     effect(() => {
@@ -102,6 +105,7 @@ export class DungeonFirstPersonComponent {
       this.spellPlacements();
       this.obstaclePlacements();
       this.obstacleImagesBySquare();
+      this.bagImagesBySquare();
       this.monsterImpactEffects();
       this.impactPulse();
       this.playerHp();
@@ -198,6 +202,20 @@ export class DungeonFirstPersonComponent {
       const key = this.getSquareKey(obs.row, obs.column);
       obstacleImageBySquare.set(key, obstacleImagesBySquare.get(key) ?? null);
       obstacleBySquare.set(key, obs);
+      if (obs.containsItemId !== null && !obs.itemTaken) {
+        bagSquareKeys.add(key);
+      }
+    }
+
+    const bagImagesBySquare = this.bagImagesBySquare();
+
+    // Squares that have both a bag item (item/potion/spell) and an obstacle.
+    // These are drawn on top of (or inside) the obstacle instead of on the floor.
+    const obstacleItemSquareKeys = new Set<string>();
+    for (const key of bagSquareKeys) {
+      if (obstacleBySquare.has(key)) {
+        obstacleItemSquareKeys.add(key);
+      }
     }
 
     if (visibleFirstPersonView.steps.length === 0) {
@@ -473,16 +491,15 @@ export class DungeonFirstPersonComponent {
       const { step, nearFrame, farFrame } = segment;
       const squareKey = this.getSquareKey(step.row, step.column);
       const tresherCount = tresherCountBySquare.get(squareKey) ?? 0;
+      const bagImage = bagImagesBySquare.get(squareKey) ?? null;
       if (pitTrapSquareKeys.has(squareKey)) {
         this.drawFirstPersonPitTrap(context, nearFrame, farFrame);
       }
 
-      if (tresherCount > 0) {
+      if (bagSquareKeys.has(squareKey) && !obstacleItemSquareKeys.has(squareKey)) {
+        this.drawFirstPersonFloorBag(context, nearFrame, farFrame, bagImage);
+      } else if (tresherCount > 0) {
         this.drawFirstPersonFloorCoinStack(context, nearFrame, farFrame, tresherCount);
-      }
-
-      if (bagSquareKeys.has(squareKey) && tresherCount === 0) {
-        this.drawFirstPersonFloorBag(context, nearFrame, farFrame);
       }
 
       if (step.visibleMonsterSlots.length > 0) {
@@ -519,6 +536,17 @@ export class DungeonFirstPersonComponent {
               obsPlacement,
               segment.depth
             );
+            if (obstacleItemSquareKeys.has(slot.squareKey)) {
+              this.drawItemOnObstacle(
+                context,
+                nearFrame,
+                farFrame,
+                obsPlacement,
+                slot.lateralOffset,
+                obstacleLateralRange,
+                bagImagesBySquare.get(slot.squareKey) ?? null
+              );
+            }
           }
         }
       }
@@ -1851,75 +1879,103 @@ export class DungeonFirstPersonComponent {
   private drawFirstPersonFloorBag(
     context: CanvasRenderingContext2D,
     nearFrame: { left: number; right: number; top: number; bottom: number },
-    farFrame: { left: number; right: number; top: number; bottom: number }
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    bagImage: HTMLImageElement | null
   ): void {
     const midLeft = (nearFrame.left + farFrame.left) / 2;
     const midRight = (nearFrame.right + farFrame.right) / 2;
-    const tileWidth = midRight - midLeft;
     const centerX = (midLeft + midRight) / 2;
     const floorY = (nearFrame.bottom + farFrame.bottom) / 2;
-    const bagW = Math.max(12, Math.min(64, tileWidth * 0.45));
-    const bagH = bagW * 1.15;
-    const bagLeft = centerX - bagW / 2;
-    const bagBottom = floorY - 1;
-    const bagTop = bagBottom - bagH;
-    const r = bagW * 0.20;
+    const height = 30;
+    const bottom = floorY - 1;
+    this.drawLootImage(context, centerX, bottom, height, bagImage);
+  }
 
-    const glowRadius = bagW * 0.65;
-    const glowGrad = context.createRadialGradient(centerX, bagBottom, 0, centerX, bagBottom, glowRadius);
-    glowGrad.addColorStop(0, 'rgba(210, 140, 30, 0.45)');
-    glowGrad.addColorStop(1, 'rgba(210, 140, 30, 0)');
-    context.fillStyle = glowGrad;
-    context.beginPath();
-    context.ellipse(centerX, bagBottom, glowRadius, glowRadius * 0.35, 0, 0, Math.PI * 2);
-    context.fill();
+  private drawItemOnObstacle(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    obs: ObstaclePlacement | undefined,
+    lateralOffset: number,
+    lateralRange: number,
+    bagImage: HTMLImageElement | null
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midTop = (nearFrame.top + farFrame.top) / 2;
+    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
+    const tileWidth = midRight - midLeft;
+    const tileHeight = midBottom - midTop;
 
-    context.fillStyle = '#a06820';
-    context.beginPath();
-    context.moveTo(bagLeft + r, bagTop);
-    context.lineTo(bagLeft + bagW - r, bagTop);
-    context.quadraticCurveTo(bagLeft + bagW, bagTop, bagLeft + bagW, bagTop + r);
-    context.lineTo(bagLeft + bagW, bagBottom - r);
-    context.quadraticCurveTo(bagLeft + bagW, bagBottom, bagLeft + bagW - r, bagBottom);
-    context.lineTo(bagLeft + r, bagBottom);
-    context.quadraticCurveTo(bagLeft, bagBottom, bagLeft, bagBottom - r);
-    context.lineTo(bagLeft, bagTop + r);
-    context.quadraticCurveTo(bagLeft, bagTop, bagLeft + r, bagTop);
-    context.closePath();
-    context.fill();
+    const normalizedOffset = lateralRange <= 0 ? 0 : lateralOffset / (Math.max(1, lateralRange) + 0.65);
+    const centeredX = (midLeft + midRight) / 2 + normalizedOffset * tileWidth * 0.82;
+    const centerX = Math.max(midLeft + tileWidth * 0.12, Math.min(midRight - tileWidth * 0.12, centeredX));
 
-    const neckW = bagW * 0.38;
-    const neckH = bagH * 0.18;
-    context.fillStyle = '#6b430e';
-    context.fillRect(centerX - neckW / 2, bagTop - neckH, neckW, neckH);
+    const heightPct = Math.max(1, Math.min(100, obs?.heightPercent ?? 100)) / 100;
+    const heightAnchor = obs?.heightAnchor ?? 'floor';
 
-    context.fillStyle = '#ffd700';
-    context.beginPath();
-    context.arc(centerX, bagTop - neckH * 0.4, bagW * 0.16, 0, Math.PI * 2);
-    context.fill();
-    context.strokeStyle = '#b8860b';
-    context.lineWidth = Math.max(0.5, bagW * 0.02);
-    context.stroke();
+    // Obstacle extents in the mid-frame plane
+    const obsDrawH = tileHeight * heightPct;
+    const obsTopY = heightAnchor === 'ceiling' ? midTop : midBottom - obsDrawH;
 
-    context.fillStyle = 'rgba(255, 210, 100, 0.28)';
-    context.beginPath();
-    context.ellipse(bagLeft + bagW * 0.28, bagTop + bagH * 0.27, bagW * 0.18, bagH * 0.20, -0.3, 0, Math.PI * 2);
-    context.fill();
+    const bagH = 30;
 
-    context.strokeStyle = '#3a1e04';
-    context.lineWidth = Math.max(1, bagW * 0.04);
-    context.beginPath();
-    context.moveTo(bagLeft + r, bagTop);
-    context.lineTo(bagLeft + bagW - r, bagTop);
-    context.quadraticCurveTo(bagLeft + bagW, bagTop, bagLeft + bagW, bagTop + r);
-    context.lineTo(bagLeft + bagW, bagBottom - r);
-    context.quadraticCurveTo(bagLeft + bagW, bagBottom, bagLeft + bagW - r, bagBottom);
-    context.lineTo(bagLeft + r, bagBottom);
-    context.quadraticCurveTo(bagLeft, bagBottom, bagLeft, bagBottom - r);
-    context.lineTo(bagLeft, bagTop + r);
-    context.quadraticCurveTo(bagLeft, bagTop, bagLeft + r, bagTop);
-    context.closePath();
-    context.stroke();
+    // Placement rules:
+    // - ceiling anchor → always in the middle of the obstacle
+    // - floor anchor, >= 80% tall → middle of obstacle
+    // - floor anchor, < 80% tall → on top of obstacle
+    let bagCenterY: number;
+    if (heightAnchor === 'ceiling' || heightPct >= 0.8) {
+      bagCenterY = obsTopY + obsDrawH / 2;
+    } else {
+      bagCenterY = obsTopY - bagH / 2 - 1;
+    }
+
+    const bagBottom = bagCenterY + bagH / 2;
+    this.drawLootImage(context, centerX, bagBottom, bagH, bagImage);
+  }
+
+  private drawLootImage(
+    context: CanvasRenderingContext2D,
+    centerX: number,
+    bottomY: number,
+    height: number,
+    preferredImage: HTMLImageElement | null
+  ): void {
+    const image = preferredImage ?? this.getGenericTresherImage();
+    if (!image || !image.complete || image.naturalHeight <= 0) {
+      return;
+    }
+
+    const aspect = image.naturalWidth / image.naturalHeight;
+    const drawHeight = Math.max(8, height);
+    const drawWidth = Math.max(8, drawHeight * (Number.isFinite(aspect) && aspect > 0 ? aspect : 1));
+    const left = centerX - drawWidth / 2;
+    const top = bottomY - drawHeight;
+    context.drawImage(image, left, top, drawWidth, drawHeight);
+  }
+
+  private getGenericTresherImage(): HTMLImageElement | null {
+    if (this.genericTresherImage) {
+      return this.genericTresherImage;
+    }
+
+    if (this.genericTresherImageLoading) {
+      return null;
+    }
+
+    this.genericTresherImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      this.genericTresherImage = img;
+      this.genericTresherImageLoading = false;
+      this.drawCanvas();
+    };
+    img.onerror = () => {
+      this.genericTresherImageLoading = false;
+    };
+    img.src = '/images/genericTresher.png';
+    return null;
   }
 
   private drawFirstPersonFloorCoinStack(

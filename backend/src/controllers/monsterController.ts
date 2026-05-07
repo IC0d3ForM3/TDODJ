@@ -53,6 +53,7 @@ interface MonsterWriteInput {
   npcGivesInfoAfterDamaged?: unknown;
   npcAttacksAfterInfo?: unknown;
   npcCanTrade?: unknown;
+  awareness?: unknown;
 }
 
 interface MonsterAttackWriteInput {
@@ -255,6 +256,7 @@ const normalizeMonsterPayload = (value: unknown): UpsertMonsterPayload | null =>
     npcGivesInfoAfterDamaged: normalizeBoolean(input.npcGivesInfoAfterDamaged),
     npcAttacksAfterInfo: normalizeBoolean(input.npcAttacksAfterInfo),
     npcCanTrade: normalizeBoolean(input.npcCanTrade),
+    awareness: Math.max(1, normalizeNumber(input.awareness, 5)),
   };
 };
 

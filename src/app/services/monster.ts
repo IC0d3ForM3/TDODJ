@@ -41,6 +41,7 @@ export interface UserMonsterListItem {
   npcGivesInfoAfterDamaged: boolean;
   npcAttacksAfterInfo: boolean;
   npcCanTrade: boolean;
+  awareness: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -81,6 +82,7 @@ export interface UserMonsterWritePayload {
   npcGivesInfoAfterDamaged: boolean;
   npcAttacksAfterInfo: boolean;
   npcCanTrade: boolean;
+  awareness: number;
 }
 
 export interface MonsterResponse {

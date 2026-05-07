@@ -208,7 +208,13 @@
 								class="open-block-btn open-block-btn--clear"
 								[class.open-block-btn--active]="isMoveMode()"
 								(click)="toggleMoveMode()"
-							>Clear</button>
+							>Reset</button>
+							<button
+								type="button"
+								class="open-block-btn open-block-btn--clear"
+								[disabled]="!selectedDungonId() || isSavingDungonJson() || isPublishingDungon()"
+								(click)="clearAllCurrentDungonContent()"
+							>Clear All</button>
 							<select
 								class="tools-dropdown-select"
 								aria-label="Tools"
@@ -1062,14 +1068,46 @@
 						<label class="tresher-field"><span>Number of Targets</span><input type="number" formControlName="numberOfTargets" min="1" /></label>
 						<label class="tresher-field"><span>Image</span>
 							<div style="display:flex;gap:0.4rem;align-items:center">
-								<select formControlName="imageId"><option [ngValue]="null">No Image</option>@for (img of libImageOptions(); track img.id) { <option [ngValue]="img.id">{{ img.name }}</option> }</select>
+								<select formControlName="imageId">
+									<option [ngValue]="null">No Image</option>
+									@if (libGameImageOptions().length > 0) {
+										<optgroup label="Game Images">
+											@for (img of libGameImageOptions(); track img.id) {
+												<option [ngValue]="img.id">{{ mediaOptionName(img.name) }}</option>
+											}
+										</optgroup>
+									}
+									@if (libUploadedImageOptions().length > 0) {
+										<optgroup label="Uploaded Images">
+											@for (img of libUploadedImageOptions(); track img.id) {
+												<option [ngValue]="img.id">{{ mediaOptionName(img.name) }}</option>
+											}
+										</optgroup>
+									}
+								</select>
 								<app-upload-popup mediaType="image" (mediaUploaded)="onLibSpellImageUploaded($event)" />
 							</div>
 							@if (libSelectedSpellImageUrl()) { <div class="monster-selected-image-wrap spell-image-preview"><img class="dashboard-image-thumb" [src]="libSelectedSpellImageUrl()" alt="spell image" /></div> }
 						</label>
 						<label class="tresher-field"><span>Sound</span>
 							<div style="display:flex;gap:0.4rem;align-items:center">
-								<select formControlName="soundId"><option [ngValue]="null">No Sound</option>@for (snd of libSoundOptions(); track snd.id) { <option [ngValue]="snd.id">{{ snd.name }}</option> }</select>
+								<select formControlName="soundId">
+									<option [ngValue]="null">No Sound</option>
+									@if (libGameSoundOptions().length > 0) {
+										<optgroup label="Game Sounds">
+											@for (snd of libGameSoundOptions(); track snd.id) {
+												<option [ngValue]="snd.id">{{ mediaOptionName(snd.name) }}</option>
+											}
+										</optgroup>
+									}
+									@if (libUploadedSoundOptions().length > 0) {
+										<optgroup label="Uploaded Sounds">
+											@for (snd of libUploadedSoundOptions(); track snd.id) {
+												<option [ngValue]="snd.id">{{ mediaOptionName(snd.name) }}</option>
+											}
+										</optgroup>
+									}
+								</select>
 								<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="playLibSelectedSpellSound()" [disabled]="!libSelectedSpellSoundUrl()">Play</button>
 								<app-upload-popup mediaType="sound" (mediaUploaded)="onLibSpellSoundUploaded($event)" />
 							</div>
@@ -2615,9 +2653,9 @@
 
 				<label class="form-label" for="obstacle-item">Contains Item (optional)</label>
 				<select id="obstacle-item" class="form-input" formControlName="containsItemId">
-					<option [value]="null">— None —</option>
+					<option [ngValue]="null">— None —</option>
 					@for (item of libItems(); track item.id) {
-						<option [value]="item.id">{{ item.name }}</option>
+						<option [ngValue]="item.id">{{ item.name }}</option>
 					}
 				</select>
 

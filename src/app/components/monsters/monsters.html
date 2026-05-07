@@ -112,8 +112,19 @@
             <div class="mn-upload-row">
               <select formControlName="imageId">
                 <option [ngValue]="null">No Image</option>
-                @for (image of allImageOptions(); track image.id) {
-                  <option [ngValue]="image.id">{{ image.name }} (ID {{ image.id }})</option>
+                @if (groupedImageOptions().game.length > 0) {
+                  <optgroup label="Game Images">
+                    @for (image of groupedImageOptions().game; track image.id) {
+                      <option [ngValue]="image.id">{{ mediaOptionName(image.name) }} (ID {{ image.id }})</option>
+                    }
+                  </optgroup>
+                }
+                @if (groupedImageOptions().uploaded.length > 0) {
+                  <optgroup label="Uploaded Images">
+                    @for (image of groupedImageOptions().uploaded; track image.id) {
+                      <option [ngValue]="image.id">{{ mediaOptionName(image.name) }} (ID {{ image.id }})</option>
+                    }
+                  </optgroup>
                 }
               </select>
               <app-upload-popup mediaType="image" (mediaUploaded)="onImageUploaded($event)" />
@@ -128,8 +139,19 @@
             <div class="mn-upload-row">
               <select formControlName="soundId">
                 <option [ngValue]="null">No Sound</option>
-                @for (sound of allSoundOptions(); track sound.id) {
-                  <option [ngValue]="sound.id">{{ sound.name }} (ID {{ sound.id }})</option>
+                @if (groupedSoundOptions().game.length > 0) {
+                  <optgroup label="Game Sounds">
+                    @for (sound of groupedSoundOptions().game; track sound.id) {
+                      <option [ngValue]="sound.id">{{ mediaOptionName(sound.name) }} (ID {{ sound.id }})</option>
+                    }
+                  </optgroup>
+                }
+                @if (groupedSoundOptions().uploaded.length > 0) {
+                  <optgroup label="Uploaded Sounds">
+                    @for (sound of groupedSoundOptions().uploaded; track sound.id) {
+                      <option [ngValue]="sound.id">{{ mediaOptionName(sound.name) }} (ID {{ sound.id }})</option>
+                    }
+                  </optgroup>
                 }
               </select>
               <button type="button" class="mn-btn-muted" (click)="playSelectedSound()" [disabled]="!selectedSoundUrl()">Play</button>

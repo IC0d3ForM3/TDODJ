@@ -36,6 +36,8 @@ export class Curses implements OnInit {
   private readonly _localSounds = signal<SoundOption[]>([]);
   readonly allImageOptions = computed(() => [...this.imageOptions(), ...this._localImages()]);
   readonly allSoundOptions = computed(() => [...this.soundOptions(), ...this._localSounds()]);
+  readonly groupedImageOptions = computed(() => this.groupMediaOptions(this.allImageOptions()));
+  readonly groupedSoundOptions = computed(() => this.groupMediaOptions(this.allSoundOptions()));
 
   readonly effectToOptions = [
     'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'ROS', 'AE', 'Action Economy', '# of Attacks', 'Boost Dice',
@@ -114,6 +116,10 @@ export class Curses implements OnInit {
   selectedSoundUrl(): string {
     const sound = this.selectedSoundOption();
     return sound ? this.resolveSoundUrl(sound.path) : '';
+  }
+
+  mediaOptionName(name: string): string {
+    return name.replace(/^\[(Game|Uploaded)\]\s*/i, '');
   }
 
   playSelectedSound(): void {
@@ -203,6 +209,20 @@ export class Curses implements OnInit {
     if (!path) return '';
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+  }
+
+  private groupMediaOptions<T extends { path: string }>(options: T[]): { game: T[]; uploaded: T[] } {
+    const grouped: { game: T[]; uploaded: T[] } = { game: [], uploaded: [] };
+    for (const option of options) {
+      if (this.isUploadedMediaPath(option.path)) grouped.uploaded.push(option);
+      else grouped.game.push(option);
+    }
+    return grouped;
+  }
+
+  private isUploadedMediaPath(path: string): boolean {
+    const normalized = path.toLowerCase();
+    return normalized.includes('/uploads/') || normalized.includes('\\uploads\\') || normalized.startsWith('uploads/');
   }
 
   private buildPayload(): UserCurseWritePayload {

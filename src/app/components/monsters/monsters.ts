@@ -51,6 +51,8 @@ export class Monsters implements OnInit {
   private readonly _localSounds = signal<SoundOption[]>([]);
   readonly allImageOptions = computed(() => [...this.imageOptions(), ...this._localImages()]);
   readonly allSoundOptions = computed(() => [...this.soundOptions(), ...this._localSounds()]);
+  readonly groupedImageOptions = computed(() => this.groupMediaOptions(this.allImageOptions()));
+  readonly groupedSoundOptions = computed(() => this.groupMediaOptions(this.allSoundOptions()));
   readonly itemOptions = input<ItemOption[]>([]);
   readonly spellOptions = input<SpellOption[]>([]);
   readonly curseOptions = input<CurseOption[]>([]);
@@ -95,6 +97,7 @@ export class Monsters implements OnInit {
     npcGivesInfoAfterDamaged: new FormControl<boolean>(false, { nonNullable: true }),
     npcAttacksAfterInfo: new FormControl<boolean>(false, { nonNullable: true }),
     npcCanTrade: new FormControl<boolean>(false, { nonNullable: true }),
+    awareness: new FormControl<number>(5, { nonNullable: true }),
   });
 
   ngOnInit(): void {
@@ -149,6 +152,10 @@ export class Monsters implements OnInit {
   selectedSoundUrl(): string {
     const sound = this.selectedSound();
     return sound ? this.resolveSoundUrl(sound.path) : '';
+  }
+
+  mediaOptionName(name: string): string {
+    return name.replace(/^\[(Game|Uploaded)\]\s*/i, '');
   }
 
   playSelectedSound(): void {
@@ -277,6 +284,7 @@ export class Monsters implements OnInit {
     c.npcGivesInfoAfterDamaged.setValue(item.npcGivesInfoAfterDamaged === true);
     c.npcAttacksAfterInfo.setValue(item.npcAttacksAfterInfo === true);
     c.npcCanTrade.setValue(item.npcCanTrade === true);
+    c.awareness.setValue(Math.max(1, item.awareness ?? 5));
   }
 
   cancelEdit(): void {
@@ -329,6 +337,20 @@ export class Monsters implements OnInit {
     if (!path) return '';
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+  }
+
+  private groupMediaOptions<T extends { path: string }>(options: T[]): { game: T[]; uploaded: T[] } {
+    const grouped: { game: T[]; uploaded: T[] } = { game: [], uploaded: [] };
+    for (const option of options) {
+      if (this.isUploadedMediaPath(option.path)) grouped.uploaded.push(option);
+      else grouped.game.push(option);
+    }
+    return grouped;
+  }
+
+  private isUploadedMediaPath(path: string): boolean {
+    const normalized = path.toLowerCase();
+    return normalized.includes('/uploads/') || normalized.includes('\\uploads\\') || normalized.startsWith('uploads/');
   }
 
   private get monsterTresherIdsArray(): FormArray<MonsterTresherControl> {
@@ -393,6 +415,7 @@ export class Monsters implements OnInit {
       npcGivesInfoAfterDamaged: c.npcGivesInfoAfterDamaged.value === true,
       npcAttacksAfterInfo: c.npcAttacksAfterInfo.value === true,
       npcCanTrade: c.npcCanTrade.value === true,
+      awareness: Math.max(1, c.awareness.value ?? 5),
     };
   }
 
@@ -424,6 +447,7 @@ export class Monsters implements OnInit {
     c.npcGivesInfoAfterDamaged.setValue(false);
     c.npcAttacksAfterInfo.setValue(false);
     c.npcCanTrade.setValue(false);
+    c.awareness.setValue(5);
   }
 
   private replaceTresherForms(tresherIds: number[]): void {

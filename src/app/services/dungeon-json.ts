@@ -255,12 +255,24 @@ export class DungeonJsonService {
         note: typeof src['note'] === 'string' ? src['note'] : '',
         imageId: typeof src['imageId'] === 'number'
           ? src['imageId']
-          : typeof src['imageId'] === 'string' && src['imageId']
-            ? (parseInt(src['imageId'], 10) || null)
-            : null,
+          : typeof src['imageid'] === 'number'
+            ? src['imageid']
+            : typeof src['imageId'] === 'string' && src['imageId']
+              ? (parseInt(src['imageId'], 10) || null)
+              : typeof src['imageid'] === 'string' && src['imageid']
+                ? (parseInt(src['imageid'], 10) || null)
+                : null,
         hp,
         isIndestructible: src['isIndestructible'] === true,
-        containsItemId: typeof src['containsItemId'] === 'number' ? src['containsItemId'] : null,
+        containsItemId: typeof src['containsItemId'] === 'number'
+          ? src['containsItemId']
+          : typeof src['containsitemid'] === 'number'
+            ? src['containsitemid']
+            : typeof src['containsItemId'] === 'string' && src['containsItemId']
+              ? (parseInt(src['containsItemId'], 10) || null)
+              : typeof src['containsitemid'] === 'string' && src['containsitemid']
+                ? (parseInt(src['containsitemid'], 10) || null)
+                : null,
         shape,
         heightPercent,
         heightAnchor,

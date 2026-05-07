@@ -159,6 +159,7 @@
 									[potionPlacements]="previewPotionPlacementsForView()"
 									[spellPlacements]="previewSpellPlacementsForView()"
 									[obstaclePlacements]="previewObstaclePlacementsForView()"
+									[bagImagesBySquare]="previewBagImagesBySquareForView()"
 									[monsterImpactEffects]="monsterImpactEffects()"
 									[impactPulse]="monsterImpactPulse()"
 								[obstacleImagesBySquare]="previewObstacleImagesBySquareForView()"
@@ -193,6 +194,7 @@
 								class="fpv-icon-btn fpv-icon-btn-eye"
 							title="Search (costs 1 AE)"
 							[class.fpv-icon-btn-active]="canSearch()"
+							[class.fpv-icon-btn-blink]="isThiephTrapSenseActive()"
 							[disabled]="!canSearch()"
 								(click)="searchForTraps()"
 							>👁</button>
@@ -245,6 +247,25 @@
 								title="Talk to NPC"
 								(click)="talkToNpc()"
 							>💬</button>
+							<button
+								type="button"
+								class="fpv-icon-btn"
+								[class.fpv-icon-btn-active]="canUseSneek()"
+								[class.fpv-icon-btn-sneek-active]="playerSneekRoundsRemaining() > 0"
+								[disabled]="!canUseSneek() && playerSneekRoundsRemaining() === 0"
+								title="Sneek (Thieph/Shorties: free, lasts round | Others: 1 AE, re-check each action)"
+								(click)="trySneek()"
+							>🤷</button>
+							@if (isHealerClass()) {
+							<button
+								type="button"
+								class="fpv-icon-btn"
+								[class.fpv-icon-btn-active]="canUseHealerLesserHeal()"
+								[disabled]="!canUseHealerLesserHeal()"
+								title="Free Lesser Heal (once per round, no cost)"
+								(click)="useHealerLesserHeal()"
+							>💊</button>
+							}
 						</div>
 					<!-- Bottom row: 2D minimap LEFT + body outfit panel RIGHT -->
 					<div class="fpv-below-row">
@@ -541,6 +562,21 @@
 									<span class="discovery-kind">{{ item.kind }}</span>
 									<p class="discovery-name">{{ item.name }}</p>
 									<p class="discovery-description">{{ item.description }}</p>
+									@if (item.kind === 'Obstacle' && forwardObstacleWithItem() !== null && item.row === forwardObstacleWithItem()!.row && item.column === forwardObstacleWithItem()!.column) {
+										@if (examinedObstacleResults().get(forwardObstacleWithItem()!.id); as examineResult) {
+											<p class="discovery-description" style="font-style:italic">
+												@if (examineResult === '?') { You can't identify what's inside. } @else { Contents: <strong>{{ examineResult }}</strong> }
+											</p>
+										}
+										<div class="inventory-item-actions">
+											<button type="button" class="action-button" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="examineObstacle(forwardObstacleWithItem()!.id)">
+												Examine
+											</button>
+											<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="takeItemFromObstacle(forwardObstacleWithItem()!.id)">
+												Take Item
+											</button>
+										</div>
+									}
 								</li>
 							}
 						</ul>

@@ -191,6 +191,8 @@ export class Creator implements OnInit {
   private readonly stairsUpSquareAssignment = new Map<string, 1 | 2 | 3>();
   private readonly obstacleImageCache = new Map<number, HTMLImageElement>();
   private readonly obstacleImageCacheVersion = signal(0);
+  private rawLibImageOptions: Array<{ id: number; name: string; path: string }> = [];
+  private rawLibSoundOptions: Array<{ id: number; name: string; path: string }> = [];
   readonly account = inject(Account);
   private readonly dungeonJsonService = inject(DungeonJsonService);
   private readonly dungeonState = inject(DungeonStateService);
@@ -412,6 +414,26 @@ export class Creator implements OnInit {
   get libImageOptions() { return this.libraryService.libImageOptions; }
   get libSoundOptions() { return this.libraryService.libSoundOptions; }
 
+  libGameImageOptions() {
+    return this.libImageOptions().filter((opt) => !this.isUploadedMediaPath(opt.path));
+  }
+
+  libUploadedImageOptions() {
+    return this.libImageOptions().filter((opt) => this.isUploadedMediaPath(opt.path));
+  }
+
+  libGameSoundOptions() {
+    return this.libSoundOptions().filter((opt) => !this.isUploadedMediaPath(opt.path));
+  }
+
+  libUploadedSoundOptions() {
+    return this.libSoundOptions().filter((opt) => this.isUploadedMediaPath(opt.path));
+  }
+
+  mediaOptionName(name: string): string {
+    return name.replace(/^\[(Game|Uploaded)\]\s*/i, '');
+  }
+
   get libUserImages() { return this.libraryService.libUserImages; }
   get isLoadingLibImages() { return this.libraryService.isLoadingLibImages; }
   get libImagesError() { return this.libraryService.libImagesError; }
@@ -429,6 +451,11 @@ export class Creator implements OnInit {
   get libSoundSaveMessage() { return this.libraryService.libSoundSaveMessage; }
   get isLibSoundSectionVisible() { return this.libraryService.isLibSoundSectionVisible; }
   get selectedLibSoundFile() { return this.libraryService.selectedLibSoundFile; }
+
+  private isUploadedMediaPath(path: string): boolean {
+    const normalized = path.toLowerCase();
+    return normalized.includes('/uploads/') || normalized.includes('\\uploads\\') || normalized.startsWith('uploads/');
+  }
 
   get libUserSpells() { return this.libraryService.libUserSpells; }
   get isLoadingLibSpells() { return this.libraryService.isLoadingLibSpells; }
@@ -1353,6 +1380,8 @@ export class Creator implements OnInit {
 
     const controls = this.obstacleForm.controls;
     const rawImageId = controls.imageId.value;
+    const rawContainsItemId = controls.containsItemId.value;
+    const normalizedContainsItemId = rawContainsItemId !== null ? (Number(rawContainsItemId) || null) : null;
     const editingId = this.editingObstacleId();
 
     if (editingId !== null) {
@@ -1367,7 +1396,7 @@ export class Creator implements OnInit {
                 imageId: rawImageId !== null ? (Number(rawImageId) || null) : null,
                 hp: Math.max(1, controls.hp.value),
                 isIndestructible: controls.isIndestructible.value,
-                containsItemId: controls.containsItemId.value ?? null,
+                containsItemId: normalizedContainsItemId,
                 heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
                 heightAnchor: controls.heightAnchor.value,
                 widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
@@ -1389,7 +1418,7 @@ export class Creator implements OnInit {
         imageId: rawImageId !== null ? (Number(rawImageId) || null) : null,
         hp: Math.max(1, controls.hp.value),
         isIndestructible: controls.isIndestructible.value,
-        containsItemId: controls.containsItemId.value ?? null,
+        containsItemId: normalizedContainsItemId,
         heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
         heightAnchor: controls.heightAnchor.value,
         widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
@@ -1446,6 +1475,8 @@ export class Creator implements OnInit {
     if (!pending) return;
     const controls = this.obstacleForm.controls;
     const rawImageId = controls.imageId.value;
+    const rawContainsItemId = controls.containsItemId.value;
+    const normalizedContainsItemId = rawContainsItemId !== null ? (Number(rawContainsItemId) || null) : null;
     this.copyObstacleSource.set({
       id: -1,
       row: pending.row,
@@ -1455,7 +1486,7 @@ export class Creator implements OnInit {
       imageId: rawImageId !== null ? (Number(rawImageId) || null) : null,
       hp: Math.max(1, controls.hp.value),
       isIndestructible: controls.isIndestructible.value,
-      containsItemId: controls.containsItemId.value ?? null,
+      containsItemId: normalizedContainsItemId,
       heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
       heightAnchor: controls.heightAnchor.value,
       widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
@@ -2240,6 +2271,86 @@ export class Creator implements OnInit {
     this.isPlaceSpellDialogVisible.set(false);
 
     this.syncIdsFromLoadedData(this.squaresByDungon()[dungonId] ?? {}, [], [], [], [], [], []);
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+  }
+
+  clearAllCurrentDungonContent(): void {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Clear ALL dungeon content? This removes everything including the grid layout. This cannot be undone.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.startPointByDungon.update((all) => ({ ...all, [dungonId]: null }));
+    this.exitsByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.tresherListByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.tresherPlacementsByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.monsterListByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.monsterPlacementsByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.squareTextsByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.floorTrapPlacementsByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.obstaclePlacementsByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.portalPlacementsByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.itemPlacementsByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.potionPlacementsByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.spellPlacementsByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.squaresByDungon.update((all) => ({ ...all, [dungonId]: {} }));
+    this.filledSquaresByDungon.update((all) => ({ ...all, [dungonId]: {} }));
+    this.cheaterByDungon.update((all) => ({ ...all, [dungonId]: { ...DEFAULT_CHEATER } }));
+    this.keyList = [];
+    this.selectedPlacedItemKey.set(null);
+    this.selectedKeyIdForPlacement.set(null);
+    this.pendingStartPointPlacement.set(null);
+    this.pendingExitPlacement.set(null);
+    this.pendingTresherPlacement.set(null);
+    this.pendingMonsterPlacement.set(null);
+    this.pendingFloorTrapPlacement.set(null);
+    this.pendingObstaclePlacement.set(null);
+    this.pendingItemPlacement.set(null);
+    this.pendingPotionPlacement.set(null);
+    this.pendingSpellPlacement.set(null);
+    this.isStartPointMode.set(false);
+    this.isExitMode.set(false);
+    this.isPlaceTresherMode.set(false);
+    this.isPlaceMonsterMode.set(false);
+    this.isPlaceFloorTrapMode.set(false);
+    this.isPlaceObstacleMode.set(false);
+    this.isPlaceItemMode.set(false);
+    this.isPlacePotionMode.set(false);
+    this.isPlaceSpellMode.set(false);
+    this.isAddTextMode.set(false);
+    this.isImportPlacementMode.set(false);
+    this.isCopyMonsterMode.set(false);
+    this.isCopyFloorTrapMode.set(false);
+    this.isCopyObstacleMode.set(false);
+    this.copyMonsterSource.set(null);
+    this.copyFloorTrapSource.set(null);
+    this.copyObstacleSource.set(null);
+    this.portalPickMode.set(null);
+    this.portalPickingId.set(null);
+    this.isWhiteSpacePreviewPickMode.set(false);
+    this.isTextDialogVisible.set(false);
+    this.isStartPointDialogVisible.set(false);
+    this.isExitDialogVisible.set(false);
+    this.isPlaceTresherDialogVisible.set(false);
+    this.isPlaceMonsterDialogVisible.set(false);
+    this.isFloorTrapDialogVisible.set(false);
+    this.isObstacleDialogVisible.set(false);
+    this.isPortalDialogVisible.set(false);
+    this.isPlaceItemDialogVisible.set(false);
+    this.isPlacePotionDialogVisible.set(false);
+    this.isPlaceSpellDialogVisible.set(false);
+
+    this.syncIdsFromLoadedData({}, [], [], [], [], [], []);
     this.markDungonJsonChanged();
     this.drawGridCanvas();
     this.drawPreviewGridCanvas();
@@ -3616,6 +3727,7 @@ export class Creator implements OnInit {
       npcGivesInfoAfterDamaged: libraryMonster.npcGivesInfoAfterDamaged === true,
       npcAttacksAfterInfo: libraryMonster.npcAttacksAfterInfo === true,
       npcCanTrade: libraryMonster.npcCanTrade === true,
+      awareness: libraryMonster.awareness ?? 5,
     };
     this.nextMonsterId += 1;
     this.monsterListByDungon.update((allMonsters) => ({
@@ -3749,6 +3861,7 @@ export class Creator implements OnInit {
       npcGivesInfoAfterDamaged: false,
       npcAttacksAfterInfo: false,
       npcCanTrade: false,
+      awareness: 5,
     };
 
     if (editingId !== null) {
@@ -6265,6 +6378,7 @@ export class Creator implements OnInit {
         name: i.name,
         description: i.description,
         type: i.type as string,
+        imageId: i.imageId ?? null,
         effectValue: i.effectValue,
         damage: i.damage,
         range: i.range,
@@ -6815,6 +6929,7 @@ export class Creator implements OnInit {
       npcGivesInfoAfterDamaged: (source as Record<string, unknown>)['npcGivesInfoAfterDamaged'] === true,
       npcAttacksAfterInfo: (source as Record<string, unknown>)['npcAttacksAfterInfo'] === true,
       npcCanTrade: (source as Record<string, unknown>)['npcCanTrade'] === true,
+      awareness: typeof (source as Record<string, unknown>)['awareness'] === 'number' ? (source as Record<string, unknown>)['awareness'] as number : 5,
     };
   }
 
@@ -11065,7 +11180,16 @@ export class Creator implements OnInit {
     if (!userkey) return;
     this.http
       .get<{ id: number; name: string; path: string }[]>(`${API_BASE_URL}/images`, { params: { userkey, scope: 'library' } })
-      .subscribe({ next: (items) => this.libImageOptions.set(items), error: () => this.libImageOptions.set([]) });
+      .subscribe({
+        next: (items) => {
+          this.rawLibImageOptions = Array.isArray(items) ? items : [];
+          this.rebuildLibraryMediaOptions();
+        },
+        error: () => {
+          this.rawLibImageOptions = [];
+          this.libImageOptions.set([]);
+        },
+      });
   }
 
   private loadLibSoundOptions(): void {
@@ -11073,7 +11197,16 @@ export class Creator implements OnInit {
     if (!userkey) return;
     this.http
       .get<{ id: number; name: string; path: string }[]>(`${API_BASE_URL}/sounds`, { params: { userkey, scope: 'library' } })
-      .subscribe({ next: (items) => this.libSoundOptions.set(items), error: () => this.libSoundOptions.set([]) });
+      .subscribe({
+        next: (items) => {
+          this.rawLibSoundOptions = Array.isArray(items) ? items : [];
+          this.rebuildLibraryMediaOptions();
+        },
+        error: () => {
+          this.rawLibSoundOptions = [];
+          this.libSoundOptions.set([]);
+        },
+      });
   }
 
   private loadLibSpellOptions(userkey: string): void {
@@ -11091,7 +11224,11 @@ export class Creator implements OnInit {
       .get<LibImageItem[]>(`${API_BASE_URL}/images`, { params: { userkey } })
       .pipe(finalize(() => this.isLoadingLibImages.set(false)))
       .subscribe({
-        next: (items) => { this.libUserImages.set(items); this.loadLibImageOptions(); },
+        next: (items) => {
+          this.libUserImages.set(items);
+          this.rebuildLibraryMediaOptions();
+          this.loadLibImageOptions();
+        },
         error: () => { this.libUserImages.set([]); this.libImagesError.set('Failed to load your images.'); },
       });
   }
@@ -11105,9 +11242,44 @@ export class Creator implements OnInit {
       .get<LibSoundItem[]>(`${API_BASE_URL}/sounds`, { params: { userkey } })
       .pipe(finalize(() => this.isLoadingLibSounds.set(false)))
       .subscribe({
-        next: (items) => { this.libUserSounds.set(items); this.loadLibSoundOptions(); },
+        next: (items) => {
+          this.libUserSounds.set(items);
+          this.rebuildLibraryMediaOptions();
+          this.loadLibSoundOptions();
+        },
         error: () => { this.libUserSounds.set([]); this.libSoundsError.set('Failed to load your sounds.'); },
       });
+  }
+
+  private rebuildLibraryMediaOptions(): void {
+    const myImageIds = new Set((this.libUserImages() ?? []).map((i) => i.id));
+    const mySoundIds = new Set((this.libUserSounds() ?? []).map((s) => s.id));
+
+    const classifyAndSort = (
+      items: Array<{ id: number; name: string; path: string }>,
+      mine: Set<number>
+    ): Array<{ id: number; name: string; path: string }> => {
+      const withBucket = items.map((item) => ({
+        ...item,
+        bucket: mine.has(item.id) ? 'uploaded' as const : 'game' as const,
+      }));
+
+      withBucket.sort((a, b) => {
+        if (a.bucket !== b.bucket) {
+          return a.bucket === 'game' ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      });
+
+      return withBucket.map((item) => ({
+        id: item.id,
+        path: item.path,
+        name: `${item.bucket === 'game' ? '[Game]' : '[Uploaded]'} ${item.name}`,
+      }));
+    };
+
+    this.libImageOptions.set(classifyAndSort(this.rawLibImageOptions, myImageIds));
+    this.libSoundOptions.set(classifyAndSort(this.rawLibSoundOptions, mySoundIds));
   }
 
   private loadLibUserSpells(): void {

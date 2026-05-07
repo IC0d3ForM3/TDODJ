@@ -60,6 +60,7 @@ export type FloorItemData = {
   name: string;
   description: string;
   type: string;
+  imageId?: number | null;
   effectValue: number;
   damage: number;
   range: number;

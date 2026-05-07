@@ -36,4 +36,5 @@ export interface Monster {
   npcGivesInfoAfterDamaged: boolean;
   npcAttacksAfterInfo: boolean;
   npcCanTrade: boolean;
+  awareness: number;
 }
