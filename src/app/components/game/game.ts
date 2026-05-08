@@ -6754,6 +6754,51 @@ export class Game implements OnInit {
     const rowY = (nearY: number, u: number, row: number): number => (
       nearY + u * projectionOffsetForRow(row)
     );
+    const nearMidY = nearTop + nearH * 0.5;
+    const farMidY = points[1].y + farH * 0.5;
+    const midpointYAtU = (u: number): number => nearMidY + u * (farMidY - nearMidY);
+    const clipSegmentToRowHalf = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      row: number
+    ): { x0: number; y0: number; x1: number; y1: number } | null => {
+      const isTopHalf = row < midSwitchRow;
+      const xSpan = farX - nearX;
+      const toU = (x: number): number => {
+        if (Math.abs(xSpan) <= 0.000001) {
+          return 0;
+        }
+        const raw = (x - nearX) / xSpan;
+        return Math.max(0, Math.min(1, raw));
+      };
+
+      const u0 = toU(x0);
+      const u1 = toU(x1);
+      const delta0 = y0 - midpointYAtU(u0);
+      const delta1 = y1 - midpointYAtU(u1);
+      const inside0 = isTopHalf ? delta0 <= 0 : delta0 >= 0;
+      const inside1 = isTopHalf ? delta1 <= 0 : delta1 >= 0;
+
+      if (inside0 && inside1) {
+        return { x0, y0, x1, y1 };
+      }
+
+      if (!inside0 && !inside1) {
+        return null;
+      }
+
+      const denominator = delta0 - delta1;
+      const rawT = Math.abs(denominator) <= 0.000001 ? 0.5 : delta0 / denominator;
+      const t = Math.max(0, Math.min(1, rawT));
+      const midX = x0 + (x1 - x0) * t;
+      const midY = y0 + (y1 - y0) * t;
+
+      return inside0
+        ? { x0, y0, x1: midX, y1: midY }
+        : { x0: midX, y0: midY, x1, y1 };
+    };
 
     // ── Draw brick fills ─────────────────────────────────────────
     // Gradient: near side brighter, far side darker (depth cue).
@@ -6815,8 +6860,18 @@ export class Game implements OnInit {
       }
       const nearY = nearTop + (row / rowCount) * nearH;
       const projOffset = projectionOffsetForRow(row);
-      context.moveTo(nearX, nearY);
-      context.lineTo(farX,  nearY + projOffset);
+      const clipped = clipSegmentToRowHalf(
+        nearX,
+        nearY,
+        farX,
+        nearY + projOffset,
+        row
+      );
+      if (!clipped) {
+        continue;
+      }
+      context.moveTo(clipped.x0, clipped.y0);
+      context.lineTo(clipped.x1, clipped.y1);
     }
 
     // Vertical joints within each row.
@@ -6830,8 +6885,18 @@ export class Game implements OnInit {
       for (let bx = stagger + noise; bx < stripW; bx += brickW) {
         const u = bx / stripW;
         const sx = uToX(u);
-        context.moveTo(sx, rowY(nearRowTop, u, row));
-        context.lineTo(sx, rowY(nearRowBot, u, row));
+        const clipped = clipSegmentToRowHalf(
+          sx,
+          rowY(nearRowTop, u, row),
+          sx,
+          rowY(nearRowBot, u, row),
+          row
+        );
+        if (!clipped) {
+          continue;
+        }
+        context.moveTo(clipped.x0, clipped.y0);
+        context.lineTo(clipped.x1, clipped.y1);
       }
     }
 

@@ -2876,6 +2876,51 @@ export class DungeonFirstPersonComponent {
     const rowY = (nearY: number, u: number, rowIndex: number): number => (
       nearY + u * getProjectionOffsetForRow(rowIndex)
     );
+    const nearMidY = nearTop + nearHeight * 0.5;
+    const farMidY = points[1].y + farHeight * 0.5;
+    const midpointYAtU = (u: number): number => nearMidY + u * (farMidY - nearMidY);
+    const clipSegmentToRowHalf = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      rowIndex: number
+    ): { x0: number; y0: number; x1: number; y1: number } | null => {
+      const isTopHalf = rowIndex < midSwitchRow;
+      const xSpan = farX - nearX;
+      const toU = (x: number): number => {
+        if (Math.abs(xSpan) <= 0.000001) {
+          return 0;
+        }
+        const raw = (x - nearX) / xSpan;
+        return Math.max(0, Math.min(1, raw));
+      };
+
+      const u0 = toU(x0);
+      const u1 = toU(x1);
+      const delta0 = y0 - midpointYAtU(u0);
+      const delta1 = y1 - midpointYAtU(u1);
+      const inside0 = isTopHalf ? delta0 <= 0 : delta0 >= 0;
+      const inside1 = isTopHalf ? delta1 <= 0 : delta1 >= 0;
+
+      if (inside0 && inside1) {
+        return { x0, y0, x1, y1 };
+      }
+
+      if (!inside0 && !inside1) {
+        return null;
+      }
+
+      const denominator = delta0 - delta1;
+      const rawT = Math.abs(denominator) <= 0.000001 ? 0.5 : delta0 / denominator;
+      const t = Math.max(0, Math.min(1, rawT));
+      const midX = x0 + (x1 - x0) * t;
+      const midY = y0 + (y1 - y0) * t;
+
+      return inside0
+        ? { x0, y0, x1: midX, y1: midY }
+        : { x0: midX, y0: midY, x1, y1 };
+    };
 
     for (let row = 0; row < rowCount; row += 1) {
       const nearRowTop = nearTop + (row / rowCount) * nearHeight;
@@ -2930,8 +2975,18 @@ export class DungeonFirstPersonComponent {
       }
       const nearY = nearTop + (row / rowCount) * nearHeight;
       const projectionOffset = getProjectionOffsetForRow(row);
-      context.moveTo(nearX, nearY);
-      context.lineTo(farX, nearY + projectionOffset);
+      const clipped = clipSegmentToRowHalf(
+        nearX,
+        nearY,
+        farX,
+        nearY + projectionOffset,
+        row
+      );
+      if (!clipped) {
+        continue;
+      }
+      context.moveTo(clipped.x0, clipped.y0);
+      context.lineTo(clipped.x1, clipped.y1);
     }
 
     for (let row = 0; row < rowCount; row += 1) {
@@ -2944,8 +2999,18 @@ export class DungeonFirstPersonComponent {
       for (let brickX = staggerBase + staggerNoise; brickX < stripWidth; brickX += brickWidth) {
         const u = brickX / stripWidth;
         const x = uToX(u);
-        context.moveTo(x, rowY(nearRowTop, u, row));
-        context.lineTo(x, rowY(nearRowBottom, u, row));
+        const clipped = clipSegmentToRowHalf(
+          x,
+          rowY(nearRowTop, u, row),
+          x,
+          rowY(nearRowBottom, u, row),
+          row
+        );
+        if (!clipped) {
+          continue;
+        }
+        context.moveTo(clipped.x0, clipped.y0);
+        context.lineTo(clipped.x1, clipped.y1);
       }
     }
 
