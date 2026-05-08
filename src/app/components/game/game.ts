@@ -5520,15 +5520,39 @@ export class Game implements OnInit {
     const endFrame = frameAtDepth(firstPersonView.steps.length);
     const endStep = firstPersonView.steps[firstPersonView.steps.length - 1] ?? null;
     const canExtendEndWall = firstPersonView.endBlock.type === 'wall' && endStep !== null;
+    const leftEndHasVisibleBackSurface =
+      canExtendEndWall &&
+      endStep.leftOpeningBackBlock !== null &&
+      endStep.leftOpeningBackBlock.type !== 'none' &&
+      endStep.leftOpeningBackBlock.type !== 'void' &&
+      this.canSeeOpeningBackWallAtDepth(
+        firstPersonView.steps,
+        firstPersonView.steps.length - 1,
+        'left'
+      );
+    const rightEndHasVisibleBackSurface =
+      canExtendEndWall &&
+      endStep.rightOpeningBackBlock !== null &&
+      endStep.rightOpeningBackBlock.type !== 'none' &&
+      endStep.rightOpeningBackBlock.type !== 'void' &&
+      this.canSeeOpeningBackWallAtDepth(
+        firstPersonView.steps,
+        firstPersonView.steps.length - 1,
+        'right'
+      );
     const endWallExtension = canExtendEndWall
       ? Math.max(2, (endFrame.right - endFrame.left) * 0.18)
       : 0;
     const extendedEndLeft =
-      canExtendEndWall && this.isSideSightTransparent(endStep.leftBlock)
+      leftEndHasVisibleBackSurface
+        ? 0
+        : canExtendEndWall
         ? Math.max(0, endFrame.left - endWallExtension)
         : endFrame.left;
     const extendedEndRight =
-      canExtendEndWall && this.isSideSightTransparent(endStep.rightBlock)
+      rightEndHasVisibleBackSurface
+        ? width
+        : canExtendEndWall
         ? Math.min(width, endFrame.right + endWallExtension)
         : endFrame.right;
     const endWallWidth = Math.max(0, extendedEndRight - extendedEndLeft);
