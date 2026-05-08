@@ -2116,10 +2116,10 @@ export class Game implements OnInit {
     const facing = cheater.facingDir;
 
     const firstPersonView = this.getFirstPersonView(preview, cheater);
-    const maxFrameDepth = Math.max(2, Math.min(12, firstPersonView.steps.length + 2));
+    const maxFrameDepth = Math.max(2, Math.min(12, firstPersonView.steps.length + 0.85));
     const frameAtDepth = (depth: number): { left: number; right: number; top: number; bottom: number } => {
       const ratio = Math.min(1, depth / maxFrameDepth);
-      const marginX = ratio * (viewportWidth * 0.38);
+      const marginX = ratio * (viewportWidth * 0.41);
       const marginY = ratio * (viewportHeight * 0.33);
       return {
         left: marginX,
@@ -5352,10 +5352,10 @@ export class Game implements OnInit {
       return;
     }
 
-    const maxFrameDepth = Math.max(2, Math.min(12, firstPersonView.steps.length + 2));
+    const maxFrameDepth = Math.max(2, Math.min(12, firstPersonView.steps.length + 0.85));
     const frameAtDepth = (depth: number): { left: number; right: number; top: number; bottom: number } => {
       const ratio = Math.min(1, depth / maxFrameDepth);
-      const marginX = ratio * (width * 0.38);
+      const marginX = ratio * (width * 0.41);
       const marginY = ratio * (height * 0.33);
       return {
         left: marginX,
@@ -5409,6 +5409,50 @@ export class Game implements OnInit {
         'floor'
       );
 
+      // Side floor extensions: fill corner areas below the frame on each side.
+      const leftFloorExt = [
+        { x: 0, y: nearFrame.bottom },
+        { x: nearFrame.left, y: nearFrame.bottom },
+        { x: farFrame.left, y: farFrame.bottom },
+        { x: 0, y: farFrame.bottom },
+      ];
+      const rightFloorExt = [
+        { x: nearFrame.right, y: nearFrame.bottom },
+        { x: width, y: nearFrame.bottom },
+        { x: width, y: farFrame.bottom },
+        { x: farFrame.right, y: farFrame.bottom },
+      ];
+      context.fillStyle = floorGradient;
+      context.beginPath();
+      context.moveTo(0, nearFrame.bottom);
+      context.lineTo(nearFrame.left, nearFrame.bottom);
+      context.lineTo(farFrame.left, farFrame.bottom);
+      context.lineTo(0, farFrame.bottom);
+      context.closePath();
+      context.fill();
+      this.drawSurfaceTextureInPolygon(
+        context,
+        leftFloorExt,
+        nearFrame.left * 3 + nearFrame.bottom * 5 + farFrame.right * 7 + depth * 29 + 31,
+        depth,
+        'floor'
+      );
+      context.fillStyle = floorGradient;
+      context.beginPath();
+      context.moveTo(nearFrame.right, nearFrame.bottom);
+      context.lineTo(width, nearFrame.bottom);
+      context.lineTo(width, farFrame.bottom);
+      context.lineTo(farFrame.right, farFrame.bottom);
+      context.closePath();
+      context.fill();
+      this.drawSurfaceTextureInPolygon(
+        context,
+        rightFloorExt,
+        nearFrame.right * 3 + nearFrame.bottom * 5 + farFrame.left * 7 + depth * 29 + 37,
+        depth,
+        'floor'
+      );
+
       const ceilingGradient = context.createLinearGradient(0, nearFrame.top, 0, farFrame.top);
       ceilingGradient.addColorStop(0, `rgba(38, 34, 58, ${Math.min(0.72, depthAlpha + 0.09)})`);
       ceilingGradient.addColorStop(1, `rgba(58, 53, 80, ${Math.min(0.76, depthAlpha + 0.05)})`);
@@ -5424,6 +5468,50 @@ export class Game implements OnInit {
         context,
         ceilingPoints,
         nearFrame.right * 11 + nearFrame.top * 13 + farFrame.left * 17 + depth * 31,
+        depth,
+        'ceiling'
+      );
+
+      // Side ceiling extensions: fill corner areas above the frame on each side.
+      const leftCeilingExt = [
+        { x: 0, y: nearFrame.top },
+        { x: nearFrame.left, y: nearFrame.top },
+        { x: farFrame.left, y: farFrame.top },
+        { x: 0, y: farFrame.top },
+      ];
+      const rightCeilingExt = [
+        { x: nearFrame.right, y: nearFrame.top },
+        { x: width, y: nearFrame.top },
+        { x: width, y: farFrame.top },
+        { x: farFrame.right, y: farFrame.top },
+      ];
+      context.fillStyle = ceilingGradient;
+      context.beginPath();
+      context.moveTo(0, nearFrame.top);
+      context.lineTo(nearFrame.left, nearFrame.top);
+      context.lineTo(farFrame.left, farFrame.top);
+      context.lineTo(0, farFrame.top);
+      context.closePath();
+      context.fill();
+      this.drawSurfaceTextureInPolygon(
+        context,
+        leftCeilingExt,
+        nearFrame.right * 11 + nearFrame.top * 13 + farFrame.left * 17 + depth * 31 + 41,
+        depth,
+        'ceiling'
+      );
+      context.fillStyle = ceilingGradient;
+      context.beginPath();
+      context.moveTo(nearFrame.right, nearFrame.top);
+      context.lineTo(width, nearFrame.top);
+      context.lineTo(width, farFrame.top);
+      context.lineTo(farFrame.right, farFrame.top);
+      context.closePath();
+      context.fill();
+      this.drawSurfaceTextureInPolygon(
+        context,
+        rightCeilingExt,
+        nearFrame.left * 11 + nearFrame.top * 13 + farFrame.right * 17 + depth * 31 + 47,
         depth,
         'ceiling'
       );
@@ -5492,16 +5580,15 @@ export class Game implements OnInit {
 
     for (const segment of farToNearSegments) {
       const { depth, step, nearFrame, farFrame } = segment;
-      const isFarthestVisibleLayer = depth === firstPersonView.steps.length - 1;
 
       const leftOpeningBackBlock = step.leftOpeningBackBlock;
       const rightOpeningBackBlock = step.rightOpeningBackBlock;
-      const canSeeLeftOpeningBackWall = this.hasClearSideSightToDepth(
+      const canSeeLeftOpeningBackWall = this.canSeeOpeningBackWallAtDepth(
         firstPersonView.steps,
         depth,
         'left'
       );
-      const canSeeRightOpeningBackWall = this.hasClearSideSightToDepth(
+      const canSeeRightOpeningBackWall = this.canSeeOpeningBackWallAtDepth(
         firstPersonView.steps,
         depth,
         'right'
@@ -5515,7 +5602,7 @@ export class Game implements OnInit {
           'left',
           leftOpeningBackBlock,
           depth,
-          !isFarthestVisibleLayer
+          true
         );
       }
 
@@ -5527,7 +5614,7 @@ export class Game implements OnInit {
           'right',
           rightOpeningBackBlock,
           depth,
-          !isFarthestVisibleLayer
+          true
         );
       }
     }
@@ -5932,45 +6019,31 @@ export class Game implements OnInit {
 
     const openingWidth =
       side === 'left' ? farFrame.left - nearFrame.left : nearFrame.right - farFrame.right;
-    const nearInset = Math.max(6, openingWidth * 3.2);
-    const panelThickness = Math.max(8, openingWidth * 1.8);
-    const seamOverlap = 1.8;
+    const seamOverlap = 2.4;
     const portalNearX =
       side === 'left' ? nearFrame.left - seamOverlap : nearFrame.right + seamOverlap;
+    const canvasWidth = nearFrame.left + nearFrame.right;
     const panelInnerX =
-      side === 'left' ? nearFrame.left - nearInset : nearFrame.right + nearInset;
+      side === 'left' ? farFrame.left : farFrame.right;
     const panelOuterX =
-      side === 'left' ? panelInnerX - panelThickness : panelInnerX + panelThickness;
+      side === 'left' ? 0 : canvasWidth;
     const panelLeft = Math.min(panelInnerX, panelOuterX);
     const panelRight = Math.max(panelInnerX, panelOuterX);
-    const wallTop = nearFrame.top;
-    const wallBottom = nearFrame.bottom;
+    const wallTop = farFrame.top;
+    const wallBottom = farFrame.bottom;
 
-    const backWallPoints =
-      side === 'left'
-        ? [
-            { x: panelLeft, y: wallTop },
-            { x: panelRight, y: wallTop },
-            { x: panelRight, y: wallBottom },
-            { x: panelLeft, y: wallBottom },
-          ]
-        : [
-            { x: panelLeft, y: wallTop },
-            { x: panelRight, y: wallTop },
-            { x: panelRight, y: wallBottom },
-            { x: panelLeft, y: wallBottom },
-          ];
+    const backWallPoints = [
+      { x: panelLeft, y: wallTop },
+      { x: panelRight, y: wallTop },
+      { x: panelRight, y: wallBottom },
+      { x: panelLeft, y: wallBottom },
+    ];
 
-    const connectorMidX = side === 'left'
-      ? portalNearX - Math.max(2, openingWidth * 0.35)
-      : portalNearX + Math.max(2, openingWidth * 0.35);
     const connectorPoints = [
-      { x: portalNearX, y: nearFrame.top },
-      { x: connectorMidX, y: farFrame.top },
-      { x: side === 'left' ? panelRight : panelLeft, y: wallTop },
-      { x: side === 'left' ? panelRight : panelLeft, y: wallBottom },
-      { x: connectorMidX, y: farFrame.bottom },
-      { x: portalNearX, y: nearFrame.bottom },
+      { x: portalNearX, y: wallTop },
+      { x: panelInnerX, y: wallTop },
+      { x: panelInnerX, y: wallBottom },
+      { x: portalNearX, y: wallBottom },
     ];
 
     context.fillStyle = this.getFirstPersonOpeningBackWallColor(block.type, wallDepth);
@@ -7115,6 +7188,33 @@ export class Game implements OnInit {
     }
 
     return true;
+  }
+
+  private canSeeOpeningBackWallAtDepth(
+    steps: FirstPersonStep[],
+    depth: number,
+    side: 'left' | 'right'
+  ): boolean {
+    if (this.hasClearSideSightToDepth(steps, depth, side)) {
+      return true;
+    }
+
+    if (depth <= 0) {
+      return false;
+    }
+
+    const previousStep = steps[depth - 1];
+    const currentStep = steps[depth];
+    if (!previousStep || !currentStep) {
+      return false;
+    }
+
+    const previousBlock = side === 'left' ? previousStep.leftBlock : previousStep.rightBlock;
+    const currentBlock = side === 'left' ? currentStep.leftBlock : currentStep.rightBlock;
+
+    // Intersection/corner peek rule: if a side changes from blocked to open at this depth,
+    // allow rendering the opening back wall even though earlier depths were blocked.
+    return !this.isSideSightTransparent(previousBlock) && this.isSideSightTransparent(currentBlock);
   }
 
   private getVisibleMonsterSlotsForDepth(
