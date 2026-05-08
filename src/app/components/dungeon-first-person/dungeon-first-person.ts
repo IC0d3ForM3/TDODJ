@@ -925,7 +925,7 @@ export class DungeonFirstPersonComponent {
         textureSeed,
         this.getStoneTextureOptionsForWallDepth(wallDepth)
       );
-      this.drawBrickPatternInPolygon(context, points, textureSeed + 131, wallDepth);
+      this.drawBrickPatternInPolygon(context, points, textureSeed + 131, wallDepth, true);
     }
 
     if (highlight) {
@@ -2782,9 +2782,15 @@ export class DungeonFirstPersonComponent {
     context: CanvasRenderingContext2D,
     points: Array<{ x: number; y: number }>,
     seed: number,
-    wallDepth: number
+    wallDepth: number,
+    sidePerspective = false
   ): void {
     if (points.length < 3) {
+      return;
+    }
+
+    if (points.length === 4) {
+      this.drawBrickPatternInQuad(context, points, seed, wallDepth, sidePerspective);
       return;
     }
 
@@ -2805,6 +2811,260 @@ export class DungeonFirstPersonComponent {
     context.clip();
     this.drawBrickPatternInRect(context, left, top, right - left, bottom - top, seed, wallDepth);
     context.restore();
+  }
+
+  private drawBrickPatternInQuad(
+    context: CanvasRenderingContext2D,
+    points: Array<{ x: number; y: number }>,
+    seed: number,
+    wallDepth: number,
+    sidePerspective: boolean
+  ): void {
+    context.save();
+    context.beginPath();
+    context.moveTo(points[0].x, points[0].y);
+    for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
+      context.lineTo(points[pointIndex].x, points[pointIndex].y);
+    }
+    context.closePath();
+    context.clip();
+
+    if (sidePerspective) {
+      this.drawSideWallBricks(context, points, seed, wallDepth);
+    } else {
+      this.drawBilinearBricks(context, points, seed, wallDepth);
+    }
+
+    context.restore();
+  }
+
+  private drawSideWallBricks(
+    context: CanvasRenderingContext2D,
+    points: Array<{ x: number; y: number }>,
+    seed: number,
+    wallDepth: number
+  ): void {
+    const nearX = points[0].x;
+    const farX = points[1].x;
+    const nearTop = points[0].y;
+    const nearBottom = points[3].y;
+    const topProjectionOffset = points[1].y - points[0].y;
+    const bottomProjectionOffset = points[2].y - points[3].y;
+
+    const nearHeight = nearBottom - nearTop;
+    const farHeight = points[2].y - points[1].y;
+    const averageHeight = Math.max(1, (nearHeight + farHeight) * 0.5);
+    const stripWidth = Math.abs(farX - nearX);
+    if (stripWidth <= 0.001) {
+      return;
+    }
+
+    const normalizedDepth = Math.max(0, wallDepth);
+    const brickHeight = Math.max(4, Math.min(12, averageHeight * 0.18));
+    const brickWidth = Math.max(8, brickHeight * 1.9);
+    const rowCount = Math.max(1, Math.ceil(averageHeight / brickHeight));
+    const midSwitchRow = Math.floor(rowCount / 2);
+    const topHalfEndRow = Math.floor((rowCount - 1) / 2);
+    const bottomHalfStartRow = Math.ceil((rowCount + 1) / 2);
+    const mortarAlpha = Math.max(0.45, 0.62 - normalizedDepth * 0.018);
+    const tintAlpha = Math.max(0.16, 0.34 - normalizedDepth * 0.015);
+
+    const uToX = (u: number): number => nearX + u * (farX - nearX);
+    const getProjectionOffsetForRow = (rowIndex: number): number => (
+      rowIndex < midSwitchRow ? topProjectionOffset : bottomProjectionOffset
+    );
+    const rowY = (nearY: number, u: number, rowIndex: number): number => (
+      nearY + u * getProjectionOffsetForRow(rowIndex)
+    );
+
+    for (let row = 0; row < rowCount; row += 1) {
+      const nearRowTop = nearTop + (row / rowCount) * nearHeight;
+      const nearRowBottom = nearTop + ((row + 1) / rowCount) * nearHeight;
+
+      const staggerBase = row % 2 === 0 ? 0 : brickWidth * 0.5;
+      const staggerNoise = (this.getSeededNoise(seed, row * 5 + 1) - 0.5) * brickWidth * 0.2;
+      let brickColumn = 0;
+
+      for (let brickStart = -brickWidth + staggerBase + staggerNoise; brickStart < stripWidth; brickStart += brickWidth) {
+        const visibleLeft = Math.max(0, brickStart);
+        const visibleRight = Math.min(stripWidth, brickStart + brickWidth);
+        if (visibleRight - visibleLeft <= 1) {
+          brickColumn += 1;
+          continue;
+        }
+
+        const u0 = visibleLeft / stripWidth;
+        const u1 = visibleRight / stripWidth;
+
+        const x0 = uToX(u0);
+        const x1 = uToX(u1);
+        const topY0 = rowY(nearRowTop, u0, row);
+        const topY1 = rowY(nearRowTop, u1, row);
+        const bottomY0 = rowY(nearRowBottom, u0, row);
+        const bottomY1 = rowY(nearRowBottom, u1, row);
+
+        const toneNoise = this.getSeededNoise(seed + row * 19 + brickColumn * 31, 2);
+        const tone = 132 + Math.floor(toneNoise * 34);
+        const alpha = tintAlpha * (0.7 + toneNoise * 0.6);
+        context.fillStyle = `rgba(${tone}, ${tone}, ${tone}, ${alpha})`;
+
+        context.beginPath();
+        context.moveTo(x0, topY0);
+        context.lineTo(x1, topY1);
+        context.lineTo(x1, bottomY1);
+        context.lineTo(x0, bottomY0);
+        context.closePath();
+        context.fill();
+
+        brickColumn += 1;
+      }
+    }
+
+    context.strokeStyle = `rgba(80, 88, 102, ${mortarAlpha})`;
+    context.lineWidth = 1.5;
+    context.beginPath();
+
+    for (let row = 1; row < rowCount; row += 1) {
+      if (row === topHalfEndRow || row === bottomHalfStartRow) {
+        continue;
+      }
+      const nearY = nearTop + (row / rowCount) * nearHeight;
+      const projectionOffset = getProjectionOffsetForRow(row);
+      context.moveTo(nearX, nearY);
+      context.lineTo(farX, nearY + projectionOffset);
+    }
+
+    for (let row = 0; row < rowCount; row += 1) {
+      const nearRowTop = nearTop + (row / rowCount) * nearHeight;
+      const nearRowBottom = nearTop + ((row + 1) / rowCount) * nearHeight;
+
+      const staggerBase = row % 2 === 0 ? 0 : brickWidth * 0.5;
+      const staggerNoise = (this.getSeededNoise(seed, row * 5 + 1) - 0.5) * brickWidth * 0.2;
+
+      for (let brickX = staggerBase + staggerNoise; brickX < stripWidth; brickX += brickWidth) {
+        const u = brickX / stripWidth;
+        const x = uToX(u);
+        context.moveTo(x, rowY(nearRowTop, u, row));
+        context.lineTo(x, rowY(nearRowBottom, u, row));
+      }
+    }
+
+    context.stroke();
+  }
+
+  private drawBilinearBricks(
+    context: CanvasRenderingContext2D,
+    points: Array<{ x: number; y: number }>,
+    seed: number,
+    wallDepth: number
+  ): void {
+    const normalizedDepth = Math.max(0, wallDepth);
+    const leftEdgeLength = Math.hypot(points[3].x - points[0].x, points[3].y - points[0].y);
+    const rightEdgeLength = Math.hypot(points[2].x - points[1].x, points[2].y - points[1].y);
+    const averageHeight = Math.max(1, (leftEdgeLength + rightEdgeLength) * 0.5);
+
+    const brickHeight = Math.max(4, Math.min(12, averageHeight * 0.18));
+    const brickWidth = Math.max(8, brickHeight * 1.9);
+    const mortarAlpha = Math.max(0.08, 0.2 - normalizedDepth * 0.012);
+    const tintAlpha = Math.max(0.05, 0.16 - normalizedDepth * 0.01);
+
+    const rowCount = Math.max(1, Math.ceil(averageHeight / brickHeight));
+    const spanLength = Math.max(
+      1,
+      Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y),
+      Math.hypot(points[2].x - points[3].x, points[2].y - points[3].y)
+    );
+
+    const interpolate = (
+      topLeft: { x: number; y: number },
+      topRight: { x: number; y: number },
+      bottomRight: { x: number; y: number },
+      bottomLeft: { x: number; y: number },
+      u: number,
+      v: number
+    ): { x: number; y: number } => {
+      const oneMinusU = 1 - u;
+      const oneMinusV = 1 - v;
+      return {
+        x:
+          topLeft.x * oneMinusU * oneMinusV +
+          topRight.x * u * oneMinusV +
+          bottomRight.x * u * v +
+          bottomLeft.x * oneMinusU * v,
+        y:
+          topLeft.y * oneMinusU * oneMinusV +
+          topRight.y * u * oneMinusV +
+          bottomRight.y * u * v +
+          bottomLeft.y * oneMinusU * v,
+      };
+    };
+
+    for (let row = 0; row < rowCount; row += 1) {
+      const v0 = row / rowCount;
+      const v1 = (row + 1) / rowCount;
+      const staggerBase = row % 2 === 0 ? 0 : brickWidth * 0.5;
+      const staggerNoise = (this.getSeededNoise(seed, row * 5 + 1) - 0.5) * brickWidth * 0.2;
+      let brickColumn = 0;
+
+      for (let brickStart = -brickWidth + staggerBase + staggerNoise; brickStart < spanLength; brickStart += brickWidth) {
+        const visibleLeft = Math.max(0, brickStart);
+        const visibleRight = Math.min(spanLength, brickStart + brickWidth);
+        if (visibleRight - visibleLeft <= 1) {
+          brickColumn += 1;
+          continue;
+        }
+
+        const u0 = visibleLeft / spanLength;
+        const u1 = visibleRight / spanLength;
+        const p0 = interpolate(points[0], points[1], points[2], points[3], u0, v0);
+        const p1 = interpolate(points[0], points[1], points[2], points[3], u1, v0);
+        const p2 = interpolate(points[0], points[1], points[2], points[3], u1, v1);
+        const p3 = interpolate(points[0], points[1], points[2], points[3], u0, v1);
+
+        const toneNoise = this.getSeededNoise(seed + row * 19 + brickColumn * 31, 2);
+        const tone = 132 + Math.floor(toneNoise * 34);
+        const alpha = tintAlpha * (0.7 + toneNoise * 0.6);
+        context.fillStyle = `rgba(${tone}, ${tone}, ${tone}, ${alpha})`;
+        context.beginPath();
+        context.moveTo(p0.x, p0.y);
+        context.lineTo(p1.x, p1.y);
+        context.lineTo(p2.x, p2.y);
+        context.lineTo(p3.x, p3.y);
+        context.closePath();
+        context.fill();
+
+        brickColumn += 1;
+      }
+    }
+
+    context.strokeStyle = `rgba(74, 80, 92, ${mortarAlpha})`;
+    context.lineWidth = 1;
+    context.beginPath();
+
+    for (let row = 1; row < rowCount; row += 1) {
+      const v = row / rowCount;
+      const start = interpolate(points[0], points[1], points[2], points[3], 0, v);
+      const end = interpolate(points[0], points[1], points[2], points[3], 1, v);
+      context.moveTo(start.x, start.y);
+      context.lineTo(end.x, end.y);
+    }
+
+    for (let row = 0; row < rowCount; row += 1) {
+      const v0 = row / rowCount;
+      const v1 = (row + 1) / rowCount;
+      const staggerBase = row % 2 === 0 ? 0 : brickWidth * 0.5;
+      const staggerNoise = (this.getSeededNoise(seed, row * 5 + 1) - 0.5) * brickWidth * 0.2;
+
+      for (let brickX = staggerBase + staggerNoise; brickX < spanLength; brickX += brickWidth) {
+        const u = brickX / spanLength;
+        const start = interpolate(points[0], points[1], points[2], points[3], u, v0);
+        const end = interpolate(points[0], points[1], points[2], points[3], u, v1);
+        context.moveTo(start.x, start.y);
+        context.lineTo(end.x, end.y);
+      }
+    }
+
+    context.stroke();
   }
 
   private drawBrickPatternInRect(

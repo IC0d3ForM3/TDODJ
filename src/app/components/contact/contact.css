@@ -10,7 +10,17 @@
 
 .contact-intro {
   color: #666;
+  margin-bottom: 0.4rem;
+}
+
+.contact-direct-email {
+  color: #4b5563;
   margin-bottom: 1.5rem;
+}
+
+.contact-direct-email a {
+  color: #2a5fd6;
+  font-weight: 600;
 }
 
 .contact-form {

@@ -19,7 +19,9 @@
 }
 
 .signup-success-icon {
-  font-size: 3rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #4ade80;
   margin-bottom: 0.75rem;
 }
 
@@ -31,7 +33,72 @@
 
 .signup-success-box p {
   color: #94a3b8;
+  margin: 0.2rem 0;
+}
+
+.auth-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(3, 9, 21, 0.78);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.auth-loading-box {
+  width: min(92vw, 360px);
+  text-align: center;
+  background: rgba(8, 16, 35, 0.96);
+  border: 1px solid rgba(120, 170, 255, 0.28);
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  padding: 1.5rem 1.25rem;
+}
+
+.auth-spinner {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  margin: 0 auto 0.9rem;
+  border: 3px solid rgba(76, 121, 217, 0.24);
+  border-top-color: #87b4ff;
+  border-right-color: #5a7fce;
+  position: relative;
+  animation: runeSpin 1s linear infinite;
+}
+
+.auth-spinner::before,
+.auth-spinner::after {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  border: 2px dashed rgba(139, 177, 255, 0.45);
+}
+
+.auth-spinner::after {
+  inset: 22px;
+  border: 2px solid rgba(195, 218, 255, 0.8);
+}
+
+.auth-loading-title {
   margin: 0;
+  color: #eaf2ff;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.auth-loading-sub {
+  margin: 0.4rem 0 0;
+  color: #93aed1;
+  font-size: 0.88rem;
+}
+
+@keyframes runeSpin {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes fadeIn {
@@ -190,6 +257,11 @@
 
 .signup-tac-link:hover {
   color: #9fd0ff;
+}
+
+.signup-tac-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .signup-btn {

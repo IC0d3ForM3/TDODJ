@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Account } from '../../services/account';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-login',
@@ -15,12 +16,16 @@ export class Login {
   username = '';
   password = '';
   error: string | null = null;
+  isSubmitting = false;
 
   constructor(private account: Account, private router: Router) {}
 
   onSubmit() {
-    if (!this.username.trim() || !this.password) return;
-    this.account.login(this.username, this.password).subscribe({
+    if (this.isSubmitting || !this.username.trim() || !this.password) return;
+    this.isSubmitting = true;
+    this.account.login(this.username, this.password).pipe(finalize(() => {
+      this.isSubmitting = false;
+    })).subscribe({
       next: (res) => {
         this.account.setKey(res.key, res.isAdmin, res.isCreator, res.username);
         this.error = null;

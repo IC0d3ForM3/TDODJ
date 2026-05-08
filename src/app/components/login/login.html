@@ -1,4 +1,14 @@
 <div class="login-page">
+  @if (isSubmitting) {
+    <div class="auth-loading-overlay">
+      <div class="auth-loading-box" role="status" aria-live="polite" aria-label="Logging in">
+        <div class="auth-spinner" aria-hidden="true"></div>
+        <p class="auth-loading-title">Consulting The Codex...</p>
+        <p class="auth-loading-sub">Opening your character sheet.</p>
+      </div>
+    </div>
+  }
+
   <div class="login-card">
     <div class="login-icon">🗝️</div>
     <h2 class="login-title">Enter the Dungeon</h2>
@@ -7,16 +17,18 @@
     <form #loginForm="ngForm" (ngSubmit)="onSubmit()" class="login-form">
       <div class="login-field">
         <label for="username">Username</label>
-        <input type="text" id="username" name="username" required [(ngModel)]="username" autocomplete="username" />
+        <input type="text" id="username" name="username" required [(ngModel)]="username" autocomplete="username" [disabled]="isSubmitting" />
       </div>
       <div class="login-field">
         <label for="password">Password</label>
-        <input type="password" id="password" name="password" required [(ngModel)]="password" autocomplete="current-password" />
+        <input type="password" id="password" name="password" required [(ngModel)]="password" autocomplete="current-password" [disabled]="isSubmitting" />
       </div>
 
       <div *ngIf="error" class="login-error">{{ error }}</div>
 
-      <button type="submit" class="login-btn">Log In</button>
+      <button type="submit" class="login-btn" [disabled]="isSubmitting || !username || !password">
+        @if (isSubmitting) { Logging In... } @else { Log In }
+      </button>
     </form>
 
     <p class="login-footer">

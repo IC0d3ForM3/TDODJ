@@ -5,6 +5,7 @@ import { User } from '../../interfaces/user';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { TacModal } from '../tac-modal/tac-modal';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-signup',
@@ -21,6 +22,7 @@ export class Signup {
   result: number | null = null;
   error: string | null = null;
   showSuccess = false;
+  isSubmitting = false;
   agreedToTac = false;
   showTac = false;
 
@@ -48,13 +50,16 @@ export class Signup {
   }
 
   onSubmit() {
-    if (!this.canSave()) return;
+    if (this.isSubmitting || !this.canSave()) return;
+    this.isSubmitting = true;
     const user: User = {
       username: this.username,
       email: this.email,
       password: this.password,
     };
-    this.account.signup(user).subscribe({
+    this.account.signup(user).pipe(finalize(() => {
+      this.isSubmitting = false;
+    })).subscribe({
       next: (res) => {
         this.result = res.result;
         this.error = null;

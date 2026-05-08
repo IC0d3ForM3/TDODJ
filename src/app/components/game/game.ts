@@ -5324,6 +5324,16 @@ export class Game implements OnInit {
       bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
     }
 
+    const obstacleSquareKeys = new Set<string>();
+    const obstacleImageBySquare = new Map<string, HTMLImageElement | null>();
+    for (const obs of this.obstaclePlacementsByDungon()[preview.dungonId] ?? []) {
+      if (obs.isDestroyed) continue;
+      const squareKey = this.getSquareKey(obs.row, obs.column);
+      obstacleSquareKeys.add(squareKey);
+      const image = obs.imageId !== null ? (this.obstacleImageCache.get(obs.imageId) ?? null) : null;
+      obstacleImageBySquare.set(squareKey, image);
+    }
+
     const liveMonsterInstances = this.monsterInstances().filter((m) => this.shouldRenderMonsterInstance(m));
     const monstersById = this.getMonstersByIdForDungon(preview.dungonId);
     const monsterImageBySquare = new Map<string, HTMLImageElement | null>();
@@ -5536,9 +5546,65 @@ export class Game implements OnInit {
     // Pass 3: draw floor items and monsters last so they stay visible.
     for (const segment of farToNearSegments) {
       const { step, nearFrame, farFrame } = segment;
-      const squareKey = this.getSquareKey(step.row, step.column);
-      if (bagSquareKeys.has(squareKey)) {
-        this.drawFirstPersonFloorBag(context, nearFrame, farFrame);
+      const visibleSlots = [...step.visibleMonsterSlots];
+
+      const visibleObstacleSlots = visibleSlots.filter((slot) => obstacleSquareKeys.has(slot.squareKey));
+      if (visibleObstacleSlots.length > 0) {
+        const lateralRange = Math.max(
+          1,
+          ...visibleObstacleSlots.map((slot) => Math.abs(slot.lateralOffset))
+        );
+
+        for (const slot of visibleObstacleSlots) {
+          const obstacleImage = obstacleImageBySquare.get(slot.squareKey) ?? null;
+          if (slot.isPeek) {
+            this.drawFirstPersonPeekObstacle(
+              context,
+              width,
+              nearFrame,
+              farFrame,
+              obstacleImage,
+              slot.lateralOffset < 0 ? 'left' : 'right'
+            );
+          } else {
+            this.drawFirstPersonObstacle(
+              context,
+              nearFrame,
+              farFrame,
+              obstacleImage,
+              slot.lateralOffset,
+              lateralRange
+            );
+          }
+        }
+      }
+
+      const visibleBagSlots = visibleSlots.filter((slot) => bagSquareKeys.has(slot.squareKey));
+      if (visibleBagSlots.length > 0) {
+        const lateralRange = Math.max(
+          1,
+          ...visibleBagSlots.map((slot) => Math.abs(slot.lateralOffset))
+        );
+
+        for (const slot of visibleBagSlots) {
+          if (slot.isPeek) {
+            this.drawFirstPersonPeekBag(
+              context,
+              width,
+              nearFrame,
+              farFrame,
+              slot.lateralOffset < 0 ? 'left' : 'right'
+            );
+          } else {
+            this.drawFirstPersonFloorBag(
+              context,
+              nearFrame,
+              farFrame,
+              slot.lateralOffset,
+              lateralRange
+            );
+          }
+        }
       }
 
       if (step.hasKey) {
@@ -5583,13 +5649,72 @@ export class Game implements OnInit {
       }
     }
 
-    context.fillStyle = '#dde4ee';
-    context.font = '12px sans-serif';
-    context.fillText(
-      `Facing ${this.getFacingDirectionLabel(displayDirection)}`,
-      12,
-      18
-    );
+    this.drawFirstPersonAngleGuideLines(context, frameAtDepth(0), frameAtDepth(1));
+  }
+
+  private drawFirstPersonAngleGuideLines(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number }
+  ): void {
+    const lerp = (start: number, end: number, t: number): number => start + (end - start) * t;
+
+    const drawGuidesOnSide = (side: 'left' | 'right'): void => {
+      const nearX = side === 'left' ? nearFrame.left : nearFrame.right;
+      const farX = side === 'left' ? farFrame.left : farFrame.right;
+      const topDy = farFrame.top - nearFrame.top;
+
+      const drawSegment = (
+        nearBaseY: number,
+        tStart: number,
+        tEnd: number,
+        color: string,
+        lineWidth: number
+      ): void => {
+        const x1 = lerp(nearX, farX, tStart);
+        const y1 = nearBaseY + topDy * tStart;
+        const x2 = lerp(nearX, farX, tEnd);
+        const y2 = nearBaseY + topDy * tEnd;
+
+        // Dark underlay to keep the guide visible over any wall texture.
+        context.strokeStyle = 'rgba(8, 12, 18, 0.95)';
+        context.lineWidth = lineWidth + 2;
+        context.beginPath();
+        context.moveTo(x1, y1);
+        context.lineTo(x2, y2);
+        context.stroke();
+
+        context.strokeStyle = color;
+        context.lineWidth = lineWidth;
+        context.beginPath();
+        context.moveTo(x1, y1);
+        context.lineTo(x2, y2);
+        context.stroke();
+
+        // Tiny endpoint markers help confirm the exact drawn slope.
+        context.fillStyle = color;
+        context.beginPath();
+        context.arc(x1, y1, 1.8, 0, Math.PI * 2);
+        context.arc(x2, y2, 1.8, 0, Math.PI * 2);
+        context.fill();
+      };
+
+      // Guide 1: top-edge angle guide (yellow)
+      // Positioned away from compass/heart overlays and canvas edges.
+      const topNearY = nearFrame.top + 8;
+      drawSegment(topNearY, 0.34, 0.72, '#ffd44a', 2.8);
+
+      // Guide 2: mortar-row angle guide (cyan) in the middle of the wall.
+      const middleNearY = lerp(nearFrame.top, nearFrame.bottom, 0.58);
+      drawSegment(middleNearY, 0.36, 0.78, '#34d9ff', 2.6);
+    };
+
+    context.save();
+    context.globalAlpha = 1;
+    context.globalCompositeOperation = 'source-over';
+    drawGuidesOnSide('left');
+    drawGuidesOnSide('right');
+    context.restore();
   }
 
   private getFirstPersonView(preview: GridPreviewContext, cheater: Cheater): FirstPersonView {
@@ -5784,7 +5909,7 @@ export class Game implements OnInit {
 
     if (block.type === 'wall') {
       const textureSeed = nearFrame.top * 11 + nearFrame.left * 5 + (side === 'left' ? 17 : 29);
-      this.drawBrickPatternInPolygon(context, points, textureSeed + 131, wallDepth);
+      this.drawBrickPatternInPolygon(context, points, textureSeed + 131, wallDepth, true);
     }
 
     if (block.type === 'closedDoor') {
@@ -5807,35 +5932,44 @@ export class Game implements OnInit {
 
     const openingWidth =
       side === 'left' ? farFrame.left - nearFrame.left : nearFrame.right - farFrame.right;
-    const nearInset = Math.max(4, openingWidth * 2.8);
-    const farInset = Math.max(3, openingWidth * 1.8);
-    const seamOverlap = 1.4;
+    const nearInset = Math.max(6, openingWidth * 3.2);
+    const panelThickness = Math.max(8, openingWidth * 1.8);
+    const seamOverlap = 1.8;
     const portalNearX =
       side === 'left' ? nearFrame.left - seamOverlap : nearFrame.right + seamOverlap;
-    const portalFarX =
-      side === 'left' ? farFrame.left - seamOverlap : farFrame.right + seamOverlap;
+    const panelInnerX =
+      side === 'left' ? nearFrame.left - nearInset : nearFrame.right + nearInset;
+    const panelOuterX =
+      side === 'left' ? panelInnerX - panelThickness : panelInnerX + panelThickness;
+    const panelLeft = Math.min(panelInnerX, panelOuterX);
+    const panelRight = Math.max(panelInnerX, panelOuterX);
+    const wallTop = nearFrame.top;
+    const wallBottom = nearFrame.bottom;
 
     const backWallPoints =
       side === 'left'
         ? [
-            { x: nearFrame.left - nearInset, y: nearFrame.top },
-            { x: farFrame.left - farInset, y: farFrame.top },
-            { x: farFrame.left - farInset, y: farFrame.bottom },
-            { x: nearFrame.left - nearInset, y: nearFrame.bottom },
+            { x: panelLeft, y: wallTop },
+            { x: panelRight, y: wallTop },
+            { x: panelRight, y: wallBottom },
+            { x: panelLeft, y: wallBottom },
           ]
         : [
-            { x: nearFrame.right + nearInset, y: nearFrame.top },
-            { x: farFrame.right + farInset, y: farFrame.top },
-            { x: farFrame.right + farInset, y: farFrame.bottom },
-            { x: nearFrame.right + nearInset, y: nearFrame.bottom },
+            { x: panelLeft, y: wallTop },
+            { x: panelRight, y: wallTop },
+            { x: panelRight, y: wallBottom },
+            { x: panelLeft, y: wallBottom },
           ];
 
+    const connectorMidX = side === 'left'
+      ? portalNearX - Math.max(2, openingWidth * 0.35)
+      : portalNearX + Math.max(2, openingWidth * 0.35);
     const connectorPoints = [
       { x: portalNearX, y: nearFrame.top },
-      { x: portalFarX, y: farFrame.top },
-      backWallPoints[1],
-      backWallPoints[2],
-      { x: portalFarX, y: farFrame.bottom },
+      { x: connectorMidX, y: farFrame.top },
+      { x: side === 'left' ? panelRight : panelLeft, y: wallTop },
+      { x: side === 'left' ? panelRight : panelLeft, y: wallBottom },
+      { x: connectorMidX, y: farFrame.bottom },
       { x: portalNearX, y: nearFrame.bottom },
     ];
 
@@ -6078,12 +6212,18 @@ export class Game implements OnInit {
   private drawFirstPersonFloorBag(
     context: CanvasRenderingContext2D,
     nearFrame: { left: number; right: number; top: number; bottom: number },
-    farFrame: { left: number; right: number; top: number; bottom: number }
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    lateralOffset = 0,
+    lateralRange = 1
   ): void {
     const midLeft = (nearFrame.left + farFrame.left) / 2;
     const midRight = (nearFrame.right + farFrame.right) / 2;
     const tileWidth = midRight - midLeft;
-    const centerX = (midLeft + midRight) / 2;
+    const normalizedOffset = lateralRange <= 0 ? 0 : lateralOffset / (Math.max(1, lateralRange) + 0.65);
+    const shiftedCenterX = (midLeft + midRight) / 2 + normalizedOffset * tileWidth * 0.82;
+    const minCenterX = midLeft + tileWidth * 0.12;
+    const maxCenterX = midRight - tileWidth * 0.12;
+    const centerX = Math.max(minCenterX, Math.min(maxCenterX, shiftedCenterX));
     const floorY = (nearFrame.bottom + farFrame.bottom) / 2;
     const bagW = Math.max(12, Math.min(64, tileWidth * 0.45));
     const bagH = bagW * 1.15;
@@ -6153,6 +6293,112 @@ export class Game implements OnInit {
     context.quadraticCurveTo(bagLeft, bagTop, bagLeft + r, bagTop);
     context.closePath();
     context.stroke();
+  }
+
+  private drawFirstPersonObstacle(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    image: HTMLImageElement | null,
+    lateralOffset: number,
+    lateralRange: number
+  ): void {
+    const midLeft = nearFrame.left * 0.65 + farFrame.left * 0.35;
+    const midRight = nearFrame.right * 0.65 + farFrame.right * 0.35;
+    const midTop = nearFrame.top * 0.65 + farFrame.top * 0.35;
+    const midBottom = nearFrame.bottom * 0.65 + farFrame.bottom * 0.35;
+    const tileWidth = midRight - midLeft;
+    const tileHeight = midBottom - midTop;
+    const normalizedOffset = lateralRange <= 0 ? 0 : lateralOffset / (Math.max(1, lateralRange) + 0.65);
+    const centeredX = (midLeft + midRight) / 2 + normalizedOffset * tileWidth * 0.82;
+    const minCenterX = midLeft + tileWidth * 0.12;
+    const maxCenterX = midRight - tileWidth * 0.12;
+    const centerX = Math.max(minCenterX, Math.min(maxCenterX, centeredX));
+    const scale = 1 - Math.min(0.32, Math.abs(normalizedOffset) * 0.22);
+
+    if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+      const maxWidth = tileWidth * 0.46 * scale;
+      const maxHeight = tileHeight * 0.62 * scale;
+      const aspectRatio = image.naturalWidth / image.naturalHeight;
+      let drawWidth = maxWidth;
+      let drawHeight = drawWidth / aspectRatio;
+      if (drawHeight > maxHeight) {
+        drawHeight = maxHeight;
+        drawWidth = drawHeight * aspectRatio;
+      }
+      drawWidth = Math.max(10, drawWidth);
+      drawHeight = Math.max(10, drawHeight);
+      const drawX = centerX - drawWidth / 2;
+      const drawY = midBottom - drawHeight;
+      context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      return;
+    }
+
+    const blockW = Math.max(10, tileWidth * 0.28 * scale);
+    const blockH = Math.max(10, tileHeight * 0.38 * scale);
+    const blockX = centerX - blockW / 2;
+    const blockY = midBottom - blockH;
+    context.fillStyle = '#7d8794';
+    context.fillRect(blockX, blockY, blockW, blockH);
+    context.strokeStyle = '#d6dde8';
+    context.lineWidth = 1;
+    context.strokeRect(blockX, blockY, blockW, blockH);
+  }
+
+  private drawFirstPersonPeekObstacle(
+    context: CanvasRenderingContext2D,
+    canvasWidth: number,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    image: HTMLImageElement | null,
+    side: 'left' | 'right'
+  ): void {
+    context.save();
+    context.beginPath();
+    if (side === 'left') {
+      context.rect(nearFrame.left, 0, canvasWidth - nearFrame.left, context.canvas.height);
+    } else {
+      context.rect(0, 0, nearFrame.right, context.canvas.height);
+    }
+    context.clip();
+    context.globalAlpha = 0.9;
+    this.drawFirstPersonObstacle(
+      context,
+      nearFrame,
+      farFrame,
+      image,
+      side === 'left' ? -1 : 1,
+      1
+    );
+    context.globalAlpha = 1;
+    context.restore();
+  }
+
+  private drawFirstPersonPeekBag(
+    context: CanvasRenderingContext2D,
+    canvasWidth: number,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    side: 'left' | 'right'
+  ): void {
+    context.save();
+    context.beginPath();
+    if (side === 'left') {
+      context.rect(nearFrame.left, 0, canvasWidth - nearFrame.left, context.canvas.height);
+    } else {
+      context.rect(0, 0, nearFrame.right, context.canvas.height);
+    }
+    context.clip();
+    context.globalAlpha = 0.9;
+    this.drawFirstPersonFloorBag(
+      context,
+      nearFrame,
+      farFrame,
+      side === 'left' ? -1 : 1,
+      1
+    );
+    context.globalAlpha = 1;
+    context.restore();
   }
 
   private drawFloorItemMarker(
@@ -6401,9 +6647,15 @@ export class Game implements OnInit {
     context: CanvasRenderingContext2D,
     points: Array<{ x: number; y: number }>,
     seed: number,
-    wallDepth: number
+    wallDepth: number,
+    sidePerspective = false
   ): void {
     if (points.length < 3) {
+      return;
+    }
+
+    if (points.length === 4) {
+      this.drawBrickPatternInQuad(context, points, seed, wallDepth, sidePerspective);
       return;
     }
 
@@ -6424,6 +6676,272 @@ export class Game implements OnInit {
     context.clip();
     this.drawBrickPatternInRect(context, left, top, right - left, bottom - top, seed, wallDepth);
     context.restore();
+  }
+
+  private drawBrickPatternInQuad(
+    context: CanvasRenderingContext2D,
+    points: Array<{ x: number; y: number }>,
+    seed: number,
+    wallDepth: number,
+    sidePerspective: boolean
+  ): void {
+    // Clip drawing to the polygon boundary.
+    context.save();
+    context.beginPath();
+    context.moveTo(points[0].x, points[0].y);
+    for (let pi = 1; pi < points.length; pi += 1) {
+      context.lineTo(points[pi].x, points[pi].y);
+    }
+    context.closePath();
+    context.clip();
+
+    if (sidePerspective) {
+      this.drawSideWallBricks(context, points, seed, wallDepth);
+    } else {
+      this.drawBilinearBricks(context, points, seed, wallDepth);
+    }
+
+    context.restore();
+  }
+
+  /**
+   * Used for side walls.
+   *
+   * Key insight: in this renderer the near and far edges of each side-wall strip
+   * are both VERTICAL (same x each), so bilinear interpolation always produces
+   * a HORIZONTAL mortar line at t=0.5 (the middle of the wall).  Only the very
+   * top/bottom rows ever look angled — the rest look flat.
+   *
+  * Fix: split side-wall projection at the midpoint.
+  * Top-half rows follow the top edge slope, while mid-and-below rows switch to
+  * the bottom edge slope. Transition mortar rows at the handoff are omitted to
+  * avoid a visible seam.
+   */
+  private drawSideWallBricks(
+    context: CanvasRenderingContext2D,
+    points: Array<{ x: number; y: number }>,
+    seed: number,
+    wallDepth: number
+  ): void {
+    // points[0]=nearTop, points[1]=farTop, points[2]=farBottom, points[3]=nearBottom
+    const nearX      = points[0].x;
+    const farX       = points[1].x;
+    const nearTop    = points[0].y;
+    const nearBot    = points[3].y;
+    const topProjOffset = points[1].y - points[0].y;
+    const bottomProjOffset = points[2].y - points[3].y;
+
+    const nearH      = nearBot - nearTop;
+    const farH       = points[2].y - points[1].y;
+    const avgH       = Math.max(1, (nearH + farH) * 0.5);
+    const stripW     = Math.abs(farX - nearX);
+
+    const normalizedDepth = Math.max(0, wallDepth);
+    const brickH     = Math.max(4, Math.min(12, avgH * 0.18));
+    const brickW     = Math.max(8, brickH * 1.9);
+    const rowCount   = Math.max(1, Math.ceil(avgH / brickH));
+    const midSwitchRow = Math.floor(rowCount / 2);
+    const topHalfEndRow = Math.floor((rowCount - 1) / 2);
+    const bottomHalfStartRow = Math.ceil((rowCount + 1) / 2);
+    const mortarA    = Math.max(0.45, 0.62 - normalizedDepth * 0.018);
+    const tintA      = Math.max(0.16, 0.34 - normalizedDepth * 0.015);
+
+    // u=0 at near edge, u=1 at far edge (handles both left/right walls).
+    const uToX = (u: number): number => nearX + u * (farX - nearX);
+    const projectionOffsetForRow = (row: number): number => (
+      row < midSwitchRow ? topProjOffset : bottomProjOffset
+    );
+    const rowY = (nearY: number, u: number, row: number): number => (
+      nearY + u * projectionOffsetForRow(row)
+    );
+
+    // ── Draw brick fills ─────────────────────────────────────────
+    // Gradient: near side brighter, far side darker (depth cue).
+    const brightGrad = context.createLinearGradient(nearX, 0, farX, 0);
+    brightGrad.addColorStop(0, `rgba(210,215,222,${tintA * 1.8})`);
+    brightGrad.addColorStop(1, `rgba(115,122,135,${tintA * 0.9})`);
+
+    for (let row = 0; row < rowCount; row += 1) {
+      const nearRowTop = nearTop + (row / rowCount) * nearH;
+      const nearRowBot = nearTop + ((row + 1) / rowCount) * nearH;
+
+      const stagger = row % 2 === 0 ? 0 : brickW * 0.5;
+      const noise   = (this.getSeededNoise(seed, row * 5 + 1) - 0.5) * brickW * 0.2;
+      let col = 0;
+
+      for (
+        let bx = -brickW + stagger + noise;
+        bx < stripW;
+        bx += brickW
+      ) {
+        const vL = Math.max(0, bx);
+        const vR = Math.min(stripW, bx + brickW);
+        if (vR - vL <= 1) { col += 1; continue; }
+
+        const u0 = vL / stripW;
+        const u1 = vR / stripW;
+
+        // Four corners of this parallelogram brick.
+        const x0 = uToX(u0),  x1 = uToX(u1);
+        const ty0 = rowY(nearRowTop, u0, row),  ty1 = rowY(nearRowTop, u1, row);
+        const by0 = rowY(nearRowBot, u0, row),  by1 = rowY(nearRowBot, u1, row);
+
+        const toneNoise = this.getSeededNoise(seed + row * 19 + col * 31, 2);
+        const tone = 132 + Math.floor(toneNoise * 34);
+        const alpha = tintA * (0.7 + toneNoise * 0.6);
+        context.fillStyle = `rgba(${tone},${tone},${tone},${alpha})`;
+
+        context.beginPath();
+        context.moveTo(x0, ty0);
+        context.lineTo(x1, ty1);
+        context.lineTo(x1, by1);
+        context.lineTo(x0, by0);
+        context.closePath();
+        context.fill();
+
+        col += 1;
+      }
+    }
+
+    // ── Draw mortar lines ─────────────────────────────────────────
+    context.strokeStyle = `rgba(80,88,102,${mortarA})`;
+    context.lineWidth = 1.5;
+    context.beginPath();
+
+    // Horizontal mortar rows: switch slope at midpoint and hide transition seams.
+    for (let row = 1; row < rowCount; row += 1) {
+      if (row === topHalfEndRow || row === bottomHalfStartRow) {
+        continue;
+      }
+      const nearY = nearTop + (row / rowCount) * nearH;
+      const projOffset = projectionOffsetForRow(row);
+      context.moveTo(nearX, nearY);
+      context.lineTo(farX,  nearY + projOffset);
+    }
+
+    // Vertical joints within each row.
+    for (let row = 0; row < rowCount; row += 1) {
+      const nearRowTop = nearTop + (row / rowCount) * nearH;
+      const nearRowBot = nearTop + ((row + 1) / rowCount) * nearH;
+
+      const stagger = row % 2 === 0 ? 0 : brickW * 0.5;
+      const noise   = (this.getSeededNoise(seed, row * 5 + 1) - 0.5) * brickW * 0.2;
+
+      for (let bx = stagger + noise; bx < stripW; bx += brickW) {
+        const u = bx / stripW;
+        const sx = uToX(u);
+        context.moveTo(sx, rowY(nearRowTop, u, row));
+        context.lineTo(sx, rowY(nearRowBot, u, row));
+      }
+    }
+
+    context.stroke();
+  }
+
+  /** Used for front-facing surfaces (opening back walls etc.) — bilinear quad mapping. */
+  private drawBilinearBricks(
+    context: CanvasRenderingContext2D,
+    points: Array<{ x: number; y: number }>,
+    seed: number,
+    wallDepth: number
+  ): void {
+    const normalizedDepth = Math.max(0, wallDepth);
+    const leftEdgeLength  = Math.hypot(points[3].x - points[0].x, points[3].y - points[0].y);
+    const rightEdgeLength = Math.hypot(points[2].x - points[1].x, points[2].y - points[1].y);
+    const avgHeight = Math.max(1, (leftEdgeLength + rightEdgeLength) * 0.5);
+
+    const brickHeight = Math.max(4, Math.min(12, avgHeight * 0.18));
+    const brickWidth  = Math.max(8, brickHeight * 1.9);
+    const mortarAlpha = Math.max(0.08, 0.2 - normalizedDepth * 0.012);
+    const tintAlpha   = Math.max(0.05, 0.16 - normalizedDepth * 0.01);
+    const rowCount    = Math.max(1, Math.ceil(avgHeight / brickHeight));
+
+    const lerp = (
+      a: { x: number; y: number },
+      b: { x: number; y: number },
+      t: number
+    ): { x: number; y: number } => ({
+      x: a.x + (b.x - a.x) * t,
+      y: a.y + (b.y - a.y) * t,
+    });
+
+    for (let row = 0; row < rowCount; row += 1) {
+      const tS = row / rowCount;
+      const tE = (row + 1) / rowCount;
+      const TL = lerp(points[0], points[3], tS);
+      const TR = lerp(points[1], points[2], tS);
+      const BL = lerp(points[0], points[3], tE);
+      const BR = lerp(points[1], points[2], tE);
+      const rowW = Math.max(1,
+        (Math.hypot(TR.x - TL.x, TR.y - TL.y) +
+         Math.hypot(BR.x - BL.x, BR.y - BL.y)) * 0.5);
+
+      const stagger = row % 2 === 0 ? 0 : brickWidth * 0.5;
+      const noise   = (this.getSeededNoise(seed, row * 5 + 1) - 0.5) * brickWidth * 0.2;
+      let col = 0;
+
+      for (let bx = -brickWidth + stagger + noise; bx < rowW; bx += brickWidth) {
+        const vL = Math.max(0, bx);
+        const vR = Math.min(rowW, bx + brickWidth);
+        if (vR - vL <= 1) { col += 1; continue; }
+
+        const u0 = vL / rowW;
+        const u1 = vR / rowW;
+        const tA = lerp(TL, TR, u0);
+        const tB = lerp(TL, TR, u1);
+        const bB = lerp(BL, BR, u1);
+        const bA = lerp(BL, BR, u0);
+
+        const toneNoise = this.getSeededNoise(seed + row * 19 + col * 31, 2);
+        const tone  = 132 + Math.floor(toneNoise * 34);
+        const alpha = tintAlpha * (0.7 + toneNoise * 0.6);
+        context.fillStyle = `rgba(${tone},${tone},${tone},${alpha})`;
+        context.beginPath();
+        context.moveTo(tA.x, tA.y);
+        context.lineTo(tB.x, tB.y);
+        context.lineTo(bB.x, bB.y);
+        context.lineTo(bA.x, bA.y);
+        context.closePath();
+        context.fill();
+        col += 1;
+      }
+    }
+
+    context.strokeStyle = `rgba(74,80,92,${mortarAlpha})`;
+    context.lineWidth = 1;
+    context.beginPath();
+
+    for (let row = 1; row < rowCount; row += 1) {
+      const t  = row / rowCount;
+      const lP = lerp(points[0], points[3], t);
+      const rP = lerp(points[1], points[2], t);
+      context.moveTo(lP.x, lP.y);
+      context.lineTo(rP.x, rP.y);
+    }
+
+    for (let row = 0; row < rowCount; row += 1) {
+      const tS = row / rowCount;
+      const tE = (row + 1) / rowCount;
+      const TL = lerp(points[0], points[3], tS);
+      const TR = lerp(points[1], points[2], tS);
+      const BL = lerp(points[0], points[3], tE);
+      const BR = lerp(points[1], points[2], tE);
+      const rowW = Math.max(1,
+        (Math.hypot(TR.x - TL.x, TR.y - TL.y) +
+         Math.hypot(BR.x - BL.x, BR.y - BL.y)) * 0.5);
+
+      const stagger = row % 2 === 0 ? 0 : brickWidth * 0.5;
+      const noise   = (this.getSeededNoise(seed, row * 5 + 1) - 0.5) * brickWidth * 0.2;
+      for (let x = stagger + noise; x < rowW; x += brickWidth) {
+        const u  = x / rowW;
+        const tP = lerp(TL, TR, u);
+        const bP = lerp(BL, BR, u);
+        context.moveTo(tP.x, tP.y);
+        context.lineTo(bP.x, bP.y);
+      }
+    }
+
+    context.stroke();
   }
 
   private drawBrickPatternInRect(

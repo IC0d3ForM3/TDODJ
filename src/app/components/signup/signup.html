@@ -1,9 +1,19 @@
 @if (showSuccess) {
   <div class="signup-success-overlay">
     <div class="signup-success-box">
-      <div class="signup-success-icon">🎉</div>
+      <div class="signup-success-icon">Mail Sent</div>
       <h3>Account Created!</h3>
+      <p>Look for a confirmation email from support&#64;tdodj.com.</p>
       <p>Redirecting you to login...</p>
+    </div>
+  </div>
+}
+@if (isSubmitting) {
+  <div class="auth-loading-overlay">
+    <div class="auth-loading-box" role="status" aria-live="polite" aria-label="Creating account">
+      <div class="auth-spinner" aria-hidden="true"></div>
+      <p class="auth-loading-title">Inscribing New Hero...</p>
+      <p class="auth-loading-sub">The guild ledger is updating.</p>
     </div>
   </div>
 }
@@ -16,18 +26,18 @@
     <form #signupForm="ngForm" (ngSubmit)="onSubmit()" class="signup-form">
       <div class="signup-field">
         <label for="username">Username</label>
-        <input type="text" id="username" name="username" required [(ngModel)]="username" autocomplete="username" />
+        <input type="text" id="username" name="username" required [(ngModel)]="username" autocomplete="username" [disabled]="isSubmitting" />
       </div>
 
       <div class="signup-field">
         <label for="email">Email</label>
-        <input type="email" id="email" name="email" required [(ngModel)]="email" email autocomplete="email" />
+        <input type="email" id="email" name="email" required [(ngModel)]="email" email autocomplete="email" [disabled]="isSubmitting" />
         <span *ngIf="email && !isEmailValid(email)" class="signup-hint signup-hint-error">Invalid email address.</span>
       </div>
 
       <div class="signup-field">
         <label for="password">Password</label>
-        <input type="password" id="password" name="password" required [(ngModel)]="password" autocomplete="new-password" />
+        <input type="password" id="password" name="password" required [(ngModel)]="password" autocomplete="new-password" [disabled]="isSubmitting" />
         <span *ngIf="password && !isStrongPassword(password)" class="signup-hint signup-hint-error">
           At least 8 characters with uppercase, lowercase, number &amp; special character.
         </span>
@@ -35,19 +45,19 @@
 
       <div class="signup-field">
         <label for="confirmPassword">Confirm Password</label>
-        <input type="password" id="confirmPassword" name="confirmPassword" required [(ngModel)]="confirmPassword" autocomplete="new-password" />
+        <input type="password" id="confirmPassword" name="confirmPassword" required [(ngModel)]="confirmPassword" autocomplete="new-password" [disabled]="isSubmitting" />
         <span *ngIf="confirmPassword && password !== confirmPassword" class="signup-hint signup-hint-error">Passwords do not match.</span>
       </div>
 
-      <div *ngIf="result === 1" class="signup-notice signup-notice-success">Account created! You can now <a routerLink="/login">log in</a>.</div>
+      <div *ngIf="result === 1" class="signup-notice signup-notice-success">Account created! Check your email for a message from support&#64;tdodj.com, then <a routerLink="/login">log in</a>.</div>
       <div *ngIf="result === 2" class="signup-notice signup-notice-warn">That email is already registered.</div>
       <div *ngIf="result === -1 || error" class="signup-notice signup-notice-error">Signup failed. {{ error }}</div>
 
       <div class="signup-tac-row">
         <label class="signup-tac-label">
-          <input type="checkbox" name="agreedToTac" [(ngModel)]="agreedToTac" />
+          <input type="checkbox" name="agreedToTac" [(ngModel)]="agreedToTac" [disabled]="isSubmitting" />
           I have read and agree to the
-          <button type="button" class="signup-tac-link" (click)="showTac = true">Terms &amp; Conditions</button>
+          <button type="button" class="signup-tac-link" (click)="showTac = true" [disabled]="isSubmitting">Terms &amp; Conditions</button>
         </label>
       </div>
 
@@ -59,7 +69,9 @@
         />
       }
 
-      <button type="submit" class="signup-btn" [disabled]="!canSave()">Create Account</button>
+      <button type="submit" class="signup-btn" [disabled]="isSubmitting || !canSave()">
+        @if (isSubmitting) { Creating Account... } @else { Create Account }
+      </button>
     </form>
 
     <p class="signup-footer">
