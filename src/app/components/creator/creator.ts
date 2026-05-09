@@ -223,6 +223,8 @@ export class Creator implements OnInit {
 
   readonly isSidebarCollapsed = signal(false);
   readonly previewShowMonsters = signal(true);
+  readonly showFpvSquareOutlines = signal(false);
+  readonly fpvDebugPass = signal(-1);
   readonly isCreateFormVisible = signal(false);
   readonly isSaving = signal(false);
   readonly saveError = signal<string | null>(null);
@@ -4671,6 +4673,12 @@ export class Creator implements OnInit {
     this.isGridPreviewModalVisible.set(false);
     this.gridPreviewContext.set(null);
     this.previewActionMessage.set(null);
+  }
+
+  stepFpvDebug(): void {
+    // Cycles: -1 (full) → 0 (clear) → 1 → 2 → 3 → 4 → 5 → 6 → 7 → -1
+    const current = this.fpvDebugPass();
+    this.fpvDebugPass.set(current >= 7 ? -1 : current + 1);
   }
 
   togglePreviewMonsterInclusion(): void {

@@ -1612,8 +1612,10 @@
 					<div
 						style="overflow: auto; padding: 0.4rem; border: 1px solid #d9d9d9; border-radius: 4px; background-color: #0b0b0b"
 					>
-						<p class="details-message" style="margin: 0 0 0.45rem">First Person View</p>
+						<p class="details-message" style="margin: 0 0 0.45rem">First Person View <button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem; padding: 0.1rem 0.45rem; margin-left: 0.4rem" (click)="showFpvSquareOutlines.update(v => !v)">{{ showFpvSquareOutlines() ? 'Hide Grid' : 'Show Grid' }}</button> <button type="button" class="btn btn-sm btn-outline-warning" style="font-size:0.7rem; padding: 0.1rem 0.45rem; margin-left: 0.4rem" (click)="stepFpvDebug()">{{ fpvDebugPass() < 0 ? 'Debug Step' : 'Pass ' + fpvDebugPass() + (fpvDebugPass() === 0 ? ' (clear)' : fpvDebugPass() === 1 ? ' (floor/ceil)' : fpvDebugPass() === 2 ? ' (end wall)' : fpvDebugPass() === 3 ? ' (back walls)' : fpvDebugPass() === 4 ? ' (side walls)' : fpvDebugPass() === 5 ? ' (floor items)' : fpvDebugPass() === 6 ? ' (obstacles)' : ' (monsters)') }}</button></p>
 						<app-dungeon-first-person
+							[showSquareOutlines]="showFpvSquareOutlines()"
+							[debugRenderPass]="fpvDebugPass()"
 							[preview]="preview"
 							[cheater]="previewCheaterForModal()"
 							[squares]="previewSquaresForModal()"

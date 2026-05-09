@@ -73,6 +73,8 @@ export class DungeonFirstPersonComponent {
   readonly impactPulse = input<number>(0);
   readonly playerHp = input<number>(20);
   readonly playerMaxHp = input<number>(20);
+  readonly showSquareOutlines = input<boolean>(false);
+  readonly debugRenderPass = input<number>(-1);
 
   readonly canvasWidth = 330;
   readonly canvasHeight = 220;
@@ -110,6 +112,8 @@ export class DungeonFirstPersonComponent {
       this.impactPulse();
       this.playerHp();
       this.playerMaxHp();
+      this.showSquareOutlines();
+      this.debugRenderPass();
       untracked(() => this.drawCanvas());
     });
     this.loadDoorImages();
@@ -121,6 +125,8 @@ export class DungeonFirstPersonComponent {
     const canvas = this._canvasRef?.nativeElement;
     const preview = this.preview();
     const cheater = this.cheater();
+    const debugPass = this.debugRenderPass();
+    const isDebug = debugPass >= 0;
     if (!canvas) {
       return;
     }
@@ -245,6 +251,8 @@ export class DungeonFirstPersonComponent {
       farFrame: frameAtDepth(depth + 1),
     }));
     const farToNearSegments = [...depthSegments].reverse();
+
+    if (isDebug && debugPass < 1) return;
 
     // Pass 1: paint floor and ceiling perspective bands first.
     for (const segment of farToNearSegments) {
@@ -390,6 +398,8 @@ export class DungeonFirstPersonComponent {
       );
     }
 
+    if (isDebug && debugPass < 2) return;
+
     const endFrame = frameAtDepth(visibleFirstPersonView.steps.length);
     const endStep = visibleFirstPersonView.steps[visibleFirstPersonView.steps.length - 1] ?? null;
     const canExtendEndWall = visibleFirstPersonView.endBlock.type === 'wall' && endStep !== null;
@@ -511,6 +521,8 @@ export class DungeonFirstPersonComponent {
       }
     }
 
+    if (isDebug && debugPass < 3) return;
+
     // Pass 2: draw walls, side surfaces, and portals.
 
     for (const segment of farToNearSegments) {
@@ -555,6 +567,8 @@ export class DungeonFirstPersonComponent {
       }
     }
 
+    if (isDebug && debugPass < 4) return;
+
     for (const segment of farToNearSegments) {
       const { depth, step, nearFrame, farFrame } = segment;
 
@@ -588,6 +602,8 @@ export class DungeonFirstPersonComponent {
       }
     }
 
+    if (isDebug && debugPass < 5) return;
+
     // Pass 3: draw floor markers and monsters last so they stay visible.
     const showMonsters = this.showMonsters();
     const monsterImages = this.monsterImagesBySquare();
@@ -613,6 +629,16 @@ export class DungeonFirstPersonComponent {
       } else if (tresherCount > 0) {
         this.drawFirstPersonFloorCoinStack(context, nearFrame, farFrame, tresherCount);
       }
+
+      if (step.hasKey) {
+        this.drawFirstPersonFloorKey(context, nearFrame, farFrame);
+      }
+
+      if (step.exitTransitionType) {
+        this.drawFirstPersonFloorExit(context, nearFrame, farFrame, step.exitTransitionType, squareKey);
+      }
+
+      if (isDebug && debugPass < 6) continue;
 
       if (step.visibleMonsterSlots.length > 0) {
         const visibleObstacleSlots = [...step.visibleMonsterSlots].sort(
@@ -663,13 +689,7 @@ export class DungeonFirstPersonComponent {
         }
       }
 
-      if (step.hasKey) {
-        this.drawFirstPersonFloorKey(context, nearFrame, farFrame);
-      }
-
-      if (step.exitTransitionType) {
-        this.drawFirstPersonFloorExit(context, nearFrame, farFrame, step.exitTransitionType, squareKey);
-      }
+      if (isDebug && debugPass < 7) continue;
 
       if (showMonsters && step.visibleMonsterSlots.length > 0) {
         const visibleMonsterSlots = [...step.visibleMonsterSlots].sort(
@@ -710,6 +730,88 @@ export class DungeonFirstPersonComponent {
           }
         }
       }
+    }
+
+    if (this.showSquareOutlines()) {
+      context.save();
+      context.strokeStyle = 'rgba(80, 200, 255, 0.6)';
+      context.lineWidth = 1;
+      context.setLineDash([3, 3]);
+
+      for (const segment of farToNearSegments) {
+        const { step, nearFrame, farFrame } = segment;
+
+        // Center (forward) tile floor
+        context.beginPath();
+        context.moveTo(nearFrame.left, nearFrame.bottom);
+        context.lineTo(nearFrame.right, nearFrame.bottom);
+        context.lineTo(farFrame.right, farFrame.bottom);
+        context.lineTo(farFrame.left, farFrame.bottom);
+        context.closePath();
+        context.stroke();
+
+        // Left side tile floor (only when open — not wall/door)
+        if (step.leftBlock.type === 'none') {
+          context.beginPath();
+          context.moveTo(0, nearFrame.bottom);
+          context.lineTo(nearFrame.left, nearFrame.bottom);
+          context.lineTo(farFrame.left, farFrame.bottom);
+          context.lineTo(0, farFrame.bottom);
+          context.closePath();
+          context.stroke();
+        }
+
+        // Right side tile floor (only when open)
+        if (step.rightBlock.type === 'none') {
+          context.beginPath();
+          context.moveTo(nearFrame.right, nearFrame.bottom);
+          context.lineTo(width, nearFrame.bottom);
+          context.lineTo(width, farFrame.bottom);
+          context.lineTo(farFrame.right, farFrame.bottom);
+          context.closePath();
+          context.stroke();
+        }
+      }
+
+      context.restore();
+    }
+
+    // Debug overlay: when stepping through passes, show slot info per depth
+    if (isDebug) {
+      context.save();
+
+      // Top bar: obstacle map keys
+      const obsMapKeys = [...obstacleImageBySquare.keys()];
+      context.fillStyle = 'rgba(0,0,0,0.85)';
+      context.fillRect(0, 0, width, 15);
+      context.font = 'bold 10px monospace';
+      context.fillStyle = obsMapKeys.length === 0 ? '#f55' : '#ff0';
+      context.fillText(`MAP(${obsMapKeys.length}):${obsMapKeys.length === 0 ? ' EMPTY' : ' ' + obsMapKeys.join(' ')}`, 2, 11);
+
+      context.font = 'bold 9px monospace';
+      for (const segment of depthSegments) {
+        const { depth, step, nearFrame } = segment;
+        const cx = (nearFrame.left + nearFrame.right) / 2;
+        const cy = (nearFrame.top + nearFrame.bottom) / 2;
+        const slots = step.visibleMonsterSlots;
+        const sides = slots.filter(s => s.lateralOffset !== 0);
+        const centerKey = this.getSquareKey(step.row, step.column);
+        const centerMatch = obstacleImageBySquare.has(centerKey);
+        const matchingSlots = slots.filter(s => obstacleImageBySquare.has(s.squareKey));
+        const hasMatch = matchingSlots.length > 0;
+        const lines = [
+          `d${depth}[${step.row},${step.column}] L:${step.leftBlock.type[0]} R:${step.rightBlock.type[0]}`,
+          `ctr=${centerKey}${centerMatch ? 'OK' : 'NO'} obs:${matchingSlots.length}/${slots.length}`,
+          ...sides.map(s => `${s.lateralOffset > 0 ? 'R' : 'L'}${Math.abs(s.lateralOffset)}=${s.squareKey}${obstacleImageBySquare.has(s.squareKey) ? 'OK' : 'NO'}`),
+        ];
+        context.fillStyle = hasMatch ? 'rgba(0,100,0,0.85)' : 'rgba(0,0,0,0.75)';
+        context.fillRect(cx - 54, cy - lines.length * 6, 108, lines.length * 11 + 4);
+        context.fillStyle = hasMatch ? '#0f0' : (centerMatch ? '#fa0' : '#0ff');
+        lines.forEach((line, i) => {
+          context.fillText(line, cx - 52, cy - lines.length * 6 + i * 11 + 9);
+        });
+      }
+      context.restore();
     }
 
     this.drawCompass(context, cheater.facingDir);
@@ -770,7 +872,9 @@ export class DungeonFirstPersonComponent {
     depth: number,
     side: 'left' | 'right'
   ): boolean {
-    for (let index = 0; index <= depth; index += 1) {
+    // Start from index 1 (player's own side at index 0 does not gate forward-lateral sight —
+    // you can look through a side opening at depth D without needing an opening at depth 0).
+    for (let index = 1; index <= depth; index += 1) {
       const step = steps[index];
       if (!step) {
         return false;
@@ -826,10 +930,6 @@ export class DungeonFirstPersonComponent {
       { squareKey: this.getSquareKey(row, column), lateralOffset: 0 },
     ];
 
-    if (depth <= 0) {
-      return visibleSlots;
-    }
-
     const collectSideSlots = (
       side: 'left' | 'right',
       offset: { rowOffset: number; columnOffset: number },
@@ -841,16 +941,17 @@ export class DungeonFirstPersonComponent {
 
       let currentRow = row;
       let currentColumn = column;
-      for (let distance = 1; distance <= depth; distance += 1) {
+      for (let distance = 1; distance <= Math.max(1, depth); distance += 1) {
         const nextRow = currentRow + offset.rowOffset;
         const nextColumn = currentColumn + offset.columnOffset;
-        const connection = this.getMovementConnectionInfoBetweenAdjacentSquares(
-          currentRow,
-          currentColumn,
-          nextRow,
-          nextColumn
+
+        // Use one-sided check (only FROM square's wall) — consistent with how
+        // leftBlock/rightBlock are computed via getLateralBlockType. The destination
+        // square's own facing wall should not block sight to an obstacle inside it.
+        const outboundBlock = this.getLateralBlockType(
+          currentRow, currentColumn, offset.rowOffset, offset.columnOffset
         );
-        if (!this.isTransparentConnectionType(connection.type)) {
+        if (!this.isSideSightTransparent(outboundBlock)) {
           break;
         }
 
@@ -1314,8 +1415,9 @@ export class DungeonFirstPersonComponent {
     const normalizedOffset =
       lateralRange <= 0 ? 0 : lateralOffset / (Math.max(1, lateralRange) + 0.65);
     const centeredX = (midLeft + midRight) / 2 + normalizedOffset * tileWidth * 0.82;
-    const minCenterX = midLeft + tileWidth * 0.12;
-    const maxCenterX = midRight - tileWidth * 0.12;
+    const sideInset = lateralOffset === 0 ? 0.12 : 0.02;
+    const minCenterX = midLeft + tileWidth * sideInset;
+    const maxCenterX = midRight - tileWidth * sideInset;
     const centerX = Math.max(minCenterX, Math.min(maxCenterX, centeredX));
     const scale = 1 - Math.min(0.32, Math.abs(normalizedOffset) * 0.22);
 
@@ -1848,18 +1950,30 @@ export class DungeonFirstPersonComponent {
     const fogAlpha = Math.min(0.72, depth * 0.16);
     const shape = obs?.shape ?? 'circle';
 
-    // ── Square shape: flat face box fills the tile front ──────────────────────
-    // Side squares (lateralOffset != 0) have no correct lateral face calculation;
-    // the peek path handles corner visibility, so skip here to avoid painting
-    // the full nearFrame width across the front view.
+    // ── Square shape: wall-like block face ─────────────────────────────────────
     if (shape === 'square') {
-      if (lateralOffset !== 0) return;
+      const isCenter = lateralOffset === 0;
       const frameW = nearFrame.right - nearFrame.left;
       const frameH = nearFrame.bottom - nearFrame.top;
-      const sw = Math.max(4, frameW * widthPct);
-      const sx = nearFrame.left + (frameW - sw) / 2;
       const sh = Math.max(4, frameH * heightPct);
       const sy = heightAnchor === 'ceiling' ? nearFrame.top : nearFrame.bottom - sh;
+
+      let sx = 0;
+      let sw = 0;
+      if (isCenter) {
+        sw = Math.max(4, frameW * widthPct);
+        sx = nearFrame.left + (frameW - sw) / 2;
+      } else if (lateralOffset < 0) {
+        // Left side tile: anchor to center's left edge so it meets center cleanly.
+        const sideW = Math.max(0, nearFrame.left);
+        sw = Math.max(4, sideW * widthPct);
+        sx = nearFrame.left - sw;
+      } else {
+        // Right side tile: anchor to center's right edge so it meets center cleanly.
+        const sideW = Math.max(0, this.canvasWidth - nearFrame.right);
+        sw = Math.max(4, sideW * widthPct);
+        sx = nearFrame.right;
+      }
 
       if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
         context.drawImage(image, sx, sy, sw, sh);
@@ -1887,9 +2001,9 @@ export class DungeonFirstPersonComponent {
 
       // For 100% fill on a straight-ahead obstacle: cover the floor/ceiling
       // trapezoids and far face so adjacent 100% obstacles touch with no gap.
-      // Only applies when lateralOffset === 0 — side obstacles must not extend
-      // across the full view width.
-      if (widthPct >= 1 && heightPct >= 1 && lateralOffset === 0) {
+      // Only applies when centered — side obstacles must not extend
+      // across floor/ceiling or far face.
+      if (widthPct >= 1 && heightPct >= 1 && isCenter) {
         if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
           context.fillStyle = '#c0c0c0';
         } else if (!color) {
