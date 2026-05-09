@@ -523,88 +523,7 @@ export class DungeonFirstPersonComponent {
 
     if (isDebug && debugPass < 3) return;
 
-    // Pass 2: draw walls, side surfaces, and portals.
-
-    for (const segment of farToNearSegments) {
-      const { depth, step, nearFrame, farFrame } = segment;
-      const isFarthestVisibleLayer = depth === visibleFirstPersonView.steps.length - 1;
-
-      const leftOpeningBackBlock = step.leftOpeningBackBlock;
-      const rightOpeningBackBlock = step.rightOpeningBackBlock;
-      const canSeeLeftOpeningBackWall = this.canSeeOpeningBackWallAtDepth(
-        visibleFirstPersonView.steps,
-        depth,
-        'left'
-      );
-      const canSeeRightOpeningBackWall = this.canSeeOpeningBackWallAtDepth(
-        visibleFirstPersonView.steps,
-        depth,
-        'right'
-      );
-
-      if (leftOpeningBackBlock && canSeeLeftOpeningBackWall) {
-        this.drawFirstPersonOpeningBackWall(
-          context,
-          nearFrame,
-          farFrame,
-          'left',
-          leftOpeningBackBlock,
-          depth,
-          true
-        );
-      }
-
-      if (rightOpeningBackBlock && canSeeRightOpeningBackWall) {
-        this.drawFirstPersonOpeningBackWall(
-          context,
-          nearFrame,
-          farFrame,
-          'right',
-          rightOpeningBackBlock,
-          depth,
-          true
-        );
-      }
-    }
-
-    if (isDebug && debugPass < 4) return;
-
-    for (const segment of farToNearSegments) {
-      const { depth, step, nearFrame, farFrame } = segment;
-
-      this.drawFirstPersonSideSurface(
-        context,
-        nearFrame,
-        farFrame,
-        'left',
-        step.leftBlock,
-        depth,
-        depth === 0 && currentTextWallGlow === 'left'
-      );
-      this.drawFirstPersonSideSurface(
-        context,
-        nearFrame,
-        farFrame,
-        'right',
-        step.rightBlock,
-        depth,
-        depth === 0 && currentTextWallGlow === 'right'
-      );
-
-      if (step.forwardDoor && step.forwardDoor.type === 'openDoor') {
-        this.drawFirstPersonDoorFace(
-          context,
-          farFrame,
-          step.forwardDoor,
-          true,
-          depth === 0 && currentTextWallGlow === 'front'
-        );
-      }
-    }
-
-    if (isDebug && debugPass < 5) return;
-
-    // Pass 3: draw floor markers and monsters last so they stay visible.
+    // Render per-depth from far to near so nearer rows naturally occlude farther rows.
     const showMonsters = this.showMonsters();
     const monsterImages = this.monsterImagesBySquare();
     const monsterImpactEffects = this.monsterImpactEffects();
@@ -616,7 +535,80 @@ export class DungeonFirstPersonComponent {
     );
 
     for (const segment of farToNearSegments) {
-      const { step, nearFrame, farFrame } = segment;
+      const { depth, step, nearFrame, farFrame } = segment;
+
+      if (!isDebug || debugPass >= 3) {
+        const leftOpeningBackBlock = step.leftOpeningBackBlock;
+        const rightOpeningBackBlock = step.rightOpeningBackBlock;
+        const canSeeLeftOpeningBackWall = this.canSeeOpeningBackWallAtDepth(
+          visibleFirstPersonView.steps,
+          depth,
+          'left'
+        );
+        const canSeeRightOpeningBackWall = this.canSeeOpeningBackWallAtDepth(
+          visibleFirstPersonView.steps,
+          depth,
+          'right'
+        );
+
+        if (leftOpeningBackBlock && canSeeLeftOpeningBackWall) {
+          this.drawFirstPersonOpeningBackWall(
+            context,
+            nearFrame,
+            farFrame,
+            'left',
+            leftOpeningBackBlock,
+            depth,
+            true
+          );
+        }
+
+        if (rightOpeningBackBlock && canSeeRightOpeningBackWall) {
+          this.drawFirstPersonOpeningBackWall(
+            context,
+            nearFrame,
+            farFrame,
+            'right',
+            rightOpeningBackBlock,
+            depth,
+            true
+          );
+        }
+      }
+
+      if (!isDebug || debugPass >= 4) {
+        this.drawFirstPersonSideSurface(
+          context,
+          nearFrame,
+          farFrame,
+          'left',
+          step.leftBlock,
+          depth,
+          depth === 0 && currentTextWallGlow === 'left'
+        );
+        this.drawFirstPersonSideSurface(
+          context,
+          nearFrame,
+          farFrame,
+          'right',
+          step.rightBlock,
+          depth,
+          depth === 0 && currentTextWallGlow === 'right'
+        );
+
+        if (step.forwardDoor && step.forwardDoor.type === 'openDoor') {
+          this.drawFirstPersonDoorFace(
+            context,
+            farFrame,
+            step.forwardDoor,
+            true,
+            depth === 0 && currentTextWallGlow === 'front'
+          );
+        }
+      }
+
+      if (isDebug && debugPass < 5) continue;
+
       const squareKey = this.getSquareKey(step.row, step.column);
       const tresherCount = tresherCountBySquare.get(squareKey) ?? 0;
       const bagImage = bagImagesBySquare.get(squareKey) ?? null;
@@ -661,7 +653,7 @@ export class DungeonFirstPersonComponent {
               obsImage,
               slot.lateralOffset < 0 ? 'left' : 'right',
               obsPlacement,
-              segment.depth
+              depth
             );
           } else {
             this.drawFirstPersonObstacle(
@@ -672,7 +664,7 @@ export class DungeonFirstPersonComponent {
               slot.lateralOffset,
               obstacleLateralRange,
               obsPlacement,
-              segment.depth
+              depth
             );
             if (obstacleItemSquareKeys.has(slot.squareKey)) {
               this.drawItemOnObstacle(
