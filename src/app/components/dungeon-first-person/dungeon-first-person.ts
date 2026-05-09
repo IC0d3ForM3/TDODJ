@@ -2008,8 +2008,8 @@ export class DungeonFirstPersonComponent {
         context.fillStyle = topFill;
         context.fill();
 
-        // Side face (pick visible side by lateral placement)
-        const drawRightSide = lateralOffset >= 0;
+        // Side face: lateral cubes should show their inner face toward the center corridor.
+        const drawRightSide = lateralOffset < 0 || (lateralOffset === 0 && widthAnchor !== 'west');
         context.beginPath();
         if (drawRightSide) {
           context.moveTo(fx2, fy1);
