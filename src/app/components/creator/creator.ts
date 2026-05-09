@@ -224,6 +224,7 @@ export class Creator implements OnInit {
   readonly isSidebarCollapsed = signal(false);
   readonly previewShowMonsters = signal(true);
   readonly showFpvSquareOutlines = signal(false);
+  readonly showFpvDebugControls = signal(false);
   readonly fpvDebugPass = signal(-1);
   readonly isCreateFormVisible = signal(false);
   readonly isSaving = signal(false);
@@ -715,6 +716,7 @@ export class Creator implements OnInit {
     name: new FormControl<string>('', { nonNullable: true }),
     description: new FormControl<string>('', { nonNullable: true }),
     look: new FormControl<PortalLook>('starUp', { nonNullable: true }),
+    isTwoWay: new FormControl<boolean>(true, { nonNullable: true }),
   });
 
   keyList: Key[] = [];
@@ -1594,12 +1596,13 @@ export class Creator implements OnInit {
           name: portal.name,
           description: portal.description,
           look: portal.look,
+          isTwoWay: portal.isTwoWay,
         });
       } else {
-        this.portalForm.reset({ name: '', description: '', look: 'starUp' });
+        this.portalForm.reset({ name: '', description: '', look: 'starUp', isTwoWay: true });
       }
     } else {
-      this.portalForm.reset({ name: '', description: '', look: 'starUp' });
+      this.portalForm.reset({ name: '', description: '', look: 'starUp', isTwoWay: true });
     }
     this.isPortalDialogVisible.set(true);
   }
@@ -1612,13 +1615,14 @@ export class Creator implements OnInit {
     const name = controls.name.value.trim() || 'Unnamed Portal';
     const description = controls.description.value.trim();
     const look = controls.look.value;
+    const isTwoWay = controls.isTwoWay.value;
     const editingId = this.editingPortalId();
 
     if (editingId !== null) {
       this.portalPlacementsByDungon.update((all) => ({
         ...all,
         [dungonId]: (all[dungonId] ?? []).map((p) =>
-          p.id === editingId ? { ...p, name, description, look } : p
+          p.id === editingId ? { ...p, name, description, look, isTwoWay } : p
         ),
       }));
       this.isPortalDialogVisible.set(false);
@@ -1631,6 +1635,7 @@ export class Creator implements OnInit {
         name,
         description,
         look,
+        isTwoWay,
         startRow: null,
         startColumn: null,
         endRow: null,
@@ -4681,6 +4686,14 @@ export class Creator implements OnInit {
     this.fpvDebugPass.set(current >= 7 ? -1 : current + 1);
   }
 
+  toggleFpvDebugControls(): void {
+    const next = !this.showFpvDebugControls();
+    this.showFpvDebugControls.set(next);
+    if (!next) {
+      this.fpvDebugPass.set(-1);
+    }
+  }
+
   togglePreviewMonsterInclusion(): void {
     this.previewShowMonsters.update((value) => !value);
     if (this.previewShowMonsters()) {
@@ -4722,6 +4735,12 @@ export class Creator implements OnInit {
     const preview = this.gridPreviewContext();
     if (!preview) return [];
     return this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
+  }
+
+  previewPortalPlacementsForModal(): PortalPlacement[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) return [];
+    return this.portalPlacementsByDungon()[preview.dungonId] ?? [];
   }
 
   previewObstacleImagesBySquareForModal(): Map<string, HTMLImageElement | null> {
@@ -6855,6 +6874,7 @@ export class Creator implements OnInit {
         name: typeof src['name'] === 'string' ? src['name'] : '',
         description: typeof src['description'] === 'string' ? src['description'] : '',
         look,
+        isTwoWay: src['isTwoWay'] !== false,
         startRow: toNullableInt(src['startRow']),
         startColumn: toNullableInt(src['startColumn']),
         endRow: toNullableInt(src['endRow']),
@@ -7722,9 +7742,47 @@ export class Creator implements OnInit {
       const ptFilledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
       const portalColors = ['#cc44ff', '#44ddff', '#ff44cc', '#88ff44', '#ffaa00'];
       const portals = this.portalPlacementsByDungon()[dungonId] ?? [];
+
+      // Tint magic-door squares so one-way/two-way destinations are obvious on the 2D grid.
+      const magicPortalModeBySquare = new Map<string, 'oneWay' | 'twoWay'>();
+      for (const portal of portals) {
+        if (portal.look !== 'magicDoor') continue;
+        if (portal.startRow !== null && portal.startColumn !== null) {
+          magicPortalModeBySquare.set(
+            this.getSquareKey(portal.startRow, portal.startColumn),
+            portal.isTwoWay === false ? 'oneWay' : 'twoWay'
+          );
+        }
+        if (portal.isTwoWay !== false && portal.endRow !== null && portal.endColumn !== null) {
+          magicPortalModeBySquare.set(this.getSquareKey(portal.endRow, portal.endColumn), 'twoWay');
+        }
+      }
+
+      for (const [squareKey, mode] of magicPortalModeBySquare) {
+        if (!ptFilledSquares[squareKey]) continue;
+        const [rowText, colText] = squareKey.split(':');
+        const row = Number.parseInt(rowText ?? '', 10);
+        const col = Number.parseInt(colText ?? '', 10);
+        if (Number.isNaN(row) || Number.isNaN(col)) continue;
+        if (row < 0 || col < 0 || row >= this.gridRowCount || col >= this.gridColumnCount) continue;
+
+        const left = col * this.gridCellSize + 1;
+        const top = row * this.gridCellSize + 1;
+        const size = this.gridCellSize - 2;
+        const fill = mode === 'oneWay' ? 'rgba(255, 40, 40, 0.35)' : 'rgba(177, 88, 255, 0.34)';
+        const stroke = mode === 'oneWay' ? '#ff2a2a' : '#b26dff';
+        context.fillStyle = fill;
+        context.fillRect(left, top, size, size);
+        context.strokeStyle = stroke;
+        context.lineWidth = 2;
+        context.strokeRect(left + 0.5, top + 0.5, size - 1, size - 1);
+      }
+
       for (let pi = 0; pi < portals.length; pi++) {
         const portal = portals[pi];
-        const color = portalColors[pi % portalColors.length] ?? '#cc44ff';
+        const color = portal.look === 'magicDoor'
+          ? (portal.isTwoWay === false ? '#ff2a2a' : '#b26dff')
+          : (portalColors[pi % portalColors.length] ?? '#cc44ff');
         const symbol = portal.look === 'starDown' ? '▼' : portal.look === 'magicDoor' ? '⊡' : '▲';
 
         const drawPortalMarker = (row: number | null, col: number | null, label: string): void => {

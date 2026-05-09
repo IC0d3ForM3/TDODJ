@@ -2,9 +2,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  OnDestroy,
   ViewChild,
   effect,
   input,
+  signal,
   untracked,
 } from '@angular/core';
 import { Door } from '../../interfaces/door';
@@ -28,6 +30,7 @@ import {
   PathBlockType,
   SpellPlacement,
   PotionPlacement,
+  PortalPlacement,
   SquareSide,
   SquareText,
   TresherPlacement,
@@ -42,7 +45,7 @@ type MonsterImpactState = { kind: MonsterImpactKind; color?: string | null; star
   imports: [],
   templateUrl: './dungeon-first-person.html',
 })
-export class DungeonFirstPersonComponent {
+export class DungeonFirstPersonComponent implements OnDestroy {
   private _canvasRef: ElementRef<HTMLCanvasElement> | null = null;
 
   @ViewChild('canvas')
@@ -66,6 +69,7 @@ export class DungeonFirstPersonComponent {
   readonly itemPlacements = input<ItemPlacement[]>([]);
   readonly potionPlacements = input<PotionPlacement[]>([]);
   readonly spellPlacements = input<SpellPlacement[]>([]);
+  readonly portalPlacements = input<PortalPlacement[]>([]);
   readonly obstaclePlacements = input<ObstaclePlacement[]>([]);
   readonly obstacleImagesBySquare = input<Map<string, HTMLImageElement | null>>(new Map());
   readonly bagImagesBySquare = input<Map<string, HTMLImageElement | null>>(new Map());
@@ -84,6 +88,8 @@ export class DungeonFirstPersonComponent {
   private readonly stairsUpSquareAssignment = new Map<string, 1 | 2 | 3>();
   private readonly stairsDownImageCache = new Map<string, HTMLImageElement>();
   private readonly stairsDownSquareAssignment = new Map<string, number>();
+  private readonly portalPulseTick = signal(0);
+  private portalPulseTimer: ReturnType<typeof setInterval> | null = null;
   private genericTresherImage: HTMLImageElement | null = null;
   private genericTresherImageLoading = false;
 
@@ -105,6 +111,7 @@ export class DungeonFirstPersonComponent {
       this.itemPlacements();
       this.potionPlacements();
       this.spellPlacements();
+      const portals = this.portalPlacements();
       this.obstaclePlacements();
       this.obstacleImagesBySquare();
       this.bagImagesBySquare();
@@ -114,11 +121,20 @@ export class DungeonFirstPersonComponent {
       this.playerMaxHp();
       this.showSquareOutlines();
       this.debugRenderPass();
+      this.portalPulseTick();
+      this.syncPortalPulseTimer(portals);
       untracked(() => this.drawCanvas());
     });
     this.loadDoorImages();
     this.loadStairsUpImages();
     this.loadStairsDownImages();
+  }
+
+  ngOnDestroy(): void {
+    if (this.portalPulseTimer !== null) {
+      clearInterval(this.portalPulseTimer);
+      this.portalPulseTimer = null;
+    }
   }
 
   private drawCanvas(): void {
@@ -221,6 +237,20 @@ export class DungeonFirstPersonComponent {
     for (const key of bagSquareKeys) {
       if (obstacleBySquare.has(key)) {
         obstacleItemSquareKeys.add(key);
+      }
+    }
+
+    const magicPortalGlowBySquare = new Map<string, 'oneWay' | 'twoWay'>();
+    for (const portal of this.portalPlacements()) {
+      if (portal.look !== 'magicDoor') continue;
+      if (portal.startRow !== null && portal.startColumn !== null) {
+        magicPortalGlowBySquare.set(
+          this.getSquareKey(portal.startRow, portal.startColumn),
+          portal.isTwoWay === false ? 'oneWay' : 'twoWay'
+        );
+      }
+      if (portal.isTwoWay !== false && portal.endRow !== null && portal.endColumn !== null) {
+        magicPortalGlowBySquare.set(this.getSquareKey(portal.endRow, portal.endColumn), 'twoWay');
       }
     }
 
@@ -612,6 +642,19 @@ export class DungeonFirstPersonComponent {
       const squareKey = this.getSquareKey(step.row, step.column);
       const tresherCount = tresherCountBySquare.get(squareKey) ?? 0;
       const bagImage = bagImagesBySquare.get(squareKey) ?? null;
+
+      const magicPortalMode = magicPortalGlowBySquare.get(squareKey);
+      if (magicPortalMode) {
+        this.drawFirstPersonMagicPortalGlow(
+          context,
+          nearFrame,
+          farFrame,
+          this.portalPulseTick(),
+          depth,
+          magicPortalMode
+        );
+      }
+
       if (pitTrapSquareKeys.has(squareKey)) {
         this.drawFirstPersonPitTrap(context, nearFrame, farFrame);
       }
@@ -1158,6 +1201,9 @@ export class DungeonFirstPersonComponent {
         this.getStoneTextureOptionsForWallDepth(wallDepth)
       );
       this.drawBrickPatternInPolygon(context, points, textureSeed + 131, wallDepth, true);
+    } else if (block.type === 'closedDoor' || block.type === 'openDoor') {
+      const textureSeed = nearFrame.top * 13 + nearFrame.left * 7 + (side === 'left' ? 23 : 31);
+      this.drawWoodGrainInPolygon(context, points, textureSeed, wallDepth);
     }
 
     if (highlight) {
@@ -1305,7 +1351,7 @@ export class DungeonFirstPersonComponent {
       ? (nearFrame.left + farFrame.left) / 2
       : (nearFrame.right + farFrame.right) / 2;
 
-    context.strokeStyle = '#f0a6a6';
+    context.strokeStyle = '#d7b07a';
     context.lineWidth = 2;
     context.beginPath();
     context.moveTo(x, midTop + 2);
@@ -1314,13 +1360,68 @@ export class DungeonFirstPersonComponent {
 
     if (doorType === 'openDoor') {
       const swing = side === 'left' ? 6 : -6;
-      context.strokeStyle = '#ff7f7f';
+      context.strokeStyle = '#f0c88f';
       context.lineWidth = 1;
       context.beginPath();
       context.moveTo(x, midTop + 4);
       context.lineTo(x + swing, midTop + 9);
       context.stroke();
     }
+  }
+
+  private drawWoodGrainInPolygon(
+    context: CanvasRenderingContext2D,
+    points: Array<{ x: number; y: number }>,
+    seed: number,
+    depth: number
+  ): void {
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const left = Math.min(...xs);
+    const right = Math.max(...xs);
+    const top = Math.min(...ys);
+    const bottom = Math.max(...ys);
+    const width = right - left;
+    const height = bottom - top;
+    if (width <= 0 || height <= 0) return;
+
+    context.save();
+    context.beginPath();
+    context.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i += 1) {
+      context.lineTo(points[i].x, points[i].y);
+    }
+    context.closePath();
+    context.clip();
+
+    const normalizedDepth = Math.max(0, depth);
+    const lineCount = Math.max(6, Math.floor(height / 9));
+    const grainAlpha = Math.max(0.16, 0.30 - normalizedDepth * 0.015);
+    context.lineWidth = 1;
+    for (let i = 0; i < lineCount; i += 1) {
+      const y = top + (i / lineCount) * height;
+      const wobble = (this.getSeededNoise(seed, i * 3 + 1) - 0.5) * 2.2;
+      const tone = 68 + Math.floor(this.getSeededNoise(seed, i * 3 + 2) * 36);
+      context.strokeStyle = `rgba(${tone + 15}, ${tone}, ${Math.max(20, tone - 25)}, ${grainAlpha})`;
+      context.beginPath();
+      context.moveTo(left - 1, y + wobble);
+      context.lineTo(right + 1, y - wobble * 0.4);
+      context.stroke();
+    }
+
+    const knotCount = Math.max(1, Math.floor((width * height) / 14000));
+    for (let i = 0; i < knotCount; i += 1) {
+      const cx = left + this.getSeededNoise(seed + 101, i * 4 + 1) * width;
+      const cy = top + this.getSeededNoise(seed + 101, i * 4 + 2) * height;
+      const rx = 2 + this.getSeededNoise(seed + 101, i * 4 + 3) * 4;
+      const ry = rx * (0.6 + this.getSeededNoise(seed + 101, i * 4 + 4) * 0.5);
+      context.strokeStyle = `rgba(64, 42, 24, ${grainAlpha})`;
+      context.beginPath();
+      context.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      context.stroke();
+    }
+
+    context.restore();
   }
 
   private drawFirstPersonPitTrap(
@@ -2074,6 +2175,7 @@ export class DungeonFirstPersonComponent {
           : centerX - drawWidth / 2;
       const drawY = heightAnchor === 'ceiling' ? midTop : midBottom - drawHeight;
       context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      this.drawPillarDepthOverlay(context, drawX, drawY, drawWidth, drawHeight, 0.58);
       if (fogAlpha > 0) {
         context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
         context.fillRect(drawX, drawY, drawWidth, drawHeight);
@@ -2111,10 +2213,85 @@ export class DungeonFirstPersonComponent {
       context.lineWidth = 1;
       context.strokeRect(x, y, w, h);
     }
+    this.drawPillarDepthOverlay(context, x, y, w, h, 0.66);
     if (fogAlpha > 0) {
       context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
       context.fillRect(x, y, w, h);
     }
+  }
+
+  private drawPillarDepthOverlay(
+    context: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    intensity: number
+  ): void {
+    if (w <= 0 || h <= 0) return;
+
+    const capH = Math.max(2, Math.min(h * 0.18, w * 0.24));
+    const topCx = x + w / 2;
+    const topCy = y + capH * 0.9;
+    const botCx = x + w / 2;
+    const botCy = y + h - capH * 0.7;
+    const rx = w * 0.5;
+    const ry = capH * 0.6;
+
+    context.save();
+
+    // Side shading: darker edges, slight center highlight.
+    const sideGrad = context.createLinearGradient(x, 0, x + w, 0);
+    sideGrad.addColorStop(0, `rgba(0,0,0,${0.28 * intensity})`);
+    sideGrad.addColorStop(0.2, `rgba(0,0,0,${0.14 * intensity})`);
+    sideGrad.addColorStop(0.5, `rgba(255,255,255,${0.12 * intensity})`);
+    sideGrad.addColorStop(0.8, `rgba(0,0,0,${0.16 * intensity})`);
+    sideGrad.addColorStop(1, `rgba(0,0,0,${0.3 * intensity})`);
+    context.fillStyle = sideGrad;
+    context.fillRect(x, y, w, h);
+
+    // Top rounded cap highlight.
+    const topGrad = context.createRadialGradient(
+      topCx,
+      topCy - ry * 0.3,
+      Math.max(1, rx * 0.1),
+      topCx,
+      topCy,
+      Math.max(2, rx)
+    );
+    topGrad.addColorStop(0, `rgba(255,255,255,${0.34 * intensity})`);
+    topGrad.addColorStop(0.7, `rgba(255,255,255,${0.1 * intensity})`);
+    topGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    context.fillStyle = topGrad;
+    context.beginPath();
+    context.ellipse(topCx, topCy, rx, ry, 0, Math.PI, Math.PI * 2);
+    context.fill();
+
+    // Bottom rounded cap shadow.
+    const botGrad = context.createRadialGradient(
+      botCx,
+      botCy,
+      Math.max(1, rx * 0.1),
+      botCx,
+      botCy,
+      Math.max(2, rx)
+    );
+    botGrad.addColorStop(0, `rgba(0,0,0,${0.26 * intensity})`);
+    botGrad.addColorStop(0.75, `rgba(0,0,0,${0.08 * intensity})`);
+    botGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    context.fillStyle = botGrad;
+    context.beginPath();
+    context.ellipse(botCx, botCy, rx, ry, 0, 0, Math.PI);
+    context.fill();
+
+    // Crisp edge cue for cylindrical silhouette.
+    context.strokeStyle = `rgba(255,255,255,${0.14 * intensity})`;
+    context.lineWidth = 1;
+    context.beginPath();
+    context.ellipse(topCx, topCy, rx * 0.9, ry * 0.78, 0, Math.PI, Math.PI * 2);
+    context.stroke();
+
+    context.restore();
   }
 
   private drawFirstPersonFloorBag(
@@ -2150,7 +2327,12 @@ export class DungeonFirstPersonComponent {
 
     const normalizedOffset = lateralRange <= 0 ? 0 : lateralOffset / (Math.max(1, lateralRange) + 0.65);
     const centeredX = (midLeft + midRight) / 2 + normalizedOffset * tileWidth * 0.82;
-    const centerX = Math.max(midLeft + tileWidth * 0.12, Math.min(midRight - tileWidth * 0.12, centeredX));
+    const minVisibleX = midLeft + tileWidth * 0.08;
+    const maxVisibleX = midRight - tileWidth * 0.08;
+    if (centeredX < minVisibleX || centeredX > maxVisibleX) {
+      return;
+    }
+    const centerX = Math.max(minVisibleX, Math.min(maxVisibleX, centeredX));
 
     const heightPct = Math.max(1, Math.min(100, obs?.heightPercent ?? 100)) / 100;
     const heightAnchor = obs?.heightAnchor ?? 'floor';
@@ -2404,6 +2586,98 @@ export class DungeonFirstPersonComponent {
     context.fill();
   }
 
+  private drawFirstPersonMagicPortalGlow(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    pulseTick: number,
+    depth: number,
+    mode: 'oneWay' | 'twoWay'
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const centerX = (midLeft + midRight) / 2;
+    const midTop = (nearFrame.top + farFrame.top) / 2;
+    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
+    const topY = midTop + (midBottom - midTop) * 0.06;
+    const bottomY = midBottom - (midBottom - midTop) * 0.04;
+    const centerY = (topY + bottomY) / 2;
+    const columnH = Math.max(8, bottomY - topY);
+    const tileWidth = Math.max(6, midRight - midLeft);
+    const radius = Math.max(4, tileWidth * 0.22);
+    const pulse = (Math.sin(pulseTick * 0.22 + depth * 0.6) + 1) / 2;
+    const fogFactor = 1 - Math.min(0.62, depth * 0.11);
+    const isOneWay = mode === 'oneWay';
+
+    context.save();
+
+    const outerA = isOneWay ? 'rgba(255, 30, 30,' : 'rgba(201, 118, 255,';
+    const midA = isOneWay ? 'rgba(225, 28, 28,' : 'rgba(154, 71, 227,';
+    const endA = isOneWay ? 'rgba(120, 10, 10, 0)' : 'rgba(107, 39, 160, 0)';
+
+    // Tall vertical aura that fills most of the square height.
+    const auraGrad = context.createLinearGradient(centerX, topY, centerX, bottomY);
+    auraGrad.addColorStop(0, `${outerA} ${0.22 * fogFactor})`);
+    auraGrad.addColorStop(0.5, `${midA} ${0.38 * fogFactor})`);
+    auraGrad.addColorStop(1, `${outerA} ${0.24 * fogFactor})`);
+    context.fillStyle = auraGrad;
+    context.beginPath();
+    context.ellipse(centerX, centerY, radius * 1.45, columnH * 0.5, 0, 0, Math.PI * 2);
+    context.fill();
+
+    const glow = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius * 2.8);
+    glow.addColorStop(0, `${outerA} ${0.42 * fogFactor})`);
+    glow.addColorStop(0.45, `${midA} ${0.30 * fogFactor})`);
+    glow.addColorStop(1, endA);
+    context.fillStyle = glow;
+    context.beginPath();
+    context.ellipse(centerX, centerY, radius * 1.95, radius * 0.94, 0, 0, Math.PI * 2);
+    context.fill();
+
+    const core = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius * 0.95);
+    core.addColorStop(0, isOneWay ? `rgba(255, 235, 235, ${0.82 * fogFactor})` : `rgba(248, 224, 255, ${0.8 * fogFactor})`);
+    core.addColorStop(0.4, isOneWay ? `rgba(255, 84, 84, ${0.62 * fogFactor})` : `rgba(186, 110, 255, ${0.58 * fogFactor})`);
+    core.addColorStop(1, isOneWay ? `rgba(148, 22, 22, ${0.24 * fogFactor})` : `rgba(126, 56, 191, ${0.2 * fogFactor})`);
+    context.fillStyle = core;
+    context.beginPath();
+    context.ellipse(centerX, centerY, radius * 1.02, radius * 0.46, 0, 0, Math.PI * 2);
+    context.fill();
+
+    const glitterCount = 10;
+    for (let i = 0; i < glitterCount; i += 1) {
+      const theta = (pulseTick * 0.11 + i * 0.78);
+      const orbit = radius * (0.2 + (i % 4) * 0.22 + pulse * 0.28);
+      const gx = centerX + Math.cos(theta + i * 0.37) * orbit;
+      const gy = centerY + Math.sin(theta * 1.17 + i * 0.19) * columnH * 0.42;
+      const r = (i % 3 === 0 ? 1.7 : 1.2) * (0.75 + pulse * 0.4);
+      context.fillStyle = i % 2 === 0
+        ? `rgba(255, 232, 116, ${0.9 * fogFactor})`
+        : `rgba(255, 200, 72, ${0.78 * fogFactor})`;
+      context.beginPath();
+      context.arc(gx, gy, r, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    context.restore();
+  }
+
+  private syncPortalPulseTimer(portals: PortalPlacement[]): void {
+    const hasMagicDoor = portals.some((portal) => portal.look === 'magicDoor');
+    if (!hasMagicDoor) {
+      if (this.portalPulseTimer !== null) {
+        clearInterval(this.portalPulseTimer);
+        this.portalPulseTimer = null;
+      }
+      return;
+    }
+
+    if (this.portalPulseTimer === null) {
+      this.portalPulseTimer = setInterval(() => {
+        this.portalPulseTick.update((value) => (value + 1) % 100000);
+      }, 85);
+    }
+  }
+
   private drawTresherCoinMarker(
     context: CanvasRenderingContext2D,
     centerX: number,
@@ -2432,7 +2706,7 @@ export class DungeonFirstPersonComponent {
         this.doorImageCache.set(key, img);
         this.drawCanvas();
       };
-      img.src = key === 'open' ? '/images/dooropen.jpg' : '/images/doorclosed.jpg';
+      img.src = key === 'open' ? '/images/dooropen1.png' : '/images/doorclose1.png';
     }
   }
 
@@ -2472,9 +2746,6 @@ export class DungeonFirstPersonComponent {
     if (block.type !== 'openDoor' && block.type !== 'closedDoor') {
       return;
     }
-    if (block.type === 'openDoor') {
-      return;
-    }
     const frameWidth = frame.right - frame.left;
     const frameHeight = frame.bottom - frame.top;
     const insetX = Math.max(2, frameWidth * 0.1);
@@ -2486,20 +2757,81 @@ export class DungeonFirstPersonComponent {
     const doorW = doorRight - doorLeft;
     const doorH = doorBottom - doorTop;
 
-    const img = this.doorImageCache.get('closed') ?? null;
+    const img = this.doorImageCache.get(block.type === 'openDoor' ? 'open' : 'closed') ?? null;
 
     context.save();
     context.globalAlpha = isPortal ? 0.84 : 1;
 
+    // Draw a dark wall ring around the door opening so doors are embedded in stone,
+    // not in a colored panel.
+    const wallRingColor = '#1a1a1a';
+    context.fillStyle = wallRingColor;
+    // Top band
+    context.fillRect(frame.left, frame.top, frameWidth, Math.max(0, doorTop - frame.top));
+    // Bottom band
+    context.fillRect(frame.left, doorBottom, frameWidth, Math.max(0, frame.bottom - doorBottom));
+    // Left band
+    context.fillRect(frame.left, doorTop, Math.max(0, doorLeft - frame.left), Math.max(0, doorH));
+    // Right band
+    context.fillRect(doorRight, doorTop, Math.max(0, frame.right - doorRight), Math.max(0, doorH));
+
+    // Add subtle stone texture to the ring.
+    const ringSeed = Math.floor(frame.left * 11 + frame.top * 17 + frameWidth * 7 + frameHeight * 5);
+    // Top
+    this.drawStoneTextureInRect(
+      context,
+      frame.left,
+      frame.top,
+      frameWidth,
+      Math.max(0, doorTop - frame.top),
+      ringSeed + 13,
+      { toneMin: 58, toneRange: 34, alphaMultiplier: 0.58 }
+    );
+    // Bottom
+    this.drawStoneTextureInRect(
+      context,
+      frame.left,
+      doorBottom,
+      frameWidth,
+      Math.max(0, frame.bottom - doorBottom),
+      ringSeed + 29,
+      { toneMin: 58, toneRange: 34, alphaMultiplier: 0.58 }
+    );
+    // Left
+    this.drawStoneTextureInRect(
+      context,
+      frame.left,
+      doorTop,
+      Math.max(0, doorLeft - frame.left),
+      Math.max(0, doorH),
+      ringSeed + 47,
+      { toneMin: 58, toneRange: 34, alphaMultiplier: 0.58 }
+    );
+    // Right
+    this.drawStoneTextureInRect(
+      context,
+      doorRight,
+      doorTop,
+      Math.max(0, frame.right - doorRight),
+      Math.max(0, doorH),
+      ringSeed + 61,
+      { toneMin: 58, toneRange: 34, alphaMultiplier: 0.58 }
+    );
+
+    // Light brick lines to blend with surrounding walls.
+    context.strokeStyle = 'rgba(195, 205, 220, 0.14)';
+    context.lineWidth = 1;
+    context.strokeRect(frame.left + 0.5, frame.top + 0.5, Math.max(0, frameWidth - 1), Math.max(0, frameHeight - 1));
+
     if (img) {
       context.drawImage(img, doorLeft, doorTop, doorW, doorH);
     } else {
-      context.fillStyle = '#b33030';
+      context.fillStyle = block.type === 'openDoor' ? '#9aa7b3' : '#b33030';
       context.fillRect(doorLeft, doorTop, doorW, doorH);
-      context.strokeStyle = '#f0b0b0';
+      context.strokeStyle = block.type === 'openDoor' ? '#d7e1ea' : '#f0b0b0';
       context.lineWidth = Math.max(1, Math.min(2, doorW * 0.04));
       context.strokeRect(doorLeft, doorTop, doorW, doorH);
-      {
+      if (block.type === 'closedDoor') {
         const centerX = (doorLeft + doorRight) / 2;
         context.strokeStyle = '#f5c1c1';
         context.lineWidth = 1;
@@ -2888,15 +3220,15 @@ export class DungeonFirstPersonComponent {
   }
 
   private getFirstPersonSideColor(block: PathBlockType): string {
-    if (block === 'closedDoor') return '#8f2525';
-    if (block === 'openDoor') return '#ab2f2f';
+    if (block === 'closedDoor') return '#4e3522';
+    if (block === 'openDoor') return '#5b3f28';
     if (block === 'wall') return this.getFirstPersonFrontColor('wall');
     return '#1b1d21';
   }
 
   private getFirstPersonFrontColor(block: PathBlockType): string {
-    if (block === 'closedDoor') return '#9d2727';
-    if (block === 'openDoor') return '#b13131';
+    if (block === 'closedDoor') return '#5a3f2c';
+    if (block === 'openDoor') return '#694b33';
     if (block === 'wall') return '#d6d9df';
     return '#191b1f';
   }
@@ -2907,8 +3239,8 @@ export class DungeonFirstPersonComponent {
       const darkenAmount = Math.min(0.86, normalizedDepth * 0.085);
       return this.darkenHexColor(this.getFirstPersonFrontColor('wall'), darkenAmount);
     }
-    if (block === 'closedDoor') return '#6f1e1e';
-    if (block === 'openDoor') return '#7f2525';
+    if (block === 'closedDoor') return '#462f1f';
+    if (block === 'openDoor') return '#503825';
     return '#14171b';
   }
 

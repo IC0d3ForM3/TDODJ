@@ -1612,7 +1612,7 @@
 					<div
 						style="overflow: auto; padding: 0.4rem; border: 1px solid #d9d9d9; border-radius: 4px; background-color: #0b0b0b"
 					>
-						<p class="details-message" style="margin: 0 0 0.45rem">First Person View <button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem; padding: 0.1rem 0.45rem; margin-left: 0.4rem" (click)="showFpvSquareOutlines.update(v => !v)">{{ showFpvSquareOutlines() ? 'Hide Grid' : 'Show Grid' }}</button> <button type="button" class="btn btn-sm btn-outline-warning" style="font-size:0.7rem; padding: 0.1rem 0.45rem; margin-left: 0.4rem" (click)="stepFpvDebug()">{{ fpvDebugPass() < 0 ? 'Debug Step' : 'Pass ' + fpvDebugPass() + (fpvDebugPass() === 0 ? ' (clear)' : fpvDebugPass() === 1 ? ' (floor/ceil)' : fpvDebugPass() === 2 ? ' (end wall)' : fpvDebugPass() === 3 ? ' (back walls)' : fpvDebugPass() === 4 ? ' (side walls)' : fpvDebugPass() === 5 ? ' (floor items)' : fpvDebugPass() === 6 ? ' (obstacles)' : ' (monsters)') }}</button></p>
+						<p class="details-message" style="margin: 0 0 0.45rem">First Person View <button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem; padding: 0.1rem 0.45rem; margin-left: 0.4rem" (click)="showFpvSquareOutlines.update(v => !v)">{{ showFpvSquareOutlines() ? 'Hide Grid' : 'Show Grid' }}</button> <button type="button" class="btn btn-sm btn-outline-warning" style="font-size:0.7rem; padding: 0.1rem 0.45rem; margin-left: 0.4rem" (click)="toggleFpvDebugControls()">{{ showFpvDebugControls() ? 'Hide Debug' : 'Debug' }}</button> @if (showFpvDebugControls()) { <button type="button" class="btn btn-sm btn-outline-warning" style="font-size:0.7rem; padding: 0.1rem 0.45rem; margin-left: 0.4rem" (click)="stepFpvDebug()">{{ fpvDebugPass() < 0 ? 'Debug Step' : 'Pass ' + fpvDebugPass() + (fpvDebugPass() === 0 ? ' (clear)' : fpvDebugPass() === 1 ? ' (floor/ceil)' : fpvDebugPass() === 2 ? ' (end wall)' : fpvDebugPass() === 3 ? ' (back walls)' : fpvDebugPass() === 4 ? ' (side walls)' : fpvDebugPass() === 5 ? ' (floor items)' : fpvDebugPass() === 6 ? ' (obstacles)' : ' (monsters)') }}</button> }</p>
 						<app-dungeon-first-person
 							[showSquareOutlines]="showFpvSquareOutlines()"
 							[debugRenderPass]="fpvDebugPass()"
@@ -1629,6 +1629,7 @@
 							[itemPlacements]="previewItemPlacementsForModal()"
 							[potionPlacements]="previewPotionPlacementsForModal()"
 							[spellPlacements]="previewSpellPlacementsForModal()"
+							[portalPlacements]="previewPortalPlacementsForModal()"
 					[obstaclePlacements]="previewObstaclePlacementsForModal()"
 					[obstacleImagesBySquare]="previewObstacleImagesBySquareForModal()"
 						></app-dungeon-first-person>
@@ -2686,6 +2687,11 @@
 					<option value="starDown">Star (Down) ▼</option>
 					<option value="magicDoor">Magic Door ⊡</option>
 				</select>
+
+				<label class="door-locked-toggle">
+					<input type="checkbox" formControlName="isTwoWay" />
+					Two-way portal (unchecked = one-way)
+				</label>
 
 				<div class="form-actions">
 					<button type="submit" class="save-button">

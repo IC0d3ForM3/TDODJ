@@ -5,6 +5,7 @@ export interface PortalPlacement {
   name: string;
   description: string;
   look: PortalLook;
+  isTwoWay: boolean;
   startRow: number | null;
   startColumn: number | null;
   endRow: number | null;
