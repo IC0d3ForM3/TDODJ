@@ -1957,6 +1957,16 @@ export class DungeonFirstPersonComponent {
       const frameH = nearFrame.bottom - nearFrame.top;
       const sh = Math.max(4, frameH * heightPct);
       const sy = heightAnchor === 'ceiling' ? nearFrame.top : nearFrame.bottom - sh;
+      const projectXToFar = (x: number): number => {
+        const nearSpan = Math.max(1, nearFrame.right - nearFrame.left);
+        const t = (x - nearFrame.left) / nearSpan;
+        return farFrame.left + t * (farFrame.right - farFrame.left);
+      };
+      const projectYToFar = (y: number): number => {
+        const nearSpan = Math.max(1, nearFrame.bottom - nearFrame.top);
+        const t = (y - nearFrame.top) / nearSpan;
+        return farFrame.top + t * (farFrame.bottom - farFrame.top);
+      };
 
       let sx = 0;
       let sw = 0;
@@ -1973,6 +1983,48 @@ export class DungeonFirstPersonComponent {
         const sideW = Math.max(0, this.canvasWidth - nearFrame.right);
         sw = Math.max(4, sideW * widthPct);
         sx = nearFrame.right;
+      }
+
+      if (widthPct >= 1) {
+        const fx1 = sx;
+        const fx2 = sx + sw;
+        const fy1 = sy;
+        const fy2 = sy + sh;
+        const bx1 = projectXToFar(fx1);
+        const bx2 = projectXToFar(fx2);
+        const by1 = projectYToFar(fy1);
+        const by2 = projectYToFar(fy2);
+
+        const topFill = color ?? 'rgba(205,205,205,0.95)';
+        const sideFill = color ?? 'rgba(145,145,145,0.95)';
+
+        // Top face
+        context.beginPath();
+        context.moveTo(fx1, fy1);
+        context.lineTo(fx2, fy1);
+        context.lineTo(bx2, by1);
+        context.lineTo(bx1, by1);
+        context.closePath();
+        context.fillStyle = topFill;
+        context.fill();
+
+        // Side face (pick visible side by lateral placement)
+        const drawRightSide = lateralOffset >= 0;
+        context.beginPath();
+        if (drawRightSide) {
+          context.moveTo(fx2, fy1);
+          context.lineTo(fx2, fy2);
+          context.lineTo(bx2, by2);
+          context.lineTo(bx2, by1);
+        } else {
+          context.moveTo(fx1, fy1);
+          context.lineTo(fx1, fy2);
+          context.lineTo(bx1, by2);
+          context.lineTo(bx1, by1);
+        }
+        context.closePath();
+        context.fillStyle = sideFill;
+        context.fill();
       }
 
       if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
@@ -1997,57 +2049,6 @@ export class DungeonFirstPersonComponent {
         context.strokeStyle = 'rgba(0,0,0,0.3)';
         context.lineWidth = 1;
         context.strokeRect(sx, sy, sw, sh);
-      }
-
-      // For 100% fill on a straight-ahead obstacle: cover the floor/ceiling
-      // trapezoids and far face so adjacent 100% obstacles touch with no gap.
-      // Only applies when centered — side obstacles must not extend
-      // across floor/ceiling or far face.
-      if (widthPct >= 1 && heightPct >= 1 && isCenter) {
-        if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
-          context.fillStyle = '#c0c0c0';
-        } else if (!color) {
-          context.fillStyle = '#c8c8c8';
-        }
-        // floor trapezoid
-        context.beginPath();
-        context.moveTo(nearFrame.left, nearFrame.bottom);
-        context.lineTo(nearFrame.right, nearFrame.bottom);
-        context.lineTo(farFrame.right, farFrame.bottom);
-        context.lineTo(farFrame.left, farFrame.bottom);
-        context.closePath();
-        context.fill();
-        // ceiling trapezoid
-        context.beginPath();
-        context.moveTo(nearFrame.left, nearFrame.top);
-        context.lineTo(nearFrame.right, nearFrame.top);
-        context.lineTo(farFrame.right, farFrame.top);
-        context.lineTo(farFrame.left, farFrame.top);
-        context.closePath();
-        context.fill();
-        // far face
-        context.fillRect(farFrame.left, farFrame.top,
-          farFrame.right - farFrame.left, farFrame.bottom - farFrame.top);
-
-        if (fogAlpha > 0) {
-          context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
-          context.beginPath();
-          context.moveTo(nearFrame.left, nearFrame.bottom);
-          context.lineTo(nearFrame.right, nearFrame.bottom);
-          context.lineTo(farFrame.right, farFrame.bottom);
-          context.lineTo(farFrame.left, farFrame.bottom);
-          context.closePath();
-          context.fill();
-          context.beginPath();
-          context.moveTo(nearFrame.left, nearFrame.top);
-          context.lineTo(nearFrame.right, nearFrame.top);
-          context.lineTo(farFrame.right, farFrame.top);
-          context.lineTo(farFrame.left, farFrame.top);
-          context.closePath();
-          context.fill();
-          context.fillRect(farFrame.left, farFrame.top,
-            farFrame.right - farFrame.left, farFrame.bottom - farFrame.top);
-        }
       }
 
       if (fogAlpha > 0) {
