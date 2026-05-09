@@ -88,6 +88,7 @@ export class DungeonFirstPersonComponent implements OnDestroy {
   private readonly stairsUpSquareAssignment = new Map<string, 1 | 2 | 3>();
   private readonly stairsDownImageCache = new Map<string, HTMLImageElement>();
   private readonly stairsDownSquareAssignment = new Map<string, number>();
+  private readonly shopImageCache = new Map<string, HTMLImageElement>();
   private readonly portalPulseTick = signal(0);
   private portalPulseTimer: ReturnType<typeof setInterval> | null = null;
   private genericTresherImage: HTMLImageElement | null = null;
@@ -671,6 +672,29 @@ export class DungeonFirstPersonComponent implements OnDestroy {
 
       if (step.exitTransitionType) {
         this.drawFirstPersonFloorExit(context, nearFrame, farFrame, step.exitTransitionType, squareKey);
+      }
+
+      // Portals can be visible in side slots even when not in the center square.
+      if (step.visibleMonsterSlots.length > 0) {
+        const portalLateralRange = Math.max(
+          1,
+          ...step.visibleMonsterSlots.map((s) => Math.abs(s.lateralOffset))
+        );
+        for (const slot of step.visibleMonsterSlots) {
+          if (slot.lateralOffset === 0) continue;
+          const sidePortalMode = magicPortalGlowBySquare.get(slot.squareKey);
+          if (!sidePortalMode) continue;
+          this.drawFirstPersonMagicPortalGlow(
+            context,
+            nearFrame,
+            farFrame,
+            this.portalPulseTick(),
+            depth,
+            sidePortalMode,
+            slot.lateralOffset,
+            portalLateralRange
+          );
+        }
       }
 
       if (isDebug && debugPass < 6) continue;
@@ -2043,6 +2067,19 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     const fogAlpha = Math.min(0.72, depth * 0.16);
     const shape = obs?.shape ?? 'circle';
 
+    if (this.isYeOldMagiceShop(obs)) {
+      this.drawFirstPersonShopObstacle(
+        context,
+        nearFrame,
+        farFrame,
+        lateralOffset,
+        lateralRange,
+        fogAlpha,
+        obs
+      );
+      return;
+    }
+
     // ── Square shape: wall-like block face ─────────────────────────────────────
     if (shape === 'square') {
       const isCenter = lateralOffset === 0;
@@ -2218,6 +2255,172 @@ export class DungeonFirstPersonComponent implements OnDestroy {
       context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
       context.fillRect(x, y, w, h);
     }
+  }
+
+  private isYeOldMagiceShop(obs: ObstaclePlacement | undefined): boolean {
+    return (obs?.name ?? '').trim().toLowerCase() === 'ye old magice shop';
+  }
+
+  private drawFirstPersonShopObstacle(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    lateralOffset: number,
+    lateralRange: number,
+    fogAlpha: number,
+    obs?: ObstaclePlacement
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midTop = (nearFrame.top + farFrame.top) / 2;
+    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
+    const tileWidth = midRight - midLeft;
+    const tileHeight = midBottom - midTop;
+
+    const normalizedOffset =
+      lateralRange <= 0 ? 0 : lateralOffset / (Math.max(1, lateralRange) + 0.65);
+    const centeredX = (midLeft + midRight) / 2 + normalizedOffset * tileWidth * 0.82;
+    const minCenterX = midLeft + tileWidth * 0.08;
+    const maxCenterX = midRight - tileWidth * 0.08;
+    const centerX = Math.max(minCenterX, Math.min(maxCenterX, centeredX));
+    const lateralScale = 1 - Math.min(0.28, Math.abs(normalizedOffset) * 0.2);
+
+    const maxWidth = Math.max(20, tileWidth * 0.84 * lateralScale);
+    const maxHeight = Math.max(20, tileHeight * 0.9 * lateralScale);
+
+    const frontFacing = this.getShopFrontFacingDirection(obs);
+    const showFront = this.isPlayerViewingShopFront(obs, frontFacing);
+    const sideVariant = this.getShopSideVariantForView(obs, lateralOffset, frontFacing);
+    const image = this.getShopObstacleImage(showFront ? 'front' : sideVariant);
+
+    let drawWidth = maxWidth;
+    let drawHeight = maxHeight;
+    if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+      const ar = image.naturalWidth / image.naturalHeight;
+      drawWidth = drawHeight * ar;
+      if (drawWidth > maxWidth) { drawWidth = maxWidth; drawHeight = drawWidth / ar; }
+    }
+
+    const drawX = centerX - drawWidth / 2;
+    const drawY = midBottom - drawHeight;
+
+    if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+      context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+    } else {
+      context.fillStyle = '#6f4b2e';
+      context.fillRect(drawX, drawY, drawWidth, drawHeight);
+      context.strokeStyle = '#2b1b10';
+      context.lineWidth = 1.5;
+      context.strokeRect(drawX, drawY, drawWidth, drawHeight);
+      context.fillStyle = '#f6e3b0';
+      context.font = `bold ${Math.max(8, Math.floor(drawHeight * 0.12))}px serif`;
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText('SHOP', drawX + drawWidth / 2, drawY + drawHeight * 0.52);
+    }
+
+    if (fogAlpha > 0) {
+      context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
+      context.fillRect(drawX, drawY, drawWidth, drawHeight);
+    }
+  }
+
+  private getShopFrontFacingDirection(obs: ObstaclePlacement | undefined): FacingDirection | null {
+    if (!obs) return null;
+    const square = this.squares()[this.getSquareKey(obs.row, obs.column)];
+    if (!square) return null;
+
+    const candidates: FacingDirection[] = [];
+    // Shop front points away from the wall it is anchored to.
+    if (this.isWallConnection(square.toRight)) candidates.push('left');
+    if (this.isWallConnection(square.toLeft)) candidates.push('right');
+    if (this.isWallConnection(square.toTop)) candidates.push('down');
+    if (this.isWallConnection(square.toBottom)) candidates.push('up');
+    return candidates[0] ?? null;
+  }
+
+  private isPlayerViewingShopFront(
+    obs: ObstaclePlacement | undefined,
+    frontFacing: FacingDirection | null
+  ): boolean {
+    if (!obs || !frontFacing) return false;
+
+    const preview = this.preview();
+    const cheater = this.cheater();
+    const dRow = preview.centerRow - obs.row;
+    const dCol = preview.centerColumn - obs.column;
+
+    let shopToPlayer: FacingDirection | null = null;
+    if (dRow === 0 && dCol !== 0) shopToPlayer = dCol > 0 ? 'right' : 'left';
+    else if (dCol === 0 && dRow !== 0) shopToPlayer = dRow > 0 ? 'down' : 'up';
+    if (!shopToPlayer) return false;
+
+    return (
+      shopToPlayer === frontFacing &&
+      cheater.facingDir === this.getOppositeFacingDirection(frontFacing)
+    );
+  }
+
+  private getShopSideVariantForView(
+    obs: ObstaclePlacement | undefined,
+    lateralOffset: number,
+    frontFacing: FacingDirection | null
+  ): 'left' | 'right' {
+    if (lateralOffset < 0) return 'right';
+    if (lateralOffset > 0) return 'left';
+
+    if (!obs || !frontFacing) return 'left';
+    const preview = this.preview();
+    const dRow = preview.centerRow - obs.row;
+    const dCol = preview.centerColumn - obs.column;
+    if (dRow === 0 && dCol === 0) return 'left';
+
+    const sideByFront: Record<FacingDirection, { left: FacingDirection; right: FacingDirection }> = {
+      up: { left: 'left', right: 'right' },
+      right: { left: 'up', right: 'down' },
+      down: { left: 'right', right: 'left' },
+      left: { left: 'down', right: 'up' },
+    };
+    const sideMap = sideByFront[frontFacing];
+
+    let playerDir: FacingDirection;
+    if (Math.abs(dCol) >= Math.abs(dRow)) {
+      playerDir = dCol >= 0 ? 'right' : 'left';
+    } else {
+      playerDir = dRow >= 0 ? 'down' : 'up';
+    }
+
+    return playerDir === sideMap.left ? 'left' : 'right';
+  }
+
+  private getOppositeFacingDirection(direction: FacingDirection): FacingDirection {
+    if (direction === 'up') return 'down';
+    if (direction === 'down') return 'up';
+    if (direction === 'left') return 'right';
+    return 'left';
+  }
+
+  private getShopObstacleImage(variant: 'front' | 'left' | 'right'): HTMLImageElement | null {
+    const candidatePaths: Record<'front' | 'left' | 'right', string[]> = {
+      front: ['/images/front of shop.png', '/images/front%20of%20shop.png'],
+      left: ['/images/Left of shop.png', '/images/left of shop.png', '/images/Left%20of%20shop.png'],
+      right: ['/images/Righ of shop.png', '/images/Right of shop.png', '/images/Righ%20of%20shop.png'],
+    };
+
+    for (const path of candidatePaths[variant]) {
+      let image = this.shopImageCache.get(path) ?? null;
+      if (!image) {
+        image = new Image();
+        image.src = path;
+        image.onload = () => this.drawCanvas();
+        this.shopImageCache.set(path, image);
+      }
+      if (image.complete && image.naturalWidth > 0) {
+        return image;
+      }
+    }
+
+    return null;
   }
 
   private drawPillarDepthOverlay(
@@ -2592,19 +2795,27 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     farFrame: { left: number; right: number; top: number; bottom: number },
     pulseTick: number,
     depth: number,
-    mode: 'oneWay' | 'twoWay'
+    mode: 'oneWay' | 'twoWay',
+    lateralOffset: number = 0,
+    lateralRange: number = 1
   ): void {
     const midLeft = (nearFrame.left + farFrame.left) / 2;
     const midRight = (nearFrame.right + farFrame.right) / 2;
-    const centerX = (midLeft + midRight) / 2;
+    const tileWidth = Math.max(6, midRight - midLeft);
+    const normalizedOffset =
+      lateralRange <= 0 ? 0 : lateralOffset / (Math.max(1, lateralRange) + 0.65);
+    const centeredX = (midLeft + midRight) / 2 + normalizedOffset * tileWidth * 0.82;
+    const minCenterX = midLeft + tileWidth * 0.08;
+    const maxCenterX = midRight - tileWidth * 0.08;
+    const centerX = Math.max(minCenterX, Math.min(maxCenterX, centeredX));
+    const lateralScale = 1 - Math.min(0.28, Math.abs(normalizedOffset) * 0.2);
     const midTop = (nearFrame.top + farFrame.top) / 2;
     const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
     const topY = midTop + (midBottom - midTop) * 0.06;
     const bottomY = midBottom - (midBottom - midTop) * 0.04;
     const centerY = (topY + bottomY) / 2;
-    const columnH = Math.max(8, bottomY - topY);
-    const tileWidth = Math.max(6, midRight - midLeft);
-    const radius = Math.max(4, tileWidth * 0.22);
+    const columnH = Math.max(8, (bottomY - topY) * lateralScale);
+    const radius = Math.max(4, tileWidth * 0.22 * lateralScale);
     const pulse = (Math.sin(pulseTick * 0.22 + depth * 0.6) + 1) / 2;
     const fogFactor = 1 - Math.min(0.62, depth * 0.11);
     const isOneWay = mode === 'oneWay';

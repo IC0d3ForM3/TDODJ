@@ -1203,3 +1203,35 @@
 	padding-top: 0.6rem;
 }
 
+
+/* -- Shop Config Dialog -------------------------------------------- */
+.shop-config-dialog {
+width: min(700px, 100%);
+}
+
+.shop-config-catalog {
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 0.75rem;
+margin: 0.85rem 0 1rem;
+}
+
+.shop-config-section h5.form-label {
+margin: 0 0 0.4rem;
+font-size: 0.82rem;
+font-weight: 600;
+text-transform: uppercase;
+letter-spacing: 0.04em;
+color: #475569;
+border-bottom: 1px solid #e2e8f0;
+padding-bottom: 0.2rem;
+}
+
+.shop-config-checklist {
+display: flex;
+flex-direction: column;
+gap: 0.28rem;
+max-height: 220px;
+overflow-y: auto;
+padding-right: 0.2rem;
+}

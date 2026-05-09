@@ -209,12 +209,6 @@
 								[class.open-block-btn--active]="isMoveMode()"
 								(click)="toggleMoveMode()"
 							>Reset</button>
-							<button
-								type="button"
-								class="open-block-btn open-block-btn--clear"
-								[disabled]="!selectedDungonId() || isSavingDungonJson() || isPublishingDungon()"
-								(click)="clearAllCurrentDungonContent()"
-							>Clear All</button>
 							<select
 								class="tools-dropdown-select"
 								aria-label="Tools"
@@ -225,6 +219,8 @@
 								<option value="setExit" [disabled]="!hasAnyWhiteSpace()">Set Exit</option>
 								<option value="createThresher">Create Thresher</option>
 								<option value="createMonseter">Create Monseter</option>
+								<option value="placeShop" [disabled]="!hasAnyWhiteSpace()">Place Shop</option>
+								<option value="clearAll" [disabled]="!selectedDungonId() || isSavingDungonJson() || isPublishingDungon()">Clear All</option>
 							</select>
 						</div>
 						<div class="open-block-footer-row">
@@ -2589,6 +2585,86 @@
 		</section>
 	</div>
 }
+@if (isShopConfigDialogVisible()) {
+	<div class="door-dialog-backdrop">
+		<section class="door-dialog shop-config-dialog" role="dialog" aria-modal="true" aria-label="Configure Shop">
+			<h4 class="door-dialog-title">Ye Old Magice Shop — Configure</h4>
+
+			<label class="form-label" for="shop-keeper-knows">What does the Keeper know? <small>(optional — shown after player buys a drink)</small></label>
+			<textarea
+				id="shop-keeper-knows"
+				class="form-textarea"
+				rows="3"
+				[value]="shopConfigKeeperKnows()"
+				(input)="shopConfigKeeperKnows.set($any($event.target).value)"
+				placeholder="e.g. The exit is to the north. The red dragon sleeps on level 3."
+			></textarea>
+
+			<div class="shop-config-catalog">
+				<div class="shop-config-section">
+					<h5 class="form-label">Items for Sale</h5>
+					@if (libItems().length === 0) {
+						<p class="details-message">No items in library.</p>
+					} @else {
+						<div class="shop-config-checklist">
+							@for (item of libItems(); track item.id) {
+								<label class="publish-friend-option">
+									<input type="checkbox"
+										[checked]="shopConfigSelectedItemIds().includes(item.id)"
+										(change)="toggleShopConfigItem(item.id)" />
+									{{ item.name }}
+								</label>
+							}
+						</div>
+					}
+				</div>
+
+				<div class="shop-config-section">
+					<h5 class="form-label">Spells for Sale</h5>
+					@if (libUserSpells().length === 0) {
+						<p class="details-message">No spells in library.</p>
+					} @else {
+						<div class="shop-config-checklist">
+							@for (spell of libUserSpells(); track spell.id) {
+								<label class="publish-friend-option">
+									<input type="checkbox"
+										[checked]="shopConfigSelectedSpellIds().includes(spell.id)"
+										(change)="toggleShopConfigSpell(spell.id)" />
+									{{ spell.name }}
+								</label>
+							}
+						</div>
+					}
+				</div>
+
+				<div class="shop-config-section">
+					<h5 class="form-label">Potions for Sale</h5>
+					@if (libPotions().length === 0) {
+						<p class="details-message">No potions in library.</p>
+					} @else {
+						<div class="shop-config-checklist">
+							@for (potion of libPotions(); track potion.id) {
+								<label class="publish-friend-option">
+									<input type="checkbox"
+										[checked]="shopConfigSelectedPotionIds().includes(potion.id)"
+										(change)="toggleShopConfigPotion(potion.id)" />
+									{{ potion.name }}
+								</label>
+							}
+						</div>
+					}
+				</div>
+			</div>
+
+			<div class="form-actions">
+				<button type="button" class="save-button" (click)="confirmShopConfig()">
+					{{ shopConfigEditMode() ? 'Update Shop' : 'Continue → Place Shop' }}
+				</button>
+				<button type="button" class="cancel-button" (click)="cancelShopConfig()">Cancel</button>
+			</div>
+		</section>
+	</div>
+}
 @if (isObstacleDialogVisible()) {
 	<div class="door-dialog-backdrop">
 		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Obstacle settings">
@@ -2596,9 +2672,12 @@
 			<form class="door-settings-form" [formGroup]="obstacleForm" (ngSubmit)="saveObstacle()">
 				<label class="form-label" for="obstacle-name">Name</label>
 				<input id="obstacle-name" class="form-input" type="text" formControlName="name" placeholder="e.g. Barrel, Crate, Statue" />
+				<p class="form-hint">Use exact name <strong>Ye Old magice shop</strong> to make this obstacle a shop (must be next to a wall).</p>
 
-				<label class="form-label" for="obstacle-note">Note (readable by player)</label>
-				<textarea id="obstacle-note" class="form-textarea" rows="3" formControlName="note" placeholder="Text the player sees when examining this obstacle"></textarea>
+				@if ((obstacleForm.controls.name.value || '').trim().toLowerCase() !== 'ye old magice shop') {
+					<label class="form-label" for="obstacle-note">Note (readable by player)</label>
+					<textarea id="obstacle-note" class="form-textarea" rows="3" formControlName="note" placeholder="Text the player sees when examining this obstacle"></textarea>
+				}
 
 				<label class="form-label" for="obstacle-image">Image (optional)</label>
 				<select id="obstacle-image" class="form-input" formControlName="imageId">

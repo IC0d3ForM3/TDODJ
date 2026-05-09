@@ -339,6 +339,11 @@ export class Creator implements OnInit {
   get obstaclePlacementsByDungon() { return this.dungeonState.obstaclePlacementsByDungon; }
   get isPlaceObstacleMode() { return this.placementService.isPlaceObstacleMode; }
   readonly isObstacleDialogVisible = signal(false);
+  readonly isShopConfigDialogVisible = signal(false);
+  readonly shopConfigKeeperKnows = signal('');
+  readonly shopConfigSelectedItemIds = signal<number[]>([]);
+  readonly shopConfigSelectedSpellIds = signal<number[]>([]);
+  readonly shopConfigSelectedPotionIds = signal<number[]>([]);
   get pendingObstaclePlacement() { return this.placementService.pendingObstaclePlacement; }
   get editingObstacleId() { return this.placementService.editingObstacleId; }
   get isCopyObstacleMode() { return this.placementService.isCopyObstacleMode; }
@@ -1199,6 +1204,10 @@ export class Creator implements OnInit {
       this.startPlaceFloorTrapMode();
     } else if (action === 'placeObstacle') {
       this.startPlaceObstacleMode();
+    } else if (action === 'placeShop') {
+      this.startPlaceShopMode();
+    } else if (action === 'clearAll') {
+      this.clearAllCurrentDungonContent();
     } else if (action === 'placePortal') {
       this.openPortalDialog(null);
     }
@@ -1337,6 +1346,9 @@ export class Creator implements OnInit {
 
   // ── Obstacles ─────────────────────────────────────────────────────────────
 
+  private placeShopModeActive = false;
+  readonly shopConfigEditMode = signal(false);
+
   startPlaceObstacleMode(): void {
     this.isPlaceObstacleMode.set(true);
     this.isPlaceFloorTrapMode.set(false);
@@ -1357,10 +1369,71 @@ export class Creator implements OnInit {
     this.pendingObstaclePlacement.set(null);
     this.editingObstacleId.set(null);
     this.isCopyObstacleMode.set(false);
+    this.placeShopModeActive = false;
+  }
+
+  startPlaceShopMode(): void {
+    this.shopConfigKeeperKnows.set('');
+    this.shopConfigSelectedItemIds.set([]);
+    this.shopConfigSelectedSpellIds.set([]);
+    this.shopConfigSelectedPotionIds.set([]);
+    this.shopConfigEditMode.set(false);
+    this.isShopConfigDialogVisible.set(true);
+  }
+
+  confirmShopConfig(): void {
+    this.isShopConfigDialogVisible.set(false);
+    if (this.shopConfigEditMode()) {
+      this.shopConfigEditMode.set(false);
+      this.obstacleForm.patchValue({ note: this.buildShopConfigNote() });
+      this.isObstacleDialogVisible.set(true);
+    } else {
+      this.placeShopModeActive = true;
+      this.startPlaceObstacleMode();
+    }
+  }
+
+  cancelShopConfig(): void {
+    this.isShopConfigDialogVisible.set(false);
+    this.shopConfigEditMode.set(false);
+  }
+
+  toggleShopConfigItem(id: number): void {
+    this.shopConfigSelectedItemIds.update((ids) =>
+      ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]);
+  }
+
+  toggleShopConfigSpell(id: number): void {
+    this.shopConfigSelectedSpellIds.update((ids) =>
+      ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]);
+  }
+
+  toggleShopConfigPotion(id: number): void {
+    this.shopConfigSelectedPotionIds.update((ids) =>
+      ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]);
   }
 
   openObstacleDialog(dungonId: number, row: number, column: number): void {
     this.pendingObstaclePlacement.set({ dungonId, row, column });
+    if (this.placeShopModeActive) {
+      this.placeShopModeActive = false;
+      this.obstacleForm.reset({
+        name: 'Ye Old magice shop',
+        note: this.buildShopConfigNote(),
+        imageId: null,
+        hp: 10,
+        isIndestructible: false,
+        containsItemId: null,
+        shape: 'square',
+        heightPercent: 100,
+        heightAnchor: 'floor',
+        widthPercent: 100,
+        widthAnchor: 'center',
+        color: null,
+      });
+      this.saveObstacle();
+      return;
+    }
     this.obstacleForm.reset({
       name: '',
       note: '',
@@ -1386,6 +1459,27 @@ export class Creator implements OnInit {
     const rawImageId = controls.imageId.value;
     const rawContainsItemId = controls.containsItemId.value;
     const normalizedContainsItemId = rawContainsItemId !== null ? (Number(rawContainsItemId) || null) : null;
+    const obstacleName = controls.name.value.trim() || 'Obstacle';
+
+    if (
+      this.isYeOldMagicShopName(obstacleName) &&
+      !this.isSquareAdjacentToWall(pending.dungonId, pending.row, pending.column)
+    ) {
+      this.previewActionMessage.set('Ye Old magice shop must be placed next to at least one wall.');
+      return;
+    }
+
+    if (this.isYeOldMagicShopName(obstacleName)) {
+      const editingNow = this.editingObstacleId();
+      const alreadyHasShop = (this.obstaclePlacementsByDungon()[pending.dungonId] ?? []).some(
+        (obs) => obs.id !== editingNow && this.isYeOldMagicShopName(obs.name ?? '')
+      );
+      if (alreadyHasShop) {
+        this.previewActionMessage.set('Only one Ye Old magice shop is allowed per dungeon.');
+        return;
+      }
+    }
+
     const editingId = this.editingObstacleId();
 
     if (editingId !== null) {
@@ -1395,7 +1489,7 @@ export class Creator implements OnInit {
           obs.id === editingId
             ? {
                 ...obs,
-                name: controls.name.value.trim() || 'Obstacle',
+                name: obstacleName,
                 note: controls.note.value.trim(),
                 imageId: rawImageId !== null ? (Number(rawImageId) || null) : null,
                 hp: Math.max(1, controls.hp.value),
@@ -1417,7 +1511,7 @@ export class Creator implements OnInit {
         id: this.nextObstacleId,
         row: pending.row,
         column: pending.column,
-        name: controls.name.value.trim() || 'Obstacle',
+        name: obstacleName,
         note: controls.note.value.trim(),
         imageId: rawImageId !== null ? (Number(rawImageId) || null) : null,
         hp: Math.max(1, controls.hp.value),
@@ -1446,6 +1540,30 @@ export class Creator implements OnInit {
     this.pendingObstaclePlacement.set(null);
   }
 
+  private buildShopConfigNote(): string {
+    return JSON.stringify({
+      keeperKnows: this.shopConfigKeeperKnows().trim() || 'The keeper says little without a drink in hand.',
+      itemIds: this.shopConfigSelectedItemIds(),
+      spellIds: this.shopConfigSelectedSpellIds(),
+      potionIds: this.shopConfigSelectedPotionIds(),
+    });
+  }
+
+  private isYeOldMagicShopName(name: string): boolean {
+    return name.trim().toLowerCase() === 'ye old magice shop';
+  }
+
+  private isSquareAdjacentToWall(dungonId: number, row: number, column: number): boolean {
+    const square = (this.squaresByDungon()[dungonId] ?? {})[this.getSquareKey(row, column)];
+    if (!square) return false;
+    return (
+      this.isWallConnection(square.toTop) ||
+      this.isWallConnection(square.toRight) ||
+      this.isWallConnection(square.toBottom) ||
+      this.isWallConnection(square.toLeft)
+    );
+  }
+
   cancelObstacle(): void {
     this.isObstacleDialogVisible.set(false);
     this.pendingObstaclePlacement.set(null);
@@ -1455,6 +1573,41 @@ export class Creator implements OnInit {
   openObstacleEditDialog(dungonId: number, obstacleId: number): void {
     const obstacle = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find((o) => o.id === obstacleId);
     if (!obstacle) return;
+
+    if (this.isYeOldMagicShopName(obstacle.name ?? '')) {
+      this.editingObstacleId.set(obstacleId);
+      this.pendingObstaclePlacement.set({ dungonId, row: obstacle.row, column: obstacle.column });
+      this.obstacleForm.reset({
+        name: obstacle.name,
+        note: obstacle.note,
+        imageId: obstacle.imageId,
+        hp: obstacle.hp,
+        isIndestructible: obstacle.isIndestructible,
+        containsItemId: obstacle.containsItemId,
+        shape: obstacle.shape ?? 'circle',
+        heightPercent: obstacle.heightPercent ?? 100,
+        heightAnchor: obstacle.heightAnchor ?? 'floor',
+        widthPercent: obstacle.widthPercent ?? 100,
+        widthAnchor: obstacle.widthAnchor ?? 'center',
+        color: obstacle.color ?? null,
+      });
+      try {
+        const config = JSON.parse(obstacle.note ?? '{}');
+        this.shopConfigKeeperKnows.set(typeof config.keeperKnows === 'string' ? config.keeperKnows : '');
+        this.shopConfigSelectedItemIds.set(Array.isArray(config.itemIds) ? config.itemIds : []);
+        this.shopConfigSelectedSpellIds.set(Array.isArray(config.spellIds) ? config.spellIds : []);
+        this.shopConfigSelectedPotionIds.set(Array.isArray(config.potionIds) ? config.potionIds : []);
+      } catch {
+        this.shopConfigKeeperKnows.set(obstacle.note ?? '');
+        this.shopConfigSelectedItemIds.set([]);
+        this.shopConfigSelectedSpellIds.set([]);
+        this.shopConfigSelectedPotionIds.set([]);
+      }
+      this.shopConfigEditMode.set(true);
+      this.isShopConfigDialogVisible.set(true);
+      return;
+    }
+
     this.editingObstacleId.set(obstacleId);
     this.pendingObstaclePlacement.set({ dungonId, row: obstacle.row, column: obstacle.column });
     this.obstacleForm.reset({

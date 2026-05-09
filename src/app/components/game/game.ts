@@ -112,6 +112,26 @@ interface DirectionPadButton {
   ariaLabel: string;
 }
 
+interface ShopCatalogEntry {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+}
+
+type ShopSlotKey =
+  | 'item1Id' | 'item2Id' | 'item3Id' | 'item4Id'
+  | 'spell1Id' | 'spell2Id' | 'spell3Id' | 'spell4Id'
+  | 'potion1Id' | 'potion2Id' | 'potion3Id';
+
+interface ShopSellEntry {
+  tresherIndex: number;
+  slotKey: ShopSlotKey;
+  sourceId: number;
+  name: string;
+  sellPrice: number;
+}
+
 @Component({
   selector: 'app-game',
   standalone: true,
@@ -303,6 +323,21 @@ export class Game implements OnInit {
   get dungonSpReward() { return this.interactionService.dungonSpReward; }
   get dungonWon() { return this.interactionService.dungonWon; }
   get showTavernModal() { return this.interactionService.showTavernModal; }
+  readonly showYeOldMagiceShopModal = signal(false);
+  readonly yeOldMagiceShopView = signal<'main' | 'buyItems' | 'sellItems' | 'buySpells' | 'sellSpells' | 'buyPotions' | 'sellPotions' | 'info'>('main');
+  readonly yeOldMagiceShopMessage = signal<string | null>(null);
+  readonly yeOldMagiceShopInfoUnlocked = signal(false);
+  readonly yeOldMagiceShopDrinkPurchased = signal(false);
+  readonly yeOldMagiceShopImage = signal<'taren1' | 'taren2'>('taren1');
+  readonly yeOldMagiceShopKeeperInfo = signal('');
+  readonly activeYeOldMagiceShopDungonId = signal<number | null>(null);
+  readonly activeYeOldMagiceShopObstacleId = signal<number | null>(null);
+  readonly shopBuyItemCost = 24;
+  readonly shopBuySpellCost = 30;
+  readonly shopBuyPotionCost = 18;
+  readonly shopDrinkCost = 6;
+  readonly shopHealingCost = 10;
+  readonly shopCurseClearCost = 22;
   readonly soundMuted = signal<boolean>((() => {
     const stored = localStorage.getItem('soundMuted');
     if (stored === 'true') return true;
@@ -319,6 +354,7 @@ export class Game implements OnInit {
   readonly bugReportError = signal<string | null>(null);
   private tavernMusicAudio: HTMLAudioElement | null = null;
   private readonly tavernWindowSoundPaths = ['/sounds/game sounds/1.mp3', '/sounds/game sounds/2.mp3'];
+  private readonly portalTraverseSoundPath = '/sounds/game sounds/portal sound.wav';
 
   get questItemsForTavern(): Tresher[] {
     const result: Tresher[] = [];
@@ -366,6 +402,50 @@ export class Game implements OnInit {
   ];
 
   keyList: Key[] = [];
+
+  readonly frontFacingYeOldMagiceShop = computed(() => this.getFrontFacingYeOldMagiceShop());
+
+  readonly yeOldMagiceShopBuyableItems = computed<ShopCatalogEntry[]>(() => {
+    const dungonId = this.activeYeOldMagiceShopDungonId();
+    const obstacleId = this.activeYeOldMagiceShopObstacleId();
+    if (dungonId == null || obstacleId == null) return [];
+    const obs = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find((o) => o.id === obstacleId);
+    let itemIds: number[] = [];
+    try { itemIds = JSON.parse(obs?.note ?? '{}').itemIds ?? []; } catch { return []; }
+    const allItems = this.pcTresherItemsById();
+    return (itemIds as number[])
+      .map((id) => allItems.get(id))
+      .filter((item): item is NonNullable<typeof item> => item != null)
+      .map((item) => ({ id: item.id, name: item.name, description: item.description, price: this.shopBuyItemCost }));
+  });
+
+  readonly yeOldMagiceShopBuyableSpells = computed<ShopCatalogEntry[]>(() => {
+    const dungonId = this.activeYeOldMagiceShopDungonId();
+    const obstacleId = this.activeYeOldMagiceShopObstacleId();
+    if (dungonId == null || obstacleId == null) return [];
+    const obs = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find((o) => o.id === obstacleId);
+    let spellIds: number[] = [];
+    try { spellIds = JSON.parse(obs?.note ?? '{}').spellIds ?? []; } catch { return []; }
+    const allSpells = this.pcTresherSpellsById();
+    return (spellIds as number[])
+      .map((id) => allSpells.get(id))
+      .filter((spell): spell is NonNullable<typeof spell> => spell != null)
+      .map((spell) => ({ id: spell.id, name: spell.name, description: spell.description, price: this.shopBuySpellCost }));
+  });
+
+  readonly yeOldMagiceShopBuyablePotions = computed<ShopCatalogEntry[]>(() => {
+    const dungonId = this.activeYeOldMagiceShopDungonId();
+    const obstacleId = this.activeYeOldMagiceShopObstacleId();
+    if (dungonId == null || obstacleId == null) return [];
+    const obs = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find((o) => o.id === obstacleId);
+    let potionIds: number[] = [];
+    try { potionIds = JSON.parse(obs?.note ?? '{}').potionIds ?? []; } catch { return []; }
+    const allPotions = this.pcTresherPotionsById();
+    return (potionIds as number[])
+      .map((id) => allPotions.get(id))
+      .filter((potion): potion is NonNullable<typeof potion> => potion != null)
+      .map((potion) => ({ id: potion.id, name: potion.name, description: potion.description, price: this.shopBuyPotionCost }));
+  });
 
   private savedCombatState: {
     playerHp: number | null;
@@ -9631,9 +9711,329 @@ export class Game implements OnInit {
 
   closeTavernModal(): void {
     this.showTavernModal.set(false);
-    if (!this.npcDialog()) {
+    if (!this.npcDialog() && !this.showYeOldMagiceShopModal()) {
       this.stopTavernMusic();
     }
+  }
+
+  enterFrontYeOldMagiceShop(): void {
+    const shop = this.frontFacingYeOldMagiceShop();
+    if (!shop) return;
+
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+
+    this.activeYeOldMagiceShopDungonId.set(preview.dungonId);
+    this.activeYeOldMagiceShopObstacleId.set(shop.id);
+    let keeperKnows = 'The keeper squints. "I have rumors, but ale loosens the tongue."';
+    try {
+      const cfg = JSON.parse(shop.note ?? '{}');
+      if (typeof cfg.keeperKnows === 'string' && cfg.keeperKnows.trim()) {
+        keeperKnows = cfg.keeperKnows.trim();
+      }
+    } catch { /* use default */ }
+    this.yeOldMagiceShopKeeperInfo.set(keeperKnows);
+    this.yeOldMagiceShopView.set('main');
+    this.yeOldMagiceShopMessage.set(null);
+    this.yeOldMagiceShopInfoUnlocked.set(false);
+    this.yeOldMagiceShopDrinkPurchased.set(false);
+    this.yeOldMagiceShopImage.set(Math.random() < 0.5 ? 'taren1' : 'taren2');
+    this.showYeOldMagiceShopModal.set(true);
+    this.startTavernMusic();
+  }
+
+  closeYeOldMagiceShop(): void {
+    this.showYeOldMagiceShopModal.set(false);
+    this.yeOldMagiceShopView.set('main');
+    this.yeOldMagiceShopMessage.set(null);
+    this.activeYeOldMagiceShopDungonId.set(null);
+    this.activeYeOldMagiceShopObstacleId.set(null);
+    if (!this.npcDialog() && !this.showTavernModal()) {
+      this.stopTavernMusic();
+    }
+  }
+
+  setYeOldMagiceShopView(
+    view: 'main' | 'buyItems' | 'sellItems' | 'buySpells' | 'sellSpells' | 'buyPotions' | 'sellPotions' | 'info'
+  ): void {
+    this.yeOldMagiceShopView.set(view);
+    this.yeOldMagiceShopMessage.set(null);
+  }
+
+  buyDrinkForKeeperInfo(): void {
+    if (this.yeOldMagiceShopDrinkPurchased()) {
+      this.yeOldMagiceShopMessage.set('You already bought a drink for the keeper.');
+      return;
+    }
+    if (this.playerSp() < this.shopDrinkCost) {
+      this.yeOldMagiceShopMessage.set(`Need ${this.shopDrinkCost} SP for a drink.`);
+      return;
+    }
+    this.playerSp.update((sp) => sp - this.shopDrinkCost);
+    this.yeOldMagiceShopDrinkPurchased.set(true);
+    this.yeOldMagiceShopMessage.set('You slide a drink across the bar. The keeper nods.');
+    this.saveGameState();
+  }
+
+  askKeeperForDungonInfo(): void {
+    if (!this.yeOldMagiceShopDrinkPurchased()) {
+      this.yeOldMagiceShopMessage.set('Buy the keeper a drink first.');
+      return;
+    }
+    this.yeOldMagiceShopInfoUnlocked.set(true);
+    this.yeOldMagiceShopMessage.set('The keeper shares what they know.');
+  }
+
+  buyHealingAtShop(): void {
+    if (this.playerHp() >= this.getEffectivePlayerMaxHp()) {
+      this.yeOldMagiceShopMessage.set('You are already fully healed.');
+      return;
+    }
+    if (this.playerSp() < this.shopHealingCost) {
+      this.yeOldMagiceShopMessage.set(`Need ${this.shopHealingCost} SP for healing.`);
+      return;
+    }
+    this.playerSp.update((sp) => sp - this.shopHealingCost);
+    this.playerHp.set(this.getEffectivePlayerMaxHp());
+    this.yeOldMagiceShopMessage.set('The keeper patches you up to full health.');
+    this.saveGameState();
+  }
+
+  clearCursesAtShop(): void {
+    const dungonId = this.activeYeOldMagiceShopDungonId();
+    if (dungonId === null) return;
+
+    const hasInventoryCurse = this.inventoryTreshersForPreview().some((t) => t.curse1Id !== null || t.curse2Id !== null);
+    const hasActiveCurse = this.playerActiveEffects().some((e) => e.effectAmount < 0 || e.effectOn === 'Boost Dice');
+    if (!hasInventoryCurse && !hasActiveCurse) {
+      this.yeOldMagiceShopMessage.set('No curse is currently affecting you.');
+      return;
+    }
+    if (this.playerSp() < this.shopCurseClearCost) {
+      this.yeOldMagiceShopMessage.set(`Need ${this.shopCurseClearCost} SP to clear curses.`);
+      return;
+    }
+
+    this.playerSp.update((sp) => sp - this.shopCurseClearCost);
+    this.cheaterByDungon.update((all) => {
+      const existing = all[dungonId] ?? { ...DEFAULT_CHEATER };
+      return {
+        ...all,
+        [dungonId]: {
+          ...existing,
+          inventory: {
+            ...existing.inventory,
+            treshers: existing.inventory.treshers.map((t) => ({ ...t, curse1Id: null, curse2Id: null })),
+          },
+        },
+      };
+    });
+    this.playerActiveEffects.update((effects) => effects.filter((e) => !(e.effectAmount < 0 || e.effectOn === 'Boost Dice')));
+    this.yeOldMagiceShopMessage.set('A cleansing ritual clears your curses.');
+    this.saveGameState();
+  }
+
+  buyShopItem(itemId: number): void {
+    const item = this.pcTresherItemsById().get(itemId);
+    if (!item) return;
+    this.buyFromShopCatalog(
+      this.shopBuyItemCost,
+      this.buildShopPurchaseTresher(`Shop Item: ${item.name}`, item.description, { itemId })
+    );
+  }
+
+  buyShopSpell(spellId: number): void {
+    const spell = this.pcTresherSpellsById().get(spellId);
+    if (!spell) return;
+    this.buyFromShopCatalog(
+      this.shopBuySpellCost,
+      this.buildShopPurchaseTresher(`Shop Spell: ${spell.name}`, spell.description, { spellId })
+    );
+  }
+
+  buyShopPotion(potionId: number): void {
+    const potion = this.pcTresherPotionsById().get(potionId);
+    if (!potion) return;
+    this.buyFromShopCatalog(
+      this.shopBuyPotionCost,
+      this.buildShopPurchaseTresher(`Shop Potion: ${potion.name}`, potion.description, { potionId })
+    );
+  }
+
+  yeOldMagiceShopSellableItems(): ShopSellEntry[] {
+    return this.getYeOldMagiceShopSellEntries('item');
+  }
+
+  yeOldMagiceShopSellableSpells(): ShopSellEntry[] {
+    return this.getYeOldMagiceShopSellEntries('spell');
+  }
+
+  yeOldMagiceShopSellablePotions(): ShopSellEntry[] {
+    return this.getYeOldMagiceShopSellEntries('potion');
+  }
+
+  sellFromYeOldMagiceShop(entry: ShopSellEntry): void {
+    const dungonId = this.activeYeOldMagiceShopDungonId();
+    if (dungonId === null) return;
+
+    this.cheaterByDungon.update((all) => {
+      const existing = all[dungonId] ?? { ...DEFAULT_CHEATER };
+      const inventory = existing.inventory;
+      if (entry.tresherIndex < 0 || entry.tresherIndex >= inventory.treshers.length) {
+        return all;
+      }
+      const updatedTreshers = inventory.treshers.map((tresher, index) =>
+        index === entry.tresherIndex ? { ...tresher, [entry.slotKey]: null } : tresher
+      );
+      return {
+        ...all,
+        [dungonId]: {
+          ...existing,
+          inventory: {
+            ...inventory,
+            treshers: updatedTreshers,
+          },
+        },
+      };
+    });
+
+    this.playerSp.update((sp) => sp + entry.sellPrice);
+    this.yeOldMagiceShopMessage.set(`Sold ${entry.name} for ${entry.sellPrice} SP.`);
+    this.saveGameState();
+  }
+
+  private buyFromShopCatalog(cost: number, purchasedTresher: Tresher): void {
+    const dungonId = this.activeYeOldMagiceShopDungonId();
+    if (dungonId === null) return;
+    if (this.playerSp() < cost) {
+      this.yeOldMagiceShopMessage.set(`Need ${cost} SP.`);
+      return;
+    }
+    this.playerSp.update((sp) => sp - cost);
+    this.addItemsToCheaterInventory(dungonId, [], [purchasedTresher]);
+    this.yeOldMagiceShopMessage.set(`Purchased ${purchasedTresher.name} for ${cost} SP.`);
+    this.saveGameState();
+  }
+
+  private buildShopPurchaseTresher(
+    name: string,
+    description: string,
+    payload: { itemId?: number; spellId?: number; potionId?: number }
+  ): Tresher {
+    const dungonId = this.activeYeOldMagiceShopDungonId() ?? this.gridPreviewContext()?.dungonId ?? 0;
+    const existing = this.cheaterByDungon()[dungonId]?.inventory.treshers ?? [];
+    const nextId = existing.reduce((max, t) => Math.max(max, t.id), 0) + 1;
+    return {
+      id: nextId,
+      name,
+      description,
+      type: 'Shop',
+      gold: 0,
+      silver: 0,
+      copper: 0,
+      zinc: 0,
+      item1Id: payload.itemId ?? null,
+      item2Id: null,
+      item3Id: null,
+      item4Id: null,
+      spell1Id: payload.spellId ?? null,
+      spell2Id: null,
+      spell3Id: null,
+      spell4Id: null,
+      curse1Id: null,
+      curse2Id: null,
+      potion1Id: payload.potionId ?? null,
+      potion2Id: null,
+      potion3Id: null,
+      imageId: null,
+      soundId: null,
+      spReward: 0,
+      trap: null,
+      isquest: false,
+    };
+  }
+
+  private getYeOldMagiceShopSellEntries(kind: 'item' | 'spell' | 'potion'): ShopSellEntry[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) return [];
+    const inventory = this.cheaterByDungon()[preview.dungonId]?.inventory.treshers ?? [];
+    const itemMap = this.pcTresherItemsById();
+    const spellMap = this.pcTresherSpellsById();
+    const potionMap = this.pcTresherPotionsById();
+
+    const slotsByKind: Record<'item' | 'spell' | 'potion', ShopSlotKey[]> = {
+      item: ['item1Id', 'item2Id', 'item3Id', 'item4Id'],
+      spell: ['spell1Id', 'spell2Id', 'spell3Id', 'spell4Id'],
+      potion: ['potion1Id', 'potion2Id', 'potion3Id'],
+    };
+
+    const entries: ShopSellEntry[] = [];
+    for (let tresherIndex = 0; tresherIndex < inventory.length; tresherIndex += 1) {
+      const tresher = inventory[tresherIndex];
+      for (const slotKey of slotsByKind[kind]) {
+        const value = tresher[slotKey];
+        if (typeof value !== 'number') continue;
+        let name = 'Unknown';
+        if (kind === 'item') name = itemMap.get(value)?.name ?? `Item ${value}`;
+        if (kind === 'spell') name = spellMap.get(value)?.name ?? `Spell ${value}`;
+        if (kind === 'potion') name = potionMap.get(value)?.name ?? `Potion ${value}`;
+        entries.push({
+          tresherIndex,
+          slotKey,
+          sourceId: value,
+          name,
+          sellPrice: Math.max(2, Math.floor(kind === 'spell' ? this.shopBuySpellCost : kind === 'potion' ? this.shopBuyPotionCost : this.shopBuyItemCost) / 2),
+        });
+      }
+    }
+
+    return entries;
+  }
+
+  private getFrontFacingYeOldMagiceShop(): ObstaclePlacement | null {
+    const preview = this.gridPreviewContext();
+    if (!preview) return null;
+
+    const cheater = this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER;
+    const forward = this.getMovementDeltaForFacingDirection(cheater.facingDir);
+    const frontRow = preview.centerRow + forward.rowOffset;
+    const frontColumn = preview.centerColumn + forward.columnOffset;
+    const shop = (this.obstaclePlacementsByDungon()[preview.dungonId] ?? []).find(
+      (obs) => !obs.isDestroyed && this.isYeOldMagiceShopObstacle(obs) && obs.row === frontRow && obs.column === frontColumn
+    );
+    if (!shop) return null;
+
+    const wallSide = this.getObstaclePrimaryWallSide(preview.dungonId, shop.row, shop.column);
+    if (!wallSide) return null;
+    const frontDelta = this.getOffsetForSquareSide(this.oppositeWallSide(wallSide));
+    const expectedPlayerRow = shop.row + frontDelta.rowOffset;
+    const expectedPlayerColumn = shop.column + frontDelta.columnOffset;
+    if (preview.centerRow !== expectedPlayerRow || preview.centerColumn !== expectedPlayerColumn) {
+      return null;
+    }
+
+    return shop;
+  }
+
+  private isYeOldMagiceShopObstacle(obs: ObstaclePlacement): boolean {
+    return (obs.name ?? '').trim().toLowerCase() === 'ye old magice shop';
+  }
+
+  private getObstaclePrimaryWallSide(dungonId: number, row: number, column: number): SquareSide | null {
+    const square = (this.squaresByDungon()[dungonId] ?? {})[this.getSquareKey(row, column)];
+    if (!square) return null;
+    if (this.isWallConnection(square.toTop)) return 'toTop';
+    if (this.isWallConnection(square.toRight)) return 'toRight';
+    if (this.isWallConnection(square.toBottom)) return 'toBottom';
+    if (this.isWallConnection(square.toLeft)) return 'toLeft';
+    return null;
+  }
+
+  private getOffsetForSquareSide(side: SquareSide): { rowOffset: number; columnOffset: number } {
+    if (side === 'toTop') return { rowOffset: -1, columnOffset: 0 };
+    if (side === 'toRight') return { rowOffset: 0, columnOffset: 1 };
+    if (side === 'toBottom') return { rowOffset: 1, columnOffset: 0 };
+    return { rowOffset: 0, columnOffset: -1 };
   }
 
   toggleMute(): void {
@@ -9642,7 +10042,7 @@ export class Game implements OnInit {
     localStorage.setItem('soundMuted', muted ? 'true' : 'false');
     if (muted) {
       this.stopTavernMusic();
-    } else if (this.showTavernModal() || this.npcDialog()) {
+    } else if (this.showTavernModal() || this.npcDialog() || this.showYeOldMagiceShopModal()) {
       this.startTavernMusic();
     }
   }
@@ -9925,7 +10325,7 @@ export class Game implements OnInit {
 
   dismissNpcDialog(): void {
     this.npcDialog.set(null);
-    if (!this.showTavernModal()) {
+    if (!this.showTavernModal() && !this.showYeOldMagiceShopModal()) {
       this.stopTavernMusic();
     }
   }
@@ -10089,6 +10489,9 @@ export class Game implements OnInit {
     if (transitionType === 'stairsUp' && this.winStairsImageIndex() === null) {
       const idx = (Math.floor(Math.random() * 3) + 1) as 1 | 2 | 3;
       this.winStairsImageIndex.set(idx);
+    }
+    if (transitionType === 'stairsUp' || transitionType === 'stairsDown') {
+      this.playSoundPath(this.portalTraverseSoundPath);
     }
     const spReward = this.dungonSpReward();
     if (spReward > 0) {

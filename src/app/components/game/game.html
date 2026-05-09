@@ -32,6 +32,120 @@
 		></app-tavern-modal>
 	}
 
+	@if (showYeOldMagiceShopModal()) {
+		<div class="shop-overlay" (click)="closeYeOldMagiceShop()"></div>
+		<div class="shop-modal" role="dialog" aria-modal="true" aria-label="Ye Old magice shop" (click)="$event.stopPropagation()">
+			<button type="button" class="shop-close-btn" (click)="closeYeOldMagiceShop()" aria-label="Close">✕</button>
+			<div class="shop-image-wrap">
+				<img [src]="'images/' + yeOldMagiceShopImage() + '.jpg'" alt="Shop Keeper" class="shop-keeper-img" />
+			</div>
+			<div class="shop-body">
+				<h3 class="shop-title">Ye Old magice shop</h3>
+				<p class="shop-sp">SP: <strong>{{ playerSp() }}</strong></p>
+
+				@if (yeOldMagiceShopView() === 'main') {
+					<div class="shop-nav">
+						<button type="button" class="shop-nav-btn" (click)="setYeOldMagiceShopView('buyItems')">Buy Items</button>
+						<button type="button" class="shop-nav-btn" (click)="setYeOldMagiceShopView('sellItems')">Sell Items</button>
+						<button type="button" class="shop-nav-btn" (click)="setYeOldMagiceShopView('buySpells')">Buy Spells</button>
+						<button type="button" class="shop-nav-btn" (click)="setYeOldMagiceShopView('sellSpells')">Sell Spells</button>
+						<button type="button" class="shop-nav-btn" (click)="setYeOldMagiceShopView('buyPotions')">Buy Potions</button>
+						<button type="button" class="shop-nav-btn" (click)="setYeOldMagiceShopView('sellPotions')">Sell Potions</button>
+						<button type="button" class="shop-nav-btn" (click)="buyHealingAtShop()">Buy Healing ({{ shopHealingCost }} SP)</button>
+						<button type="button" class="shop-nav-btn" (click)="clearCursesAtShop()">Clear Curse ({{ shopCurseClearCost }} SP)</button>
+						<button type="button" class="shop-nav-btn" (click)="setYeOldMagiceShopView('info')">Talk to Keeper</button>
+						<button type="button" class="shop-nav-btn shop-nav-btn-exit" (click)="closeYeOldMagiceShop()">Exit</button>
+					</div>
+				}
+
+				@if (yeOldMagiceShopView() === 'buyItems') {
+					<button type="button" class="shop-back-btn" (click)="setYeOldMagiceShopView('main')">← Back</button>
+					@for (entry of yeOldMagiceShopBuyableItems(); track entry.id) {
+						<div class="shop-row">
+							<div><strong>{{ entry.name }}</strong><div class="shop-row-desc">{{ entry.description }}</div></div>
+							<button type="button" (click)="buyShopItem(entry.id)">Buy {{ entry.price }} SP</button>
+						</div>
+					}
+				}
+
+				@if (yeOldMagiceShopView() === 'sellItems') {
+					<button type="button" class="shop-back-btn" (click)="setYeOldMagiceShopView('main')">← Back</button>
+					@for (entry of yeOldMagiceShopSellableItems(); track $index) {
+						<div class="shop-row">
+							<span>{{ entry.name }}</span>
+							<button type="button" (click)="sellFromYeOldMagiceShop(entry)">Sell {{ entry.sellPrice }} SP</button>
+						</div>
+					} @empty {
+						<p class="shop-empty">No sellable items.</p>
+					}
+				}
+
+				@if (yeOldMagiceShopView() === 'buySpells') {
+					<button type="button" class="shop-back-btn" (click)="setYeOldMagiceShopView('main')">← Back</button>
+					@for (entry of yeOldMagiceShopBuyableSpells(); track entry.id) {
+						<div class="shop-row">
+							<div><strong>{{ entry.name }}</strong><div class="shop-row-desc">{{ entry.description }}</div></div>
+							<button type="button" (click)="buyShopSpell(entry.id)">Buy {{ entry.price }} SP</button>
+						</div>
+					}
+				}
+
+				@if (yeOldMagiceShopView() === 'sellSpells') {
+					<button type="button" class="shop-back-btn" (click)="setYeOldMagiceShopView('main')">← Back</button>
+					@for (entry of yeOldMagiceShopSellableSpells(); track $index) {
+						<div class="shop-row">
+							<span>{{ entry.name }}</span>
+							<button type="button" (click)="sellFromYeOldMagiceShop(entry)">Sell {{ entry.sellPrice }} SP</button>
+						</div>
+					} @empty {
+						<p class="shop-empty">No sellable spells.</p>
+					}
+				}
+
+				@if (yeOldMagiceShopView() === 'buyPotions') {
+					<button type="button" class="shop-back-btn" (click)="setYeOldMagiceShopView('main')">← Back</button>
+					@for (entry of yeOldMagiceShopBuyablePotions(); track entry.id) {
+						<div class="shop-row">
+							<div><strong>{{ entry.name }}</strong><div class="shop-row-desc">{{ entry.description }}</div></div>
+							<button type="button" (click)="buyShopPotion(entry.id)">Buy {{ entry.price }} SP</button>
+						</div>
+					}
+				}
+
+				@if (yeOldMagiceShopView() === 'sellPotions') {
+					<button type="button" class="shop-back-btn" (click)="setYeOldMagiceShopView('main')">← Back</button>
+					@for (entry of yeOldMagiceShopSellablePotions(); track $index) {
+						<div class="shop-row">
+							<span>{{ entry.name }}</span>
+							<button type="button" (click)="sellFromYeOldMagiceShop(entry)">Sell {{ entry.sellPrice }} SP</button>
+						</div>
+					} @empty {
+						<p class="shop-empty">No sellable potions.</p>
+					}
+				}
+
+				@if (yeOldMagiceShopView() === 'info') {
+					<button type="button" class="shop-back-btn" (click)="setYeOldMagiceShopView('main')">← Back</button>
+					<div class="shop-row">
+						<span>Buy keeper a drink</span>
+						<button type="button" (click)="buyDrinkForKeeperInfo()">{{ shopDrinkCost }} SP</button>
+					</div>
+					<div class="shop-row">
+						<span>Ask about this dungon</span>
+						<button type="button" (click)="askKeeperForDungonInfo()">Ask</button>
+					</div>
+					@if (yeOldMagiceShopInfoUnlocked()) {
+						<p class="shop-info-text">{{ yeOldMagiceShopKeeperInfo() }}</p>
+					}
+				}
+
+				@if (yeOldMagiceShopMessage(); as msg) {
+					<p class="shop-message">{{ msg }}</p>
+				}
+			</div>
+		</div>
+	}
+
 	@if (npcDialog(); as dialog) {
 		<div class="npc-dialog-overlay" (click)="dismissNpcDialog()">
 			<div class="npc-dialog-box" (click)="$event.stopPropagation()">
@@ -166,6 +280,15 @@
 								[playerHp]="playerHp()"
 								[playerMaxHp]="playerMaxHpForView()"
 														></app-dungeon-first-person>
+								@if (!showYeOldMagiceShopModal() && frontFacingYeOldMagiceShop(); as frontShop) {
+									<div class="shop-front-prompt">
+										<p class="shop-front-prompt-text">{{ frontShop.name }} is ahead. Enter?</p>
+										<div class="shop-front-prompt-actions">
+											<button type="button" class="shop-front-prompt-btn" (click)="enterFrontYeOldMagiceShop()">Enter Shop</button>
+											<button type="button" class="shop-front-prompt-btn shop-front-prompt-btn-later">Later</button>
+										</div>
+									</div>
+								}
 								@if (bloodSplatter().length) {
 									<div class="fpv-blood-overlay">
 										@for (s of bloodSplatter(); track $index) {
