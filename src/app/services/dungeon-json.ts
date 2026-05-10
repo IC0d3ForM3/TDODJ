@@ -262,6 +262,15 @@ export class DungeonJsonService {
               : typeof src['imageid'] === 'string' && src['imageid']
                 ? (parseInt(src['imageid'], 10) || null)
                 : null,
+        textImageId: typeof src['textImageId'] === 'number'
+          ? src['textImageId']
+          : typeof src['textimageid'] === 'number'
+            ? src['textimageid']
+            : typeof src['textImageId'] === 'string' && src['textImageId']
+              ? (parseInt(src['textImageId'], 10) || null)
+              : typeof src['textimageid'] === 'string' && src['textimageid']
+                ? (parseInt(src['textimageid'], 10) || null)
+                : null,
         hp,
         isIndestructible: src['isIndestructible'] === true,
         containsItemId: typeof src['containsItemId'] === 'number'
@@ -273,6 +282,15 @@ export class DungeonJsonService {
               : typeof src['containsitemid'] === 'string' && src['containsitemid']
                 ? (parseInt(src['containsitemid'], 10) || null)
                 : null,
+        requiredKeyId: typeof src['requiredKeyId'] === 'number'
+          ? src['requiredKeyId']
+          : typeof src['requiredkeyid'] === 'number'
+            ? src['requiredkeyid']
+            : typeof src['requiredKeyId'] === 'string' && src['requiredKeyId']
+              ? (parseInt(src['requiredKeyId'], 10) || null)
+              : typeof src['requiredkeyid'] === 'string' && src['requiredkeyid']
+                ? (parseInt(src['requiredkeyid'], 10) || null)
+                : null,
         shape,
         heightPercent,
         heightAnchor,
@@ -281,6 +299,7 @@ export class DungeonJsonService {
         color,
         currentHp,
         isDestroyed: src['isDestroyed'] === true,
+        isOpened: src['isOpened'] === true,
         itemTaken: src['itemTaken'] === true,
       });
     }

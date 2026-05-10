@@ -386,6 +386,35 @@ export class DungeonPreviewGridComponent {
           context.arc(centerX, centerY, radius, 0, Math.PI * 2);
           context.stroke();
         }
+
+        if (obs.requiredKeyId !== null && obs.requiredKeyId !== undefined) {
+          const keyholeRadius = Math.max(2, this.cellSize * 0.11);
+          const keyholeCenterY = centerY - this.cellSize * 0.08;
+          const shaftWidth = Math.max(2, this.cellSize * 0.12);
+          const shaftHeight = Math.max(3, this.cellSize * 0.16);
+
+          context.fillStyle = 'rgba(255,255,255,0.78)';
+          context.beginPath();
+          context.arc(centerX, keyholeCenterY, keyholeRadius, 0, Math.PI * 2);
+          context.fill();
+          context.fillRect(
+            centerX - shaftWidth / 2,
+            keyholeCenterY + keyholeRadius * 0.35,
+            shaftWidth,
+            shaftHeight
+          );
+
+          context.fillStyle = '#1f1f1f';
+          context.beginPath();
+          context.arc(centerX, keyholeCenterY, keyholeRadius * 0.52, 0, Math.PI * 2);
+          context.fill();
+          context.fillRect(
+            centerX - shaftWidth * 0.25,
+            keyholeCenterY + keyholeRadius * 0.45,
+            shaftWidth * 0.5,
+            shaftHeight * 0.85
+          );
+        }
       }
     }
 

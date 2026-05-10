@@ -88,6 +88,8 @@ export class Monsters implements OnInit {
     attacks: new FormArray<MonsterAttackFormGroup>([this.createMonsterAttackForm()]),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
     callsReinforcements: new FormControl<boolean>(false, { nonNullable: true }),
+    reinforcementCount: new FormControl<number>(1, { nonNullable: true }),
+    reinforcementMonsterName: new FormControl<string>('', { nonNullable: true }),
     toHitPlusNeeded: new FormControl<number>(0, { nonNullable: true }),
     npcGreeting: new FormControl<string>('', { nonNullable: true }),
     npcInfo1: new FormControl<string>('', { nonNullable: true }),
@@ -275,6 +277,8 @@ export class Monsters implements OnInit {
     c.spReward.setValue(this.normalizeNumber(item.spReward, 0));
     c.isPublic.setValue(item.isPublic);
     c.callsReinforcements.setValue(item.callsReinforcements === true);
+    c.reinforcementCount.setValue(Math.max(1, this.normalizeNumber(item.reinforcementCount, 1)));
+    c.reinforcementMonsterName.setValue(item.reinforcementMonsterName ?? '');
     c.toHitPlusNeeded.setValue(this.normalizeNumber(item.toHitPlusNeeded, 0));
     c.npcGreeting.setValue(item.npcGreeting ?? '');
     c.npcInfo1.setValue(item.npcInfo1 ?? '');
@@ -406,6 +410,14 @@ export class Monsters implements OnInit {
       attacks,
       isPublic: this.isAdminUser() ? c.isPublic.value === true : false,
       callsReinforcements: c.callsReinforcements.value === true,
+      reinforcementCount:
+        c.callsReinforcements.value === true
+          ? Math.max(1, this.normalizeNumber(c.reinforcementCount.value, 1))
+          : 0,
+      reinforcementMonsterName:
+        c.callsReinforcements.value === true
+          ? c.reinforcementMonsterName.value.trim() || null
+          : null,
       toHitPlusNeeded: Math.max(0, this.normalizeNumber(c.toHitPlusNeeded.value, 0)),
       npcGreeting: c.npcGreeting.value.trim() || null,
       npcInfo1: c.npcInfo1.value.trim() || null,
@@ -438,6 +450,9 @@ export class Monsters implements OnInit {
     c.magic.setValue(0);
     c.spReward.setValue(0);
     c.isPublic.setValue(false);
+    c.callsReinforcements.setValue(false);
+    c.reinforcementCount.setValue(1);
+    c.reinforcementMonsterName.setValue('');
     c.toHitPlusNeeded.setValue(0);
     c.npcGreeting.setValue('');
     c.npcInfo1.setValue('');
@@ -541,5 +556,18 @@ export class Monsters implements OnInit {
           .filter((entry): entry is number => entry !== null && entry > 0)
       )
     );
+  }
+
+  reinforcementMonsterOptions(): string[] {
+    const names = this.items()
+      .map((monster) => (monster.name || '').trim())
+      .filter((name) => name.length > 0);
+
+    const current = this.userMonsterForm.controls.reinforcementMonsterName.value.trim();
+    if (current.length > 0) {
+      names.push(current);
+    }
+
+    return Array.from(new Set(names));
   }
 }

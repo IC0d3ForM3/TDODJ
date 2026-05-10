@@ -685,21 +685,9 @@
 									<span class="discovery-kind">{{ item.kind }}</span>
 									<p class="discovery-name">{{ item.name }}</p>
 									<p class="discovery-description">{{ item.description }}</p>
-									@if (item.kind === 'Obstacle' && forwardObstacleWithItem() !== null && item.row === forwardObstacleWithItem()!.row && item.column === forwardObstacleWithItem()!.column) {
-										@if (examinedObstacleResults().get(forwardObstacleWithItem()!.id); as examineResult) {
-											<p class="discovery-description" style="font-style:italic">
-												@if (examineResult === '?') { You can't identify what's inside. } @else { Contents: <strong>{{ examineResult }}</strong> }
-											</p>
-										}
-										<div class="inventory-item-actions">
-											<button type="button" class="action-button" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="examineObstacle(forwardObstacleWithItem()!.id)">
-												Examine
-											</button>
-											<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="takeItemFromObstacle(forwardObstacleWithItem()!.id)">
-												Take Item
-											</button>
-										</div>
-									}
+								@if (item.imageSrc) {
+									<img [src]="item.imageSrc" alt="discovery image" style="display:block;max-width:100%;max-height:140px;border:1px solid rgba(255,255,255,0.25);border-radius:4px;margin-top:0.35rem" />
+								}
 								</li>
 							}
 						</ul>
@@ -736,15 +724,18 @@
 							@for (obs of currentSquareObstacles(); track obs.id) {
 								<div class="obstacle-action-row">
 									<span class="obstacle-action-name">{{ obs.name }}</span>
+									@if (obs.containsItemId !== null && !obs.itemTaken && !obs.isDestroyed) {
+										<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="openObstacle(obs.id)">
+											Open
+										</button>
+									}
 									@if (!obs.isIndestructible && !(obs.isDestroyed)) {
 										<button type="button" class="action-button" (click)="smashObstacle(obs.id)">
 											Smash
 										</button>
 									}
-									@if (obs.containsItemId !== null && !obs.itemTaken && (obs.isIndestructible || obs.isDestroyed)) {
-										<button type="button" class="action-button action-button-strong" (click)="takeItemFromObstacle(obs.id)">
-											Take Item
-										</button>
+									@if (obstacleRequiresKeyLabel(obs); as keyLabel) {
+										<span class="details-message" style="font-size:0.8rem">Requires key: {{ keyLabel }}</span>
 									}
 								</div>
 							}

@@ -33,6 +33,8 @@ export interface MonsterRecord {
   magic: number;
   magicResistance: number;
   callsReinforcements: boolean;
+  reinforcementCount: number;
+  reinforcementMonsterName: string | null;
   toHitPlusNeeded: number;
   npcGreeting: string | null;
   npcInfo1: string | null;
@@ -64,6 +66,8 @@ export interface UpsertMonsterPayload {
   magic: number;
   magicResistance: number;
   callsReinforcements: boolean;
+  reinforcementCount: number;
+  reinforcementMonsterName: string | null;
   toHitPlusNeeded: number;
   npcGreeting: string | null;
   npcInfo1: string | null;
@@ -112,6 +116,8 @@ const SELECT_MONSTER_FIELDS = `
   COALESCE(magic, 0) AS magic,
   COALESCE(magicresistance, 0) AS "magicResistance",
   COALESCE(callsreinforcements, FALSE) AS "callsReinforcements",
+  COALESCE(reinforcementcount, 0) AS "reinforcementCount",
+  reinforcementmonstername AS "reinforcementMonsterName",
   COALESCE(tohitplusneeded, 0) AS "toHitPlusNeeded",
   npc_greeting AS "npcGreeting",
   npc_info_1 AS "npcInfo1",
@@ -178,6 +184,8 @@ export const insertMonsterForUser = async (
        magic,
        magicresistance,
        callsreinforcements,
+      reinforcementcount,
+      reinforcementmonstername,
        tohitplusneeded,
        npc_greeting,
        npc_info_1,
@@ -193,9 +201,9 @@ export const insertMonsterForUser = async (
      VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
        $11::jsonb, $12::jsonb, $13::jsonb,
-       $14, $15, $16, $17, $18, $19, $20,
-       $21, $22, $23, $24, $25, $26, $27, $28,
-       $29,
+       $14, $15, $16, $17, $18, $19, $20, $21, $22,
+       $23, $24, $25, $26, $27, $28, $29, $30,
+       $31,
        NOW()
      )
      RETURNING ${SELECT_MONSTER_FIELDS}`,
@@ -219,6 +227,8 @@ export const insertMonsterForUser = async (
       payload.magic,
       payload.magicResistance,
       payload.callsReinforcements,
+      payload.reinforcementCount,
+      payload.reinforcementMonsterName,
       payload.toHitPlusNeeded,
       payload.npcGreeting,
       payload.npcInfo1,
@@ -261,16 +271,18 @@ export const updateMonsterForUser = async (
        magic = $18,
        magicresistance = $19,
        callsreinforcements = $20,
-       tohitplusneeded = $21,
-       npc_greeting = $22,
-       npc_info_1 = $23,
-       npc_info_2 = $24,
-       npc_info_3 = $25,
-       npc_only_attack_when_attacked = $26,
-       npc_gives_info_after_damaged = $27,
-       npc_attacks_after_info = $28,
-       npc_can_trade = $29,
-       awareness = $30,
+      reinforcementcount = $21,
+      reinforcementmonstername = $22,
+      tohitplusneeded = $23,
+      npc_greeting = $24,
+      npc_info_1 = $25,
+      npc_info_2 = $26,
+      npc_info_3 = $27,
+      npc_only_attack_when_attacked = $28,
+      npc_gives_info_after_damaged = $29,
+      npc_attacks_after_info = $30,
+      npc_can_trade = $31,
+      awareness = $32,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_MONSTER_FIELDS}`,
@@ -295,6 +307,8 @@ export const updateMonsterForUser = async (
       payload.magic,
       payload.magicResistance,
       payload.callsReinforcements,
+      payload.reinforcementCount,
+      payload.reinforcementMonsterName,
       payload.toHitPlusNeeded,
       payload.npcGreeting,
       payload.npcInfo1,

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as dungonService from '../services/dungonService';
+import { generateDungon, GenerateDungonParams } from '../services/dungon-generator';
 import * as pcService from '../services/pcService';
 import * as tresherService from '../services/tresherService';
 import * as itemService from '../services/itemService';
@@ -1062,5 +1063,108 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error building sample game session:', error);
     return res.status(500).json({ error: 'Failed to build sample game session' });
+  }
+};
+
+export const generateDungonContent = async (req: Request, res: Response) => {
+  const dungonId = Number.parseInt(req.params['id'], 10);
+  if (!Number.isInteger(dungonId) || dungonId <= 0) {
+    return res.status(400).json({ error: 'Valid dungon id is required' });
+  }
+
+  const { userkey, story, inhabitants, treasureStyle, obstacleStyle, level, name, anchorRow, anchorColumn, monsterRequests, itemRequests } = req.body as Partial<{
+    userkey: string;
+    story: string;
+    inhabitants: string;
+    treasureStyle: string;
+    obstacleStyle: string;
+    level: number;
+    name: string;
+    anchorRow: number;
+    anchorColumn: number;
+    monsterRequests: Array<{ monsterDbId: number; count: number }>;
+    itemRequests: Array<{ itemDbId: number; count: number }>;
+  }>;
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ error: 'Valid userkey is required' });
+  }
+  if (typeof story !== 'string' || story.trim().length < 1) {
+    return res.status(400).json({ error: 'story is required' });
+  }
+  if (typeof inhabitants !== 'string' || inhabitants.trim().length < 1) {
+    return res.status(400).json({ error: 'inhabitants is required' });
+  }
+  if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2)) {
+    return res.status(400).json({ error: 'name must be at least 2 characters when provided' });
+  }
+  const levelNum = typeof level === 'number' ? level : Number.parseInt(String(level), 10);
+  if (!Number.isFinite(levelNum) || levelNum < 0) {
+    return res.status(400).json({ error: 'level must be a non-negative number' });
+  }
+
+  const normalizedMonsterRequests = Array.isArray(monsterRequests)
+    ? monsterRequests
+      .map((request) => ({
+        monsterDbId: Number(request?.monsterDbId),
+        count: Number(request?.count),
+      }))
+      .filter((request) => Number.isInteger(request.monsterDbId) && request.monsterDbId > 0 && Number.isInteger(request.count) && request.count > 0)
+    : [];
+
+  const normalizedItemRequests = Array.isArray(itemRequests)
+    ? itemRequests
+      .map((request) => ({
+        itemDbId: Number(request?.itemDbId),
+        count: Number(request?.count),
+      }))
+      .filter((request) => Number.isInteger(request.itemDbId) && request.itemDbId > 0 && Number.isInteger(request.count) && request.count > 0)
+    : [];
+
+  if (normalizedMonsterRequests.length === 0 && normalizedItemRequests.length === 0) {
+    return res.status(400).json({ error: 'Add at least one monster or item request' });
+  }
+
+  const hasAnchorRow = anchorRow !== undefined && anchorRow !== null;
+  const hasAnchorColumn = anchorColumn !== undefined && anchorColumn !== null;
+  if (hasAnchorRow !== hasAnchorColumn) {
+    return res.status(400).json({ error: 'anchorRow and anchorColumn must be provided together' });
+  }
+
+  const parsedAnchorRow = hasAnchorRow ? Number(anchorRow) : null;
+  const parsedAnchorColumn = hasAnchorColumn ? Number(anchorColumn) : null;
+  if (
+    parsedAnchorRow !== null &&
+    (!Number.isInteger(parsedAnchorRow) || parsedAnchorRow < 0 || !Number.isInteger(parsedAnchorColumn) || (parsedAnchorColumn ?? -1) < 0)
+  ) {
+    return res.status(400).json({ error: 'anchorRow and anchorColumn must be non-negative integers' });
+  }
+
+  // Verify ownership
+  const dungon = await dungonService.fetchDungonByIdForUser(dungonId, userkey.trim()).catch(() => null);
+  if (!dungon) {
+    return res.status(404).json({ error: 'Dungon not found or you do not own it' });
+  }
+
+  const params: GenerateDungonParams = {
+    name: (typeof name === 'string' && name.trim().length > 0 ? name.trim() : dungon.name) ?? 'Unnamed Dungeon',
+    story: story.trim(),
+    level: levelNum,
+    inhabitants: inhabitants.trim(),
+    treasureStyle: typeof treasureStyle === 'string' ? treasureStyle.trim() : '',
+    obstacleStyle: typeof obstacleStyle === 'string' ? obstacleStyle.trim() : '',
+    monsterRequests: normalizedMonsterRequests,
+    itemRequests: normalizedItemRequests,
+    anchorRow: parsedAnchorRow ?? undefined,
+    anchorColumn: parsedAnchorColumn ?? undefined,
+  };
+
+  try {
+    const dungonJson = await generateDungon(params, dungon.dungenJson);
+    return res.json({ dungonJson });
+  } catch (error) {
+    console.error('Error generating dungon:', error);
+    const message = error instanceof Error ? error.message : 'Failed to generate dungon';
+    return res.status(500).json({ error: message });
   }
 };

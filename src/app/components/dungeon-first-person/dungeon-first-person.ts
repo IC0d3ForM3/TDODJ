@@ -1977,6 +1977,9 @@ export class DungeonFirstPersonComponent implements OnDestroy {
         context.fillRect(sx, sy, slabW, sh);
         context.globalAlpha = 0.8;
       }
+      if (obs?.requiredKeyId !== null && obs?.requiredKeyId !== undefined) {
+        this.drawObstacleKeyhole(context, sx, sy, slabW, sh, depth);
+      }
     } else if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
       const maxWidth = tileWidth * 0.72 * widthPct;
       const maxHeight = tileHeight * heightPct;
@@ -1998,6 +2001,9 @@ export class DungeonFirstPersonComponent implements OnDestroy {
         context.fillStyle = '#000';
         context.fillRect(edgeX - drawWidth / 2, drawY, drawWidth, drawHeight);
         context.globalAlpha = 0.8;
+      }
+      if (obs?.requiredKeyId !== null && obs?.requiredKeyId !== undefined) {
+        this.drawObstacleKeyhole(context, edgeX - drawWidth / 2, drawY, drawWidth, drawHeight, depth);
       }
     } else {
       const w = Math.max(6, tileWidth * 0.22 * widthPct);
@@ -2028,6 +2034,9 @@ export class DungeonFirstPersonComponent implements OnDestroy {
         context.fillStyle = '#000';
         context.fillRect(x, y, w, h);
         context.globalAlpha = 0.8;
+      }
+      if (obs?.requiredKeyId !== null && obs?.requiredKeyId !== undefined) {
+        this.drawObstacleKeyhole(context, x, y, w, h, depth);
       }
     }
 
@@ -2185,6 +2194,9 @@ export class DungeonFirstPersonComponent implements OnDestroy {
         context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
         context.fillRect(sx, sy, sw, sh);
       }
+      if (obs?.requiredKeyId !== null && obs?.requiredKeyId !== undefined) {
+        this.drawObstacleKeyhole(context, sx, sy, sw, sh, depth);
+      }
       return;
     }
 
@@ -2216,6 +2228,9 @@ export class DungeonFirstPersonComponent implements OnDestroy {
       if (fogAlpha > 0) {
         context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
         context.fillRect(drawX, drawY, drawWidth, drawHeight);
+      }
+      if (obs?.requiredKeyId !== null && obs?.requiredKeyId !== undefined) {
+        this.drawObstacleKeyhole(context, drawX, drawY, drawWidth, drawHeight, depth);
       }
       return;
     }
@@ -2255,6 +2270,45 @@ export class DungeonFirstPersonComponent implements OnDestroy {
       context.fillStyle = `rgba(0, 0, 0, ${fogAlpha})`;
       context.fillRect(x, y, w, h);
     }
+    if (obs?.requiredKeyId !== null && obs?.requiredKeyId !== undefined) {
+      this.drawObstacleKeyhole(context, x, y, w, h, depth);
+    }
+  }
+
+  private drawObstacleKeyhole(
+    context: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    depth: number,
+  ): void {
+    if (width <= 4 || height <= 6) {
+      return;
+    }
+
+    const fogFactor = Math.max(0.38, 1 - Math.min(0.55, depth * 0.12));
+    const centerX = x + width / 2;
+    const centerY = y + height * 0.45;
+    const headRadius = Math.max(2, Math.min(width, height) * 0.09);
+    const shaftWidth = Math.max(1.6, headRadius * 0.82);
+    const shaftHeight = Math.max(2.4, headRadius * 1.8);
+
+    context.save();
+
+    context.fillStyle = `rgba(255, 255, 255, ${0.8 * fogFactor})`;
+    context.beginPath();
+    context.arc(centerX, centerY, headRadius, 0, Math.PI * 2);
+    context.fill();
+    context.fillRect(centerX - shaftWidth / 2, centerY + headRadius * 0.25, shaftWidth, shaftHeight);
+
+    context.fillStyle = `rgba(20, 20, 20, ${0.92 * fogFactor})`;
+    context.beginPath();
+    context.arc(centerX, centerY, headRadius * 0.58, 0, Math.PI * 2);
+    context.fill();
+    context.fillRect(centerX - shaftWidth * 0.26, centerY + headRadius * 0.38, shaftWidth * 0.52, shaftHeight * 0.82);
+
+    context.restore();
   }
 
   private isYeOldMagiceShop(obs: ObstaclePlacement | undefined): boolean {

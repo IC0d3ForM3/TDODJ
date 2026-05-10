@@ -327,6 +327,12 @@
 								>+Import</button>
 								<button
 									type="button"
+									class="open-block-btn"
+									[disabled]="generateButtonReason() !== null"
+									(click)="openGenerateDungonDialog()"
+								>+Generate</button>
+								<button
+									type="button"
 									class="open-block-btn open-block-btn--clear"
 									[disabled]="!canClearCurrentDungonContent() || isSavingDungonJson() || isPublishingDungon()"
 									(click)="clearCurrentDungonContent()"
@@ -334,6 +340,12 @@
 								<input #gridMapFileInput type="file" accept=".json" style="display:none"
 									(change)="importMapFromFile($event)" />
 							</div>
+							@if (isGenerateAnchorPickMode()) {
+								<div class="details-message" style="margin-top:0.45rem; color:#ffffff; display:flex; align-items:center; justify-content:space-between; gap:0.6rem; flex-wrap:wrap;">
+									<span>Generate is waiting: click an open square on the map to choose the monster area anchor.</span>
+									<button type="button" class="cancel-button" style="padding:0.2rem 0.45rem" (click)="cancelGenerateAnchorPickMode()">Cancel</button>
+								</div>
+							}
 							<div class="publish-actions-column">
 								<button
 									type="button"
@@ -1134,6 +1146,113 @@
 
 @if (isCreatorTabActive('curses')) {
 <app-curses [imageOptions]="libImageOptions()" [soundOptions]="libSoundOptions()" />
+}
+
+@if (isGenerateDialogVisible()) {
+	<div class="door-dialog-backdrop">
+		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Generate dungeon">
+			<h4 class="door-dialog-title">Fill Dungeon With Content</h4>
+			<p class="publish-dialog-copy">Add one or more monster batches and item batches, then click Fill Dungeon.</p>
+			@if (generateAnchorSquare(); as anchor) {
+				<p class="details-message" style="margin-bottom:0.6rem">Selected area anchor square: row {{ anchor.row }}, col {{ anchor.column }}.</p>
+			}
+
+			<div class="form-row" style="display:grid;grid-template-columns:1fr auto auto auto;gap:0.6rem;align-items:end;">
+				<div>
+					<label class="form-label" for="fill-monster-select">Monster</label>
+					<select
+						id="fill-monster-select"
+						class="form-input"
+						[value]="generateMonsterSelection() ?? ''"
+						(change)="setGenerateMonsterSelection(($any($event.target).value))"
+					>
+						<option value="">Select a monster...</option>
+						@for (monster of monsterLibrary(); track monster.id) {
+							<option [value]="monster.id">{{ monster.name }}</option>
+						}
+					</select>
+				</div>
+				<div>
+					<label class="form-label" for="fill-monster-count">Count</label>
+					<input
+						id="fill-monster-count"
+						type="number"
+						min="1"
+						class="form-input"
+						[value]="generateMonsterCount()"
+						(input)="setGenerateMonsterCount(($any($event.target).value))"
+					/>
+				</div>
+				<button type="button" class="dashboard-action-button" (click)="addGenerateMonsterBatch()">Add Monster</button>
+			</div>
+
+			@if (generateMonsterBatches().length > 0) {
+				<div class="form-row" style="display:flex;flex-direction:column;gap:0.35rem;">
+					@for (batch of generateMonsterBatches(); track batch.monsterDbId) {
+						<div style="display:flex;justify-content:space-between;gap:0.8rem;align-items:center;">
+							<span>{{ batch.monsterName }} x{{ batch.count }}</span>
+							<button type="button" class="cancel-button" style="padding:0.2rem 0.45rem" (click)="removeGenerateMonsterBatch(batch.monsterDbId)">Remove</button>
+						</div>
+					}
+				</div>
+			}
+
+			<div class="form-row" style="display:grid;grid-template-columns:1fr auto auto auto;gap:0.6rem;align-items:end;">
+				<div>
+					<label class="form-label" for="fill-item-select">Item</label>
+					<select
+						id="fill-item-select"
+						class="form-input"
+						[value]="generateItemSelection() ?? ''"
+						(change)="setGenerateItemSelection(($any($event.target).value))"
+					>
+						<option value="">Select an item...</option>
+						@for (item of libItems(); track item.id) {
+							<option [value]="item.id">{{ item.name }}</option>
+						}
+					</select>
+				</div>
+				<div>
+					<label class="form-label" for="fill-item-count">Count</label>
+					<input
+						id="fill-item-count"
+						type="number"
+						min="1"
+						class="form-input"
+						[value]="generateItemCount()"
+						(input)="setGenerateItemCount(($any($event.target).value))"
+					/>
+				</div>
+				<button type="button" class="dashboard-action-button" (click)="addGenerateItemBatch()">Add Item</button>
+			</div>
+
+			@if (generateItemBatches().length > 0) {
+				<div class="form-row" style="display:flex;flex-direction:column;gap:0.35rem;">
+					@for (batch of generateItemBatches(); track batch.itemDbId) {
+						<div style="display:flex;justify-content:space-between;gap:0.8rem;align-items:center;">
+							<span>{{ batch.itemName }} x{{ batch.count }}</span>
+							<button type="button" class="cancel-button" style="padding:0.2rem 0.45rem" (click)="removeGenerateItemBatch(batch.itemDbId)">Remove</button>
+						</div>
+					}
+				</div>
+			}
+
+			@if (generateDungonError()) {
+				<small class="details-message details-message-error">{{ generateDungonError() }}</small>
+			}
+
+			<div class="door-dialog-actions">
+				<button type="button" class="cancel-button" [disabled]="isGeneratingDungon()" (click)="closeGenerateDungonDialog()">Cancel</button>
+				<button type="button" class="save-button" [disabled]="isGeneratingDungon()" (click)="generateDungonWithAi()">
+					@if (isGeneratingDungon()) {
+						Generating...
+					} @else {
+						Fill Dungeon
+					}
+				</button>
+			</div>
+		</section>
+	</div>
 }
 
 @if (isPublishDialogVisible()) {
@@ -2675,8 +2794,16 @@
 				<p class="form-hint">Use exact name <strong>Ye Old magice shop</strong> to make this obstacle a shop (must be next to a wall).</p>
 
 				@if ((obstacleForm.controls.name.value || '').trim().toLowerCase() !== 'ye old magice shop') {
-					<label class="form-label" for="obstacle-note">Note (readable by player)</label>
+					<label class="form-label" for="obstacle-note">Obstacle Text (shows in wall-note area)</label>
 					<textarea id="obstacle-note" class="form-textarea" rows="3" formControlName="note" placeholder="Text the player sees when examining this obstacle"></textarea>
+
+					<label class="form-label" for="obstacle-text-image">Text Image (shows under obstacle text)</label>
+					<select id="obstacle-text-image" class="form-input" formControlName="textImageId">
+						<option [ngValue]="null">— None —</option>
+						@for (img of libUserImages(); track img.id) {
+							<option [ngValue]="img.id">{{ img.name }}</option>
+						}
+					</select>
 				}
 
 				<label class="form-label" for="obstacle-image">Image (optional)</label>
@@ -2740,6 +2867,17 @@
 						<option [ngValue]="item.id">{{ item.name }}</option>
 					}
 				</select>
+
+				<label class="form-label" for="obstacle-required-key">Required Key To Open (optional)</label>
+				<select id="obstacle-required-key" class="form-input" formControlName="requiredKeyId">
+					<option [ngValue]="null">— None —</option>
+					@for (key of keyList; track key.id) {
+						<option [ngValue]="key.id">{{ key.name || ('Key #' + key.id) }}</option>
+					}
+				</select>
+				<button type="button" class="cancel-button" (click)="createObstacleRequiredKey()" style="margin-top:0.35rem; width:max-content;">
+					Create New Key
+				</button>
 
 				<div class="form-actions">
 					<button type="submit" class="save-button">Save</button>

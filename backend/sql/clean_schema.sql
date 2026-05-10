@@ -290,6 +290,8 @@ CREATE TABLE IF NOT EXISTS monsters (
   spreward                   INTEGER      NOT NULL DEFAULT 0,
   tohitplusneeded            INTEGER      NOT NULL DEFAULT 0,
   callsreinforcements        BOOLEAN      NOT NULL DEFAULT FALSE,
+  reinforcementcount         INTEGER      NOT NULL DEFAULT 0,
+  reinforcementmonstername   TEXT,
   ispublic                   BOOLEAN      NOT NULL DEFAULT FALSE,
   imageid                    INTEGER      NULL,
   soundid                    INTEGER      NULL,

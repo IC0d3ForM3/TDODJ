@@ -83,6 +83,7 @@ app.post('/dungons', dungonController.createDungon);
 app.put('/dungons/:id/metadata', dungonController.updateDungonMetadata);
 app.put('/dungons/:id/dungonjson', dungonController.updateDungonJson);
 app.put('/dungons/:id/publish', dungonController.publishDungon);
+app.post('/dungons/:id/generate', dungonController.generateDungonContent);
 app.put('/dungons/:id/approve', dungonController.approveDungon);
 app.put('/dungons/:id/set-sample', dungonController.setSampleDungon);
 app.delete('/dungons/:id', dungonController.deleteDungon);

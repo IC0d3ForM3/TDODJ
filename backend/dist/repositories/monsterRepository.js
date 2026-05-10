@@ -36,6 +36,8 @@ const SELECT_MONSTER_FIELDS = `
   COALESCE(magic, 0) AS magic,
   COALESCE(magicresistance, 0) AS "magicResistance",
   COALESCE(callsreinforcements, FALSE) AS "callsReinforcements",
+  COALESCE(reinforcementcount, 0) AS "reinforcementCount",
+  reinforcementmonstername AS "reinforcementMonsterName",
   COALESCE(tohitplusneeded, 0) AS "toHitPlusNeeded",
   npc_greeting AS "npcGreeting",
   npc_info_1 AS "npcInfo1",
@@ -44,7 +46,8 @@ const SELECT_MONSTER_FIELDS = `
   COALESCE(npc_only_attack_when_attacked, FALSE) AS "npcOnlyAttackWhenAttacked",
   COALESCE(npc_gives_info_after_damaged, FALSE) AS "npcGivesInfoAfterDamaged",
   COALESCE(npc_attacks_after_info, FALSE) AS "npcAttacksAfterInfo",
-  COALESCE(npc_can_trade, FALSE) AS "npcCanTrade"
+  COALESCE(npc_can_trade, FALSE) AS "npcCanTrade",
+  COALESCE(awareness, 5) AS awareness
 `;
 const getMonstersByUserGuid = async (userguid) => {
     const { rows } = await db_1.default.query(`SELECT ${SELECT_MONSTER_FIELDS}
@@ -86,6 +89,8 @@ const insertMonsterForUser = async (userguid, payload) => {
        magic,
        magicresistance,
        callsreinforcements,
+      reinforcementcount,
+      reinforcementmonstername,
        tohitplusneeded,
        npc_greeting,
        npc_info_1,
@@ -95,13 +100,15 @@ const insertMonsterForUser = async (userguid, payload) => {
        npc_gives_info_after_damaged,
        npc_attacks_after_info,
        npc_can_trade,
+       awareness,
        updatedat
      )
      VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
        $11::jsonb, $12::jsonb, $13::jsonb,
-       $14, $15, $16, $17, $18, $19, $20,
-       $21, $22, $23, $24, $25, $26, $27, $28,
+       $14, $15, $16, $17, $18, $19, $20, $21, $22,
+       $23, $24, $25, $26, $27, $28, $29, $30,
+       $31,
        NOW()
      )
      RETURNING ${SELECT_MONSTER_FIELDS}`, [
@@ -124,6 +131,8 @@ const insertMonsterForUser = async (userguid, payload) => {
         payload.magic,
         payload.magicResistance,
         payload.callsReinforcements,
+        payload.reinforcementCount,
+        payload.reinforcementMonsterName,
         payload.toHitPlusNeeded,
         payload.npcGreeting,
         payload.npcInfo1,
@@ -133,6 +142,7 @@ const insertMonsterForUser = async (userguid, payload) => {
         payload.npcGivesInfoAfterDamaged,
         payload.npcAttacksAfterInfo,
         payload.npcCanTrade,
+        payload.awareness,
     ]);
     return rows[0];
 };
@@ -158,15 +168,18 @@ const updateMonsterForUser = async (id, userguid, payload) => {
        magic = $18,
        magicresistance = $19,
        callsreinforcements = $20,
-       tohitplusneeded = $21,
-       npc_greeting = $22,
-       npc_info_1 = $23,
-       npc_info_2 = $24,
-       npc_info_3 = $25,
-       npc_only_attack_when_attacked = $26,
-       npc_gives_info_after_damaged = $27,
-       npc_attacks_after_info = $28,
-       npc_can_trade = $29,
+      reinforcementcount = $21,
+      reinforcementmonstername = $22,
+      tohitplusneeded = $23,
+      npc_greeting = $24,
+      npc_info_1 = $25,
+      npc_info_2 = $26,
+      npc_info_3 = $27,
+      npc_only_attack_when_attacked = $28,
+      npc_gives_info_after_damaged = $29,
+      npc_attacks_after_info = $30,
+      npc_can_trade = $31,
+      awareness = $32,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_MONSTER_FIELDS}`, [
@@ -190,6 +203,8 @@ const updateMonsterForUser = async (id, userguid, payload) => {
         payload.magic,
         payload.magicResistance,
         payload.callsReinforcements,
+        payload.reinforcementCount,
+        payload.reinforcementMonsterName,
         payload.toHitPlusNeeded,
         payload.npcGreeting,
         payload.npcInfo1,
@@ -199,6 +214,7 @@ const updateMonsterForUser = async (id, userguid, payload) => {
         payload.npcGivesInfoAfterDamaged,
         payload.npcAttacksAfterInfo,
         payload.npcCanTrade,
+        payload.awareness,
     ]);
     return rows[0] ?? null;
 };

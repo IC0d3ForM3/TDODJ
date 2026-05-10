@@ -32,6 +32,8 @@ export interface UserMonsterListItem {
   spReward: number;
   isPublic: boolean;
   callsReinforcements: boolean;
+  reinforcementCount: number;
+  reinforcementMonsterName: string | null;
   toHitPlusNeeded: number;
   npcGreeting: string | null;
   npcInfo1: string | null;
@@ -73,6 +75,8 @@ export interface UserMonsterWritePayload {
   spReward: number;
   isPublic: boolean;
   callsReinforcements: boolean;
+  reinforcementCount: number;
+  reinforcementMonsterName: string | null;
   toHitPlusNeeded: number;
   npcGreeting: string | null;
   npcInfo1: string | null;
@@ -116,6 +120,11 @@ export class MonsterService {
               magic: this.normalizeNumber(item.magic, 0),
               spReward: this.normalizeNumber(item.spReward, 0),
               callsReinforcements: item.callsReinforcements === true,
+              reinforcementCount: Math.max(0, this.normalizeNumber(item.reinforcementCount, 0)),
+              reinforcementMonsterName:
+                typeof item.reinforcementMonsterName === 'string' && item.reinforcementMonsterName.trim()
+                  ? item.reinforcementMonsterName.trim()
+                  : null,
               toHitPlusNeeded: this.normalizeNumber(item.toHitPlusNeeded, 0),
               npcGreeting: typeof item.npcGreeting === 'string' ? item.npcGreeting : null,
               npcInfo1: typeof item.npcInfo1 === 'string' ? item.npcInfo1 : null,

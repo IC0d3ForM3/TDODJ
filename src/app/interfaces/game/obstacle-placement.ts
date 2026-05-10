@@ -5,9 +5,11 @@ export interface ObstaclePlacement extends BasePlacement {
   name: string;
   note: string;
   imageId: number | null;
+  textImageId?: number | null;
   hp: number;
   isIndestructible: boolean;
   containsItemId: number | null;
+  requiredKeyId?: number | null;
   shape: 'circle' | 'square';               // circle = pillar/cylinder; square = filled box
   heightPercent: number;                        // 1–100 (100 = floor to ceiling)
   heightAnchor: 'floor' | 'ceiling';            // only matters if heightPercent < 100
@@ -17,5 +19,6 @@ export interface ObstaclePlacement extends BasePlacement {
   // runtime game state (mutable during play, persisted with save):
   currentHp?: number;
   isDestroyed?: boolean;
+  isOpened?: boolean;
   itemTaken?: boolean;
 }

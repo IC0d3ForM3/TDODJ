@@ -27,6 +27,8 @@ export interface Monster {
   magic: number;
   magicResistance: number;
   callsReinforcements: boolean;
+  reinforcementCount: number;
+  reinforcementMonsterName: string | null;
   toHitPlusNeeded: number;
   npcGreeting: string | null;
   npcInfo1: string | null;

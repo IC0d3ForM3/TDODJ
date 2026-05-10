@@ -254,8 +254,27 @@
         <div class="mn-check-row">
           <input type="checkbox" id="monsterCallsReinforcements" formControlName="callsReinforcements" />
           <label for="monsterCallsReinforcements">Calls Reinforcements</label>
-          <small class="mn-hint">Uses first combat turn to wake dormant monsters nearby.</small>
+          <small class="mn-hint">Uses first combat turn to call additional enemies into the fight.</small>
         </div>
+
+        @if (userMonsterForm.controls.callsReinforcements.value) {
+          <div class="mn-form-grid">
+            <label class="mn-field">
+              <span>Reinforcement Count</span>
+              <input type="number" formControlName="reinforcementCount" min="1" max="12" />
+            </label>
+            <label class="mn-field mn-field-wide">
+              <span>Reinforcement Monster</span>
+              <select formControlName="reinforcementMonsterName">
+                <option [value]="''">Same monster type</option>
+                @for (name of reinforcementMonsterOptions(); track name) {
+                  <option [value]="name">{{ name }}</option>
+                }
+              </select>
+              <small class="mn-hint">Choose which monster name to summon. If left as same type, this monster summons copies of itself.</small>
+            </label>
+          </div>
+        }
 
         <div class="mn-npc-section">
           <h4 class="mn-npc-title">NPC / Interactive</h4>

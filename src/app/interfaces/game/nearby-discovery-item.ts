@@ -4,4 +4,5 @@ export interface NearbyDiscoveryItem {
   description: string;
   row: number;
   column: number;
+  imageSrc?: string | null;
 }

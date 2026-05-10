@@ -177,6 +177,28 @@ interface GridPlacedItem {
   refId: number;
 }
 
+interface GenerateMonsterRequest {
+  monsterDbId: number;
+  count: number;
+}
+
+interface GenerateItemRequest {
+  itemDbId: number;
+  count: number;
+}
+
+interface GenerateMonsterBatch {
+  monsterDbId: number;
+  monsterName: string;
+  count: number;
+}
+
+interface GenerateItemBatch {
+  itemDbId: number;
+  itemName: string;
+  count: number;
+}
+
 @Component({
   selector: 'app-creator',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -237,6 +259,11 @@ export class Creator implements OnInit {
   get isMoveMode() { return this.placementService.isMoveMode; }
   readonly hasUnsavedDungonJson = signal(false);
   readonly isSavingDungonJson = signal(false);
+  readonly isGenerateDialogVisible = signal(false);
+  readonly isGeneratingDungon = signal(false);
+  readonly isGenerateAnchorPickMode = signal(false);
+  readonly generateAnchorSquare = signal<{ row: number; column: number } | null>(null);
+  readonly generateDungonError = signal<string | null>(null);
   get isPublishingDungon() { return this.publishService.isPublishingDungon; }
   get isPublishDialogVisible() { return this.publishService.isPublishDialogVisible; }
   get savedPublishUpdatesByDungon() { return this.publishService.savedPublishUpdatesByDungon; }
@@ -598,6 +625,13 @@ export class Creator implements OnInit {
     imageId: new FormControl<number | null>(null),
   });
 
+  readonly generateMonsterSelection = signal<number | null>(null);
+  readonly generateMonsterCount = signal(1);
+  readonly generateMonsterBatches = signal<GenerateMonsterBatch[]>([]);
+  readonly generateItemSelection = signal<number | null>(null);
+  readonly generateItemCount = signal(1);
+  readonly generateItemBatches = signal<GenerateItemBatch[]>([]);
+
   readonly doorForm = new FormGroup({
     state: new FormControl<'open' | 'closed'>('closed', { nonNullable: true }),
     hp: new FormControl<number>(10, {
@@ -706,9 +740,11 @@ export class Creator implements OnInit {
     name: new FormControl<string>('', { nonNullable: true }),
     note: new FormControl<string>('', { nonNullable: true }),
     imageId: new FormControl<number | null>(null),
+    textImageId: new FormControl<number | null>(null),
     hp: new FormControl<number>(10, { nonNullable: true }),
     isIndestructible: new FormControl<boolean>(false, { nonNullable: true }),
     containsItemId: new FormControl<number | null>(null),
+    requiredKeyId: new FormControl<number | null>(null),
     shape: new FormControl<'circle' | 'square'>('circle', { nonNullable: true }),
     heightPercent: new FormControl<number>(100, { nonNullable: true }),
     heightAnchor: new FormControl<'floor' | 'ceiling'>('floor', { nonNullable: true }),
@@ -1421,9 +1457,11 @@ export class Creator implements OnInit {
         name: 'Ye Old magice shop',
         note: this.buildShopConfigNote(),
         imageId: null,
+        textImageId: null,
         hp: 10,
         isIndestructible: false,
         containsItemId: null,
+        requiredKeyId: null,
         shape: 'square',
         heightPercent: 100,
         heightAnchor: 'floor',
@@ -1438,9 +1476,11 @@ export class Creator implements OnInit {
       name: '',
       note: '',
       imageId: null,
+      textImageId: null,
       hp: 10,
       isIndestructible: false,
       containsItemId: null,
+      requiredKeyId: null,
       shape: 'circle',
       heightPercent: 100,
       heightAnchor: 'floor',
@@ -1457,8 +1497,11 @@ export class Creator implements OnInit {
 
     const controls = this.obstacleForm.controls;
     const rawImageId = controls.imageId.value;
+    const rawTextImageId = controls.textImageId.value;
     const rawContainsItemId = controls.containsItemId.value;
+    const rawRequiredKeyId = controls.requiredKeyId.value;
     const normalizedContainsItemId = rawContainsItemId !== null ? (Number(rawContainsItemId) || null) : null;
+    const normalizedRequiredKeyId = rawRequiredKeyId !== null ? (Number(rawRequiredKeyId) || null) : null;
     const obstacleName = controls.name.value.trim() || 'Obstacle';
 
     if (
@@ -1492,9 +1535,11 @@ export class Creator implements OnInit {
                 name: obstacleName,
                 note: controls.note.value.trim(),
                 imageId: rawImageId !== null ? (Number(rawImageId) || null) : null,
+                textImageId: rawTextImageId !== null ? (Number(rawTextImageId) || null) : null,
                 hp: Math.max(1, controls.hp.value),
                 isIndestructible: controls.isIndestructible.value,
                 containsItemId: normalizedContainsItemId,
+                requiredKeyId: normalizedRequiredKeyId,
                 heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
                 heightAnchor: controls.heightAnchor.value,
                 widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
@@ -1514,9 +1559,11 @@ export class Creator implements OnInit {
         name: obstacleName,
         note: controls.note.value.trim(),
         imageId: rawImageId !== null ? (Number(rawImageId) || null) : null,
+        textImageId: rawTextImageId !== null ? (Number(rawTextImageId) || null) : null,
         hp: Math.max(1, controls.hp.value),
         isIndestructible: controls.isIndestructible.value,
         containsItemId: normalizedContainsItemId,
+        requiredKeyId: normalizedRequiredKeyId,
         heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
         heightAnchor: controls.heightAnchor.value,
         widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
@@ -1525,6 +1572,7 @@ export class Creator implements OnInit {
         shape: controls.shape.value,
         currentHp: Math.max(1, controls.hp.value),
         isDestroyed: false,
+        isOpened: false,
         itemTaken: false,
       };
       this.nextObstacleId += 1;
@@ -1581,9 +1629,11 @@ export class Creator implements OnInit {
         name: obstacle.name,
         note: obstacle.note,
         imageId: obstacle.imageId,
+        textImageId: obstacle.textImageId ?? null,
         hp: obstacle.hp,
         isIndestructible: obstacle.isIndestructible,
         containsItemId: obstacle.containsItemId,
+        requiredKeyId: obstacle.requiredKeyId ?? null,
         shape: obstacle.shape ?? 'circle',
         heightPercent: obstacle.heightPercent ?? 100,
         heightAnchor: obstacle.heightAnchor ?? 'floor',
@@ -1614,9 +1664,11 @@ export class Creator implements OnInit {
       name: obstacle.name,
       note: obstacle.note,
       imageId: obstacle.imageId,
+      textImageId: obstacle.textImageId ?? null,
       hp: obstacle.hp,
       isIndestructible: obstacle.isIndestructible,
       containsItemId: obstacle.containsItemId,
+      requiredKeyId: obstacle.requiredKeyId ?? null,
       shape: obstacle.shape ?? 'circle',
       heightPercent: obstacle.heightPercent ?? 100,
       heightAnchor: obstacle.heightAnchor ?? 'floor',
@@ -1632,8 +1684,11 @@ export class Creator implements OnInit {
     if (!pending) return;
     const controls = this.obstacleForm.controls;
     const rawImageId = controls.imageId.value;
+    const rawTextImageId = controls.textImageId.value;
     const rawContainsItemId = controls.containsItemId.value;
+    const rawRequiredKeyId = controls.requiredKeyId.value;
     const normalizedContainsItemId = rawContainsItemId !== null ? (Number(rawContainsItemId) || null) : null;
+    const normalizedRequiredKeyId = rawRequiredKeyId !== null ? (Number(rawRequiredKeyId) || null) : null;
     this.copyObstacleSource.set({
       id: -1,
       row: pending.row,
@@ -1641,9 +1696,11 @@ export class Creator implements OnInit {
       name: controls.name.value.trim() || 'Obstacle',
       note: controls.note.value.trim(),
       imageId: rawImageId !== null ? (Number(rawImageId) || null) : null,
+      textImageId: rawTextImageId !== null ? (Number(rawTextImageId) || null) : null,
       hp: Math.max(1, controls.hp.value),
       isIndestructible: controls.isIndestructible.value,
       containsItemId: normalizedContainsItemId,
+      requiredKeyId: normalizedRequiredKeyId,
       heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
       heightAnchor: controls.heightAnchor.value,
       widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
@@ -1652,6 +1709,7 @@ export class Creator implements OnInit {
       shape: controls.shape.value,
       currentHp: Math.max(1, controls.hp.value),
       isDestroyed: false,
+      isOpened: false,
       itemTaken: false,
     });
     this.isCopyObstacleMode.set(true);
@@ -2231,6 +2289,25 @@ export class Creator implements OnInit {
 
     this.selectedKeyIdForPlacement.set(keyId);
     this.isKaysDialogVisible.set(false);
+  }
+
+  createObstacleRequiredKey(): void {
+    const obstacleName = (this.obstacleForm.controls.name.value || '').trim();
+    const keyName = obstacleName ? `${obstacleName} Key` : 'Obstacle Key';
+    const key: Key = {
+      id: this.nextKeyId,
+      name: keyName,
+      description: obstacleName ? `Opens ${obstacleName}.` : 'Opens an obstacle.',
+      doorId: null,
+      rownId: null,
+      columnId: null,
+    };
+
+    this.nextKeyId += 1;
+    this.keyList = [...this.keyList, key];
+    this.obstacleForm.patchValue({ requiredKeyId: key.id });
+    this.markDungonJsonChanged();
+    this.previewActionMessage.set(`Created key: ${key.name}`);
   }
 
   cancelKeyPlacement(): void {
@@ -3878,6 +3955,11 @@ export class Creator implements OnInit {
       magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.magicResistance), 0)),
       spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.spReward), 0)),
       callsReinforcements: libraryMonster.callsReinforcements === true,
+      reinforcementCount: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.reinforcementCount), 0)),
+      reinforcementMonsterName:
+        typeof libraryMonster.reinforcementMonsterName === 'string' && libraryMonster.reinforcementMonsterName.trim()
+          ? libraryMonster.reinforcementMonsterName.trim()
+          : null,
       toHitPlusNeeded: Math.max(0, libraryMonster.toHitPlusNeeded ?? 0),
       npcGreeting: libraryMonster.npcGreeting ?? null,
       npcInfo1: libraryMonster.npcInfo1 ?? null,
@@ -4012,6 +4094,8 @@ export class Creator implements OnInit {
       magicResistance: 0,
       spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.spReward?.value), 0)),
       callsReinforcements: false,
+      reinforcementCount: 0,
+      reinforcementMonsterName: null,
       toHitPlusNeeded: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.toHitPlusNeeded?.value), 0)),
       npcGreeting: null,
       npcInfo1: null,
@@ -5208,6 +5292,318 @@ export class Creator implements OnInit {
       });
   }
 
+  openGenerateDungonDialog(): void {
+    const selected = this.selectedDungon();
+    if (!selected) {
+      const message = 'Select a dungeon first.';
+      this.generateDungonError.set(message);
+      this.previewActionMessage.set(message);
+      return;
+    }
+
+    const precheckError = this.getGenerateDungonPrecheckError();
+    if (precheckError) {
+      this.generateDungonError.set(precheckError);
+      this.previewActionMessage.set(precheckError);
+      return;
+    }
+
+    this.generateDungonError.set(null);
+    this.isGenerateAnchorPickMode.set(true);
+    this.generateAnchorSquare.set(null);
+    this.previewActionMessage.set('Click an open square to anchor where generated monsters are allowed.');
+  }
+
+  cancelGenerateAnchorPickMode(): void {
+    this.isGenerateAnchorPickMode.set(false);
+    this.generateAnchorSquare.set(null);
+    this.previewActionMessage.set(null);
+  }
+
+  private openGenerateDungonDialogForAnchor(anchorRow: number, anchorColumn: number): void {
+    const selected = this.selectedDungon();
+    if (!selected) {
+      this.generateDungonError.set('Select a dungeon first.');
+      return;
+    }
+
+    this.resetGenerateManualSelections();
+    this.generateAnchorSquare.set({ row: anchorRow, column: anchorColumn });
+    this.isGenerateAnchorPickMode.set(false);
+    this.previewActionMessage.set(null);
+    this.generateDungonError.set(null);
+    this.isGenerateDialogVisible.set(true);
+  }
+
+  closeGenerateDungonDialog(): void {
+    this.isGenerateDialogVisible.set(false);
+    this.isGenerateAnchorPickMode.set(false);
+    this.generateDungonError.set(null);
+    this.resetGenerateManualSelections();
+  }
+
+  private resetGenerateManualSelections(): void {
+    this.generateMonsterSelection.set(null);
+    this.generateMonsterCount.set(1);
+    this.generateMonsterBatches.set([]);
+    this.generateItemSelection.set(null);
+    this.generateItemCount.set(1);
+    this.generateItemBatches.set([]);
+  }
+
+  private getGenerateDungonPrecheckError(): string | null {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) {
+      return 'Select a dungeon first.';
+    }
+
+    const filledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
+    if (Object.keys(filledSquares).length === 0) {
+      return 'Import or draw the dungeon tiles first.';
+    }
+
+    const startPoint = this.startPointByDungon()[dungonId] ?? null;
+    if (!startPoint) {
+      return 'Set a start point before generating content.';
+    }
+
+    const exits = this.exitsByDungon()[dungonId] ?? [];
+    if (exits.length === 0) {
+      return 'Set an exit before generating content.';
+    }
+
+    return null;
+  }
+
+  generateButtonReason(): string | null {
+    if (this.isGeneratingDungon()) {
+      return 'Generation is already running.';
+    }
+
+    if (this.selectedDungonId() === null) {
+      return 'Select a dungeon first.';
+    }
+
+    return this.getGenerateDungonPrecheckError();
+  }
+
+  generateDungonWithAi(): void {
+    if (this.isGeneratingDungon()) {
+      return;
+    }
+
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) {
+      this.generateDungonError.set('Select a dungeon first.');
+      return;
+    }
+
+    const precheckError = this.getGenerateDungonPrecheckError();
+    if (precheckError) {
+      this.generateDungonError.set(precheckError);
+      return;
+    }
+
+    const userKey = this.account.getKey();
+    if (!userKey) {
+      this.generateDungonError.set('You must be logged in to generate a dungeon.');
+      return;
+    }
+
+    const monsterRequests: GenerateMonsterRequest[] = this.generateMonsterBatches().map((batch) => ({
+      monsterDbId: batch.monsterDbId,
+      count: batch.count,
+    }));
+    const itemRequests: GenerateItemRequest[] = this.generateItemBatches().map((batch) => ({
+      itemDbId: batch.itemDbId,
+      count: batch.count,
+    }));
+
+    if (monsterRequests.length === 0 && itemRequests.length === 0) {
+      this.generateDungonError.set('Add at least one monster or item batch first.');
+      return;
+    }
+
+    const selected = this.selectedDungon();
+    const name = selected?.name?.trim() || 'Filled Dungeon';
+    const anchorSquare = this.generateAnchorSquare();
+
+    if (!anchorSquare) {
+      this.generateDungonError.set('Click +Generate and pick an open square first.');
+      return;
+    }
+
+    const filledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
+    if (!filledSquares[this.getSquareKey(anchorSquare.row, anchorSquare.column)]) {
+      this.generateDungonError.set('Selected anchor square is no longer open. Pick another square.');
+      return;
+    }
+
+    this.generateDungonError.set(null);
+    this.isGeneratingDungon.set(true);
+
+    this.http
+      .post<{ dungonJson?: unknown; error?: string }>(
+        `${API_BASE_URL}/dungons/${dungonId}/generate`,
+        {
+          userkey: userKey,
+          name,
+          story: selected?.description?.trim() || selected?.intro?.trim() || 'Manual fill run',
+          inhabitants: 'manual fill',
+          treasureStyle: 'manual',
+          obstacleStyle: 'manual',
+          level: 0,
+          monsterRequests,
+          itemRequests,
+          anchorRow: anchorSquare.row,
+          anchorColumn: anchorSquare.column,
+        }
+      )
+      .pipe(finalize(() => this.isGeneratingDungon.set(false)))
+      .subscribe({
+        next: (response) => {
+          if (!response.dungonJson) {
+            this.generateDungonError.set(response.error || 'Generation returned no dungeon payload.');
+            return;
+          }
+
+          this.loadDungonJsonState(dungonId, response.dungonJson);
+          this.markDungonJsonChanged();
+          this.saveDungonJson();
+          this.previewActionMessage.set('Dungeon content filled in the selected area.');
+          this.closeGenerateDungonDialog();
+        },
+        error: (errorResponse) => {
+          const errorMessage =
+            typeof errorResponse?.error?.error === 'string'
+              ? errorResponse.error.error
+              : 'Failed to generate dungeon.';
+          this.generateDungonError.set(errorMessage);
+        },
+      });
+  }
+
+  setGenerateMonsterSelection(rawValue: string): void {
+    const parsed = Number.parseInt(rawValue, 10);
+    this.generateMonsterSelection.set(Number.isInteger(parsed) && parsed > 0 ? parsed : null);
+  }
+
+  setGenerateMonsterCount(rawValue: string): void {
+    const parsed = Number.parseInt(rawValue, 10);
+    this.generateMonsterCount.set(Number.isInteger(parsed) && parsed > 0 ? parsed : 1);
+  }
+
+  addGenerateMonsterBatch(): void {
+    const monsterId = this.generateMonsterSelection();
+    const count = this.generateMonsterCount();
+    if (!monsterId || count < 1) {
+      this.generateDungonError.set('Select a monster and set a count greater than 0.');
+      return;
+    }
+
+    const monster = this.monsterLibrary().find((entry) => entry.id === monsterId);
+    if (!monster) {
+      this.generateDungonError.set('Selected monster is not available.');
+      return;
+    }
+
+    this.generateDungonError.set(null);
+    this.generateMonsterBatches.update((batches) => {
+      const existing = batches.find((batch) => batch.monsterDbId === monsterId);
+      if (existing) {
+        return batches.map((batch) => (
+          batch.monsterDbId === monsterId
+            ? { ...batch, count: batch.count + count }
+            : batch
+        ));
+      }
+      return [...batches, { monsterDbId: monsterId, monsterName: monster.name, count }];
+    });
+    this.generateMonsterCount.set(1);
+  }
+
+  removeGenerateMonsterBatch(monsterDbId: number): void {
+    this.generateMonsterBatches.update((batches) => batches.filter((batch) => batch.monsterDbId !== monsterDbId));
+  }
+
+  setGenerateItemSelection(rawValue: string): void {
+    const parsed = Number.parseInt(rawValue, 10);
+    this.generateItemSelection.set(Number.isInteger(parsed) && parsed > 0 ? parsed : null);
+  }
+
+  setGenerateItemCount(rawValue: string): void {
+    const parsed = Number.parseInt(rawValue, 10);
+    this.generateItemCount.set(Number.isInteger(parsed) && parsed > 0 ? parsed : 1);
+  }
+
+  addGenerateItemBatch(): void {
+    const itemId = this.generateItemSelection();
+    const count = this.generateItemCount();
+    if (!itemId || count < 1) {
+      this.generateDungonError.set('Select an item and set a count greater than 0.');
+      return;
+    }
+
+    const item = this.libItems().find((entry) => entry.id === itemId);
+    if (!item) {
+      this.generateDungonError.set('Selected item is not available.');
+      return;
+    }
+
+    this.generateDungonError.set(null);
+    this.generateItemBatches.update((batches) => {
+      const existing = batches.find((batch) => batch.itemDbId === itemId);
+      if (existing) {
+        return batches.map((batch) => (
+          batch.itemDbId === itemId
+            ? { ...batch, count: batch.count + count }
+            : batch
+        ));
+      }
+      return [...batches, { itemDbId: itemId, itemName: item.name, count }];
+    });
+    this.generateItemCount.set(1);
+  }
+
+  removeGenerateItemBatch(itemDbId: number): void {
+    this.generateItemBatches.update((batches) => batches.filter((batch) => batch.itemDbId !== itemDbId));
+  }
+
+  private syncDungonNameAfterGenerate(name: string, userKey: string): void {
+    const selected = this.selectedDungon();
+    if (!selected) {
+      return;
+    }
+
+    const trimmedName = name.trim();
+    if (!trimmedName || trimmedName === selected.name) {
+      return;
+    }
+
+    this.http
+      .put<{ result: number; dungon?: DungonDetails }>(
+        `${API_BASE_URL}/dungons/${selected.id}/metadata`,
+        {
+          userkey: userKey,
+          name: trimmedName,
+          description: selected.description ?? '',
+          intro: selected.intro ?? '',
+          minsplifetime: selected.minsplifetime,
+          maxsplifetime: selected.maxsplifetime,
+          ...(this.account.isAdmin() && { resettable_per_pc: selected.resettable_per_pc }),
+          imageid: selected.imageid ?? null,
+        }
+      )
+      .subscribe({
+        next: (response) => {
+          if (response.result === 1 && response.dungon) {
+            this.selectedDungon.set(response.dungon);
+            this.loadDungons();
+          }
+        },
+      });
+  }
+
   publishDungon(): void {
     if (this.isPublishingDungon()) {
       return;
@@ -5344,6 +5740,16 @@ export class Creator implements OnInit {
     const filledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
     const isFilledSquare = Boolean(filledSquares[squareKey]);
     const selections = this.openBlockSelections();
+
+    if (this.isGenerateAnchorPickMode()) {
+      if (!isFilledSquare) {
+        this.previewActionMessage.set('Pick an open square to anchor generated monster placement.');
+        return;
+      }
+
+      this.openGenerateDungonDialogForAnchor(row, column);
+      return;
+    }
 
     if (this.isCopyObstacleMode()) {
       if (isFilledSquare) {
@@ -5740,6 +6146,8 @@ export class Creator implements OnInit {
     this.isPublishDialogVisible.set(false);
     this.exitDialogError.set(null);
     this.previewActionMessage.set(null);
+    this.isGenerateAnchorPickMode.set(false);
+    this.generateAnchorSquare.set(null);
     this.hasUnsavedDungonJson.set(false);
     this.isKaysDialogVisible.set(false);
     this.isWhiteSpacePreviewPickMode.set(false);
@@ -7101,6 +7509,12 @@ export class Creator implements OnInit {
       magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magicResistance), 0)),
       spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.spReward), 0)),
       callsReinforcements: (source as Record<string, unknown>)['callsReinforcements'] === true,
+      reinforcementCount: Math.max(0, this.normalizeNumber(this.toFiniteNumber((source as Record<string, unknown>)['reinforcementCount']), 0)),
+      reinforcementMonsterName:
+        typeof (source as Record<string, unknown>)['reinforcementMonsterName'] === 'string' &&
+        String((source as Record<string, unknown>)['reinforcementMonsterName']).trim()
+          ? String((source as Record<string, unknown>)['reinforcementMonsterName']).trim()
+          : null,
       toHitPlusNeeded: Math.max(0, this.normalizeNumber(this.toFiniteNumber((source as Record<string, unknown>)['toHitPlusNeeded']), 0)),
       npcGreeting: typeof (source as Record<string, unknown>)['npcGreeting'] === 'string' && (source as Record<string, unknown>)['npcGreeting'] ? (source as Record<string, unknown>)['npcGreeting'] as string : null,
       npcInfo1: typeof (source as Record<string, unknown>)['npcInfo1'] === 'string' && (source as Record<string, unknown>)['npcInfo1'] ? (source as Record<string, unknown>)['npcInfo1'] as string : null,

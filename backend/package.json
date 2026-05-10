@@ -1,6 +1,6 @@
 {
   "name": "danddanny-backend",
-  "version": "1.0.0",
+  "version": "0.0.2",
   "description": "Node API for Angular frontend",
   "main": "dist/index.js",
   "scripts": {
@@ -27,6 +27,7 @@
     "express": "^4.18.2",
     "express-rate-limit": "^8.3.2",
     "multer": "^1.4.5-lts.2",
+    "openai": "^6.37.0",
     "pg": "^8.10.0"
   },
   "devDependencies": {

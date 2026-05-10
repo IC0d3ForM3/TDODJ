@@ -869,17 +869,6 @@ export class Game implements OnInit {
       setSquareImage(squareKey, itemImageId);
     }
 
-    for (const obstacle of this.obstaclePlacementsByDungon()[preview.dungonId] ?? []) {
-      if (obstacle.isDestroyed || obstacle.itemTaken || obstacle.containsItemId === null) {
-        continue;
-      }
-
-      const squareKey = this.getSquareKey(obstacle.row, obstacle.column);
-      const item = itemsById.get(obstacle.containsItemId);
-      const itemImageId = (item as { imageId?: number | null } | undefined)?.imageId ?? null;
-      setSquareImage(squareKey, itemImageId);
-    }
-
     return imageBySquare;
   }
 
@@ -2760,18 +2749,32 @@ export class Game implements OnInit {
       });
     }
 
+    this.obstacleImageCacheVersion();
     for (const obs of this.obstaclePlacementsByDungon()[preview.dungonId] ?? []) {
       if (obs.isDestroyed) continue;
       if (!isRelevantSquare(obs.row, obs.column)) continue;
-      const itemNote = obs.containsItemId !== null && !obs.itemTaken ? ' [Contains an item]' : '';
       const hpNote = obs.isIndestructible ? ' (Indestructible)' : ` (HP: ${obs.currentHp ?? obs.hp}/${obs.hp})`;
       items.push({
         kind: 'Obstacle',
         name: obs.name || 'Obstacle',
-        description: (obs.note ? obs.note : 'No description.') + hpNote + itemNote,
+        description: hpNote,
         row: obs.row,
         column: obs.column,
       });
+
+      const obstacleText = (obs.note ?? '').trim();
+      if (obstacleText) {
+        const textImageId = obs.textImageId ?? obs.imageId ?? null;
+        const textImage = textImageId !== null ? this.obstacleImageCache.get(textImageId) ?? null : null;
+        items.push({
+          kind: 'Text',
+          name: obs.name ? `${obs.name} Note` : 'Wall Note',
+          description: obstacleText,
+          row: obs.row,
+          column: obs.column,
+          imageSrc: textImage?.src ?? null,
+        });
+      }
     }
 
     return items.sort((left, right) => {
@@ -3315,7 +3318,7 @@ export class Game implements OnInit {
     this.obstaclePlacementsByDungon.update((all) => ({
       ...all,
       [preview.dungonId]: (all[preview.dungonId] ?? []).map((o) =>
-        o.id === obstacleId ? { ...o, currentHp: newHp, isDestroyed: destroyed } : o
+        o.id === obstacleId ? { ...o, currentHp: newHp, isDestroyed: destroyed, isOpened: destroyed || o.isOpened } : o
       ),
     }));
 
@@ -3326,6 +3329,12 @@ export class Game implements OnInit {
         [preview.dungonId]: [...(all[preview.dungonId] ?? []), { itemId: obs.containsItemId!, row: obs.row, column: obs.column }],
       }));
       this.addCombatLog(`An item falls from the rubble of ${obs.name || 'the obstacle'}!`);
+      this.obstaclePlacementsByDungon.update((all) => ({
+        ...all,
+        [preview.dungonId]: (all[preview.dungonId] ?? []).map((o) =>
+          o.id === obstacleId ? { ...o, itemTaken: true, isOpened: true } : o
+        ),
+      }));
     }
 
     this.consumePlayerAE(1, preview.dungonId);
@@ -3344,6 +3353,10 @@ export class Game implements OnInit {
     const obstacles = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
     const obs = obstacles.find((o) => o.id === obstacleId);
     if (!obs || obs.containsItemId === null || obs.itemTaken) return;
+    if (!obs.isDestroyed && !obs.isOpened) {
+      this.previewActionMessage.set('Open this obstacle first.');
+      return;
+    }
 
     this.obstaclePlacementsByDungon.update((all) => ({
       ...all,
@@ -3372,8 +3385,57 @@ export class Game implements OnInit {
     if (!fwd) return null;
     const obstacles = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
     return obstacles.find(
-      (o) => !o.isDestroyed && o.row === fwd.row && o.column === fwd.column && o.containsItemId !== null && !o.itemTaken
+      (o) => !o.isDestroyed && o.row === fwd.row && o.column === fwd.column && o.containsItemId !== null && !o.itemTaken && o.isOpened === true
     ) ?? null;
+  }
+
+  openObstacle(obstacleId: number): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0 || this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to open obstacle.');
+      return;
+    }
+
+    const obstacles = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
+    const obs = obstacles.find((o) => o.id === obstacleId);
+    if (!obs || obs.isDestroyed || obs.containsItemId === null || obs.itemTaken) return;
+
+    const requiredKeyId = obs.requiredKeyId ?? null;
+    if (requiredKeyId !== null && !this.inventoryKeysForPreview().some((key) => key.id === requiredKeyId)) {
+      const requiredKeyName = this.keyList.find((key) => key.id === requiredKeyId)?.name || `Key #${requiredKeyId}`;
+      this.previewActionMessage.set(`You need ${requiredKeyName} to open this obstacle.`);
+      return;
+    }
+
+    this.obstaclePlacementsByDungon.update((all) => ({
+      ...all,
+      [preview.dungonId]: (all[preview.dungonId] ?? []).map((o) =>
+        o.id === obstacleId ? { ...o, isOpened: true, itemTaken: true } : o
+      ),
+    }));
+
+    this.floorItemPlacementsByDungon.update((all) => ({
+      ...all,
+      [preview.dungonId]: [...(all[preview.dungonId] ?? []), { itemId: obs.containsItemId!, row: obs.row, column: obs.column }],
+    }));
+
+    const itemName = (this.floorItemListByDungon()[preview.dungonId] ?? []).find((i) => i.id === obs.containsItemId)?.name ?? 'an item';
+    this.previewActionMessage.set(`${obs.name || 'Obstacle'} opened. ${itemName} is now visible.`);
+    this.addCombatLog(`Opened ${obs.name || 'obstacle'} and revealed ${itemName}.`);
+    this.consumePlayerAE(1, preview.dungonId);
+    this.saveGameState();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
+  }
+
+  obstacleRequiresKeyLabel(obstacle: ObstaclePlacement): string | null {
+    const requiredKeyId = obstacle.requiredKeyId ?? null;
+    if (requiredKeyId === null) {
+      return null;
+    }
+
+    const key = this.keyList.find((entry) => entry.id === requiredKeyId);
+    return key?.name?.trim() || `Key #${requiredKeyId}`;
   }
 
   examineObstacle(obstacleId: number): void {
@@ -4269,6 +4331,9 @@ export class Game implements OnInit {
     for (const p of placements) {
       if (p.imageId !== null && !this.obstacleImageCache.has(p.imageId)) {
         imageIds.add(p.imageId);
+      }
+      if (p.textImageId !== null && p.textImageId !== undefined && !this.obstacleImageCache.has(p.textImageId)) {
+        imageIds.add(p.textImageId);
       }
     }
     if (imageIds.size === 0) return;
@@ -9361,6 +9426,12 @@ export class Game implements OnInit {
       magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magic), 0)),
       magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magicResistance), 0)),
       callsReinforcements: (source as Record<string, unknown>)['callsReinforcements'] === true,
+      reinforcementCount: Math.max(0, this.normalizeNumber(this.toFiniteNumber((source as Record<string, unknown>)['reinforcementCount']), 0)),
+      reinforcementMonsterName:
+        typeof (source as Record<string, unknown>)['reinforcementMonsterName'] === 'string' &&
+        String((source as Record<string, unknown>)['reinforcementMonsterName']).trim()
+          ? String((source as Record<string, unknown>)['reinforcementMonsterName']).trim()
+          : null,
       toHitPlusNeeded: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.toHitPlusNeeded), 0)),
       npcGreeting: typeof source.npcGreeting === 'string' && source.npcGreeting.trim() ? source.npcGreeting : null,
       npcInfo1: typeof source.npcInfo1 === 'string' && source.npcInfo1.trim() ? source.npcInfo1 : null,
@@ -12279,14 +12350,12 @@ export class Game implements OnInit {
       if (template.callsReinforcements && !monster.hasCalledReinforcements && canDetectPlayer) {
         monster.hasCalledReinforcements = true;
         monster.remainingAE = 0;
-        this.addCombatLog(`${template.name} calls for reinforcements!`);
-        for (const other of instances) {
-          if (other !== monster && !other.isDead && other.isDormant) {
-            other.isDormant = false;
-            const otherTpl = monstersById.get(other.monsterId);
-            other.remainingAE = otherTpl ? Math.max(0, this.getEffectiveMonsterStamina(other, otherTpl) + this.getEffectiveMonsterNumberOfAttacks(other, otherTpl)) : 0;
-            other.hasCastSpellThisTurn = false;
-          }
+        const spawnedCount = this.spawnConfiguredReinforcements(monster, template, instances, monstersById, dungonId);
+        if (spawnedCount > 0) {
+          const reinforcementLabel = this.resolveReinforcementTemplate(template, monstersById)?.name ?? template.name;
+          this.addCombatLog(`${template.name} calls ${spawnedCount} ${reinforcementLabel}${spawnedCount === 1 ? '' : 's'} for reinforcements!`);
+        } else {
+          this.addCombatLog(`${template.name} calls for reinforcements, but none can reach the battlefield.`);
         }
         continue;
       }
@@ -12627,6 +12696,140 @@ export class Game implements OnInit {
       }
     }
     monster.remainingAE = 0;
+  }
+
+  private resolveReinforcementTemplate(template: Monster, monstersById: Map<number, Monster>): Monster | null {
+    const preferredName = (template.reinforcementMonsterName ?? '').trim().toLowerCase();
+    if (!preferredName) {
+      return template;
+    }
+
+    for (const candidate of monstersById.values()) {
+      if (candidate.name.trim().toLowerCase() === preferredName) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  private spawnConfiguredReinforcements(
+    caller: GameMonsterInstance,
+    callerTemplate: Monster,
+    instances: GameMonsterInstance[],
+    monstersById: Map<number, Monster>,
+    dungonId: number
+  ): number {
+    const reinforcementTemplate = this.resolveReinforcementTemplate(callerTemplate, monstersById);
+    if (!reinforcementTemplate) {
+      return 0;
+    }
+
+    const requestedCount = Math.max(1, callerTemplate.reinforcementCount || 1);
+    const spawnLimit = Math.min(requestedCount, 12);
+    const candidates: Array<{ row: number; column: number }> = [];
+
+    for (let ring = 1; ring <= 4; ring += 1) {
+      for (let rowOffset = -ring; rowOffset <= ring; rowOffset += 1) {
+        for (let colOffset = -ring; colOffset <= ring; colOffset += 1) {
+          if (Math.max(Math.abs(rowOffset), Math.abs(colOffset)) !== ring) {
+            continue;
+          }
+          const row = caller.row + rowOffset;
+          const column = caller.column + colOffset;
+          if (this.canSpawnMonsterAtSquare(dungonId, row, column, instances, candidates)) {
+            candidates.push({ row, column });
+          }
+        }
+      }
+    }
+
+    const shuffled = this.shuffleCoordinates(candidates);
+    let spawned = 0;
+
+    for (const target of shuffled) {
+      if (spawned >= spawnLimit) {
+        break;
+      }
+
+      instances.push({
+        placementIndex: instances.length,
+        monsterId: reinforcementTemplate.id,
+        row: target.row,
+        column: target.column,
+        roam: false,
+        currentHp: reinforcementTemplate.hp,
+        currentMagic: reinforcementTemplate.magic,
+        permanentStatModifiers: {},
+        isDead: false,
+        remainingAE: 0,
+        attacksUsedThisTurn: 0,
+        hasCastSpellThisTurn: false,
+        dropTresherIds: [],
+        dropKeyIds: [],
+        dropItemIds: [],
+        dropSpellIds: [],
+        dropPotionIds: [],
+        activeEffects: [],
+        isDormant: false,
+        guardRow: null,
+        guardColumn: null,
+        isStationary: false,
+        stationaryTriggerRow: null,
+        stationaryTriggerCol: null,
+        noAttackUnlessAttacked: reinforcementTemplate.npcOnlyAttackWhenAttacked,
+        hasCalledReinforcements: false,
+        hasGreeted: false,
+        hasSharedInfo: false,
+        isSpared: false,
+        npcIsHostile: false,
+      });
+
+      spawned += 1;
+    }
+
+    return spawned;
+  }
+
+  private canSpawnMonsterAtSquare(
+    dungonId: number,
+    row: number,
+    column: number,
+    instances: GameMonsterInstance[],
+    reserved: Array<{ row: number; column: number }>
+  ): boolean {
+    if (row < 0 || column < 0 || row >= this.gridRowCount || column >= this.gridColumnCount) {
+      return false;
+    }
+
+    const filledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
+    if (!filledSquares[this.getSquareKey(row, column)]) {
+      return false;
+    }
+
+    const preview = this.gridPreviewContext();
+    if (preview && preview.centerRow === row && preview.centerColumn === column) {
+      return false;
+    }
+
+    if (instances.some((monster) => !monster.isDead && monster.row === row && monster.column === column)) {
+      return false;
+    }
+
+    if (reserved.some((spot) => spot.row === row && spot.column === column)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private shuffleCoordinates<T>(values: T[]): T[] {
+    const shuffled = [...values];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    return shuffled;
   }
 
   private canMonsterMoveTo(

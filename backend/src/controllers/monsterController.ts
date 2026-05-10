@@ -44,6 +44,8 @@ interface MonsterWriteInput {
   magic?: unknown;
   magicResistance?: unknown;
   callsReinforcements?: unknown;
+  reinforcementCount?: unknown;
+  reinforcementMonsterName?: unknown;
   toHitPlusNeeded?: unknown;
   npcGreeting?: unknown;
   npcInfo1?: unknown;
@@ -223,6 +225,11 @@ const normalizeMonsterPayload = (value: unknown): UpsertMonsterPayload | null =>
   );
   const numberOfAttacks = Math.max(0, Math.max(numberOfAttacksInput, attacks.length));
 
+  const callsReinforcements = normalizeBoolean(input.callsReinforcements);
+  const reinforcementCount = callsReinforcements
+    ? Math.max(1, normalizeNumber(input.reinforcementCount, 1))
+    : 0;
+
   return {
     imageId: normalizeNullableNumber(input.imageId ?? input.imageid),
     soundId: normalizeNullableNumber(input.soundId),
@@ -246,7 +253,11 @@ const normalizeMonsterPayload = (value: unknown): UpsertMonsterPayload | null =>
     spReward: Math.max(0, normalizeNumber(input.spReward, 0)),
     magic: Math.max(0, normalizeNumber(input.magic, 0)),
     magicResistance: Math.max(0, normalizeNumber(input.magicResistance, 0)),
-    callsReinforcements: normalizeBoolean(input.callsReinforcements),
+    callsReinforcements,
+    reinforcementCount,
+    reinforcementMonsterName: callsReinforcements
+      ? normalizeNullableText(input.reinforcementMonsterName)
+      : null,
     toHitPlusNeeded: Math.max(0, normalizeNumber(input.toHitPlusNeeded, 0)),
     npcGreeting: normalizeNullableText(input.npcGreeting),
     npcInfo1: normalizeNullableText(input.npcInfo1),
