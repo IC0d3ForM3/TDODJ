@@ -436,6 +436,13 @@
 			<!-- LEFT: library list -->
 			<div class="monster-list-wrap pc-list-panel">
 				<h4 class="dashboard-subtitle pc-panel-title">PC's LIBRARY</h4>
+				<div class="tresher-form-actions" style="margin: 0.35rem 0 0.7rem">
+					@if (!isPcEditorVisible()) {
+						<button type="button" class="dashboard-action-button" (click)="openNewPcEditor()">
+							Add New
+						</button>
+					}
+				</div>
 
 				@if (isLoadingUserPcs()) {
 					<p class="dashboard-message">Loading your PCs...</p>
@@ -492,6 +499,7 @@
 			</div>
 
 			<!-- RIGHT: create / edit form -->
+			@if (isPcEditorVisible()) {
 			<div class="pc-form-wrap">
 			<form class="monster-form" [formGroup]="userPcForm" (ngSubmit)="savePc()">
 				<!-- Identity row -->
@@ -617,7 +625,7 @@
 						<div class="monster-tresher-row">
 							<label class="tresher-field monster-tresher-select">
 								<span>Tresher</span>
-								<select [formControlName]="$index">
+								<select [formControlName]="$index" [compareWith]="compareNullableIds">
 									<option [ngValue]="null">No Tresher</option>
 									@for (tresher of monsterTresherOptions(); track tresher.id) {
 										<option [ngValue]="tresher.id">{{ tresher.name }} (ID {{ tresher.id }})</option>
@@ -815,6 +823,7 @@
 				<p class="dashboard-message" style="margin-top: 0.6rem">{{ userPcSaveMessage() }}</p>
 			}
 			</div><!-- /pc-form-wrap -->
+			}
 
 		</div><!-- /pc-two-panel -->
 	}

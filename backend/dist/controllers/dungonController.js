@@ -42,6 +42,7 @@ const itemService = __importStar(require("../services/itemService"));
 const potionService = __importStar(require("../services/potionService"));
 const spellService = __importStar(require("../services/spellService"));
 const imageService = __importStar(require("../services/imageService"));
+const soundService = __importStar(require("../services/soundService"));
 const userRepository_1 = require("../repositories/userRepository");
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const getPublishedDungons = async (req, res) => {
@@ -740,6 +741,8 @@ const getSampleGameSession = async (req, res) => {
         let pcTresherPotions = [];
         let pcTresherSpells = [];
         let pcImagePath = null;
+        let lootImages = [];
+        let soundPaths = [];
         if (typeof pc.imageId === 'number' && pc.imageId > 0) {
             const pcImages = await imageService.fetchImagesByIds([pc.imageId]);
             const pcImage = pcImages.find((img) => img.id === pc.imageId && typeof img.path === 'string' && img.path.trim().length > 0);
@@ -793,6 +796,7 @@ const getSampleGameSession = async (req, res) => {
                     name: it.name,
                     description: it.description,
                     type: it.type,
+                    imageId: it.imageId,
                     effectValue: it.effectValue,
                     damage: it.damage ?? 0,
                     range: Math.max(1, parseInt(String(it.range), 10) || 1),
@@ -895,6 +899,7 @@ const getSampleGameSession = async (req, res) => {
                         name: it.name,
                         description: it.description,
                         type: it.type,
+                        imageId: it.imageId,
                         effectValue: it.effectValue,
                         damage: it.damage ?? 0,
                         range: Math.max(1, parseInt(String(it.range), 10) || 1),
@@ -908,6 +913,98 @@ const getSampleGameSession = async (req, res) => {
         }
         catch {
             // non-fatal — proceed without dungeon tresher items
+        }
+        // Build a best-effort list of sample asset paths (images/sounds), including private IDs,
+        // so sample mode can render/play assigned assets without user auth.
+        try {
+            const dungonJsonObj = typeof dungon.dungenJson === 'string'
+                ? JSON.parse(dungon.dungenJson)
+                : dungon.dungenJson;
+            const asRecord = (value) => typeof value === 'object' && value !== null ? value : {};
+            const collectNumericIds = (values) => values
+                .map((value) => (typeof value === 'number' ? value : null))
+                .filter((value) => value !== null && Number.isInteger(value) && value > 0);
+            const rawTresherList = Array.isArray(asRecord(dungonJsonObj)['tresherList'])
+                ? asRecord(dungonJsonObj)['tresherList']
+                : Array.isArray(asRecord(dungonJsonObj)['trasherList'])
+                    ? asRecord(dungonJsonObj)['trasherList']
+                    : Array.isArray(asRecord(dungonJsonObj)['tresher'])
+                        ? asRecord(dungonJsonObj)['tresher']
+                        : [];
+            const rawItemList = Array.isArray(asRecord(dungonJsonObj)['itemList'])
+                ? asRecord(dungonJsonObj)['itemList']
+                : Array.isArray(asRecord(dungonJsonObj)['items'])
+                    ? asRecord(dungonJsonObj)['items']
+                    : [];
+            const rawSpellList = Array.isArray(asRecord(dungonJsonObj)['spellList'])
+                ? asRecord(dungonJsonObj)['spellList']
+                : Array.isArray(asRecord(dungonJsonObj)['spells'])
+                    ? asRecord(dungonJsonObj)['spells']
+                    : [];
+            const lootImageIds = new Set();
+            for (const t of pcTreshers) {
+                const id = asRecord(t)['imageId'];
+                if (typeof id === 'number' && id > 0)
+                    lootImageIds.add(id);
+            }
+            for (const it of pcTresherItems) {
+                const id = asRecord(it)['imageId'];
+                if (typeof id === 'number' && id > 0)
+                    lootImageIds.add(id);
+            }
+            for (const raw of rawTresherList) {
+                const row = asRecord(raw);
+                const ids = collectNumericIds([row['imageId'], row['imageid']]);
+                for (const id of ids)
+                    lootImageIds.add(id);
+            }
+            for (const raw of rawItemList) {
+                const row = asRecord(raw);
+                const ids = collectNumericIds([row['imageId'], row['imageid']]);
+                for (const id of ids)
+                    lootImageIds.add(id);
+            }
+            if (lootImageIds.size > 0) {
+                const images = await imageService.fetchImagesByIds(Array.from(lootImageIds));
+                lootImages = images
+                    .filter((img) => typeof img.path === 'string' && img.path.trim().length > 0)
+                    .map((img) => ({ id: img.id, path: img.path }));
+            }
+            const spellSoundIds = new Set();
+            for (const spell of pcTresherSpells) {
+                const soundId = asRecord(spell)['soundId'];
+                if (typeof soundId === 'number' && soundId > 0) {
+                    spellSoundIds.add(soundId);
+                }
+            }
+            for (const raw of rawSpellList) {
+                const row = asRecord(raw);
+                const ids = collectNumericIds([row['soundId'], row['soundid']]);
+                for (const id of ids)
+                    spellSoundIds.add(id);
+            }
+            if (spellSoundIds.size > 0) {
+                const sounds = await soundService.fetchSoundsByIds(Array.from(spellSoundIds));
+                const pathById = new Map();
+                soundPaths = sounds
+                    .filter((sound) => typeof sound.path === 'string' && sound.path.trim().length > 0)
+                    .map((sound) => {
+                    const path = sound.path.trim();
+                    pathById.set(sound.id, path);
+                    return { id: sound.id, path };
+                });
+                pcTresherSpells = pcTresherSpells.map((spell) => {
+                    const row = asRecord(spell);
+                    const soundId = row['soundId'];
+                    if (typeof soundId !== 'number' || !pathById.has(soundId)) {
+                        return spell;
+                    }
+                    return { ...row, soundPath: pathById.get(soundId) ?? null };
+                });
+            }
+        }
+        catch {
+            // non-fatal — proceed without pre-resolved sample assets
         }
         return res.json({
             id: 0,
@@ -938,6 +1035,8 @@ const getSampleGameSession = async (req, res) => {
             currentPcId: null,
             dungonSpReward: dungon.spreward,
             monsterImages,
+            lootImages,
+            soundPaths,
         });
     }
     catch (error) {

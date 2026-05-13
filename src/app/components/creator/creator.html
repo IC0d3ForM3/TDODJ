@@ -2879,6 +2879,40 @@
 					Create New Key
 				</button>
 
+				<label class="form-label">
+					<input type="checkbox" formControlName="hasTrap" />
+					Has Trap
+				</label>
+
+				@if (obstacleForm.controls.hasTrap.value) {
+					<label class="form-label" for="obstacle-trap-name">Trap Name</label>
+					<input id="obstacle-trap-name" class="form-input" type="text" formControlName="trapName" />
+
+					<label class="form-label" for="obstacle-trap-description">Trap Description</label>
+					<textarea id="obstacle-trap-description" class="form-textarea" rows="2" formControlName="trapDescription"></textarea>
+
+					<label class="form-label" for="obstacle-trap-damage">Trap Damage</label>
+					<input id="obstacle-trap-damage" class="form-input" type="number" min="0" formControlName="trapDamage" />
+
+					<label class="form-label" for="obstacle-trap-damage-to">Damage To</label>
+					<select id="obstacle-trap-damage-to" class="form-input" formControlName="trapDamageTo">
+						<option value="HP">HP</option>
+						<option value="Stamina">Stamina</option>
+						<option value="Mind">Mind</option>
+						<option value="AE">AE</option>
+						<option value="ROS">ROS</option>
+					</select>
+
+					<label class="form-label" for="obstacle-trap-curse-id">Curse ID (optional)</label>
+					<input id="obstacle-trap-curse-id" class="form-input" type="number" formControlName="trapCurseId" />
+
+					<label class="form-label" for="obstacle-trap-to-detect">To Detect DC (Mind + d12)</label>
+					<input id="obstacle-trap-to-detect" class="form-input" type="number" min="0" formControlName="trapToDetect" />
+
+					<label class="form-label" for="obstacle-trap-to-disarm">To Disarm DC (Mind + d12)</label>
+					<input id="obstacle-trap-to-disarm" class="form-input" type="number" min="0" formControlName="trapToDisarm" />
+				}
+
 				<div class="form-actions">
 					<button type="submit" class="save-button">Save</button>
 					<button type="button" class="cancel-button" (click)="cancelObstacle()">Cancel</button>

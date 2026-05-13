@@ -110,21 +110,48 @@
     <section class="sg-picker">
       <h3 class="sg-picker-title">Choose Your Character</h3>
       <p class="sg-picker-subtitle">Pick one of these pre-built adventurers to take into the dungeon.</p>
-      <div class="sg-picker-grid">
-        @for (pc of samplePcs(); track pc.id) {
-          <button type="button" class="sg-pc-choice" (click)="selectPc(pc)">
-            <span class="sg-pc-choice-name">{{ pc.name }}</span>
-            <span class="sg-pc-choice-meta">{{ pc.species }} · {{ pc.type }}</span>
+      <div class="sg-picker-carousel">
+        <button
+          type="button"
+          class="sg-picker-nav"
+          [disabled]="samplePcs().length <= 1"
+          (click)="previousPickerPc()"
+          aria-label="Previous character"
+        >
+          &#10094;
+        </button>
+
+        @if (pickerPc(); as pc) {
+          <article class="sg-pc-carousel-card">
+            <p class="sg-carousel-count">{{ pickerIndex() + 1 }} / {{ samplePcs().length }}</p>
+            <h4 class="sg-pc-choice-name">{{ pc.name }}</h4>
+            <p class="sg-pc-choice-meta">{{ pc.species }} · {{ pc.type }}</p>
+
             @if (resolveImageUrl(pc.imagePath); as portraitUrl) {
               @if (portraitUrl) {
                 <img class="sg-pc-choice-img" [src]="portraitUrl" [alt]="pc.name + ' portrait'" />
               }
             }
-            <span class="sg-pc-choice-stats">
+
+            <p class="sg-pc-choice-stats">
               HP {{ pc.maxHP }} &nbsp;·&nbsp; AC {{ pc.ac }} &nbsp;·&nbsp; AE {{ pc.actionEconomy }}
-            </span>
-          </button>
+            </p>
+
+            <button type="button" class="sg-play-btn" (click)="startWithPickerPc()">
+              Start Game
+            </button>
+          </article>
         }
+
+        <button
+          type="button"
+          class="sg-picker-nav"
+          [disabled]="samplePcs().length <= 1"
+          (click)="nextPickerPc()"
+          aria-label="Next character"
+        >
+          &#10095;
+        </button>
       </div>
     </section>
   }

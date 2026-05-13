@@ -101,6 +101,16 @@ export const getPcs = async (req: Request, res: Response) => {
 
   try {
     const pcs = await pcService.fetchPcsByUserGuid(userkey.trim());
+    console.log(
+      'PC load response tresher state:',
+      pcs.map((pc) => ({
+        id: pc.id,
+        name: pc.name,
+        tresherIds: pc.tresherIds,
+        primaryTresherId: pc.primaryTresherId,
+        weaponTresherId: pc.weaponTresherId,
+      }))
+    );
     return res.json(pcs);
   } catch (error) {
     console.error('Error fetching pcs:', error);
@@ -121,12 +131,32 @@ export const createPc = async (req: Request, res: Response) => {
   }
 
   try {
+    console.log('PC create raw request body:', JSON.stringify(pc, null, 2));
+    console.log('PC create normalized payload:', JSON.stringify(normalizedPayload, null, 2));
+    console.log('PC create request tresher payload:', {
+      tresherIds: normalizedPayload.tresherIds,
+      primaryTresherId: normalizedPayload.primaryTresherId,
+      weaponTresherId: normalizedPayload.weaponTresherId,
+      headArmorTresherId: normalizedPayload.headArmorTresherId,
+      bodyArmorTresherId: normalizedPayload.bodyArmorTresherId,
+      leftArmArmorTresherId: normalizedPayload.leftArmArmorTresherId,
+      rightArmArmorTresherId: normalizedPayload.rightArmArmorTresherId,
+      leftLegArmorTresherId: normalizedPayload.leftLegArmorTresherId,
+      rightLegArmorTresherId: normalizedPayload.rightLegArmorTresherId,
+    });
+
     const validationError = await validatePcReferencesForUser(normalizedPayload, userkey.trim());
     if (validationError) {
       return res.status(400).json({ result: -1, error: validationError });
     }
 
     const created = await pcService.createPcForUser(userkey.trim(), normalizedPayload);
+    console.log('PC create response tresher state:', {
+      id: created.id,
+      tresherIds: created.tresherIds,
+      primaryTresherId: created.primaryTresherId,
+      weaponTresherId: created.weaponTresherId,
+    });
     return res.status(201).json({ result: 1, pc: created });
   } catch (error) {
     console.error('Error creating pc:', error);
@@ -181,6 +211,21 @@ export const updatePc = async (req: Request, res: Response) => {
   }
 
   try {
+    console.log('PC update raw request body:', JSON.stringify(pc, null, 2));
+    console.log('PC update normalized payload:', JSON.stringify(normalizedPayload, null, 2));
+    console.log('PC update request tresher payload:', {
+      pcId: id,
+      tresherIds: normalizedPayload.tresherIds,
+      primaryTresherId: normalizedPayload.primaryTresherId,
+      weaponTresherId: normalizedPayload.weaponTresherId,
+      headArmorTresherId: normalizedPayload.headArmorTresherId,
+      bodyArmorTresherId: normalizedPayload.bodyArmorTresherId,
+      leftArmArmorTresherId: normalizedPayload.leftArmArmorTresherId,
+      rightArmArmorTresherId: normalizedPayload.rightArmArmorTresherId,
+      leftLegArmorTresherId: normalizedPayload.leftLegArmorTresherId,
+      rightLegArmorTresherId: normalizedPayload.rightLegArmorTresherId,
+    });
+
     const validationError = await validatePcReferencesForUser(normalizedPayload, userkey.trim());
     if (validationError) {
       return res.status(400).json({ result: -1, error: validationError });
@@ -191,6 +236,12 @@ export const updatePc = async (req: Request, res: Response) => {
       return res.status(404).json({ result: -1, error: 'PC not found' });
     }
 
+    console.log('PC update response tresher state:', {
+      id: updated.id,
+      tresherIds: updated.tresherIds,
+      primaryTresherId: updated.primaryTresherId,
+      weaponTresherId: updated.weaponTresherId,
+    });
     return res.json({ result: 1, pc: updated });
   } catch (error) {
     console.error('Error updating pc:', error);

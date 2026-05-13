@@ -745,6 +745,14 @@ export class Creator implements OnInit {
     isIndestructible: new FormControl<boolean>(false, { nonNullable: true }),
     containsItemId: new FormControl<number | null>(null),
     requiredKeyId: new FormControl<number | null>(null),
+    hasTrap: new FormControl<boolean>(false, { nonNullable: true }),
+    trapName: new FormControl<string>('', { nonNullable: true }),
+    trapDescription: new FormControl<string>('', { nonNullable: true }),
+    trapDamage: new FormControl<number>(0, { nonNullable: true }),
+    trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS'>('HP', { nonNullable: true }),
+    trapCurseId: new FormControl<number | null>(null),
+    trapToDetect: new FormControl<number>(10, { nonNullable: true }),
+    trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
     shape: new FormControl<'circle' | 'square'>('circle', { nonNullable: true }),
     heightPercent: new FormControl<number>(100, { nonNullable: true }),
     heightAnchor: new FormControl<'floor' | 'ceiling'>('floor', { nonNullable: true }),
@@ -1462,6 +1470,14 @@ export class Creator implements OnInit {
         isIndestructible: false,
         containsItemId: null,
         requiredKeyId: null,
+        hasTrap: false,
+        trapName: '',
+        trapDescription: '',
+        trapDamage: 0,
+        trapDamageTo: 'HP',
+        trapCurseId: null,
+        trapToDetect: 10,
+        trapToDisarm: 10,
         shape: 'square',
         heightPercent: 100,
         heightAnchor: 'floor',
@@ -1481,6 +1497,14 @@ export class Creator implements OnInit {
       isIndestructible: false,
       containsItemId: null,
       requiredKeyId: null,
+      hasTrap: false,
+      trapName: '',
+      trapDescription: '',
+      trapDamage: 0,
+      trapDamageTo: 'HP',
+      trapCurseId: null,
+      trapToDetect: 10,
+      trapToDisarm: 10,
       shape: 'circle',
       heightPercent: 100,
       heightAnchor: 'floor',
@@ -1500,8 +1524,20 @@ export class Creator implements OnInit {
     const rawTextImageId = controls.textImageId.value;
     const rawContainsItemId = controls.containsItemId.value;
     const rawRequiredKeyId = controls.requiredKeyId.value;
+    const hasTrap = controls.hasTrap.value;
     const normalizedContainsItemId = rawContainsItemId !== null ? (Number(rawContainsItemId) || null) : null;
     const normalizedRequiredKeyId = rawRequiredKeyId !== null ? (Number(rawRequiredKeyId) || null) : null;
+    const trap: Trap | null = hasTrap
+      ? {
+          name: controls.trapName.value.trim(),
+          description: controls.trapDescription.value.trim(),
+          damage: Math.max(0, controls.trapDamage.value),
+          damageTo: controls.trapDamageTo.value,
+          curseId: controls.trapCurseId.value ?? null,
+          toDetect: Math.max(0, controls.trapToDetect.value),
+          toDisarm: Math.max(0, controls.trapToDisarm.value),
+        }
+      : null;
     const obstacleName = controls.name.value.trim() || 'Obstacle';
 
     if (
@@ -1540,12 +1576,15 @@ export class Creator implements OnInit {
                 isIndestructible: controls.isIndestructible.value,
                 containsItemId: normalizedContainsItemId,
                 requiredKeyId: normalizedRequiredKeyId,
+                trap,
                 heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
                 heightAnchor: controls.heightAnchor.value,
                 widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
                 widthAnchor: controls.widthAnchor.value,
                 color: controls.color.value || null,
                 shape: controls.shape.value,
+                isTrapDetected: trap ? obs.isTrapDetected : false,
+                isTrapDisarmed: trap ? obs.isTrapDisarmed : false,
               }
             : obs
         ),
@@ -1564,6 +1603,7 @@ export class Creator implements OnInit {
         isIndestructible: controls.isIndestructible.value,
         containsItemId: normalizedContainsItemId,
         requiredKeyId: normalizedRequiredKeyId,
+        trap,
         heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
         heightAnchor: controls.heightAnchor.value,
         widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
@@ -1574,6 +1614,8 @@ export class Creator implements OnInit {
         isDestroyed: false,
         isOpened: false,
         itemTaken: false,
+        isTrapDetected: false,
+        isTrapDisarmed: false,
       };
       this.nextObstacleId += 1;
       this.obstaclePlacementsByDungon.update((all) => ({
@@ -1634,6 +1676,14 @@ export class Creator implements OnInit {
         isIndestructible: obstacle.isIndestructible,
         containsItemId: obstacle.containsItemId,
         requiredKeyId: obstacle.requiredKeyId ?? null,
+        hasTrap: obstacle.trap !== null,
+        trapName: obstacle.trap?.name ?? '',
+        trapDescription: obstacle.trap?.description ?? '',
+        trapDamage: obstacle.trap?.damage ?? 0,
+        trapDamageTo: obstacle.trap?.damageTo ?? 'HP',
+        trapCurseId: obstacle.trap?.curseId ?? null,
+        trapToDetect: obstacle.trap?.toDetect ?? 10,
+        trapToDisarm: obstacle.trap?.toDisarm ?? 10,
         shape: obstacle.shape ?? 'circle',
         heightPercent: obstacle.heightPercent ?? 100,
         heightAnchor: obstacle.heightAnchor ?? 'floor',
@@ -1669,6 +1719,14 @@ export class Creator implements OnInit {
       isIndestructible: obstacle.isIndestructible,
       containsItemId: obstacle.containsItemId,
       requiredKeyId: obstacle.requiredKeyId ?? null,
+      hasTrap: obstacle.trap !== null,
+      trapName: obstacle.trap?.name ?? '',
+      trapDescription: obstacle.trap?.description ?? '',
+      trapDamage: obstacle.trap?.damage ?? 0,
+      trapDamageTo: obstacle.trap?.damageTo ?? 'HP',
+      trapCurseId: obstacle.trap?.curseId ?? null,
+      trapToDetect: obstacle.trap?.toDetect ?? 10,
+      trapToDisarm: obstacle.trap?.toDisarm ?? 10,
       shape: obstacle.shape ?? 'circle',
       heightPercent: obstacle.heightPercent ?? 100,
       heightAnchor: obstacle.heightAnchor ?? 'floor',
@@ -1687,8 +1745,20 @@ export class Creator implements OnInit {
     const rawTextImageId = controls.textImageId.value;
     const rawContainsItemId = controls.containsItemId.value;
     const rawRequiredKeyId = controls.requiredKeyId.value;
+    const hasTrap = controls.hasTrap.value;
     const normalizedContainsItemId = rawContainsItemId !== null ? (Number(rawContainsItemId) || null) : null;
     const normalizedRequiredKeyId = rawRequiredKeyId !== null ? (Number(rawRequiredKeyId) || null) : null;
+    const trap: Trap | null = hasTrap
+      ? {
+          name: controls.trapName.value.trim(),
+          description: controls.trapDescription.value.trim(),
+          damage: Math.max(0, controls.trapDamage.value),
+          damageTo: controls.trapDamageTo.value,
+          curseId: controls.trapCurseId.value ?? null,
+          toDetect: Math.max(0, controls.trapToDetect.value),
+          toDisarm: Math.max(0, controls.trapToDisarm.value),
+        }
+      : null;
     this.copyObstacleSource.set({
       id: -1,
       row: pending.row,
@@ -1701,6 +1771,7 @@ export class Creator implements OnInit {
       isIndestructible: controls.isIndestructible.value,
       containsItemId: normalizedContainsItemId,
       requiredKeyId: normalizedRequiredKeyId,
+      trap,
       heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
       heightAnchor: controls.heightAnchor.value,
       widthPercent: Math.max(1, Math.min(100, controls.widthPercent.value)),
@@ -1711,6 +1782,8 @@ export class Creator implements OnInit {
       isDestroyed: false,
       isOpened: false,
       itemTaken: false,
+      isTrapDetected: false,
+      isTrapDisarmed: false,
     });
     this.isCopyObstacleMode.set(true);
     this.isObstacleDialogVisible.set(false);

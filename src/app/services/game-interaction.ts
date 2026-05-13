@@ -45,10 +45,11 @@ export class GameInteractionService {
   // Trap discovered (door search, tresher, or floor)
   readonly foundTrap = signal<{
     trap: Trap;
-    source: 'door' | 'tresher' | 'floor';
+    source: 'door' | 'tresher' | 'floor' | 'obstacle';
     doorInfo?: NearbyDoorInfo;
     tresherIndex?: number;
     floorTrapId?: number;
+    obstacleId?: number;
     adjacentRow?: number;
     adjacentColumn?: number;
   } | null>(null);

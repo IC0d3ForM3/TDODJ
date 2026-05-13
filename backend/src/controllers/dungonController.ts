@@ -7,6 +7,7 @@ import * as itemService from '../services/itemService';
 import * as potionService from '../services/potionService';
 import * as spellService from '../services/spellService';
 import * as imageService from '../services/imageService';
+import * as soundService from '../services/soundService';
 import { getUserByKey } from '../repositories/userRepository';
 
 type PublishVisibility = 'public' | 'friends' | 'private';
@@ -844,6 +845,8 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
     let pcTresherPotions: object[] = [];
     let pcTresherSpells: object[] = [];
     let pcImagePath: string | null = null;
+    let lootImages: { id: number; path: string }[] = [];
+    let soundPaths: { id: number; path: string }[] = [];
 
     if (typeof pc.imageId === 'number' && pc.imageId > 0) {
       const pcImages = await imageService.fetchImagesByIds([pc.imageId]);
@@ -903,6 +906,7 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
           name: it.name,
           description: it.description,
           type: it.type,
+          imageId: it.imageId,
           effectValue: it.effectValue,
           damage: it.damage ?? 0,
           range: Math.max(1, parseInt(String(it.range), 10) || 1),
@@ -1016,6 +1020,7 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
             name: it.name,
             description: it.description,
             type: it.type,
+            imageId: it.imageId,
             effectValue: it.effectValue,
             damage: it.damage ?? 0,
             range: Math.max(1, parseInt(String(it.range), 10) || 1),
@@ -1028,6 +1033,101 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
       }
     } catch {
       // non-fatal — proceed without dungeon tresher items
+    }
+
+    // Build a best-effort list of sample asset paths (images/sounds), including private IDs,
+    // so sample mode can render/play assigned assets without user auth.
+    try {
+      const dungonJsonObj = typeof dungon.dungenJson === 'string'
+        ? JSON.parse(dungon.dungenJson)
+        : dungon.dungenJson;
+      const asRecord = (value: unknown): Record<string, unknown> =>
+        typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+      const collectNumericIds = (values: unknown[]): number[] =>
+        values
+          .map((value) => (typeof value === 'number' ? value : null))
+          .filter((value): value is number => value !== null && Number.isInteger(value) && value > 0);
+
+      const rawTresherList = Array.isArray(asRecord(dungonJsonObj)['tresherList'])
+        ? (asRecord(dungonJsonObj)['tresherList'] as unknown[])
+        : Array.isArray(asRecord(dungonJsonObj)['trasherList'])
+          ? (asRecord(dungonJsonObj)['trasherList'] as unknown[])
+          : Array.isArray(asRecord(dungonJsonObj)['tresher'])
+            ? (asRecord(dungonJsonObj)['tresher'] as unknown[])
+            : [];
+      const rawItemList = Array.isArray(asRecord(dungonJsonObj)['itemList'])
+        ? (asRecord(dungonJsonObj)['itemList'] as unknown[])
+        : Array.isArray(asRecord(dungonJsonObj)['items'])
+          ? (asRecord(dungonJsonObj)['items'] as unknown[])
+          : [];
+      const rawSpellList = Array.isArray(asRecord(dungonJsonObj)['spellList'])
+        ? (asRecord(dungonJsonObj)['spellList'] as unknown[])
+        : Array.isArray(asRecord(dungonJsonObj)['spells'])
+          ? (asRecord(dungonJsonObj)['spells'] as unknown[])
+          : [];
+
+      const lootImageIds = new Set<number>();
+      for (const t of pcTreshers) {
+        const id = asRecord(t)['imageId'];
+        if (typeof id === 'number' && id > 0) lootImageIds.add(id);
+      }
+      for (const it of pcTresherItems) {
+        const id = asRecord(it)['imageId'];
+        if (typeof id === 'number' && id > 0) lootImageIds.add(id);
+      }
+      for (const raw of rawTresherList) {
+        const row = asRecord(raw);
+        const ids = collectNumericIds([row['imageId'], row['imageid']]);
+        for (const id of ids) lootImageIds.add(id);
+      }
+      for (const raw of rawItemList) {
+        const row = asRecord(raw);
+        const ids = collectNumericIds([row['imageId'], row['imageid']]);
+        for (const id of ids) lootImageIds.add(id);
+      }
+
+      if (lootImageIds.size > 0) {
+        const images = await imageService.fetchImagesByIds(Array.from(lootImageIds));
+        lootImages = images
+          .filter((img) => typeof img.path === 'string' && img.path.trim().length > 0)
+          .map((img) => ({ id: img.id, path: img.path }));
+      }
+
+      const spellSoundIds = new Set<number>();
+      for (const spell of pcTresherSpells) {
+        const soundId = asRecord(spell)['soundId'];
+        if (typeof soundId === 'number' && soundId > 0) {
+          spellSoundIds.add(soundId);
+        }
+      }
+      for (const raw of rawSpellList) {
+        const row = asRecord(raw);
+        const ids = collectNumericIds([row['soundId'], row['soundid']]);
+        for (const id of ids) spellSoundIds.add(id);
+      }
+
+      if (spellSoundIds.size > 0) {
+        const sounds = await soundService.fetchSoundsByIds(Array.from(spellSoundIds));
+        const pathById = new Map<number, string>();
+        soundPaths = sounds
+          .filter((sound) => typeof sound.path === 'string' && sound.path.trim().length > 0)
+          .map((sound) => {
+            const path = sound.path.trim();
+            pathById.set(sound.id, path);
+            return { id: sound.id, path };
+          });
+
+        pcTresherSpells = pcTresherSpells.map((spell) => {
+          const row = asRecord(spell);
+          const soundId = row['soundId'];
+          if (typeof soundId !== 'number' || !pathById.has(soundId)) {
+            return spell;
+          }
+          return { ...row, soundPath: pathById.get(soundId) ?? null };
+        });
+      }
+    } catch {
+      // non-fatal — proceed without pre-resolved sample assets
     }
 
     return res.json({
@@ -1059,6 +1159,8 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
       currentPcId: null,
       dungonSpReward: dungon.spreward,
       monsterImages,
+      lootImages,
+      soundPaths,
     });
   } catch (error) {
     console.error('Error building sample game session:', error);

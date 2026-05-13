@@ -20,6 +20,7 @@ import {
   getAllPcsForAdmin,
 } from '../repositories/pcRepository';
 import { tavernTurnInQuestItems as tavernTurnInQuestItemsInDb, insertTresherForUser } from '../repositories/tresherRepository';
+import { getTreshersByUserGuid } from '../repositories/tresherRepository';
 import { getPublicItemsByNames } from '../repositories/itemRepository';
 import { getPublicSpellsByNames } from '../repositories/spellRepository';
 import { getPublicPotionsByNames } from '../repositories/potionRepository';
@@ -113,20 +114,24 @@ async function assignStarterGear(pcId: number, userguid: string, pcType: string)
     gear.potions.some((n) => potionId(n) !== null);
   if (!hasContent) return;
 
-  const tresher = await insertTresherForUser(userguid, {
+  const starterPayload = {
     type: 'OtherTresher',
     name: gear.label,
     description: 'Your starting equipment.',
-    gold: 0, silver: 0, copper: 0, zinc: 0,
-    item1Id:   gear.items[0]  ? itemId(gear.items[0])   : null,
-    item2Id:   gear.items[1]  ? itemId(gear.items[1])   : null,
-    item3Id:   gear.items[2]  ? itemId(gear.items[2])   : null,
-    item4Id:   gear.items[3]  ? itemId(gear.items[3])   : null,
-    spell1Id:  gear.spells[0] ? spellId(gear.spells[0]) : null,
-    spell2Id:  gear.spells[1] ? spellId(gear.spells[1]) : null,
-    spell3Id:  gear.spells[2] ? spellId(gear.spells[2]) : null,
-    spell4Id:  gear.spells[3] ? spellId(gear.spells[3]) : null,
-    curse1Id: null, curse2Id: null,
+    gold: 0,
+    silver: 0,
+    copper: 0,
+    zinc: 0,
+    item1Id: gear.items[0] ? itemId(gear.items[0]) : null,
+    item2Id: gear.items[1] ? itemId(gear.items[1]) : null,
+    item3Id: gear.items[2] ? itemId(gear.items[2]) : null,
+    item4Id: gear.items[3] ? itemId(gear.items[3]) : null,
+    spell1Id: gear.spells[0] ? spellId(gear.spells[0]) : null,
+    spell2Id: gear.spells[1] ? spellId(gear.spells[1]) : null,
+    spell3Id: gear.spells[2] ? spellId(gear.spells[2]) : null,
+    spell4Id: gear.spells[3] ? spellId(gear.spells[3]) : null,
+    curse1Id: null,
+    curse2Id: null,
     potion1Id: gear.potions[0] ? potionId(gear.potions[0]) : null,
     potion2Id: gear.potions[1] ? potionId(gear.potions[1]) : null,
     potion3Id: gear.potions[2] ? potionId(gear.potions[2]) : null,
@@ -135,9 +140,42 @@ async function assignStarterGear(pcId: number, userguid: string, pcType: string)
     spReward: 0,
     imageId: null,
     soundId: null,
-  });
+  };
 
-  await addTresherIdToPcInDb(pcId, tresher.id);
+  const existingTreshers = await getTreshersByUserGuid(userguid);
+  const existingStarterTresher = existingTreshers.find((t) =>
+    (t.name ?? '').trim().toLowerCase() === starterPayload.name.trim().toLowerCase() &&
+    (t.type ?? '') === starterPayload.type &&
+    (t.description ?? '') === starterPayload.description &&
+    t.item1Id === starterPayload.item1Id &&
+    t.item2Id === starterPayload.item2Id &&
+    t.item3Id === starterPayload.item3Id &&
+    t.item4Id === starterPayload.item4Id &&
+    t.spell1Id === starterPayload.spell1Id &&
+    t.spell2Id === starterPayload.spell2Id &&
+    t.spell3Id === starterPayload.spell3Id &&
+    t.spell4Id === starterPayload.spell4Id &&
+    t.potion1Id === starterPayload.potion1Id &&
+    t.potion2Id === starterPayload.potion2Id &&
+    t.potion3Id === starterPayload.potion3Id &&
+    t.curse1Id === starterPayload.curse1Id &&
+    t.curse2Id === starterPayload.curse2Id &&
+    t.gold === starterPayload.gold &&
+    t.silver === starterPayload.silver &&
+    t.copper === starterPayload.copper &&
+    t.zinc === starterPayload.zinc &&
+    t.spReward === starterPayload.spReward &&
+    t.isquest === starterPayload.isquest &&
+    t.isPublic === starterPayload.isPublic
+  );
+
+  const starterTresher = existingStarterTresher ?? await insertTresherForUser(userguid, starterPayload);
+  const pc = await getPcByIdForUser(pcId, userguid);
+  if (!pc || pc.tresherIds.includes(starterTresher.id)) {
+    return;
+  }
+
+  await addTresherIdToPcInDb(pcId, starterTresher.id);
 }
 
 export const upgradeStat = async (

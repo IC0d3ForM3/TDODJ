@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveSoundForUser = exports.createSoundForUser = exports.checkSoundAccessibleByIdForUser = exports.checkUserIsAdminByGuid = exports.fetchSoundLibraryByUserGuid = exports.fetchSoundsByUserGuid = void 0;
+exports.saveSoundForUser = exports.createSoundForUser = exports.checkSoundAccessibleByIdForUser = exports.checkUserIsAdminByGuid = exports.fetchSoundsByIds = exports.fetchSoundLibraryByUserGuid = exports.fetchSoundsByUserGuid = void 0;
 const soundRepository_1 = require("../repositories/soundRepository");
 const fetchSoundsByUserGuid = async (userguid) => {
     return await (0, soundRepository_1.getSoundsByUserGuid)(userguid);
@@ -10,6 +10,10 @@ const fetchSoundLibraryByUserGuid = async (userguid) => {
     return await (0, soundRepository_1.getSoundLibraryByUserGuid)(userguid);
 };
 exports.fetchSoundLibraryByUserGuid = fetchSoundLibraryByUserGuid;
+const fetchSoundsByIds = async (ids) => {
+    return await (0, soundRepository_1.getSoundsByIds)(ids);
+};
+exports.fetchSoundsByIds = fetchSoundsByIds;
 const checkUserIsAdminByGuid = async (userguid) => {
     return await (0, soundRepository_1.isAdminUserByGuid)(userguid);
 };

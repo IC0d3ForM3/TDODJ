@@ -4,5 +4,6 @@ export interface NearbyDiscoveryItem {
   description: string;
   row: number;
   column: number;
+  obstacleId?: number | null;
   imageSrc?: string | null;
 }

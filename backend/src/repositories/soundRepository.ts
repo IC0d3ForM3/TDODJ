@@ -81,6 +81,30 @@ export const getSoundLibraryByUserGuid = async (userguid: string): Promise<Sound
   return rows;
 };
 
+export const getSoundsByIds = async (ids: number[]): Promise<SoundRecord[]> => {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const placeholders = ids.map((_, index) => `$${index + 1}`).join(', ');
+  const { rows } = await pool.query<SoundRecord>(
+    `SELECT
+       id,
+       userguid::text AS userguid,
+       path,
+       ispublic AS "isPublic",
+       isactive AS "isActive",
+       name,
+       createdat::text AS "createdAt",
+       updatedat::text AS "updatedAt"
+     FROM sounds
+     WHERE id IN (${placeholders})`,
+    ids
+  );
+
+  return rows;
+};
+
 export const isSoundAccessibleByIdForUser = async (
   soundId: number,
   userguid: string

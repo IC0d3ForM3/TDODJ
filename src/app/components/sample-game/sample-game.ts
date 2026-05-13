@@ -50,6 +50,7 @@ export class SampleGame implements OnInit {
   readonly dungon = signal<SampleDungon | null>(null);
   readonly samplePcs = signal<SamplePc[]>([]);
   readonly selectedPc = signal<SamplePc | null>(null);
+  readonly pickerIndex = signal(0);
   readonly isLoading = signal(true);
   readonly hasError = signal(false);
 
@@ -133,6 +134,7 @@ export class SampleGame implements OnInit {
       next: ({ dungon, pcs }) => {
         this.dungon.set(dungon);
         this.samplePcs.set(pcs);
+        this.pickerIndex.set(0);
         if (pcs.length === 1) {
           this.selectedPc.set(pcs[0]);
         }
@@ -147,6 +149,44 @@ export class SampleGame implements OnInit {
 
   selectPc(pc: SamplePc): void {
     this.selectedPc.set(pc);
+  }
+
+  pickerPc(): SamplePc | null {
+    const pcs = this.samplePcs();
+    if (pcs.length === 0) {
+      return null;
+    }
+    const index = this.pickerIndex();
+    if (index < 0 || index >= pcs.length) {
+      this.pickerIndex.set(0);
+      return pcs[0];
+    }
+    return pcs[index];
+  }
+
+  previousPickerPc(): void {
+    const pcs = this.samplePcs();
+    if (pcs.length <= 1) {
+      return;
+    }
+    this.pickerIndex.update((index) => (index - 1 + pcs.length) % pcs.length);
+  }
+
+  nextPickerPc(): void {
+    const pcs = this.samplePcs();
+    if (pcs.length <= 1) {
+      return;
+    }
+    this.pickerIndex.update((index) => (index + 1) % pcs.length);
+  }
+
+  startWithPickerPc(): void {
+    const pc = this.pickerPc();
+    if (!pc) {
+      return;
+    }
+    this.selectPc(pc);
+    this.playNow();
   }
 
   changePc(): void {

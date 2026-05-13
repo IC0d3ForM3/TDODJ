@@ -7,6 +7,7 @@ import {
   insertSoundForUser,
   isAdminUserByGuid,
   isSoundAccessibleByIdForUser,
+  getSoundsByIds,
   updateSoundForUser,
 } from '../repositories/soundRepository';
 
@@ -16,6 +17,10 @@ export const fetchSoundsByUserGuid = async (userguid: string): Promise<SoundReco
 
 export const fetchSoundLibraryByUserGuid = async (userguid: string): Promise<SoundRecord[]> => {
   return await getSoundLibraryByUserGuid(userguid);
+};
+
+export const fetchSoundsByIds = async (ids: number[]): Promise<SoundRecord[]> => {
+  return await getSoundsByIds(ids);
 };
 
 export const checkUserIsAdminByGuid = async (userguid: string): Promise<boolean> => {

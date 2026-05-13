@@ -678,6 +678,46 @@
 						</ul>
 					}
 
+						@if (nearbyObstaclesForPreview().length > 0) {
+							<ul class="discovery-list">
+								@for (obstacleInfo of nearbyObstaclesForPreview(); track obstacleInfo.obstacle.id) {
+									<li class="discovery-item">
+										<span class="discovery-kind">Obstacle</span>
+										<p class="discovery-name">{{ obstacleInfo.obstacle.name || 'Obstacle' }} ({{ obstacleInfo.direction }})</p>
+										<p class="discovery-description">
+											@if (obstacleInfo.obstacle.isDestroyed) {
+												Destroyed.
+											} @else if (obstacleInfo.obstacle.isOpened) {
+												Opened.
+											} @else {
+												Closed.
+											}
+											@if (obstacleRequiresKeyLabel(obstacleInfo.obstacle); as keyLabel) {
+												Requires key: {{ keyLabel }}.
+												@if (obstacleInfo.hasMatchingKey) {
+													You can unlock it now.
+												} @else {
+													You need the right key.
+												}
+											}
+										</p>
+										<div class="door-actions">
+											@if (obstacleInfo.canOpen) {
+												<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="openObstacle(obstacleInfo.obstacle.id)">
+													{{ obstacleOpenButtonLabel(obstacleInfo.obstacle) }}
+												</button>
+											}
+											@if (obstacleInfo.canTakeItem) {
+												<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="takeItemFromObstacle(obstacleInfo.obstacle.id)">
+													Take Item
+												</button>
+											}
+										</div>
+									</li>
+								}
+							</ul>
+						}
+
 					@if (otherNearbyItemsForPreview().length > 0) {
 						<ul class="discovery-list">
 							@for (item of otherNearbyItemsForPreview(); track item.kind + ':' + item.row + ':' + item.column + ':' + item.name) {
@@ -691,7 +731,7 @@
 								</li>
 							}
 						</ul>
-					} @else if (nearbyDoorsForPreview().length === 0) {
+					} @else if (nearbyDoorsForPreview().length === 0 && nearbyObstaclesForPreview().length === 0) {
 						<p class="discovery-empty">Nothing else nearby right now.</p>
 					}
 
@@ -726,7 +766,7 @@
 									<span class="obstacle-action-name">{{ obs.name }}</span>
 									@if (obs.containsItemId !== null && !obs.itemTaken && !obs.isDestroyed) {
 										<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="openObstacle(obs.id)">
-											Open
+											{{ obstacleOpenButtonLabel(obs) }}
 										</button>
 									}
 									@if (!obs.isIndestructible && !(obs.isDestroyed)) {
@@ -735,7 +775,14 @@
 										</button>
 									}
 									@if (obstacleRequiresKeyLabel(obs); as keyLabel) {
-										<span class="details-message" style="font-size:0.8rem">Requires key: {{ keyLabel }}</span>
+										<span class="details-message" style="font-size:0.8rem">
+											Requires key: {{ keyLabel }}.
+											@if (obstacleHasMatchingKey(obs)) {
+												You can unlock it now.
+											} @else {
+												You need the right key.
+											}
+										</span>
 									}
 								</div>
 							}

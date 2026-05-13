@@ -42,6 +42,7 @@ export type PcTresherItemData = {
   name: string;
   description: string;
   type: string;
+  imageId?: number | null;
   effectValue: number | null;
   damage: number;
   range: number;

@@ -1,4 +1,5 @@
 import { BasePlacement } from './base-placement';
+import { Trap } from './trap';
 
 export interface ObstaclePlacement extends BasePlacement {
   id: number;
@@ -10,6 +11,7 @@ export interface ObstaclePlacement extends BasePlacement {
   isIndestructible: boolean;
   containsItemId: number | null;
   requiredKeyId?: number | null;
+  trap: Trap | null;
   shape: 'circle' | 'square';               // circle = pillar/cylinder; square = filled box
   heightPercent: number;                        // 1–100 (100 = floor to ceiling)
   heightAnchor: 'floor' | 'ceiling';            // only matters if heightPercent < 100
@@ -21,4 +23,6 @@ export interface ObstaclePlacement extends BasePlacement {
   isDestroyed?: boolean;
   isOpened?: boolean;
   itemTaken?: boolean;
+  isTrapDetected?: boolean;
+  isTrapDisarmed?: boolean;
 }

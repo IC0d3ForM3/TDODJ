@@ -210,6 +210,7 @@ export class Dashboard implements OnInit {
   readonly isLoadingUserPcs = signal(false);
   readonly userPcsError = signal<string | null>(null);
   readonly userPcs = signal<UserPcListItem[]>([]);
+  readonly isPcEditorVisible = signal(false);
   readonly isSavingUserPc = signal(false);
   readonly editingUserPcId = signal<number | null>(null);
   readonly expandedPcId = signal<number | null>(null);
@@ -733,6 +734,11 @@ export class Dashboard implements OnInit {
       this.userPcSaveMessage.set(null);
     }
     this.resetUserPcForm();
+    this.isPcEditorVisible.set(true);
+  }
+
+  openNewPcEditor(): void {
+    this.beginCreatePc();
   }
 
   togglePcExpanded(id: number): void {
@@ -740,54 +746,63 @@ export class Dashboard implements OnInit {
   }
 
   editPc(item: UserPcListItem): void {
-    this.editingUserPcId.set(item.id);
+    this.isPcEditorVisible.set(true);
+    const source = this.userPcs().find((pc) => pc.id === item.id) ?? item;
+    this.editingUserPcId.set(source.id);
     this.userPcSaveMessage.set(null);
-    this.replacePcTresherForms(item.tresherIds ?? []);
+    this.replacePcTresherForms(source.tresherIds ?? []);
 
     const controls = this.userPcForm.controls;
-    controls.name.setValue(item.name || '');
-    controls.species.setValue(this.normalizePcSpecies(item.species));
-    controls.type.setValue(this.normalizePcType(item.type));
-    controls.imageId.setValue(this.normalizeNullableNumber(item.imageId));
-    controls.maxHP.setValue(Math.max(1, this.normalizeNumber(item.maxHP, 10)));
+    controls.name.setValue(source.name || '');
+    controls.species.setValue(this.normalizePcSpecies(source.species));
+    controls.type.setValue(this.normalizePcType(source.type));
+    controls.imageId.setValue(this.normalizeNullableNumber(source.imageId));
+    controls.maxHP.setValue(Math.max(1, this.normalizeNumber(source.maxHP, 10)));
     controls.currentHP.setValue(
-      Math.max(0, this.normalizeNumber(item.currentHP, controls.maxHP.value))
+      Math.max(0, this.normalizeNumber(source.currentHP, controls.maxHP.value))
     );
-    controls.ac.setValue(Math.max(0, this.normalizeNumber(item.ac, 10)));
+    controls.ac.setValue(Math.max(0, this.normalizeNumber(source.ac, 10)));
     controls.actionEconomy.setValue(
-      Math.max(0, this.normalizeNumber(item.actionEconomy, 0))
+      Math.max(0, this.normalizeNumber(source.actionEconomy, 0))
     );
-    controls.poisonResest.setValue(this.normalizeNumber(item.poisonResest, 0));
-    controls.magicPower.setValue(this.normalizeNumber(item.magicPower, 0));
-    controls.mind.setValue(this.normalizeNumber(item.mind, 0));
-    controls.stamina.setValue(this.normalizeNumber(item.stamina, 0));
-    controls.level.setValue(Math.max(1, this.normalizeNumber(item.level, 1)));
-    controls.strength.setValue(this.normalizeNumber(item.strength, 0));
+    controls.poisonResest.setValue(this.normalizeNumber(source.poisonResest, 0));
+    controls.magicPower.setValue(this.normalizeNumber(source.magicPower, 0));
+    controls.mind.setValue(this.normalizeNumber(source.mind, 0));
+    controls.stamina.setValue(this.normalizeNumber(source.stamina, 0));
+    controls.level.setValue(Math.max(1, this.normalizeNumber(source.level, 1)));
+    controls.strength.setValue(this.normalizeNumber(source.strength, 0));
     controls.rangeOfView.setValue(
-      Math.max(0, this.normalizeNumber(item.rangeOfView, this.rangeOfViewBySpecies(controls.species.value)))
+      Math.max(0, this.normalizeNumber(source.rangeOfView, this.rangeOfViewBySpecies(controls.species.value)))
     );
-    controls.primaryTresherId.setValue(this.normalizeNullableNumber(item.primaryTresherId));
-    controls.weaponTresherId.setValue(this.normalizeNullableNumber(item.weaponTresherId));
-    controls.headArmorTresherId.setValue(this.normalizeNullableNumber(item.headArmorTresherId));
-    controls.bodyArmorTresherId.setValue(this.normalizeNullableNumber(item.bodyArmorTresherId));
-    controls.leftArmArmorTresherId.setValue(this.normalizeNullableNumber(item.leftArmArmorTresherId));
-    controls.rightArmArmorTresherId.setValue(this.normalizeNullableNumber(item.rightArmArmorTresherId));
-    controls.leftLegArmorTresherId.setValue(this.normalizeNullableNumber(item.leftLegArmorTresherId));
-    controls.rightLegArmorTresherId.setValue(this.normalizeNullableNumber(item.rightLegArmorTresherId));
-    controls.ring1ItemId.setValue(this.normalizeNullableNumber(item.ring1ItemId));
-    controls.ring2ItemId.setValue(this.normalizeNullableNumber(item.ring2ItemId));
-    controls.ring3ItemId.setValue(this.normalizeNullableNumber(item.ring3ItemId));
-    controls.ring4ItemId.setValue(this.normalizeNullableNumber(item.ring4ItemId));
-    controls.ring5ItemId.setValue(this.normalizeNullableNumber(item.ring5ItemId));
-    controls.necklaceItemId.setValue(this.normalizeNullableNumber(item.necklaceItemId));
-    controls.hand1ItemId.setValue(this.normalizeNullableNumber(item.hand1ItemId));
-    controls.hand2ItemId.setValue(this.normalizeNullableNumber(item.hand2ItemId));
-    controls.numberOfAttacks.setValue(Math.max(1, this.normalizeNumber(item.numberOfAttacks, 1)));
+    controls.primaryTresherId.setValue(this.normalizeNullableNumber(source.primaryTresherId));
+    controls.weaponTresherId.setValue(this.normalizeNullableNumber(source.weaponTresherId));
+    controls.headArmorTresherId.setValue(this.normalizeNullableNumber(source.headArmorTresherId));
+    controls.bodyArmorTresherId.setValue(this.normalizeNullableNumber(source.bodyArmorTresherId));
+    controls.leftArmArmorTresherId.setValue(this.normalizeNullableNumber(source.leftArmArmorTresherId));
+    controls.rightArmArmorTresherId.setValue(this.normalizeNullableNumber(source.rightArmArmorTresherId));
+    controls.leftLegArmorTresherId.setValue(this.normalizeNullableNumber(source.leftLegArmorTresherId));
+    controls.rightLegArmorTresherId.setValue(this.normalizeNullableNumber(source.rightLegArmorTresherId));
+    controls.ring1ItemId.setValue(this.normalizeNullableNumber(source.ring1ItemId));
+    controls.ring2ItemId.setValue(this.normalizeNullableNumber(source.ring2ItemId));
+    controls.ring3ItemId.setValue(this.normalizeNullableNumber(source.ring3ItemId));
+    controls.ring4ItemId.setValue(this.normalizeNullableNumber(source.ring4ItemId));
+    controls.ring5ItemId.setValue(this.normalizeNullableNumber(source.ring5ItemId));
+    controls.necklaceItemId.setValue(this.normalizeNullableNumber(source.necklaceItemId));
+    controls.hand1ItemId.setValue(this.normalizeNullableNumber(source.hand1ItemId));
+    controls.hand2ItemId.setValue(this.normalizeNullableNumber(source.hand2ItemId));
+    controls.numberOfAttacks.setValue(Math.max(1, this.normalizeNumber(source.numberOfAttacks, 1)));
     this.pcStatsRolled.set(true);
   }
 
   cancelEditPc(): void {
-    this.beginCreatePc();
+    this.closePcEditor();
+  }
+
+  closePcEditor(): void {
+    this.isPcEditorVisible.set(false);
+    this.editingUserPcId.set(null);
+    this.resetUserPcForm();
+    this.userPcSaveMessage.set(null);
   }
 
   upgradeNoa(pcId: number): void {
@@ -860,9 +875,50 @@ export class Dashboard implements OnInit {
             return;
           }
 
-          this.loadUserPcs();
+          const responsePc = response.pc as UserPcListItem & Record<string, unknown>;
+          const normalizedSavedPc = this.normalizeUserPcRecord({
+            ...response.pc,
+            tresherIds: this.normalizeIdList(
+              (responsePc['tresherIds'] ?? responsePc['tresherids'] ?? payload.tresherIds) as unknown
+            ),
+            primaryTresherId: this.normalizeNullableNumber(
+              (responsePc['primaryTresherId'] ?? responsePc['primarytresherid'] ?? payload.primaryTresherId) as number | string | null
+            ),
+            weaponTresherId: this.normalizeNullableNumber(
+              (responsePc['weaponTresherId'] ?? responsePc['weapontresherid'] ?? payload.weaponTresherId) as number | string | null
+            ),
+            headArmorTresherId: this.normalizeNullableNumber(
+              (responsePc['headArmorTresherId'] ?? responsePc['headarmortresherid'] ?? payload.headArmorTresherId) as number | string | null
+            ),
+            bodyArmorTresherId: this.normalizeNullableNumber(
+              (responsePc['bodyArmorTresherId'] ?? responsePc['bodyarmortresherid'] ?? payload.bodyArmorTresherId) as number | string | null
+            ),
+            leftArmArmorTresherId: this.normalizeNullableNumber(
+              (responsePc['leftArmArmorTresherId'] ?? responsePc['leftarmarmortresherid'] ?? payload.leftArmArmorTresherId) as number | string | null
+            ),
+            rightArmArmorTresherId: this.normalizeNullableNumber(
+              (responsePc['rightArmArmorTresherId'] ?? responsePc['rightarmarmortresherid'] ?? payload.rightArmArmorTresherId) as number | string | null
+            ),
+            leftLegArmorTresherId: this.normalizeNullableNumber(
+              (responsePc['leftLegArmorTresherId'] ?? responsePc['leftlegarmortresherid'] ?? payload.leftLegArmorTresherId) as number | string | null
+            ),
+            rightLegArmorTresherId: this.normalizeNullableNumber(
+              (responsePc['rightLegArmorTresherId'] ?? responsePc['rightlegarmortresherid'] ?? payload.rightLegArmorTresherId) as number | string | null
+            ),
+          });
+
+          this.userPcs.update((pcs) => {
+            const existingIndex = pcs.findIndex((pc) => pc.id === normalizedSavedPc.id);
+            if (existingIndex === -1) {
+              return this.sortUserPcsByName([normalizedSavedPc, ...pcs]);
+            }
+            const next = [...pcs];
+            next[existingIndex] = normalizedSavedPc;
+            return this.sortUserPcsByName(next);
+          });
+
           this.userPcSaveMessage.set(editingId ? 'PC updated.' : 'PC created.');
-          this.beginCreatePc(false);
+          this.closePcEditor();
 
           // If created a new PC in the main-game flow, auto-start the game
           const pendingGame = this.pendingStartGame();
@@ -967,27 +1023,9 @@ export class Dashboard implements OnInit {
       .pipe(finalize(() => this.isLoadingUserPcs.set(false)))
       .subscribe({
         next: (items) => {
-          const normalized = items.map((item) => ({
-            ...item,
-            species: this.normalizePcSpecies(item.species),
-            type: this.normalizePcType(item.type),
-            imageId: this.normalizeNullableNumber(item.imageId),
-            tresherIds: this.normalizeIdList(item.tresherIds),
-            primaryTresherId: this.normalizeNullableNumber(item.primaryTresherId),
-            weaponTresherId: this.normalizeNullableNumber(item.weaponTresherId),
-            headArmorTresherId: this.normalizeNullableNumber(item.headArmorTresherId),
-            bodyArmorTresherId: this.normalizeNullableNumber(item.bodyArmorTresherId),
-            leftArmArmorTresherId: this.normalizeNullableNumber(item.leftArmArmorTresherId),
-            rightArmArmorTresherId: this.normalizeNullableNumber(item.rightArmArmorTresherId),
-            leftLegArmorTresherId: this.normalizeNullableNumber(item.leftLegArmorTresherId),
-            rightLegArmorTresherId: this.normalizeNullableNumber(item.rightLegArmorTresherId),
-            ring1ItemId: this.normalizeNullableNumber(item.ring1ItemId),
-            ring2ItemId: this.normalizeNullableNumber(item.ring2ItemId),
-            ring3ItemId: this.normalizeNullableNumber(item.ring3ItemId),
-            ring4ItemId: this.normalizeNullableNumber(item.ring4ItemId),
-            ring5ItemId: this.normalizeNullableNumber(item.ring5ItemId),
-            necklaceItemId: this.normalizeNullableNumber(item.necklaceItemId),
-          }));
+          const normalized = this.sortUserPcsByName(
+            items.map((item) => this.normalizeUserPcRecord(item))
+          );
 
           this.userPcs.set(normalized);
         },
@@ -1129,6 +1167,19 @@ export class Dashboard implements OnInit {
     return new FormControl<number | null>(value);
   }
 
+  readonly compareNullableIds = (
+    left: number | string | null,
+    right: number | string | null
+  ): boolean => {
+    if (left === null || left === undefined || left === '') {
+      return right === null || right === undefined || right === '';
+    }
+    if (right === null || right === undefined || right === '') {
+      return false;
+    }
+    return Number(left) === Number(right);
+  };
+
   private get userPcTresherIdsArray(): FormArray<PcTresherControl> {
     return this.userPcForm.controls.tresherIds;
   }
@@ -1141,12 +1192,23 @@ export class Dashboard implements OnInit {
     return Math.trunc(value);
   }
 
-  private normalizeNullableNumber(value: number | null): number | null {
-    if (value === null || typeof value !== 'number' || !Number.isFinite(value)) {
+  private normalizeNullableNumber(value: number | string | null): number | null {
+    if (value === null || value === undefined || value === '') {
       return null;
     }
 
-    return Math.trunc(value);
+    const asNumber =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string'
+        ? Number.parseInt(value.trim(), 10)
+        : Number.NaN;
+
+    if (!Number.isFinite(asNumber)) {
+      return null;
+    }
+
+    return Math.trunc(asNumber);
   }
 
   private normalizeNullableText(value: string | null): string | null {
@@ -1291,7 +1353,7 @@ export class Dashboard implements OnInit {
     }
 
     const normalized = value
-      .map((entry) => this.normalizeNullableNumber(entry as number | null))
+      .map((entry) => this.normalizeNullableNumber(entry as number | string | null))
       .filter((entry): entry is number => entry !== null && entry > 0)
       .map((entry) => Math.trunc(entry));
 
@@ -1312,6 +1374,74 @@ export class Dashboard implements OnInit {
     return normalizedIds
       .map((id) => nameById.get(id) || `ID ${id}`)
       .join(', ');
+  }
+
+  private normalizeUserPcRecord(item: UserPcListItem): UserPcListItem {
+    const source = item as UserPcListItem & Record<string, unknown>;
+
+    return {
+      ...item,
+      species: this.normalizePcSpecies(String(source['species'] ?? item.species ?? 'Human')),
+      type: this.normalizePcType(String(source['type'] ?? item.type ?? 'Fighter')),
+      imageId: this.normalizeNullableNumber(
+        (source['imageId'] ?? source['imageid'] ?? item.imageId) as number | string | null
+      ),
+      tresherIds: this.normalizeIdList(
+        (source['tresherIds'] ?? source['tresherids'] ?? source['trusherIds'] ?? source['trusherids'] ?? item.tresherIds) as unknown
+      ),
+      primaryTresherId: this.normalizeNullableNumber(
+        (source['primaryTresherId'] ?? source['primarytresherid'] ?? source['primaryTrusherId'] ?? source['primarytrusherid'] ?? item.primaryTresherId) as number | string | null
+      ),
+      weaponTresherId: this.normalizeNullableNumber(
+        (source['weaponTresherId'] ?? source['weapontresherid'] ?? source['weaponTrusherId'] ?? source['weapontrusherid'] ?? item.weaponTresherId) as number | string | null
+      ),
+      headArmorTresherId: this.normalizeNullableNumber(
+        (source['headArmorTresherId'] ?? source['headarmortresherid'] ?? item.headArmorTresherId) as number | string | null
+      ),
+      bodyArmorTresherId: this.normalizeNullableNumber(
+        (source['bodyArmorTresherId'] ?? source['bodyarmortresherid'] ?? item.bodyArmorTresherId) as number | string | null
+      ),
+      leftArmArmorTresherId: this.normalizeNullableNumber(
+        (source['leftArmArmorTresherId'] ?? source['leftarmarmortresherid'] ?? item.leftArmArmorTresherId) as number | string | null
+      ),
+      rightArmArmorTresherId: this.normalizeNullableNumber(
+        (source['rightArmArmorTresherId'] ?? source['rightarmarmortresherid'] ?? item.rightArmArmorTresherId) as number | string | null
+      ),
+      leftLegArmorTresherId: this.normalizeNullableNumber(
+        (source['leftLegArmorTresherId'] ?? source['leftlegarmortresherid'] ?? item.leftLegArmorTresherId) as number | string | null
+      ),
+      rightLegArmorTresherId: this.normalizeNullableNumber(
+        (source['rightLegArmorTresherId'] ?? source['rightlegarmortresherid'] ?? item.rightLegArmorTresherId) as number | string | null
+      ),
+      ring1ItemId: this.normalizeNullableNumber(
+        (source['ring1ItemId'] ?? source['ring1itemid'] ?? item.ring1ItemId) as number | string | null
+      ),
+      ring2ItemId: this.normalizeNullableNumber(
+        (source['ring2ItemId'] ?? source['ring2itemid'] ?? item.ring2ItemId) as number | string | null
+      ),
+      ring3ItemId: this.normalizeNullableNumber(
+        (source['ring3ItemId'] ?? source['ring3itemid'] ?? item.ring3ItemId) as number | string | null
+      ),
+      ring4ItemId: this.normalizeNullableNumber(
+        (source['ring4ItemId'] ?? source['ring4itemid'] ?? item.ring4ItemId) as number | string | null
+      ),
+      ring5ItemId: this.normalizeNullableNumber(
+        (source['ring5ItemId'] ?? source['ring5itemid'] ?? item.ring5ItemId) as number | string | null
+      ),
+      necklaceItemId: this.normalizeNullableNumber(
+        (source['necklaceItemId'] ?? source['necklaceitemid'] ?? item.necklaceItemId) as number | string | null
+      ),
+    };
+  }
+
+  private sortUserPcsByName(items: UserPcListItem[]): UserPcListItem[] {
+    return [...items].sort((a, b) => {
+      const byName = (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' });
+      if (byName !== 0) {
+        return byName;
+      }
+      return a.id - b.id;
+    });
   }
 
 }

@@ -88,6 +88,8 @@ interface GameSessionPayload {
   resettablePerPc?: boolean;
   dungonSpReward?: number;
   monsterImages?: { id: number; path: string }[];
+  lootImages?: { id: number; path: string }[];
+  soundPaths?: { id: number; path: string }[];
 }
 
 interface ImageRecordPayload {
@@ -130,6 +132,15 @@ interface ShopSellEntry {
   sourceId: number;
   name: string;
   sellPrice: number;
+}
+
+interface NearbyObstacleInfo {
+  obstacle: ObstaclePlacement;
+  direction: string;
+  canOpen: boolean;
+  canUseKey: boolean;
+  canTakeItem: boolean;
+  hasMatchingKey: boolean;
 }
 
 @Component({
@@ -713,7 +724,18 @@ export class Game implements OnInit {
         item.column === forwardTarget.column &&
         (item.kind === 'Item' || item.kind === 'Tresher')
     );
-    return [...ownCell, ...forwardCellItems];
+    const currentSquareObstacleLoot = this.getTakeableObstacleDiscoveryItemsForSquare(
+      preview.dungonId,
+      preview.centerRow,
+      preview.centerColumn
+    );
+    const forwardSquareObstacleLoot = this.getTakeableObstacleDiscoveryItemsForSquare(
+      preview.dungonId,
+      forwardTarget.row,
+      forwardTarget.column
+    );
+
+    return [...ownCell, ...forwardCellItems, ...currentSquareObstacleLoot, ...forwardSquareObstacleLoot];
   }
 
   otherNearbyItemsForPreview(): NearbyDiscoveryItem[] {
@@ -839,7 +861,14 @@ export class Game implements OnInit {
 
     const imageBySquare = new Map<string, HTMLImageElement | null>();
     const treshersById = new Map((this.tresherListByDungon()[preview.dungonId] ?? []).map((tresher) => [tresher.id, tresher]));
-    const itemsById = new Map((this.floorItemListByDungon()[preview.dungonId] ?? []).map((item) => [item.id, item]));
+    const itemsById = new Map<number, { imageId?: number | null }>(
+      (this.floorItemListByDungon()[preview.dungonId] ?? []).map((item) => [item.id, item])
+    );
+    for (const item of this.pcTresherItemsById().values()) {
+      if (!itemsById.has(item.id)) {
+        itemsById.set(item.id, item);
+      }
+    }
 
     const setSquareImage = (squareKey: string, imageId: number | null | undefined): void => {
       if (imageBySquare.has(squareKey) && imageBySquare.get(squareKey) !== null) {
@@ -859,7 +888,7 @@ export class Game implements OnInit {
     for (const placement of this.tresherPlacementsByDungon()[preview.dungonId] ?? []) {
       const squareKey = this.getSquareKey(placement.row, placement.column);
       const tresher = treshersById.get(placement.tresherId);
-      setSquareImage(squareKey, tresher?.imageId ?? null);
+      setSquareImage(squareKey, this.resolveTresherDisplayImageId(tresher, itemsById));
     }
 
     for (const placement of this.floorItemPlacementsByDungon()[preview.dungonId] ?? []) {
@@ -869,7 +898,45 @@ export class Game implements OnInit {
       setSquareImage(squareKey, itemImageId);
     }
 
+    for (const obs of this.obstaclePlacementsByDungon()[preview.dungonId] ?? []) {
+      if (obs.isDestroyed || obs.itemTaken || typeof obs.containsItemId !== 'number') {
+        continue;
+      }
+
+      const squareKey = this.getSquareKey(obs.row, obs.column);
+      const containedItem = itemsById.get(obs.containsItemId);
+      const containedItemImageId =
+        (containedItem as { imageId?: number | null } | undefined)?.imageId ?? null;
+      setSquareImage(squareKey, containedItemImageId);
+    }
+
     return imageBySquare;
+  }
+
+  private resolveTresherDisplayImageId(
+    tresher: Tresher | undefined,
+    itemsById: Map<number, { imageId?: number | null }>
+  ): number | null {
+    if (!tresher) {
+      return null;
+    }
+
+    if (typeof tresher.imageId === 'number' && tresher.imageId > 0) {
+      return tresher.imageId;
+    }
+
+    const candidateItemIds = [tresher.item1Id, tresher.item2Id, tresher.item3Id, tresher.item4Id];
+    for (const itemId of candidateItemIds) {
+      if (typeof itemId !== 'number' || itemId <= 0) {
+        continue;
+      }
+      const imageId = itemsById.get(itemId)?.imageId ?? null;
+      if (typeof imageId === 'number' && imageId > 0) {
+        return imageId;
+      }
+    }
+
+    return null;
   }
 
   inventoryKeysForPreview(): Key[] {
@@ -3202,6 +3269,76 @@ export class Game implements OnInit {
       }
     }
 
+    // Check obstacle traps at current square
+    const obstaclesAtCurrentSquare = (this.obstaclePlacementsByDungon()[current.dungonId] ?? []).filter(
+      (obs) =>
+        obs.row === current.row &&
+        obs.column === current.column &&
+        obs.trap !== null &&
+        !obs.isDestroyed &&
+        !obs.isTrapDisarmed
+    );
+    for (const obstacle of obstaclesAtCurrentSquare) {
+      if (mindRoll >= obstacle.trap!.toDetect) {
+        this.foundTrap.set({ trap: obstacle.trap!, source: 'obstacle', obstacleId: obstacle.id });
+        this.previewActionMessage.set(
+          `You find a trap on ${obstacle.name || 'the obstacle'}: ${obstacle.trap!.name || 'Trap'} (rolled ${mindRoll} vs DC ${obstacle.trap!.toDetect}).`
+        );
+        this.obstaclePlacementsByDungon.update((all) => ({
+          ...all,
+          [current.dungonId]: (all[current.dungonId] ?? []).map((obs) =>
+            obs.id === obstacle.id ? { ...obs, isTrapDetected: true } : obs
+          ),
+        }));
+        this.saveGameState();
+        if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
+        return;
+      }
+    }
+
+    // Check obstacle traps in adjacent squares (one cell away through open/door connections)
+    for (const adj of adjacentChecks) {
+      const adjRow = current.row + adj.dr;
+      const adjCol = current.column + adj.dc;
+      const adjKey = this.getSquareKey(adjRow, adjCol);
+      if (!filledSquares[adjKey]) continue;
+      const blockType = this.getMovementBlockTypeBetweenAdjacentSquares(
+        current.dungonId, current.row, current.column, adjRow, adjCol
+      );
+      if (blockType === 'wall') continue;
+      const adjObstacles = (this.obstaclePlacementsByDungon()[current.dungonId] ?? []).filter(
+        (obs) =>
+          obs.row === adjRow &&
+          obs.column === adjCol &&
+          obs.trap !== null &&
+          !obs.isDestroyed &&
+          !obs.isTrapDisarmed
+      );
+      for (const obstacle of adjObstacles) {
+        if (mindRoll >= obstacle.trap!.toDetect) {
+          this.foundTrap.set({
+            trap: obstacle.trap!,
+            source: 'obstacle',
+            obstacleId: obstacle.id,
+            adjacentRow: adjRow,
+            adjacentColumn: adjCol,
+          });
+          this.previewActionMessage.set(
+            `You find a trap on ${obstacle.name || 'the obstacle'} to the ${adj.label}: ${obstacle.trap!.name || 'Trap'} (rolled ${mindRoll} vs DC ${obstacle.trap!.toDetect}).`
+          );
+          this.obstaclePlacementsByDungon.update((all) => ({
+            ...all,
+            [current.dungonId]: (all[current.dungonId] ?? []).map((obs) =>
+              obs.id === obstacle.id ? { ...obs, isTrapDetected: true } : obs
+            ),
+          }));
+          this.saveGameState();
+          if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
+          return;
+        }
+      }
+    }
+
     // Check tresher traps at current square
     const treshers = this.getTreshersAtSquare(current.dungonId, current.row, current.column);
     for (let i = 0; i < treshers.length; i++) {
@@ -3297,6 +3434,93 @@ export class Game implements OnInit {
     );
   }
 
+  nearbyObstaclesForPreview(): NearbyObstacleInfo[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return [];
+    }
+
+    const inventoryKeys = this.inventoryKeysForPreview();
+    const centerRow = preview.centerRow;
+    const centerColumn = preview.centerColumn;
+    const cardinalChecks: Array<{ dr: number; dc: number; label: string }> = [
+      { dr: -1, dc: 0, label: 'North' },
+      { dr: 0, dc: 1, label: 'East' },
+      { dr: 1, dc: 0, label: 'South' },
+      { dr: 0, dc: -1, label: 'West' },
+    ];
+
+    const directionByPosition = new Map<string, string>();
+    for (const check of cardinalChecks) {
+      directionByPosition.set(`${centerRow + check.dr}:${centerColumn + check.dc}`, check.label);
+    }
+
+    const obstacles = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
+    return obstacles
+      .filter((obs) => {
+        if (!this.isObstacleInteractableFromPreview(preview.dungonId, centerRow, centerColumn, obs)) {
+          return false;
+        }
+
+        // Current-square obstacles already have a dedicated action block.
+        if (obs.row === centerRow && obs.column === centerColumn) {
+          return false;
+        }
+
+        return !!directionByPosition.get(`${obs.row}:${obs.column}`);
+      })
+      .map((obstacle) => {
+        const requiredKeyId = obstacle.requiredKeyId ?? null;
+        const hasMatchingKey =
+          requiredKeyId !== null && inventoryKeys.some((key) => key.id === requiredKeyId);
+        const canInteractWithItem = obstacle.containsItemId !== null && !obstacle.itemTaken;
+        const canTakeItem = canInteractWithItem && (obstacle.isDestroyed || obstacle.isOpened === true);
+        const canOpen = canInteractWithItem && !obstacle.isDestroyed && obstacle.isOpened !== true;
+        const canUseKey =
+          canInteractWithItem &&
+          !obstacle.isDestroyed &&
+          obstacle.isOpened !== true &&
+          requiredKeyId !== null &&
+          hasMatchingKey;
+
+        return {
+          obstacle,
+          direction: directionByPosition.get(`${obstacle.row}:${obstacle.column}`) ?? 'Nearby',
+          canOpen,
+          canUseKey,
+          canTakeItem,
+          hasMatchingKey,
+        };
+      })
+      .sort((left, right) => left.direction.localeCompare(right.direction));
+  }
+
+  private isObstacleInteractableFromPreview(
+    dungonId: number,
+    centerRow: number,
+    centerColumn: number,
+    obstacle: ObstaclePlacement,
+  ): boolean {
+    if (obstacle.row === centerRow && obstacle.column === centerColumn) {
+      return true;
+    }
+
+    const rowDelta = Math.abs(obstacle.row - centerRow);
+    const columnDelta = Math.abs(obstacle.column - centerColumn);
+    if (rowDelta + columnDelta !== 1) {
+      return false;
+    }
+
+    const blockType = this.getMovementBlockTypeBetweenAdjacentSquares(
+      dungonId,
+      centerRow,
+      centerColumn,
+      obstacle.row,
+      obstacle.column,
+    );
+    return this.isTransparentConnectionType(blockType);
+  }
+
   smashObstacle(obstacleId: number): void {
     if (this.turnPhase() !== 'player') return;
     const preview = this.gridPreviewContext();
@@ -3353,6 +3577,19 @@ export class Game implements OnInit {
     const obstacles = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
     const obs = obstacles.find((o) => o.id === obstacleId);
     if (!obs || obs.containsItemId === null || obs.itemTaken) return;
+    if (!this.isObstacleInteractableFromPreview(preview.dungonId, preview.centerRow, preview.centerColumn, obs)) {
+      this.previewActionMessage.set('Move next to that obstacle first.');
+      return;
+    }
+    if (obs.trap && !obs.isTrapDisarmed) {
+      this.previewActionMessage.set(`${obs.name || 'Obstacle'} was trapped!`);
+      this.addCombatLog(`You try to take an item from ${obs.name || 'the obstacle'} but a trap triggers!`);
+      this.triggerTrap(obs.trap);
+      this.consumePlayerAE(1, preview.dungonId);
+      this.saveGameState();
+      if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
+      return;
+    }
     if (!obs.isDestroyed && !obs.isOpened) {
       this.previewActionMessage.set('Open this obstacle first.');
       return;
@@ -3400,11 +3637,25 @@ export class Game implements OnInit {
     const obstacles = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
     const obs = obstacles.find((o) => o.id === obstacleId);
     if (!obs || obs.isDestroyed || obs.containsItemId === null || obs.itemTaken) return;
+    if (!this.isObstacleInteractableFromPreview(preview.dungonId, preview.centerRow, preview.centerColumn, obs)) {
+      this.previewActionMessage.set('Move next to that obstacle first.');
+      return;
+    }
 
     const requiredKeyId = obs.requiredKeyId ?? null;
     if (requiredKeyId !== null && !this.inventoryKeysForPreview().some((key) => key.id === requiredKeyId)) {
       const requiredKeyName = this.keyList.find((key) => key.id === requiredKeyId)?.name || `Key #${requiredKeyId}`;
       this.previewActionMessage.set(`You need ${requiredKeyName} to open this obstacle.`);
+      return;
+    }
+
+    if (obs.trap && !obs.isTrapDisarmed) {
+      this.previewActionMessage.set(`${obs.name || 'Obstacle'} was trapped!`);
+      this.addCombatLog(`You try to open ${obs.name || 'the obstacle'} but a trap triggers!`);
+      this.triggerTrap(obs.trap);
+      this.consumePlayerAE(1, preview.dungonId);
+      this.saveGameState();
+      if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') this.startMonsterTurns();
       return;
     }
 
@@ -3436,6 +3687,20 @@ export class Game implements OnInit {
 
     const key = this.keyList.find((entry) => entry.id === requiredKeyId);
     return key?.name?.trim() || `Key #${requiredKeyId}`;
+  }
+
+  obstacleHasMatchingKey(obstacle: ObstaclePlacement): boolean {
+    const requiredKeyId = obstacle.requiredKeyId ?? null;
+    if (requiredKeyId === null) {
+      return false;
+    }
+
+    return this.inventoryKeysForPreview().some((key) => key.id === requiredKeyId);
+  }
+
+  obstacleOpenButtonLabel(obstacle: ObstaclePlacement): string {
+    const requiredKeyId = obstacle.requiredKeyId ?? null;
+    return requiredKeyId !== null && this.obstacleHasMatchingKey(obstacle) ? 'Use Key' : 'Open Obstacle';
   }
 
   examineObstacle(obstacleId: number): void {
@@ -3496,6 +3761,13 @@ export class Game implements OnInit {
           [preview.dungonId]: (all[preview.dungonId] ?? []).map(p =>
             p.id === found.floorTrapId ? { ...p, isDisarmed: true } : p
           )
+        }));
+      } else if (found.source === 'obstacle' && found.obstacleId != null) {
+        this.obstaclePlacementsByDungon.update((all) => ({
+          ...all,
+          [preview.dungonId]: (all[preview.dungonId] ?? []).map((p) =>
+            p.id === found.obstacleId ? { ...p, isTrapDetected: true, isTrapDisarmed: true } : p
+          ),
         }));
       }
       this.foundTrap.set(null);
@@ -3596,6 +3868,10 @@ export class Game implements OnInit {
           (p) => p.row === forwardTarget.row && p.column === forwardTarget.column
         )
       : [];
+    const currentObstacleLoot = this.getTakeableObstacleDiscoveryItemsForSquare(current.dungonId, current.row, current.column);
+    const forwardObstacleLoot = forwardTarget
+      ? this.getTakeableObstacleDiscoveryItemsForSquare(current.dungonId, forwardTarget.row, forwardTarget.column)
+      : [];
 
     if (
       keysAtSquare.length === 0 &&
@@ -3604,7 +3880,9 @@ export class Game implements OnInit {
       floorPotionsHere.length === 0 &&
       floorSpellsHere.length === 0 &&
       forwardTresherPlacements.length === 0 &&
-      forwardFloorItemsHere.length === 0
+      forwardFloorItemsHere.length === 0 &&
+      currentObstacleLoot.length === 0 &&
+      forwardObstacleLoot.length === 0
     ) {
       this.previewActionMessage.set('Nothing to take on this square.');
       return;
@@ -3742,6 +4020,10 @@ export class Game implements OnInit {
     if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
       this.startMonsterTurns();
     }
+    for (const obstacleLoot of [...currentObstacleLoot, ...forwardObstacleLoot]) {
+      if (obstacleLoot.obstacleId == null) continue;
+      this.takeItemFromObstacle(obstacleLoot.obstacleId);
+    }
   }
 
   takeSomeFromCurrentSquare(): void {
@@ -3810,6 +4092,21 @@ export class Game implements OnInit {
           return k;
         });
         this.previewActionMessage.set(`Took ${keyToTake.name || 'Key'}.`);
+        break;
+      }
+      case 'Obstacle': {
+        if (item.obstacleId !== null && item.obstacleId !== undefined) {
+          this.takeItemFromObstacle(item.obstacleId);
+          break;
+        }
+        const obstacle = (this.obstaclePlacementsByDungon()[current.dungonId] ?? []).find(
+          (obs) => obs.row === item.row && obs.column === item.column && obs.containsItemId !== null && !obs.itemTaken
+        );
+        if (!obstacle) {
+          this.previewActionMessage.set('Could not find obstacle loot.');
+          return;
+        }
+        this.takeItemFromObstacle(obstacle.id);
         break;
       }
       case 'Tresher': {
@@ -4019,6 +4316,34 @@ export class Game implements OnInit {
                 };
                 img.src = url;
               }
+            }
+            if (Array.isArray(game.lootImages)) {
+              for (const asset of game.lootImages) {
+                if (typeof asset.id !== 'number' || !asset.path) continue;
+                if (this.lootImageCache.has(asset.id)) continue;
+                const url = this.resolveImageUrl(asset.path);
+                if (!url) continue;
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                  this.lootImageCache.set(asset.id, img);
+                  this.lootImageCacheVersion.update((v) => v + 1);
+                  this.drawFirstPersonViewCanvas();
+                };
+                img.src = url;
+              }
+            }
+            if (Array.isArray(game.soundPaths) && game.soundPaths.length > 0) {
+              this.soundPathById.update((existingMap) => {
+                const merged = new Map(existingMap);
+                for (const asset of game.soundPaths ?? []) {
+                  if (typeof asset.id !== 'number' || typeof asset.path !== 'string') continue;
+                  const trimmedPath = asset.path.trim();
+                  if (!trimmedPath) continue;
+                  merged.set(asset.id, trimmedPath);
+                }
+                return merged;
+              });
             }
             this.loadMonsterImages(game.dungonid);
             this.loadObstacleImages(game.dungonid);
@@ -4399,6 +4724,13 @@ export class Game implements OnInit {
       }
     }
 
+    for (const item of this.pcTresherItemsById().values()) {
+      const imageId = (item as { imageId?: number | null }).imageId;
+      if (typeof imageId === 'number' && imageId > 0 && !this.lootImageCache.has(imageId)) {
+        imageIds.add(imageId);
+      }
+    }
+
     if (imageIds.size === 0) {
       return;
     }
@@ -4503,18 +4835,19 @@ export class Game implements OnInit {
     }
 
     const latestCatalogSpell = this.spellCatalogById().get(spell.id);
-    const directPath = typeof spell.soundPath === 'string' && spell.soundPath.trim()
-      ? spell.soundPath.trim()
-      : typeof latestCatalogSpell?.soundPath === 'string' && latestCatalogSpell.soundPath.trim()
-        ? latestCatalogSpell.soundPath.trim()
-      : null;
     const soundId = typeof spell.soundId === 'number'
       ? spell.soundId
       : typeof latestCatalogSpell?.soundId === 'number'
         ? latestCatalogSpell.soundId
         : null;
     const selectedPath = soundId !== null ? this.soundPathById().get(soundId) ?? null : null;
-    if (!directPath && soundId == null) {
+    const directPath = typeof latestCatalogSpell?.soundPath === 'string' && latestCatalogSpell.soundPath.trim()
+      ? latestCatalogSpell.soundPath.trim()
+      : typeof spell.soundPath === 'string' && spell.soundPath.trim()
+        ? spell.soundPath.trim()
+      : null;
+
+    if (soundId === null && !directPath) {
       const userKey = this.account.getKey();
       if (userKey) {
         this.loadSpellCatalog(userKey, true);
@@ -4526,7 +4859,7 @@ export class Game implements OnInit {
         this.loadSoundCatalog(userKey, true);
       }
     }
-    const soundPath = directPath ?? selectedPath ?? this.defaultSpellSoundPath;
+    const soundPath = selectedPath ?? directPath ?? this.defaultSpellSoundPath;
     this.playSoundPath(soundPath);
   }
 
@@ -4738,6 +5071,25 @@ export class Game implements OnInit {
     return this.nearbyItemsForPreview().filter(
       (item) => item.row === preview.centerRow && item.column === preview.centerColumn
     );
+  }
+
+  private getTakeableObstacleDiscoveryItemsForSquare(
+    dungonId: number,
+    row: number,
+    column: number
+  ): NearbyDiscoveryItem[] {
+    const obstacles = this.obstaclePlacementsByDungon()[dungonId] ?? [];
+    return obstacles
+      .filter((obs) => obs.row === row && obs.column === column && obs.containsItemId !== null && !obs.itemTaken)
+      .filter((obs) => obs.isDestroyed || obs.isOpened === true)
+      .map((obs) => ({
+        kind: 'Obstacle',
+        name: obs.name || 'Obstacle',
+        description: obs.isDestroyed ? 'Loot falls from the rubble.' : 'There is something inside.',
+        row: obs.row,
+        column: obs.column,
+        obstacleId: obs.id,
+      }));
   }
 
   private getForwardPickupSquareContext(
@@ -5454,16 +5806,44 @@ export class Game implements OnInit {
     );
     const firstPersonView = this.getFirstPersonView(preview, cheater);
     const tresherPlacements = this.tresherPlacementsByDungon()[preview.dungonId] ?? [];
+    const treshersById = new Map(
+      (this.tresherListByDungon()[preview.dungonId] ?? []).map((tresher) => [tresher.id, tresher])
+    );
+    const floorItemsById = new Map<number, { imageId?: number | null }>(
+      (this.floorItemListByDungon()[preview.dungonId] ?? []).map((item) => [item.id, item])
+    );
+    for (const item of this.pcTresherItemsById().values()) {
+      if (!floorItemsById.has(item.id)) {
+        floorItemsById.set(item.id, item);
+      }
+    }
     const tresherCountBySquare = new Map<string, number>();
     const bagSquareKeys = new Set<string>();
+    const lootImageBySquare = new Map<string, HTMLImageElement | null>();
     for (const placement of tresherPlacements) {
       const squareKey = this.getSquareKey(placement.row, placement.column);
       const existingCount = tresherCountBySquare.get(squareKey) ?? 0;
       tresherCountBySquare.set(squareKey, existingCount + 1);
       bagSquareKeys.add(squareKey);
+      if (!lootImageBySquare.has(squareKey)) {
+        const tresher = treshersById.get(placement.tresherId);
+        const displayImageId = this.resolveTresherDisplayImageId(tresher, floorItemsById);
+        const tresherImage = typeof displayImageId === 'number' && displayImageId > 0
+          ? (this.lootImageCache.get(displayImageId) ?? null)
+          : null;
+        lootImageBySquare.set(squareKey, tresherImage);
+      }
     }
     for (const placement of (this.floorItemPlacementsByDungon()[preview.dungonId] ?? [])) {
-      bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
+      const squareKey = this.getSquareKey(placement.row, placement.column);
+      bagSquareKeys.add(squareKey);
+      if (!lootImageBySquare.has(squareKey)) {
+        const item = (this.floorItemListByDungon()[preview.dungonId] ?? []).find((it) => it.id === placement.itemId) ?? null;
+        const itemImage = item && typeof item.imageId === 'number' && item.imageId > 0
+          ? (this.lootImageCache.get(item.imageId) ?? null)
+          : null;
+        lootImageBySquare.set(squareKey, itemImage);
+      }
     }
     for (const placement of (this.floorPotionPlacementsByDungon()[preview.dungonId] ?? [])) {
       bagSquareKeys.add(this.getSquareKey(placement.row, placement.column));
@@ -5843,12 +6223,14 @@ export class Game implements OnInit {
         );
 
         for (const slot of visibleBagSlots) {
+          const lootImage = lootImageBySquare.get(slot.squareKey) ?? null;
           if (slot.isPeek) {
             this.drawFirstPersonPeekBag(
               context,
               width,
               nearFrame,
               farFrame,
+              lootImage,
               slot.lateralOffset < 0 ? 'left' : 'right'
             );
           } else {
@@ -5856,6 +6238,7 @@ export class Game implements OnInit {
               context,
               nearFrame,
               farFrame,
+              lootImage,
               slot.lateralOffset,
               lateralRange
             );
@@ -6455,23 +6838,46 @@ export class Game implements OnInit {
     context: CanvasRenderingContext2D,
     nearFrame: { left: number; right: number; top: number; bottom: number },
     farFrame: { left: number; right: number; top: number; bottom: number },
+    image: HTMLImageElement | null,
     lateralOffset = 0,
     lateralRange = 1
   ): void {
     const midLeft = (nearFrame.left + farFrame.left) / 2;
     const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midTop = (nearFrame.top + farFrame.top) / 2;
+    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
     const tileWidth = midRight - midLeft;
+    const tileHeight = midBottom - midTop;
     const normalizedOffset = lateralRange <= 0 ? 0 : lateralOffset / (Math.max(1, lateralRange) + 0.65);
     const shiftedCenterX = (midLeft + midRight) / 2 + normalizedOffset * tileWidth * 0.82;
     const minCenterX = midLeft + tileWidth * 0.12;
     const maxCenterX = midRight - tileWidth * 0.12;
     const centerX = Math.max(minCenterX, Math.min(maxCenterX, shiftedCenterX));
-    const floorY = (nearFrame.bottom + farFrame.bottom) / 2;
+    const floorY = midBottom;
     const bagW = Math.max(12, Math.min(64, tileWidth * 0.45));
     const bagH = bagW * 1.15;
     const bagLeft = centerX - bagW / 2;
     const bagBottom = floorY - 1;
     const bagTop = bagBottom - bagH;
+
+    if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+      const maxWidth = tileWidth * 0.50;
+      const maxHeight = tileHeight * 0.64;
+      const aspectRatio = image.naturalWidth / image.naturalHeight;
+      let drawWidth = maxWidth;
+      let drawHeight = drawWidth / aspectRatio;
+      if (drawHeight > maxHeight) {
+        drawHeight = maxHeight;
+        drawWidth = drawHeight * aspectRatio;
+      }
+      drawWidth = Math.max(10, drawWidth);
+      drawHeight = Math.max(10, drawHeight);
+      const drawX = centerX - drawWidth / 2;
+      const drawY = bagBottom - drawHeight;
+      context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      return;
+    }
+
     const r = bagW * 0.20;
 
     // Soft glow shadow under the bag so it reads against any floor
@@ -6621,6 +7027,7 @@ export class Game implements OnInit {
     canvasWidth: number,
     nearFrame: { left: number; right: number; top: number; bottom: number },
     farFrame: { left: number; right: number; top: number; bottom: number },
+    image: HTMLImageElement | null,
     side: 'left' | 'right'
   ): void {
     context.save();
@@ -6636,6 +7043,7 @@ export class Game implements OnInit {
       context,
       nearFrame,
       farFrame,
+      image,
       side === 'left' ? -1 : 1,
       1
     );

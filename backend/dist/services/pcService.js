@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.tavernTurnIn = exports.fetchSamplePcById = exports.fetchAllPcsForAdmin = exports.setMainGamePc = exports.setSamplePc = exports.fetchSamplePcs = exports.savePcForUser = exports.upgradeStat = exports.createPcForUser = exports.upgradeNod = exports.upgradeNoa = exports.awardSpToPc = exports.fetchPcByIdForUser = exports.fetchPcsByUserGuid = void 0;
 const pcRepository_1 = require("../repositories/pcRepository");
 const tresherRepository_1 = require("../repositories/tresherRepository");
+const tresherRepository_2 = require("../repositories/tresherRepository");
 const itemRepository_1 = require("../repositories/itemRepository");
 const spellRepository_1 = require("../repositories/spellRepository");
 const potionRepository_1 = require("../repositories/potionRepository");
@@ -65,11 +66,14 @@ async function assignStarterGear(pcId, userguid, pcType) {
         gear.potions.some((n) => potionId(n) !== null);
     if (!hasContent)
         return;
-    const tresher = await (0, tresherRepository_1.insertTresherForUser)(userguid, {
+    const starterPayload = {
         type: 'OtherTresher',
         name: gear.label,
         description: 'Your starting equipment.',
-        gold: 0, silver: 0, copper: 0, zinc: 0,
+        gold: 0,
+        silver: 0,
+        copper: 0,
+        zinc: 0,
         item1Id: gear.items[0] ? itemId(gear.items[0]) : null,
         item2Id: gear.items[1] ? itemId(gear.items[1]) : null,
         item3Id: gear.items[2] ? itemId(gear.items[2]) : null,
@@ -78,7 +82,8 @@ async function assignStarterGear(pcId, userguid, pcType) {
         spell2Id: gear.spells[1] ? spellId(gear.spells[1]) : null,
         spell3Id: gear.spells[2] ? spellId(gear.spells[2]) : null,
         spell4Id: gear.spells[3] ? spellId(gear.spells[3]) : null,
-        curse1Id: null, curse2Id: null,
+        curse1Id: null,
+        curse2Id: null,
         potion1Id: gear.potions[0] ? potionId(gear.potions[0]) : null,
         potion2Id: gear.potions[1] ? potionId(gear.potions[1]) : null,
         potion3Id: gear.potions[2] ? potionId(gear.potions[2]) : null,
@@ -87,8 +92,37 @@ async function assignStarterGear(pcId, userguid, pcType) {
         spReward: 0,
         imageId: null,
         soundId: null,
-    });
-    await (0, pcRepository_1.addTresherIdToPcInDb)(pcId, tresher.id);
+    };
+    const existingTreshers = await (0, tresherRepository_2.getTreshersByUserGuid)(userguid);
+    const existingStarterTresher = existingTreshers.find((t) => (t.name ?? '').trim().toLowerCase() === starterPayload.name.trim().toLowerCase() &&
+        (t.type ?? '') === starterPayload.type &&
+        (t.description ?? '') === starterPayload.description &&
+        t.item1Id === starterPayload.item1Id &&
+        t.item2Id === starterPayload.item2Id &&
+        t.item3Id === starterPayload.item3Id &&
+        t.item4Id === starterPayload.item4Id &&
+        t.spell1Id === starterPayload.spell1Id &&
+        t.spell2Id === starterPayload.spell2Id &&
+        t.spell3Id === starterPayload.spell3Id &&
+        t.spell4Id === starterPayload.spell4Id &&
+        t.potion1Id === starterPayload.potion1Id &&
+        t.potion2Id === starterPayload.potion2Id &&
+        t.potion3Id === starterPayload.potion3Id &&
+        t.curse1Id === starterPayload.curse1Id &&
+        t.curse2Id === starterPayload.curse2Id &&
+        t.gold === starterPayload.gold &&
+        t.silver === starterPayload.silver &&
+        t.copper === starterPayload.copper &&
+        t.zinc === starterPayload.zinc &&
+        t.spReward === starterPayload.spReward &&
+        t.isquest === starterPayload.isquest &&
+        t.isPublic === starterPayload.isPublic);
+    const starterTresher = existingStarterTresher ?? await (0, tresherRepository_1.insertTresherForUser)(userguid, starterPayload);
+    const pc = await (0, pcRepository_1.getPcByIdForUser)(pcId, userguid);
+    if (!pc || pc.tresherIds.includes(starterTresher.id)) {
+        return;
+    }
+    await (0, pcRepository_1.addTresherIdToPcInDb)(pcId, starterTresher.id);
 }
 const upgradeStat = async (id, userguid, stat) => {
     return await (0, pcRepository_1.upgradeStat)(id, userguid, stat);

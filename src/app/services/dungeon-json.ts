@@ -30,6 +30,18 @@ export class DungeonJsonService {
     return Math.floor(value);
   }
 
+  private parseNullableId(primary: unknown, secondary?: unknown): number | null {
+    const candidate = primary ?? secondary;
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      return Math.floor(candidate);
+    }
+    if (typeof candidate === 'string' && candidate.trim()) {
+      const parsed = Number.parseInt(candidate, 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  }
+
   // --- Public parsing methods ---
 
   parseTrapObject(raw: unknown): Trap | null {
@@ -84,8 +96,8 @@ export class DungeonJsonService {
       potion1Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion1Id'])),
       potion2Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion2Id'])),
       potion3Id: this.normalizeNullableNumber(this.toFiniteNumber(source['potion3Id'])),
-      imageId: this.normalizeNullableNumber(this.toFiniteNumber(source['imageId'])),
-      soundId: this.normalizeNullableNumber(this.toFiniteNumber(source['soundId'])),
+      imageId: this.normalizeNullableNumber(this.parseNullableId(source['imageId'], source['imageid'])),
+      soundId: this.normalizeNullableNumber(this.parseNullableId(source['soundId'], source['soundid'])),
       spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['spReward']), 0)),
       trap: this.parseTrapObject(source['trap']),
     };
@@ -291,6 +303,7 @@ export class DungeonJsonService {
               : typeof src['requiredkeyid'] === 'string' && src['requiredkeyid']
                 ? (parseInt(src['requiredkeyid'], 10) || null)
                 : null,
+        trap: this.parseTrapObject(src['trap']),
         shape,
         heightPercent,
         heightAnchor,
@@ -301,6 +314,8 @@ export class DungeonJsonService {
         isDestroyed: src['isDestroyed'] === true,
         isOpened: src['isOpened'] === true,
         itemTaken: src['itemTaken'] === true,
+        isTrapDetected: src['isTrapDetected'] === true,
+        isTrapDisarmed: src['isTrapDisarmed'] === true,
       });
     }
     return result;
