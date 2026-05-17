@@ -3,6 +3,7 @@ import {
   UpsertPotionPayload,
   getPotionsByUserGuid,
   getPotionsByIds,
+  getAllPotionsWithUsername,
   insertPotionForUser,
   isAdminUserByGuid,
   updatePotionForUser,
@@ -10,6 +11,10 @@ import {
 
 export const fetchPotionsByUserGuid = async (userguid: string): Promise<PotionRecord[]> => {
   return await getPotionsByUserGuid(userguid);
+};
+
+export const fetchAllPotionsWithUsername = async (): Promise<PotionRecord[]> => {
+  return await getAllPotionsWithUsername();
 };
 
 export const fetchPotionsByIds = async (ids: number[]): Promise<PotionRecord[]> => {

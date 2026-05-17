@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tavernTurnIn = exports.fetchSamplePcById = exports.fetchAllPcsForAdmin = exports.setMainGamePc = exports.setSamplePc = exports.fetchSamplePcs = exports.savePcForUser = exports.upgradeStat = exports.createPcForUser = exports.upgradeNod = exports.upgradeNoa = exports.awardSpToPc = exports.fetchPcByIdForUser = exports.fetchPcsByUserGuid = void 0;
+exports.tavernTurnIn = exports.fetchSamplePcById = exports.fetchAllPcsForAdmin = exports.setMainGamePc = exports.setSamplePc = exports.fetchSamplePcs = exports.savePcForUser = exports.upgradeStat = exports.createPcForUser = exports.upgradeNod = exports.upgradeNoa = exports.awardSpToPc = exports.fetchPcByIdForUser = exports.fetchAllPcsWithUsername = exports.fetchPcsByUserGuid = void 0;
 const pcRepository_1 = require("../repositories/pcRepository");
 const tresherRepository_1 = require("../repositories/tresherRepository");
 const tresherRepository_2 = require("../repositories/tresherRepository");
@@ -11,6 +11,10 @@ const fetchPcsByUserGuid = async (userguid) => {
     return await (0, pcRepository_1.getPcsByUserGuid)(userguid);
 };
 exports.fetchPcsByUserGuid = fetchPcsByUserGuid;
+const fetchAllPcsWithUsername = async () => {
+    return await (0, pcRepository_1.getAllPcsWithUsername)();
+};
+exports.fetchAllPcsWithUsername = fetchAllPcsWithUsername;
 const fetchPcByIdForUser = async (id, userguid) => {
     return await (0, pcRepository_1.getPcByIdForUser)(id, userguid);
 };

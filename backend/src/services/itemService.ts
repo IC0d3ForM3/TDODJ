@@ -3,13 +3,21 @@ import {
   UpsertItemPayload,
   isAdminUserByGuid,
   getItemsByUserGuid,
+  getItemsLibraryByUserGuid,
   getItemsByIds,
+  getAllItemsWithUsername,
   insertItemForUser,
   updateItemForUser,
 } from '../repositories/itemRepository';
 
 export const fetchItemsByUserGuid = (userguid: string): Promise<ItemRecord[]> =>
   getItemsByUserGuid(userguid);
+
+export const fetchItemsLibraryByUserGuid = (userguid: string): Promise<ItemRecord[]> =>
+  getItemsLibraryByUserGuid(userguid);
+
+export const fetchAllItemsWithUsername = (): Promise<ItemRecord[]> =>
+  getAllItemsWithUsername();
 
 export const fetchItemsByIds = (ids: number[]): Promise<ItemRecord[]> =>
   getItemsByIds(ids);

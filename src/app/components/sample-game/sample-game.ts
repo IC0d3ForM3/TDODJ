@@ -36,6 +36,129 @@ interface TutorialPage {
   text: string;
 }
 
+interface PcGuide {
+  strengths: string[];
+  watchOut: string[];
+}
+
+const PC_TYPE_GUIDES: Record<string, PcGuide> = {
+  fighter: {
+    strengths: [
+      'High HP and heavy armor — you can absorb a lot of punishment',
+      'Multiple attacks per round let you chain hits in a single turn',
+      'Top melee damage boosted by a strong Strength stat',
+      'Can equip almost any weapon or armor you find in loot',
+    ],
+    watchOut: [
+      'No spells or MP — potions are your only in-combat healing option',
+      'Ranged monsters chip away at you before you can close the gap',
+      'Running dry on potions can turn a routine fight lethal',
+    ],
+  },
+  mage: {
+    strengths: [
+      'Powerful spells can blast multiple monsters from a safe distance',
+      'Many spells bypass a monster\'s Armor Class entirely',
+      'High Magic Power means each spell lands harder',
+    ],
+    watchOut: [
+      'Fragile: low HP and AC — a few bad hits can be fatal',
+      'MP is finite for the whole dungeon; every cast counts',
+      'Melee is a last resort — stay out of reach at all times',
+    ],
+  },
+  wizard: {
+    strengths: [
+      'Powerful spells can blast multiple monsters from a safe distance',
+      'Many spells bypass a monster\'s Armor Class entirely',
+      'High Magic Power means each spell lands harder',
+    ],
+    watchOut: [
+      'Fragile: low HP and AC — a few bad hits can be fatal',
+      'MP is finite for the whole dungeon; every cast counts',
+      'Melee is a last resort — stay out of reach at all times',
+    ],
+  },
+  ranger: {
+    strengths: [
+      'Ranged weapons let you attack before a monster can close in',
+      'High Range of View — you spot threats further down the corridor',
+      'Solid balance of offense and survivability',
+    ],
+    watchOut: [
+      'Tight corridors reduce the advantage of a ranged weapon',
+      'No healing spells — stock up on potions before descending',
+      'Fast-moving melee enemies can quickly close any gap you try to keep',
+    ],
+  },
+  rogue: {
+    strengths: [
+      'Exceptional burst damage on a single target when well-positioned',
+      'High Strength multiplier maximises weapon damage per hit',
+      'Mobile and fast — you decide when and where fights begin',
+    ],
+    watchOut: [
+      'Lower HP than fighters — avoid trading blows if you can help it',
+      'No magical options; everything comes down to steel and positioning',
+      'Cornered or surrounded, your main advantage disappears quickly',
+    ],
+  },
+  cleric: {
+    strengths: [
+      'Healing spells let you restore HP without leaving the dungeon',
+      'Support and offensive spells add real tactical flexibility',
+      'Better armor than a pure mage; can hold a front-line position',
+    ],
+    watchOut: [
+      'MP is limited — save healing spells for genuine emergencies',
+      'Lower raw damage output than a dedicated fighter',
+      'Casting too freely early on leaves you helpless in harder rooms',
+    ],
+  },
+  paladin: {
+    strengths: [
+      'Heavy melee damage plus spells in one package',
+      'Strong HP and Armor Class — built to survive sustained fights',
+      'Offensive spells give options that a pure fighter simply lacks',
+    ],
+    watchOut: [
+      'Smaller MP pool than a mage — choose your moments to cast carefully',
+      'Splitting focus between sword and spell can spread resources thin',
+    ],
+  },
+  bard: {
+    strengths: [
+      'Versatile: a mix of melee, magic, and great loot synergies',
+      'Adapts well to whatever weapons and armor the dungeon provides',
+    ],
+    watchOut: [
+      'Neither the highest damage dealer nor the toughest tank — adapt your approach',
+      'Watch both HP and MP; letting either run dry will hurt',
+    ],
+  },
+  druid: {
+    strengths: [
+      'Nature-based spells with strong offensive and support options',
+      'Decent HP for a spellcasting class',
+    ],
+    watchOut: [
+      'MP conservation is critical — plan spells across the whole dungeon',
+      'Lighter armor than melee classes; avoid prolonged exchanges',
+    ],
+  },
+};
+
+const DEFAULT_PC_GUIDE: PcGuide = {
+  strengths: [
+    'Versatile enough to use most weapons and armor you find',
+    'Adapt your style to whatever the dungeon throws at you',
+  ],
+  watchOut: [
+    'Keep an eye on HP — drink potions before reaching critical health',
+    'Every AE point is precious; plan your turn before spending it',
+  ],
+};
+
 @Component({
   selector: 'app-sample-game',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -212,5 +335,23 @@ export class SampleGame implements OnInit {
     return trimmed.startsWith('/')
       ? `${API_BASE_URL}${trimmed}`
       : `${API_BASE_URL}/${trimmed}`;
+  }
+
+  readonly universalControls: { key: string; action: string }[] = [
+    { key: '← →', action: 'Turn to face a new direction' },
+    { key: '↑  or  Space / F', action: 'Step forward' },
+    { key: '↓  or  B', action: 'Step backward' },
+    { key: 'Click mini-map', action: 'Target a monster' },
+    { key: 'Attack button', action: 'Strike your target (costs 1 AE)' },
+    { key: 'Spells tab', action: 'Cast a spell (costs 1 AE + Magic Cost from MP)' },
+    { key: 'Potions tab', action: 'Drink a potion (costs 1 AE)' },
+    { key: 'Take All / Take', action: 'Pick up loot on your current square' },
+    { key: 'Inventory tab', action: 'Equip weapons and armor' },
+    { key: 'End Turn', action: 'Skip remaining AE — monsters act next' },
+  ];
+
+  getPcGuide(pc: SamplePc): PcGuide {
+    const key = (pc.type ?? '').toLowerCase().trim();
+    return PC_TYPE_GUIDES[key] ?? DEFAULT_PC_GUIDE;
   }
 }

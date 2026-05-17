@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updatePotion = exports.createPotion = exports.getPotions = void 0;
+const userRepository_1 = require("../repositories/userRepository");
 const potionService = __importStar(require("../services/potionService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EFFECT_TO_OPTIONS = new Set([
@@ -80,6 +81,9 @@ const getPotions = async (req, res) => {
         return res.status(400).json({ error: 'Valid userkey query parameter is required' });
     }
     try {
+        if (await (0, userRepository_1.isMasterAdminByGuid)(userkey.trim())) {
+            return res.json(await potionService.fetchAllPotionsWithUsername());
+        }
         const potions = await potionService.fetchPotionsByUserGuid(userkey.trim());
         return res.json(potions);
     }

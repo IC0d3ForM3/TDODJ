@@ -285,6 +285,54 @@
 	color: #a50f2d;
 }
 
+.preload-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 900;
+	background-color: #0d0d14;
+	background-size: cover;
+	background-position: center;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.preload-overlay::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.6);
+}
+
+.preload-overlay-inner {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1.2rem;
+}
+
+.preload-spinner {
+	width: 52px;
+	height: 52px;
+	border: 5px solid rgba(255, 255, 255, 0.2);
+	border-top-color: #e8c96b;
+	border-radius: 50%;
+	animation: preload-spin 0.9s linear infinite;
+}
+
+@keyframes preload-spin {
+	to { transform: rotate(360deg); }
+}
+
+.preload-label {
+	margin: 0;
+	color: #f0e8c8;
+	font-size: 1.05rem;
+	letter-spacing: 0.05em;
+	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
 .game-layout {
 	display: grid;
 	grid-template-columns: minmax(280px, 400px) minmax(260px, 1fr);

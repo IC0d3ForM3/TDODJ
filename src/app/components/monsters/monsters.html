@@ -127,7 +127,7 @@
                   </optgroup>
                 }
               </select>
-              <app-upload-popup mediaType="image" (mediaUploaded)="onImageUploaded($event)" />
+              <app-upload-popup mediaType="image" [assettype]="'Monster'" (mediaUploaded)="onImageUploaded($event)" />
               @if (selectedImageUrl()) {
                 <img class="mn-thumb mn-thumb--preview" [src]="selectedImageUrl()" [alt]="selectedImageName() || 'image'" />
               }
@@ -155,7 +155,7 @@
                 }
               </select>
               <button type="button" class="mn-btn-muted" (click)="playSelectedSound()" [disabled]="!selectedSoundUrl()">Play</button>
-              <app-upload-popup mediaType="sound" (mediaUploaded)="onSoundUploaded($event)" />
+              <app-upload-popup mediaType="sound" [assettype]="'Monster'" (mediaUploaded)="onSoundUploaded($event)" />
             </div>
           </label>
         </div>

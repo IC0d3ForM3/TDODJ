@@ -2,8 +2,11 @@ import {
   CreateImagePayload,
   ImageRecord,
   UpdateImagePayload,
+  checkImageInUse,
+  deleteImageForUser,
   getImageLibraryByUserGuid,
   getImagesByUserGuid,
+  getAllImagesWithUsername,
   getImagesByIds,
   getPublicImagesByIds,
   insertImageForUser,
@@ -18,6 +21,10 @@ export const fetchImagesByUserGuid = async (userguid: string): Promise<ImageReco
 
 export const fetchImageLibraryByUserGuid = async (userguid: string): Promise<ImageRecord[]> => {
   return await getImageLibraryByUserGuid(userguid);
+};
+
+export const fetchAllImagesWithUsername = async (): Promise<ImageRecord[]> => {
+  return await getAllImagesWithUsername();
 };
 
 export const checkUserIsAdminByGuid = async (userguid: string): Promise<boolean> => {
@@ -52,4 +59,12 @@ export const fetchPublicImagesByIds = async (ids: number[]): Promise<ImageRecord
 
 export const fetchImagesByIds = async (ids: number[]): Promise<ImageRecord[]> => {
   return await getImagesByIds(ids);
+};
+
+export const isImageInUse = async (id: number): Promise<boolean> => {
+  return await checkImageInUse(id);
+};
+
+export const removeImageForUser = async (id: number, userguid: string): Promise<boolean> => {
+  return await deleteImageForUser(id, userguid);
 };

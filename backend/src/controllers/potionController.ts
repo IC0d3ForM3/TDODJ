@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { UpsertPotionPayload } from '../repositories/potionRepository';
+import { isMasterAdminByGuid } from '../repositories/userRepository';
 import * as potionService from '../services/potionService';
 
 const UUID_REGEX =
@@ -81,6 +82,9 @@ export const getPotions = async (req: Request, res: Response) => {
   }
 
   try {
+    if (await isMasterAdminByGuid(userkey.trim())) {
+      return res.json(await potionService.fetchAllPotionsWithUsername());
+    }
     const potions = await potionService.fetchPotionsByUserGuid(userkey.trim());
     return res.json(potions);
   } catch {

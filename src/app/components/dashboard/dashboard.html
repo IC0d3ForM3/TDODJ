@@ -157,7 +157,7 @@
 										<option [ngValue]="image.id">{{ image.name }}</option>
 									}
 								</select>
-								<app-upload-popup mediaType="image" (mediaUploaded)="onPcImageUploaded($event)" />
+								<app-upload-popup mediaType="image" [assettype]="'PC'" (mediaUploaded)="onPcImageUploaded($event)" />
 							</div>
 						</label>
 						@if (selectedPcImageUrl()) {
@@ -586,7 +586,7 @@
 								<option [ngValue]="image.id">{{ image.name }} (ID {{ image.id }})</option>
 							}
 						</select>
-						<app-upload-popup mediaType="image" (mediaUploaded)="onPcImageUploaded($event)" />
+						<app-upload-popup mediaType="image" [assettype]="'PC'" (mediaUploaded)="onPcImageUploaded($event)" />
 					</div>
 				</label>
 			</div>

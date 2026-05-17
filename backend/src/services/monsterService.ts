@@ -3,6 +3,7 @@ import {
   UpsertMonsterPayload,
   getMonsterLibraryByUserGuid,
   getMonstersByUserGuid,
+  getAllMonstersWithUsername,
   insertMonsterForUser,
   isAdminUserByGuid,
   updateMonsterForUser,
@@ -16,6 +17,10 @@ export const fetchMonsterLibraryByUserGuid = async (
   userguid: string
 ): Promise<MonsterRecord[]> => {
   return await getMonsterLibraryByUserGuid(userguid);
+};
+
+export const fetchAllMonstersWithUsername = async (): Promise<MonsterRecord[]> => {
+  return await getAllMonstersWithUsername();
 };
 
 export const checkUserIsAdminByGuid = async (userguid: string): Promise<boolean> => {

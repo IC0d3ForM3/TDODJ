@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveTresherForUser = exports.createTresherForUser = exports.checkTresherAccessibleByIdForUser = exports.fetchTreshersByIds = exports.checkUserIsAdminByGuid = exports.fetchTresherLibraryByUserGuid = exports.fetchTreshersByUserGuid = void 0;
+exports.saveTresherForUser = exports.createTresherForUser = exports.checkTresherAccessibleByIdForUser = exports.fetchTreshersByIds = exports.checkUserIsAdminByGuid = exports.fetchAllTreshersWithUsername = exports.fetchTresherLibraryByUserGuid = exports.fetchTreshersByUserGuid = void 0;
 const tresherRepository_1 = require("../repositories/tresherRepository");
 const fetchTreshersByUserGuid = async (userguid) => {
     return await (0, tresherRepository_1.getTreshersByUserGuid)(userguid);
@@ -10,6 +10,10 @@ const fetchTresherLibraryByUserGuid = async (userguid) => {
     return await (0, tresherRepository_1.getTresherLibraryByUserGuid)(userguid);
 };
 exports.fetchTresherLibraryByUserGuid = fetchTresherLibraryByUserGuid;
+const fetchAllTreshersWithUsername = async () => {
+    return await (0, tresherRepository_1.getAllTreshersWithUsername)();
+};
+exports.fetchAllTreshersWithUsername = fetchAllTreshersWithUsername;
 const checkUserIsAdminByGuid = async (userguid) => {
     return await (0, tresherRepository_1.isAdminUserByGuid)(userguid);
 };

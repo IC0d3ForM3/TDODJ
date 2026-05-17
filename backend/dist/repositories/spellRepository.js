@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateSpellForUser = exports.insertSpellForUser = exports.getSpellsByUserGuid = exports.isAdminUserByGuid = exports.getPublicSpellsByNames = exports.fetchSpellsByIds = void 0;
+exports.updateSpellForUser = exports.insertSpellForUser = exports.getAllSpellsWithUsername = exports.getSpellsByUserGuid = exports.isAdminUserByGuid = exports.getPublicSpellsByNames = exports.fetchSpellsByIds = void 0;
 const db_1 = __importDefault(require("../db"));
 const SELECT_SPELL_FIELDS = `
   id,
@@ -66,6 +66,34 @@ const getSpellsByUserGuid = async (userguid) => {
     return rows;
 };
 exports.getSpellsByUserGuid = getSpellsByUserGuid;
+const getAllSpellsWithUsername = async () => {
+    const { rows } = await db_1.default.query(`SELECT s.id, s.userguid::text AS userguid, s.name, s.description,
+       COALESCE(s.range1, s.range, 0) AS range,
+       s.effecton AS "effectOn", COALESCE(s.effecton2, '') AS "effectOn2",
+       COALESCE(s.lastfor1, s.lastfor, 0) AS "lastFor",
+       s.damage AS "effectAmount", COALESCE(s.effectamount2, 0) AS "effectAmount2",
+       COALESCE(s.value, 0) AS value, COALESCE(s.sp, 0) AS sp,
+       COALESCE(s.successtestvalue, 0) AS "successTestValue",
+       COALESCE(s.magiccost, 1) AS "magicCost", COALESCE(s.costtolearn, 0) AS "costToLearn",
+       s.imageid AS "imageId", s.soundid AS "soundId",
+       s.ispublic AS "isPublic",
+       COALESCE(s.numberoftargets, 1) AS "numberOfTargets",
+       COALESCE(s.effecttype, 'Other') AS "effectType",
+       COALESCE(s.effectcolor, '#ffffff') AS "effectColor",
+       COALESCE(s.effectonpc1, FALSE) AS "effectOnPc1",
+       COALESCE(s.effectonpc2, FALSE) AS "effectOnPc2",
+       COALESCE(s.range1, s.range, 0) AS "range1",
+       COALESCE(s.range2, s.range, 0) AS "range2",
+       COALESCE(s.lastfor1, s.lastfor, 0) AS "lastFor1",
+       COALESCE(s.lastfor2, s.lastfor, 0) AS "lastFor2",
+       s.createdat::text AS "createdAt", s.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM spells s
+     LEFT JOIN users u ON u.key::text = s.userguid::text
+     ORDER BY LOWER(s.name) ASC, s.id ASC`);
+    return rows;
+};
+exports.getAllSpellsWithUsername = getAllSpellsWithUsername;
 const insertSpellForUser = async (userguid, payload) => {
     const { rows } = await db_1.default.query(`INSERT INTO spells
        (userguid, name, description, range, effecton, effecton2, lastfor, damage,

@@ -21,6 +21,7 @@
     "migrate:dungons:all": "npm run migrate:dungons && npm run migrate:dungons:json && npm run migrate:games && npm run migrate:treshers && npm run migrate:monsters && npm run migrate:images && npm run migrate:monsters:image && npm run migrate:monsters:treshers && npm run migrate:pcs && npm run migrate:friends"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1046.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^16.3.1",

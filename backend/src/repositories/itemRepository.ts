@@ -24,6 +24,7 @@ export interface ItemRecord {
   isTwoHanded: boolean;
   createdAt: string;
   updatedAt: string;
+  username?: string;
 }
 
 export interface UpsertItemPayload {
@@ -89,6 +90,39 @@ export const getItemsByUserGuid = async (userguid: string): Promise<ItemRecord[]
      WHERE userguid = $1
      ORDER BY LOWER(name) ASC, id ASC`,
     [userguid]
+  );
+  return rows;
+};
+
+export const getItemsLibraryByUserGuid = async (userguid: string): Promise<ItemRecord[]> => {
+  const { rows } = await pool.query<ItemRecord>(
+    `SELECT ${SELECT_ITEM_FIELDS}
+     FROM items
+     WHERE userguid = $1 OR ispublic = true
+     ORDER BY LOWER(name) ASC, id ASC`,
+    [userguid]
+  );
+  return rows;
+};
+
+export const getAllItemsWithUsername = async (): Promise<ItemRecord[]> => {
+  const { rows } = await pool.query<ItemRecord>(
+    `SELECT i.id, i.userguid::text AS userguid, i.name, i.description, i.type,
+       COALESCE(NULLIF(i.range, '')::int, 0) AS range,
+       i.value, i.weight, i.curseid AS "curseId",
+       COALESCE(i.effectvalue, 0) AS "effectValue", COALESCE(i.damage, 0) AS "damage",
+       i.armorslot AS "armorSlot", i.effecton AS "effectOn",
+       i.effecttopc AS "effectToPc", COALESCE(i.effecttopcvalue, 0) AS "effectToPcValue",
+       COALESCE(i.weaponeffecttype, 'Blood') AS "weaponEffectType",
+       COALESCE(i.weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
+       i.imageid AS "imageId", i.soundid AS "soundId",
+       i.ispublic AS "isPublic",
+       COALESCE(i.istwohanded, false) AS "isTwoHanded",
+       i.createdat::text AS "createdAt", i.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM items i
+     LEFT JOIN users u ON u.key::text = i.userguid::text
+     ORDER BY LOWER(i.name) ASC, i.id ASC`
   );
   return rows;
 };

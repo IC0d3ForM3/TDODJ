@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveSpellForUser = exports.createSpellForUser = exports.checkUserIsAdminByGuid = exports.fetchSpellsByUserGuid = exports.fetchSpellsByIdsForGame = void 0;
+exports.saveSpellForUser = exports.createSpellForUser = exports.checkUserIsAdminByGuid = exports.fetchAllSpellsWithUsername = exports.fetchSpellsByUserGuid = exports.fetchSpellsByIdsForGame = void 0;
 const spellRepository_1 = require("../repositories/spellRepository");
 const fetchSpellsByIdsForGame = async (ids) => {
     return await (0, spellRepository_1.fetchSpellsByIds)(ids);
@@ -10,6 +10,10 @@ const fetchSpellsByUserGuid = async (userguid) => {
     return await (0, spellRepository_1.getSpellsByUserGuid)(userguid);
 };
 exports.fetchSpellsByUserGuid = fetchSpellsByUserGuid;
+const fetchAllSpellsWithUsername = async () => {
+    return await (0, spellRepository_1.getAllSpellsWithUsername)();
+};
+exports.fetchAllSpellsWithUsername = fetchAllSpellsWithUsername;
 const checkUserIsAdminByGuid = async (userguid) => {
     return await (0, spellRepository_1.isAdminUserByGuid)(userguid);
 };

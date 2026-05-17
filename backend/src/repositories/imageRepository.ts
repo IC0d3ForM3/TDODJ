@@ -7,8 +7,10 @@ export interface ImageRecord {
   isPublic: boolean;
   isActive: boolean;
   name: string;
+  assettype: string;
   createdAt: string;
   updatedAt: string;
+  username?: string;
 }
 
 export interface CreateImagePayload {
@@ -16,6 +18,7 @@ export interface CreateImagePayload {
   isPublic: boolean;
   isActive: boolean;
   name: string;
+  assettype: string;
 }
 
 export interface UpdateImagePayload {
@@ -23,6 +26,7 @@ export interface UpdateImagePayload {
   isPublic: boolean;
   isActive: boolean;
   name: string;
+  assettype: string;
 }
 
 export const isAdminUserByGuid = async (userguid: string): Promise<boolean> => {
@@ -47,6 +51,7 @@ export const getImagesByUserGuid = async (userguid: string): Promise<ImageRecord
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM images
@@ -61,23 +66,47 @@ export const getImagesByUserGuid = async (userguid: string): Promise<ImageRecord
 export const getImageLibraryByUserGuid = async (userguid: string): Promise<ImageRecord[]> => {
   const { rows } = await pool.query<ImageRecord>(
     `SELECT
-       id,
-       userguid::text AS userguid,
-       path,
-       ispublic AS "isPublic",
-       isactive AS "isActive",
-       name,
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"
-     FROM images
-     WHERE (userguid = $1 OR ispublic = true) AND isactive = true
+       i.id,
+       i.userguid::text AS userguid,
+       i.path,
+       i.ispublic AS "isPublic",
+       i.isactive AS "isActive",
+       i.name,
+       i.assettype::text AS assettype,
+       i.createdat::text AS "createdAt",
+       i.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM images i
+     LEFT JOIN users u ON u.key::text = i.userguid::text
+     WHERE (i.userguid = $1 OR i.ispublic = true) AND i.isactive = true
      ORDER BY
-       CASE WHEN userguid = $1 THEN 0 ELSE 1 END,
-       updatedat DESC,
-       id DESC`,
+       CASE WHEN i.userguid = $1 THEN 0 ELSE 1 END,
+       i.updatedat DESC,
+       i.id DESC`,
     [userguid]
   );
 
+  return rows;
+};
+
+export const getAllImagesWithUsername = async (): Promise<ImageRecord[]> => {
+  const { rows } = await pool.query<ImageRecord>(
+    `SELECT
+       i.id,
+       i.userguid::text AS userguid,
+       i.path,
+       i.ispublic AS "isPublic",
+       i.isactive AS "isActive",
+       i.name,
+       i.assettype::text AS assettype,
+       i.createdat::text AS "createdAt",
+       i.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM images i
+     LEFT JOIN users u ON u.key::text = i.userguid::text
+     WHERE i.isactive = true
+     ORDER BY u.username ASC, i.updatedat DESC, i.id DESC`
+  );
   return rows;
 };
 
@@ -108,6 +137,7 @@ export const insertImageForUser = async (
        ispublic,
        isactive,
        name,
+       assettype,
        updatedat
      )
      VALUES (
@@ -116,6 +146,7 @@ export const insertImageForUser = async (
        $3,
        $4,
        $5,
+       $6,
        NOW()
      )
      RETURNING
@@ -125,9 +156,10 @@ export const insertImageForUser = async (
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"`,
-    [userguid, payload.path, payload.isPublic, payload.isActive, payload.name]
+    [userguid, payload.path, payload.isPublic, payload.isActive, payload.name, payload.assettype]
   );
 
   return rows[0];
@@ -145,6 +177,7 @@ export const updateImageForUser = async (
        ispublic = $4,
        isactive = $5,
        name = $6,
+       assettype = $7,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING
@@ -154,9 +187,10 @@ export const updateImageForUser = async (
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"`,
-    [id, userguid, payload.path, payload.isPublic, payload.isActive, payload.name]
+    [id, userguid, payload.path, payload.isPublic, payload.isActive, payload.name, payload.assettype]
   );
 
   return rows[0] ?? null;
@@ -175,6 +209,7 @@ export const getImagesByIds = async (ids: number[]): Promise<ImageRecord[]> => {
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM images
@@ -197,6 +232,7 @@ export const getPublicImagesByIds = async (ids: number[]): Promise<ImageRecord[]
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM images
@@ -204,4 +240,26 @@ export const getPublicImagesByIds = async (ids: number[]): Promise<ImageRecord[]
     ids
   );
   return rows;
+};
+
+export const checkImageInUse = async (id: number): Promise<boolean> => {
+  const results = await Promise.all([
+    pool.query('SELECT 1 FROM monsters WHERE imageid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM spells WHERE imageid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM curses WHERE imageid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM potions WHERE imageid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM items WHERE imageid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM treshers WHERE imageid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM dungons WHERE imageid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM pcs WHERE imageid = $1 LIMIT 1', [id]),
+  ]);
+  return results.some((r) => r.rows.length > 0);
+};
+
+export const deleteImageForUser = async (id: number, userguid: string): Promise<boolean> => {
+  const { rowCount } = await pool.query(
+    'DELETE FROM images WHERE id = $1 AND userguid = $2',
+    [id, userguid]
+  );
+  return (rowCount ?? 0) > 0;
 };

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPublicImagesByIds = exports.getImagesByIds = exports.updateImageForUser = exports.insertImageForUser = exports.isImageAccessibleByIdForUser = exports.getImageLibraryByUserGuid = exports.getImagesByUserGuid = exports.isAdminUserByGuid = void 0;
+exports.deleteImageForUser = exports.checkImageInUse = exports.getPublicImagesByIds = exports.getImagesByIds = exports.updateImageForUser = exports.insertImageForUser = exports.isImageAccessibleByIdForUser = exports.getAllImagesWithUsername = exports.getImageLibraryByUserGuid = exports.getImagesByUserGuid = exports.isAdminUserByGuid = void 0;
 const db_1 = __importDefault(require("../db"));
 const isAdminUserByGuid = async (userguid) => {
     const { rows } = await db_1.default.query('SELECT isadmin FROM users WHERE key = $1', [userguid]);
@@ -21,6 +21,7 @@ const getImagesByUserGuid = async (userguid) => {
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM images
@@ -31,23 +32,45 @@ const getImagesByUserGuid = async (userguid) => {
 exports.getImagesByUserGuid = getImagesByUserGuid;
 const getImageLibraryByUserGuid = async (userguid) => {
     const { rows } = await db_1.default.query(`SELECT
-       id,
-       userguid::text AS userguid,
-       path,
-       ispublic AS "isPublic",
-       isactive AS "isActive",
-       name,
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"
-     FROM images
-     WHERE (userguid = $1 OR ispublic = true) AND isactive = true
+       i.id,
+       i.userguid::text AS userguid,
+       i.path,
+       i.ispublic AS "isPublic",
+       i.isactive AS "isActive",
+       i.name,
+       i.assettype::text AS assettype,
+       i.createdat::text AS "createdAt",
+       i.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM images i
+     LEFT JOIN users u ON u.key::text = i.userguid::text
+     WHERE (i.userguid = $1 OR i.ispublic = true) AND i.isactive = true
      ORDER BY
-       CASE WHEN userguid = $1 THEN 0 ELSE 1 END,
-       updatedat DESC,
-       id DESC`, [userguid]);
+       CASE WHEN i.userguid = $1 THEN 0 ELSE 1 END,
+       i.updatedat DESC,
+       i.id DESC`, [userguid]);
     return rows;
 };
 exports.getImageLibraryByUserGuid = getImageLibraryByUserGuid;
+const getAllImagesWithUsername = async () => {
+    const { rows } = await db_1.default.query(`SELECT
+       i.id,
+       i.userguid::text AS userguid,
+       i.path,
+       i.ispublic AS "isPublic",
+       i.isactive AS "isActive",
+       i.name,
+       i.assettype::text AS assettype,
+       i.createdat::text AS "createdAt",
+       i.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM images i
+     LEFT JOIN users u ON u.key::text = i.userguid::text
+     WHERE i.isactive = true
+     ORDER BY u.username ASC, i.updatedat DESC, i.id DESC`);
+    return rows;
+};
+exports.getAllImagesWithUsername = getAllImagesWithUsername;
 const isImageAccessibleByIdForUser = async (imageId, userguid) => {
     const { rows } = await db_1.default.query(`SELECT id
      FROM images
@@ -64,6 +87,7 @@ const insertImageForUser = async (userguid, payload) => {
        ispublic,
        isactive,
        name,
+       assettype,
        updatedat
      )
      VALUES (
@@ -72,6 +96,7 @@ const insertImageForUser = async (userguid, payload) => {
        $3,
        $4,
        $5,
+       $6,
        NOW()
      )
      RETURNING
@@ -81,8 +106,9 @@ const insertImageForUser = async (userguid, payload) => {
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"`, [userguid, payload.path, payload.isPublic, payload.isActive, payload.name]);
+       updatedat::text AS "updatedAt"`, [userguid, payload.path, payload.isPublic, payload.isActive, payload.name, payload.assettype]);
     return rows[0];
 };
 exports.insertImageForUser = insertImageForUser;
@@ -93,6 +119,7 @@ const updateImageForUser = async (id, userguid, payload) => {
        ispublic = $4,
        isactive = $5,
        name = $6,
+       assettype = $7,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING
@@ -102,8 +129,9 @@ const updateImageForUser = async (id, userguid, payload) => {
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"`, [id, userguid, payload.path, payload.isPublic, payload.isActive, payload.name]);
+       updatedat::text AS "updatedAt"`, [id, userguid, payload.path, payload.isPublic, payload.isActive, payload.name, payload.assettype]);
     return rows[0] ?? null;
 };
 exports.updateImageForUser = updateImageForUser;
@@ -119,6 +147,7 @@ const getImagesByIds = async (ids) => {
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM images
@@ -138,6 +167,7 @@ const getPublicImagesByIds = async (ids) => {
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM images
@@ -145,3 +175,22 @@ const getPublicImagesByIds = async (ids) => {
     return rows;
 };
 exports.getPublicImagesByIds = getPublicImagesByIds;
+const checkImageInUse = async (id) => {
+    const results = await Promise.all([
+        db_1.default.query('SELECT 1 FROM monsters WHERE imageid = $1 LIMIT 1', [id]),
+        db_1.default.query('SELECT 1 FROM spells WHERE imageid = $1 LIMIT 1', [id]),
+        db_1.default.query('SELECT 1 FROM curses WHERE imageid = $1 LIMIT 1', [id]),
+        db_1.default.query('SELECT 1 FROM potions WHERE imageid = $1 LIMIT 1', [id]),
+        db_1.default.query('SELECT 1 FROM items WHERE imageid = $1 LIMIT 1', [id]),
+        db_1.default.query('SELECT 1 FROM treshers WHERE imageid = $1 LIMIT 1', [id]),
+        db_1.default.query('SELECT 1 FROM dungons WHERE imageid = $1 LIMIT 1', [id]),
+        db_1.default.query('SELECT 1 FROM pcs WHERE imageid = $1 LIMIT 1', [id]),
+    ]);
+    return results.some((r) => r.rows.length > 0);
+};
+exports.checkImageInUse = checkImageInUse;
+const deleteImageForUser = async (id, userguid) => {
+    const { rowCount } = await db_1.default.query('DELETE FROM images WHERE id = $1 AND userguid = $2', [id, userguid]);
+    return (rowCount ?? 0) > 0;
+};
+exports.deleteImageForUser = deleteImageForUser;

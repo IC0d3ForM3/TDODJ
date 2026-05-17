@@ -7,6 +7,7 @@ import {
   getPublishedDungons,
   getDungonsByUserKey,
   getDungonSpRewardById,
+  getDungonImageIdById,
   getDungonIsMainGameStatusById,
   insertDungon,
   NewDungon,
@@ -147,3 +148,6 @@ export const fetchAllPublishedDungonsForAdmin = async () => {
 
 export const fetchDungonSpReward = (dungonId: number): Promise<number> =>
   getDungonSpRewardById(dungonId);
+
+export const fetchDungonImageId = (dungonId: number): Promise<number | null> =>
+  getDungonImageIdById(dungonId);

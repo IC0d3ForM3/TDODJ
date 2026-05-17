@@ -7,8 +7,10 @@ export interface SoundRecord {
   isPublic: boolean;
   isActive: boolean;
   name: string;
+  assettype: string;
   createdAt: string;
   updatedAt: string;
+  username?: string;
 }
 
 export interface CreateSoundPayload {
@@ -16,6 +18,7 @@ export interface CreateSoundPayload {
   isPublic: boolean;
   isActive: boolean;
   name: string;
+  assettype: string;
 }
 
 export interface UpdateSoundPayload {
@@ -23,6 +26,7 @@ export interface UpdateSoundPayload {
   isPublic: boolean;
   isActive: boolean;
   name: string;
+  assettype: string;
 }
 
 export const isAdminUserByGuid = async (userguid: string): Promise<boolean> => {
@@ -47,6 +51,7 @@ export const getSoundsByUserGuid = async (userguid: string): Promise<SoundRecord
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM sounds
@@ -61,23 +66,47 @@ export const getSoundsByUserGuid = async (userguid: string): Promise<SoundRecord
 export const getSoundLibraryByUserGuid = async (userguid: string): Promise<SoundRecord[]> => {
   const { rows } = await pool.query<SoundRecord>(
     `SELECT
-       id,
-       userguid::text AS userguid,
-       path,
-       ispublic AS "isPublic",
-       isactive AS "isActive",
-       name,
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"
-     FROM sounds
-     WHERE (userguid = $1 OR ispublic = true) AND isactive = true
+       s.id,
+       s.userguid::text AS userguid,
+       s.path,
+       s.ispublic AS "isPublic",
+       s.isactive AS "isActive",
+       s.name,
+       s.assettype::text AS assettype,
+       s.createdat::text AS "createdAt",
+       s.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM sounds s
+     LEFT JOIN users u ON u.key::text = s.userguid::text
+     WHERE (s.userguid = $1 OR s.ispublic = true) AND s.isactive = true
      ORDER BY
-       CASE WHEN userguid = $1 THEN 0 ELSE 1 END,
-       updatedat DESC,
-       id DESC`,
+       CASE WHEN s.userguid = $1 THEN 0 ELSE 1 END,
+       s.updatedat DESC,
+       s.id DESC`,
     [userguid]
   );
 
+  return rows;
+};
+
+export const getAllSoundsWithUsername = async (): Promise<SoundRecord[]> => {
+  const { rows } = await pool.query<SoundRecord>(
+    `SELECT
+       s.id,
+       s.userguid::text AS userguid,
+       s.path,
+       s.ispublic AS "isPublic",
+       s.isactive AS "isActive",
+       s.name,
+       s.assettype::text AS assettype,
+       s.createdat::text AS "createdAt",
+       s.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM sounds s
+     LEFT JOIN users u ON u.key::text = s.userguid::text
+     WHERE s.isactive = true
+     ORDER BY u.username ASC, s.updatedat DESC, s.id DESC`
+  );
   return rows;
 };
 
@@ -95,6 +124,7 @@ export const getSoundsByIds = async (ids: number[]): Promise<SoundRecord[]> => {
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"
      FROM sounds
@@ -132,6 +162,7 @@ export const insertSoundForUser = async (
        ispublic,
        isactive,
        name,
+       assettype,
        updatedat
      )
      VALUES (
@@ -140,6 +171,7 @@ export const insertSoundForUser = async (
        $3,
        $4,
        $5,
+       $6,
        NOW()
      )
      RETURNING
@@ -149,9 +181,10 @@ export const insertSoundForUser = async (
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"`,
-    [userguid, payload.path, payload.isPublic, payload.isActive, payload.name]
+    [userguid, payload.path, payload.isPublic, payload.isActive, payload.name, payload.assettype]
   );
 
   return rows[0];
@@ -169,6 +202,7 @@ export const updateSoundForUser = async (
        ispublic = $4,
        isactive = $5,
        name = $6,
+       assettype = $7,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING
@@ -178,10 +212,31 @@ export const updateSoundForUser = async (
        ispublic AS "isPublic",
        isactive AS "isActive",
        name,
+       assettype::text AS assettype,
        createdat::text AS "createdAt",
        updatedat::text AS "updatedAt"`,
-    [id, userguid, payload.path, payload.isPublic, payload.isActive, payload.name]
+    [id, userguid, payload.path, payload.isPublic, payload.isActive, payload.name, payload.assettype]
   );
 
   return rows[0] ?? null;
+};
+
+export const checkSoundInUse = async (id: number): Promise<boolean> => {
+  const results = await Promise.all([
+    pool.query('SELECT 1 FROM monsters WHERE soundid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM spells WHERE soundid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM curses WHERE soundid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM potions WHERE soundid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM items WHERE soundid = $1 LIMIT 1', [id]),
+    pool.query('SELECT 1 FROM treshers WHERE soundid = $1 LIMIT 1', [id]),
+  ]);
+  return results.some((r) => r.rows.length > 0);
+};
+
+export const deleteSoundForUser = async (id: number, userguid: string): Promise<boolean> => {
+  const { rowCount } = await pool.query(
+    'DELETE FROM sounds WHERE id = $1 AND userguid = $2',
+    [id, userguid]
+  );
+  return (rowCount ?? 0) > 0;
 };

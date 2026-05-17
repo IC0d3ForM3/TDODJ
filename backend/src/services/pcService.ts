@@ -7,6 +7,7 @@ import {
   getPcByIdForUser,
   getPcByIdPublic,
   getPcsByUserGuid,
+  getAllPcsWithUsername,
   insertPcForUser,
   updatePcForUser,
   addSpToPc,
@@ -27,6 +28,10 @@ import { getPublicPotionsByNames } from '../repositories/potionRepository';
 
 export const fetchPcsByUserGuid = async (userguid: string): Promise<PcRecord[]> => {
   return await getPcsByUserGuid(userguid);
+};
+
+export const fetchAllPcsWithUsername = async (): Promise<PcRecord[]> => {
+  return await getAllPcsWithUsername();
 };
 
 export const fetchPcByIdForUser = async (

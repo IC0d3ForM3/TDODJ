@@ -52,6 +52,11 @@
 
 <section class="sg-page">
 
+  <!-- ── Beta notice ───────────────────────────────────────────── -->
+  <div class="sg-beta">
+    <strong>🧪 Beta</strong> &mdash; TDODJ is still in active development. You may encounter rough edges, missing content, and frequent updates. Your feedback is very welcome!
+  </div>
+
   <!-- ── Mini how-to ────────────────────────────────────────────── -->
   <header class="sg-hero">
     <h2>Try a Sample Game</h2>
@@ -153,6 +158,43 @@
           &#10095;
         </button>
       </div>
+
+      @if (pickerPc(); as pc) {
+        @let guide = getPcGuide(pc);
+        <div class="sg-guide">
+          <h4 class="sg-guide-title">Playing as a <span class="sg-guide-type">{{ pc.species }} {{ pc.type }}</span></h4>
+          <div class="sg-guide-grid">
+            <div class="sg-guide-card">
+              <div class="sg-guide-card-hd">Controls</div>
+              <ul class="sg-guide-list">
+                @for (ctrl of universalControls; track ctrl.key) {
+                  <li>
+                    <kbd class="sg-ctrl-key">{{ ctrl.key }}</kbd>
+                    <span>{{ ctrl.action }}</span>
+                  </li>
+                }
+              </ul>
+            </div>
+            <div class="sg-guide-card sg-guide-adv">
+              <div class="sg-guide-card-hd">Advantages</div>
+              <ul class="sg-guide-list sg-guide-bullets">
+                @for (item of guide.strengths; track $index) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+            </div>
+            <div class="sg-guide-card sg-guide-dis">
+              <div class="sg-guide-card-hd">Disadvantages</div>
+              <ul class="sg-guide-list sg-guide-bullets">
+                @for (item of guide.watchOut; track $index) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+            </div>
+          </div>
+        </div>
+      }
+
     </section>
   }
 
@@ -227,7 +269,40 @@
         }
       </section>
     </div>
-  }
+    @let pc = selectedPc()!;
+    @let guide = getPcGuide(pc);
+    <div class="sg-guide">
+      <h4 class="sg-guide-title">Playing as a <span class="sg-guide-type">{{ pc.species }} {{ pc.type }}</span></h4>
+      <div class="sg-guide-grid">
+        <div class="sg-guide-card">
+          <div class="sg-guide-card-hd">Controls</div>
+          <ul class="sg-guide-list">
+            @for (ctrl of universalControls; track ctrl.key) {
+              <li>
+                <kbd class="sg-ctrl-key">{{ ctrl.key }}</kbd>
+                <span>{{ ctrl.action }}</span>
+              </li>
+            }
+          </ul>
+        </div>
+        <div class="sg-guide-card sg-guide-adv">
+          <div class="sg-guide-card-hd">Advantages</div>
+          <ul class="sg-guide-list sg-guide-bullets">
+            @for (item of guide.strengths; track $index) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </div>
+        <div class="sg-guide-card sg-guide-dis">
+          <div class="sg-guide-card-hd">Disadvantages</div>
+          <ul class="sg-guide-list sg-guide-bullets">
+            @for (item of guide.watchOut; track $index) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </div>
+      </div>
+    </div>  }
 
   <!-- ── CTA ───────────────────────────────────────────────────── -->
   <section class="sg-cta">

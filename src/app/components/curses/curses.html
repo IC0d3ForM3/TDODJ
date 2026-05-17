@@ -70,7 +70,7 @@
 									</optgroup>
 								}
 							</select>
-							<app-upload-popup mediaType="image" (mediaUploaded)="onImageUploaded($event)" />
+							<app-upload-popup mediaType="image" [assettype]="'Curse'" (mediaUploaded)="onImageUploaded($event)" />
 						</div>
 					</label>
 					@if (selectedImageUrl()) { <div class="cu-field cu-field-wide"><img class="cu-thumb" [src]="selectedImageUrl()" [alt]="selectedImageName() || 'Selected curse image'" /></div> }
@@ -94,7 +94,7 @@
 								}
 							</select>
 							<button type="button" class="cu-btn-muted" (click)="playSelectedSound()" [disabled]="!selectedSoundUrl()">Play</button>
-							<app-upload-popup mediaType="sound" (mediaUploaded)="onSoundUploaded($event)" />
+							<app-upload-popup mediaType="sound" [assettype]="'Curse'" (mediaUploaded)="onSoundUploaded($event)" />
 						</div>
 					</label>
 					@if (isAdminUser()) {

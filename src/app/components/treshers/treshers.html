@@ -102,7 +102,7 @@
                   </optgroup>
                 }
               </select>
-              <app-upload-popup mediaType="image" (mediaUploaded)="onImageUploaded($event)" />
+              <app-upload-popup mediaType="image" [assettype]="'Tresher'" (mediaUploaded)="onImageUploaded($event)" />
               @if (selectedImageUrl()) {
                 <img class="tr-thumb" [src]="selectedImageUrl()" [alt]="selectedImageName() || 'image'" />
               }
@@ -130,7 +130,7 @@
                 }
               </select>
               <button type="button" class="tr-btn-muted" (click)="playSelectedSound()" [disabled]="!selectedSoundUrl()">Play</button>
-              <app-upload-popup mediaType="sound" (mediaUploaded)="onSoundUploaded($event)" />
+              <app-upload-popup mediaType="sound" [assettype]="'Tresher'" (mediaUploaded)="onSoundUploaded($event)" />
             </div>
           </label>
 

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { UpsertPcPayload } from '../repositories/pcRepository';
-import { getUserByKey } from '../repositories/userRepository';
+import { getUserByKey, isMasterAdminByGuid } from '../repositories/userRepository';
 import * as imageService from '../services/imageService';
 import * as pcService from '../services/pcService';
 import * as tresherService from '../services/tresherService';
@@ -100,6 +100,9 @@ export const getPcs = async (req: Request, res: Response) => {
   }
 
   try {
+    if (await isMasterAdminByGuid(userkey.trim())) {
+      return res.json(await pcService.fetchAllPcsWithUsername());
+    }
     const pcs = await pcService.fetchPcsByUserGuid(userkey.trim());
     console.log(
       'PC load response tresher state:',

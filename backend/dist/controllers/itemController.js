@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateItem = exports.createItem = exports.getItems = void 0;
+const userRepository_1 = require("../repositories/userRepository");
 const itemService = __importStar(require("../services/itemService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ITEM_TYPES = new Set(['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'gem', 'other']);
@@ -147,7 +148,14 @@ const getItems = async (req, res) => {
     if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
         return res.status(400).json({ error: 'Valid userkey query parameter is required' });
     }
+    const scope = req.query['scope'];
     try {
+        if (await (0, userRepository_1.isMasterAdminByGuid)(userkey.trim())) {
+            return res.json(await itemService.fetchAllItemsWithUsername());
+        }
+        if (scope === 'library') {
+            return res.json(await itemService.fetchItemsLibraryByUserGuid(userkey.trim()));
+        }
         const items = await itemService.fetchItemsByUserGuid(userkey.trim());
         return res.json(items);
     }

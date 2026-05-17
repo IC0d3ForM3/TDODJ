@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updatePotionForUser = exports.insertPotionForUser = exports.getPublicPotionsByNames = exports.getPotionsByIds = exports.getPotionsByUserGuid = exports.isAdminUserByGuid = void 0;
+exports.updatePotionForUser = exports.insertPotionForUser = exports.getPublicPotionsByNames = exports.getPotionsByIds = exports.getAllPotionsWithUsername = exports.getPotionsByUserGuid = exports.isAdminUserByGuid = void 0;
 const db_1 = __importDefault(require("../db"));
 const SELECT_POTION_FIELDS = `
   id,
@@ -35,6 +35,21 @@ const getPotionsByUserGuid = async (userguid) => {
     return rows;
 };
 exports.getPotionsByUserGuid = getPotionsByUserGuid;
+const getAllPotionsWithUsername = async () => {
+    const { rows } = await db_1.default.query(`SELECT p.id, p.userguid::text AS userguid, p.name, p.description,
+       p.effectto AS "effectTo", p.effectto2 AS "effectTo2",
+       p.effecttime AS "lastFor", p.effectnumber AS "effectAmount",
+       COALESCE(p.effectamount2, 0) AS "effectAmount2",
+       p.value, p.imageid AS "imageId", p.soundid AS "soundId",
+       p.ispublic AS "isPublic",
+       p.createdat::text AS "createdAt", p.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM potions p
+     LEFT JOIN users u ON u.key::text = p.userguid::text
+     ORDER BY LOWER(p.name) ASC, p.id ASC`);
+    return rows;
+};
+exports.getAllPotionsWithUsername = getAllPotionsWithUsername;
 const getPotionsByIds = async (ids) => {
     if (ids.length === 0)
         return [];

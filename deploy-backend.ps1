@@ -44,15 +44,16 @@ if (-not $SkipBuild) {
 Write-Host "`n[2/3] Uploading to EC2 ($EC2_HOST)..." -ForegroundColor Yellow
 
 # Ensure remote dist dir exists, then upload compiled JS
-# FIX: Use -r src/. to copy contents (not src/ which creates nested dir on Windows)
-ssh -i $KEY_PATH -o StrictHostKeyChecking=no "${EC2_USER}@${EC2_HOST}" "mkdir -p ${REMOTE_DIR}/dist"
+# Ensure dist dirs exist and are writable before uploading
+ssh -i $KEY_PATH -o StrictHostKeyChecking=no "${EC2_USER}@${EC2_HOST}" "mkdir -p ${REMOTE_DIR}/dist && chmod -R u+w ${REMOTE_DIR}/dist"
 scp -i $KEY_PATH -r "backend/dist/." "${EC2_USER}@${EC2_HOST}:${REMOTE_DIR}/dist/"
 
 # Upload package.json (prod deps only)
 scp -i $KEY_PATH backend\package.json "${EC2_USER}@${EC2_HOST}:${REMOTE_DIR}/package.json"
 
-# Upload .prod.env as .env
+# Upload .prod.env as .env (then strip Windows CRLF line endings so dotenv reads values correctly)
 scp -i $KEY_PATH backend\.prod.env "${EC2_USER}@${EC2_HOST}:${REMOTE_DIR}/.env"
+ssh -i $KEY_PATH -o StrictHostKeyChecking=no "${EC2_USER}@${EC2_HOST}" "sed -i 's/\r//' ${REMOTE_DIR}/.env"
 
 # 3. Remote: install prod deps + restart PM2
 Write-Host "`n[3/3] Restarting app on server..." -ForegroundColor Yellow

@@ -8,6 +8,7 @@ export interface UploadedMediaItem {
   id: number;
   name: string;
   path: string;
+  assettype?: string;
 }
 
 @Component({
@@ -22,6 +23,7 @@ export class UploadPopup {
   private readonly account = inject(Account);
 
   readonly mediaType = input<'image' | 'sound'>('image');
+  readonly assettype = input<string>('Other');
   readonly mediaUploaded = output<UploadedMediaItem>();
 
   readonly isOpen = signal(false);
@@ -68,6 +70,7 @@ export class UploadPopup {
     fd.append('name', name);
     fd.append('isPublic', 'false');
     fd.append('isActive', 'true');
+    fd.append('assettype', this.assettype());
     fd.append(this.mediaType(), file);
 
     const url = `${API_BASE_URL}/${this.mediaType() === 'image' ? 'images' : 'sounds'}`;

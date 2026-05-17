@@ -5,6 +5,7 @@ import {
   TresherRecord,
   UpsertTresherPayload,
   getTreshersByUserGuid,
+  getAllTreshersWithUsername,
   insertTresherForUser,
   isAdminUserByGuid,
   updateTresherForUser,
@@ -20,6 +21,10 @@ export const fetchTresherLibraryByUserGuid = async (
   userguid: string
 ): Promise<TresherRecord[]> => {
   return await getTresherLibraryByUserGuid(userguid);
+};
+
+export const fetchAllTreshersWithUsername = async (): Promise<TresherRecord[]> => {
+  return await getAllTreshersWithUsername();
 };
 
 export const checkUserIsAdminByGuid = async (userguid: string): Promise<boolean> => {

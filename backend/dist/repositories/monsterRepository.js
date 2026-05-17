@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateMonsterForUser = exports.insertMonsterForUser = exports.getMonsterLibraryByUserGuid = exports.getMonstersByUserGuid = exports.isAdminUserByGuid = void 0;
+exports.updateMonsterForUser = exports.insertMonsterForUser = exports.getAllMonstersWithUsername = exports.getMonsterLibraryByUserGuid = exports.getMonstersByUserGuid = exports.isAdminUserByGuid = void 0;
 const db_1 = __importDefault(require("../db"));
 const isAdminUserByGuid = async (userguid) => {
     const { rows } = await db_1.default.query('SELECT isadmin FROM users WHERE key = $1', [userguid]);
@@ -58,16 +58,71 @@ const getMonstersByUserGuid = async (userguid) => {
 };
 exports.getMonstersByUserGuid = getMonstersByUserGuid;
 const getMonsterLibraryByUserGuid = async (userguid) => {
-    const { rows } = await db_1.default.query(`SELECT ${SELECT_MONSTER_FIELDS}
-     FROM monsters
-     WHERE userguid = $1 OR ispublic = true
+    const { rows } = await db_1.default.query(`SELECT
+       m.id, m.userguid::text AS userguid,
+       m.imageid AS "imageId", m.soundid AS "soundId",
+       COALESCE(m.tresherids, '[]'::jsonb) AS "tresherIds",
+       COALESCE(m.keyids, '[]'::jsonb) AS "keyIds",
+       m.name, m.type, m.description, m.hp,
+       m.movmenteconomy AS "movementEconomy", m.ac, m.runat AS "runAt",
+       m.numberofattacks AS "numberOfAttacks", m.attacks,
+       m.ispublic AS "isPublic",
+       m.createdat::text AS "createdAt", m.updatedat::text AS "updatedAt",
+       COALESCE(m.spreward, 0) AS "spReward",
+       COALESCE(m.magic, 0) AS magic, COALESCE(m.magicresistance, 0) AS "magicResistance",
+       COALESCE(m.callsreinforcements, FALSE) AS "callsReinforcements",
+       COALESCE(m.reinforcementcount, 0) AS "reinforcementCount",
+       m.reinforcementmonstername AS "reinforcementMonsterName",
+       COALESCE(m.tohitplusneeded, 0) AS "toHitPlusNeeded",
+       m.npc_greeting AS "npcGreeting", m.npc_info_1 AS "npcInfo1",
+       m.npc_info_2 AS "npcInfo2", m.npc_info_3 AS "npcInfo3",
+       COALESCE(m.npc_only_attack_when_attacked, FALSE) AS "npcOnlyAttackWhenAttacked",
+       COALESCE(m.npc_gives_info_after_damaged, FALSE) AS "npcGivesInfoAfterDamaged",
+       COALESCE(m.npc_attacks_after_info, FALSE) AS "npcAttacksAfterInfo",
+       COALESCE(m.npc_can_trade, FALSE) AS "npcCanTrade",
+       COALESCE(m.awareness, 5) AS awareness,
+       COALESCE(u.username, '') AS username
+     FROM monsters m
+     LEFT JOIN users u ON u.key::text = m.userguid::text
+     WHERE m.userguid = $1 OR m.ispublic = true
      ORDER BY
-       CASE WHEN userguid = $1 THEN 0 ELSE 1 END,
-       updatedat DESC,
-       id DESC`, [userguid]);
+       CASE WHEN m.userguid = $1 THEN 0 ELSE 1 END,
+       m.updatedat DESC,
+       m.id DESC`, [userguid]);
     return rows;
 };
 exports.getMonsterLibraryByUserGuid = getMonsterLibraryByUserGuid;
+const getAllMonstersWithUsername = async () => {
+    const { rows } = await db_1.default.query(`SELECT
+       m.id, m.userguid::text AS userguid,
+       m.imageid AS "imageId", m.soundid AS "soundId",
+       COALESCE(m.tresherids, '[]'::jsonb) AS "tresherIds",
+       COALESCE(m.keyids, '[]'::jsonb) AS "keyIds",
+       m.name, m.type, m.description, m.hp,
+       m.movmenteconomy AS "movementEconomy", m.ac, m.runat AS "runAt",
+       m.numberofattacks AS "numberOfAttacks", m.attacks,
+       m.ispublic AS "isPublic",
+       m.createdat::text AS "createdAt", m.updatedat::text AS "updatedAt",
+       COALESCE(m.spreward, 0) AS "spReward",
+       COALESCE(m.magic, 0) AS magic, COALESCE(m.magicresistance, 0) AS "magicResistance",
+       COALESCE(m.callsreinforcements, FALSE) AS "callsReinforcements",
+       COALESCE(m.reinforcementcount, 0) AS "reinforcementCount",
+       m.reinforcementmonstername AS "reinforcementMonsterName",
+       COALESCE(m.tohitplusneeded, 0) AS "toHitPlusNeeded",
+       m.npc_greeting AS "npcGreeting", m.npc_info_1 AS "npcInfo1",
+       m.npc_info_2 AS "npcInfo2", m.npc_info_3 AS "npcInfo3",
+       COALESCE(m.npc_only_attack_when_attacked, FALSE) AS "npcOnlyAttackWhenAttacked",
+       COALESCE(m.npc_gives_info_after_damaged, FALSE) AS "npcGivesInfoAfterDamaged",
+       COALESCE(m.npc_attacks_after_info, FALSE) AS "npcAttacksAfterInfo",
+       COALESCE(m.npc_can_trade, FALSE) AS "npcCanTrade",
+       COALESCE(m.awareness, 5) AS awareness,
+       COALESCE(u.username, '') AS username
+     FROM monsters m
+     LEFT JOIN users u ON u.key::text = m.userguid::text
+     ORDER BY LOWER(m.name) ASC, m.id ASC`);
+    return rows;
+};
+exports.getAllMonstersWithUsername = getAllMonstersWithUsername;
 const insertMonsterForUser = async (userguid, payload) => {
     const { rows } = await db_1.default.query(`INSERT INTO monsters (
        userguid,

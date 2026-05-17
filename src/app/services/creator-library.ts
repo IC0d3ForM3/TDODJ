@@ -6,6 +6,7 @@ export interface TresherLibraryItem extends Tresher {
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
+  username?: string;
 }
 
 export interface MonsterLibraryItem extends Monster {
@@ -13,16 +14,19 @@ export interface MonsterLibraryItem extends Monster {
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
+  username?: string;
 }
 
 export interface LibImageItem {
   id: number; name: string; path: string; isPublic: boolean; isActive: boolean;
-  createdAt: string; updatedAt: string; userguid: string;
+  assettype: string;
+  createdAt: string; updatedAt: string; userguid: string; username?: string;
 }
 
 export interface LibSoundItem {
   id: number; name: string; path: string; isPublic: boolean; isActive: boolean;
-  createdAt: string; updatedAt: string; userguid: string;
+  assettype: string;
+  createdAt: string; updatedAt: string; userguid: string; username?: string;
 }
 
 export interface LibSpellItem {
@@ -34,7 +38,7 @@ export interface LibSpellItem {
   effectOnPc1?: boolean; effectOnPc2?: boolean;
   range1?: number; range2?: number;
   lastFor1?: number; lastFor2?: number;
-  createdAt: string; updatedAt: string;
+  createdAt: string; updatedAt: string; username?: string;
 }
 
 export type CreatorTabId = 'dungons' | 'treshers' | 'monsters' | 'images' | 'sounds' | 'spells' | 'potions' | 'items' | 'curses';
@@ -56,8 +60,8 @@ export class CreatorLibraryService {
 
   // ── Spell / image / sound option lists ──────────────────────────────────
   readonly libSpells = signal<{ id: number; name: string }[]>([]);
-  readonly libImageOptions = signal<{ id: number; name: string; path: string }[]>([]);
-  readonly libSoundOptions = signal<{ id: number; name: string; path: string }[]>([]);
+  readonly libImageOptions = signal<{ id: number; name: string; path: string; assettype: string }[]>([]);
+  readonly libSoundOptions = signal<{ id: number; name: string; path: string; assettype: string }[]>([]);
 
   // ── User image library ───────────────────────────────────────────────────
   readonly libUserImages = signal<LibImageItem[]>([]);
@@ -68,6 +72,8 @@ export class CreatorLibraryService {
   readonly libImageSaveMessage = signal<string | null>(null);
   readonly isLibImageSectionVisible = signal(true);
   readonly selectedLibImageFile = signal<File | null>(null);
+  readonly isDeletingLibImageId = signal<number | null>(null);
+  readonly libImageDeleteError = signal<string | null>(null);
 
   // ── User sound library ───────────────────────────────────────────────────
   readonly libUserSounds = signal<LibSoundItem[]>([]);
@@ -78,6 +84,8 @@ export class CreatorLibraryService {
   readonly libSoundSaveMessage = signal<string | null>(null);
   readonly isLibSoundSectionVisible = signal(true);
   readonly selectedLibSoundFile = signal<File | null>(null);
+  readonly isDeletingLibSoundId = signal<number | null>(null);
+  readonly libSoundDeleteError = signal<string | null>(null);
 
   // ── User spell library ───────────────────────────────────────────────────
   readonly libUserSpells = signal<LibSpellItem[]>([]);

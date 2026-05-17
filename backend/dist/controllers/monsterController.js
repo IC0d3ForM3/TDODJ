@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateMonster = exports.createMonster = exports.getMonsters = void 0;
+const userRepository_1 = require("../repositories/userRepository");
 const monsterService = __importStar(require("../services/monsterService"));
 const imageService = __importStar(require("../services/imageService"));
 const tresherService = __importStar(require("../services/tresherService"));
@@ -46,6 +47,9 @@ const getMonsters = async (req, res) => {
     }
     try {
         const shouldIncludePublic = typeof scope === 'string' && scope.toLowerCase() === 'library';
+        if (shouldIncludePublic && await (0, userRepository_1.isMasterAdminByGuid)(userkey.trim())) {
+            return res.json(await monsterService.fetchAllMonstersWithUsername());
+        }
         const monsters = shouldIncludePublic
             ? await monsterService.fetchMonsterLibraryByUserGuid(userkey.trim())
             : await monsterService.fetchMonstersByUserGuid(userkey.trim());

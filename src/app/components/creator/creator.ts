@@ -138,8 +138,13 @@ const SIDE_RULES: SideRule[] = [
   },
 ];
 
-interface LibImageWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
-interface LibSoundWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; }
+interface LibImageWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; assettype: string; }
+interface LibSoundWritePayload { path: string; isPublic: boolean; isActive: boolean; name: string; assettype: string; }
+
+export const ASSET_TYPES = [
+  'Other', 'Curse', 'Item-Weapon', 'Item-Armor', 'Item-Pick', 'Item-Ring', 'Item-Gem',
+  'Item-Other', 'Potion', 'Spell', 'Monster', 'Tresher', 'Dungon', 'PC',
+] as const;
 interface LibSpellWritePayload {
   name: string;
   description: string;
@@ -213,8 +218,8 @@ export class Creator implements OnInit {
   private readonly stairsUpSquareAssignment = new Map<string, 1 | 2 | 3>();
   private readonly obstacleImageCache = new Map<number, HTMLImageElement>();
   private readonly obstacleImageCacheVersion = signal(0);
-  private rawLibImageOptions: Array<{ id: number; name: string; path: string }> = [];
-  private rawLibSoundOptions: Array<{ id: number; name: string; path: string }> = [];
+  private rawLibImageOptions: Array<{ id: number; name: string; path: string; assettype: string }> = [];
+  private rawLibSoundOptions: Array<{ id: number; name: string; path: string; assettype: string }> = [];
   readonly account = inject(Account);
   private readonly dungeonJsonService = inject(DungeonJsonService);
   private readonly dungeonState = inject(DungeonStateService);
@@ -449,6 +454,24 @@ export class Creator implements OnInit {
   get libImageOptions() { return this.libraryService.libImageOptions; }
   get libSoundOptions() { return this.libraryService.libSoundOptions; }
 
+  readonly assetTypes = ASSET_TYPES;
+
+  libFilteredImageOptions(assettype: string) {
+    return this.libImageOptions().filter((opt) => opt.assettype === assettype);
+  }
+
+  libFilteredSoundOptions(assettype: string) {
+    return this.libSoundOptions().filter((opt) => opt.assettype === assettype);
+  }
+
+  libItemImageOptions() {
+    return this.libImageOptions().filter((opt) => opt.assettype.startsWith('Item'));
+  }
+
+  libItemSoundOptions() {
+    return this.libSoundOptions().filter((opt) => opt.assettype.startsWith('Item'));
+  }
+
   libGameImageOptions() {
     return this.libImageOptions().filter((opt) => !this.isUploadedMediaPath(opt.path));
   }
@@ -477,6 +500,13 @@ export class Creator implements OnInit {
   get libImageSaveMessage() { return this.libraryService.libImageSaveMessage; }
   get isLibImageSectionVisible() { return this.libraryService.isLibImageSectionVisible; }
   get selectedLibImageFile() { return this.libraryService.selectedLibImageFile; }
+  get isDeletingLibImageId() { return this.libraryService.isDeletingLibImageId; }
+  get libImageDeleteError() { return this.libraryService.libImageDeleteError; }
+  get editingLibImagePreviewUrl(): string | null {
+    if (this.editingLibImageId() === null) return null;
+    const p = this.libImageForm.controls.path.value;
+    return p ? this.libResolveImageUrl(p) : null;
+  }
 
   get libUserSounds() { return this.libraryService.libUserSounds; }
   get isLoadingLibSounds() { return this.libraryService.isLoadingLibSounds; }
@@ -486,6 +516,8 @@ export class Creator implements OnInit {
   get libSoundSaveMessage() { return this.libraryService.libSoundSaveMessage; }
   get isLibSoundSectionVisible() { return this.libraryService.isLibSoundSectionVisible; }
   get selectedLibSoundFile() { return this.libraryService.selectedLibSoundFile; }
+  get isDeletingLibSoundId() { return this.libraryService.isDeletingLibSoundId; }
+  get libSoundDeleteError() { return this.libraryService.libSoundDeleteError; }
 
   private isUploadedMediaPath(path: string): boolean {
     const normalized = path.toLowerCase();
@@ -507,6 +539,7 @@ export class Creator implements OnInit {
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
     isActive: new FormControl<boolean>(true, { nonNullable: true }),
     name: new FormControl<string>('', { nonNullable: true }),
+    assettype: new FormControl<string>('Other', { nonNullable: true }),
   });
 
   readonly libSoundForm = new FormGroup({
@@ -514,6 +547,7 @@ export class Creator implements OnInit {
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
     isActive: new FormControl<boolean>(true, { nonNullable: true }),
     name: new FormControl<string>('', { nonNullable: true }),
+    assettype: new FormControl<string>('Other', { nonNullable: true }),
   });
 
   readonly libSpellForm = new FormGroup({
@@ -899,6 +933,13 @@ export class Creator implements OnInit {
     this.placeMonsterDropTresherIds.set([]);
     this.placeMonsterDropKeyIds.set([]);
     this.placeMonsterDropItemIds.set([]);
+    this.placeMonsterDropSpellIds.set([]);
+    this.placeMonsterDropPotionIds.set([]);
+    this.placeMonsterGold.set(0);
+    this.placeMonsterSilver.set(0);
+    this.placeMonsterCopper.set(0);
+    this.placeMonsterZinc.set(0);
+    this.placeMonsterWeaponItemId.set(null);
     this.placeMonsterIsDormant.set(false);
     this.placeMonsterGuardRow.set(null);
     this.placeMonsterGuardCol.set(null);
@@ -2203,6 +2244,17 @@ export class Creator implements OnInit {
     if (!item || dungonId === null || item.type !== 'spell') return;
     this.selectedPlacedItemKey.set(null);
     this.removeSpellPlacementsAtSquare(dungonId, item.row, item.column);
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+  }
+
+  removeSelectedDoorPlacement(): void {
+    const item = this.selectedPlacedItem();
+    const dungonId = this.selectedDungonId();
+    if (!item || dungonId === null || item.type !== 'door') return;
+    this.selectedPlacedItemKey.set(null);
+    this.removeDoorById(dungonId, item.refId);
     this.markDungonJsonChanged();
     this.drawGridCanvas();
     this.drawPreviewGridCanvas();
@@ -4446,7 +4498,7 @@ export class Creator implements OnInit {
 
     this.http
       .get<{ id: number; name: string; type: string }[]>(`${API_BASE_URL}/items`, {
-        params: { userkey: userKey },
+        params: { userkey: userKey, scope: 'library' },
       })
       .subscribe({
         next: (items) =>
@@ -4568,7 +4620,8 @@ export class Creator implements OnInit {
     return this.tresherLibrary();
   }
 
-  libraryTresherSourceLabel(tresher: TresherLibraryItem): 'Mine' | 'Public' {
+  libraryTresherSourceLabel(tresher: TresherLibraryItem): string {
+    if (tresher.username) return tresher.username;
     const userKey = this.account.getKey();
     return tresher.userguid === userKey ? 'Mine' : 'Public';
   }
@@ -4590,7 +4643,8 @@ export class Creator implements OnInit {
     return this.monsterLibrary();
   }
 
-  libraryMonsterSourceLabel(monster: MonsterLibraryItem): 'Mine' | 'Public' {
+  libraryMonsterSourceLabel(monster: MonsterLibraryItem): string {
+    if (monster.username) return monster.username;
     const userKey = this.account.getKey();
     return monster.userguid === userKey ? 'Mine' : 'Public';
   }
@@ -6296,13 +6350,13 @@ export class Creator implements OnInit {
   }
 
   onCreateDungonImageUploaded(item: UploadedMediaItem): void {
-    this.libImageOptions.update((opts) => [...opts, item]);
+    this.libImageOptions.update((opts) => [...opts, { ...item, assettype: item.assettype ?? 'Dungon' }]);
     this.createDungonForm.controls.imageId.setValue(item.id);
     this.createDungonImagePreviewUrl.set(this.libResolveImageUrl(item.path));
   }
 
   onEditDungonImageUploaded(item: UploadedMediaItem): void {
-    this.libImageOptions.update((opts) => [...opts, item]);
+    this.libImageOptions.update((opts) => [...opts, { ...item, assettype: item.assettype ?? 'Dungon' }]);
     this.editMetadataForm.controls.imageId.setValue(item.id);
     this.editDungonImagePreviewUrl.set(this.libResolveImageUrl(item.path));
   }
@@ -11615,6 +11669,27 @@ export class Creator implements OnInit {
     return this.synchronizeDoorConnections(nextSquares);
   }
 
+  private removeDoorById(dungonId: number, doorId: number): void {
+    const squares = this.squaresByDungon()[dungonId];
+    if (!squares) return;
+    const sides: SquareSide[] = ['toTop', 'toRight', 'toBottom', 'toLeft'];
+    let updated = { ...squares };
+    for (const [key, square] of Object.entries(updated)) {
+      let updatedSquare = square;
+      let changed = false;
+      for (const side of sides) {
+        const conn = square[side];
+        if (this.isDoorConnection(conn) && conn.id === doorId) {
+          updatedSquare = this.withSquareSide(updatedSquare, side, this.buildWall());
+          changed = true;
+        }
+      }
+      if (changed) updated[key] = updatedSquare;
+    }
+    this.squaresByDungon.update((all) => ({ ...all, [dungonId]: updated }));
+    this.keyList = this.keyList.filter((k) => k.doorId !== doorId);
+  }
+
   private updateDoorPropertiesInPlace(
     existingSquares: Record<string, Square>,
     doorId: number,
@@ -11885,7 +11960,7 @@ export class Creator implements OnInit {
     const userkey = this.account.getKey();
     if (!userkey) return;
     this.http
-      .get<{ id: number; name: string; path: string }[]>(`${API_BASE_URL}/images`, { params: { userkey, scope: 'library' } })
+      .get<{ id: number; name: string; path: string; assettype: string }[]>(`${API_BASE_URL}/images`, { params: { userkey, scope: 'library' } })
       .subscribe({
         next: (items) => {
           this.rawLibImageOptions = Array.isArray(items) ? items : [];
@@ -11902,7 +11977,7 @@ export class Creator implements OnInit {
     const userkey = this.account.getKey();
     if (!userkey) return;
     this.http
-      .get<{ id: number; name: string; path: string }[]>(`${API_BASE_URL}/sounds`, { params: { userkey, scope: 'library' } })
+      .get<{ id: number; name: string; path: string; assettype: string }[]>(`${API_BASE_URL}/sounds`, { params: { userkey, scope: 'library' } })
       .subscribe({
         next: (items) => {
           this.rawLibSoundOptions = Array.isArray(items) ? items : [];
@@ -11962,9 +12037,9 @@ export class Creator implements OnInit {
     const mySoundIds = new Set((this.libUserSounds() ?? []).map((s) => s.id));
 
     const classifyAndSort = (
-      items: Array<{ id: number; name: string; path: string }>,
+      items: Array<{ id: number; name: string; path: string; assettype: string }>,
       mine: Set<number>
-    ): Array<{ id: number; name: string; path: string }> => {
+    ): Array<{ id: number; name: string; path: string; assettype: string }> => {
       const withBucket = items.map((item) => ({
         ...item,
         bucket: mine.has(item.id) ? 'uploaded' as const : 'game' as const,
@@ -11980,6 +12055,7 @@ export class Creator implements OnInit {
       return withBucket.map((item) => ({
         id: item.id,
         path: item.path,
+        assettype: item.assettype,
         name: `${item.bucket === 'game' ? '[Game]' : '[Uploaded]'} ${item.name}`,
       }));
     };
@@ -12036,17 +12112,17 @@ export class Creator implements OnInit {
     this.editingLibImageId.set(item.id);
     this.selectedLibImageFile.set(null);
     this.libImageSaveMessage.set(null);
-    this.libImageForm.reset({ path: item.path, isPublic: item.isPublic, isActive: item.isActive, name: item.name });
+    this.libImageForm.reset({ path: item.path, isPublic: item.isPublic, isActive: item.isActive, name: item.name, assettype: item.assettype || 'Other' });
   }
-  cancelEditLibImage(): void { this.editingLibImageId.set(null); this.selectedLibImageFile.set(null); this.libImageSaveMessage.set(null); this.libImageForm.reset({ path: '', isPublic: false, isActive: true, name: '' }); }
+  cancelEditLibImage(): void { this.editingLibImageId.set(null); this.selectedLibImageFile.set(null); this.libImageSaveMessage.set(null); this.libImageForm.reset({ path: '', isPublic: false, isActive: true, name: '', assettype: 'Other' }); }
 
   editLibSound(item: LibSoundItem): void {
     this.editingLibSoundId.set(item.id);
     this.selectedLibSoundFile.set(null);
     this.libSoundSaveMessage.set(null);
-    this.libSoundForm.reset({ path: item.path, isPublic: item.isPublic, isActive: item.isActive, name: item.name });
+    this.libSoundForm.reset({ path: item.path, isPublic: item.isPublic, isActive: item.isActive, name: item.name, assettype: item.assettype || 'Other' });
   }
-  cancelEditLibSound(): void { this.editingLibSoundId.set(null); this.selectedLibSoundFile.set(null); this.libSoundSaveMessage.set(null); this.libSoundForm.reset({ path: '', isPublic: false, isActive: true, name: '' }); }
+  cancelEditLibSound(): void { this.editingLibSoundId.set(null); this.selectedLibSoundFile.set(null); this.libSoundSaveMessage.set(null); this.libSoundForm.reset({ path: '', isPublic: false, isActive: true, name: '', assettype: 'Other' }); }
 
   editLibSpell(item: LibSpellItem): void {
     this.editingLibSpellId.set(item.id);
@@ -12085,12 +12161,12 @@ export class Creator implements OnInit {
   cancelEditLibSpell(): void { this.editingLibSpellId.set(null); this.libSpellSaveMessage.set(null); this.resetLibSpellForm(); }
 
   onLibSpellImageUploaded(item: UploadedMediaItem): void {
-    this.libImageOptions.update((opts) => [...opts, item]);
+    this.libImageOptions.update((opts) => [...opts, { ...item, assettype: item.assettype ?? 'Spell' }]);
     this.libSpellForm.controls.imageId.setValue(item.id);
   }
 
   onLibSpellSoundUploaded(item: UploadedMediaItem): void {
-    this.libSoundOptions.update((opts) => [...opts, item]);
+    this.libSoundOptions.update((opts) => [...opts, { ...item, assettype: item.assettype ?? 'Spell' }]);
     this.libSpellForm.controls.soundId.setValue(item.id);
   }
 
@@ -12145,7 +12221,7 @@ export class Creator implements OnInit {
     const userkey = this.account.getKey();
     if (!userkey) { this.libImageSaveMessage.set('Please log in to save images.'); return; }
     const v = this.libImageForm.getRawValue();
-    const payload: LibImageWritePayload = { path: (v.path || '').trim(), isPublic: this.isAdminUser() && v.isPublic, isActive: v.isActive, name: (v.name || '').trim() || 'Unnamed Image' };
+    const payload: LibImageWritePayload = { path: (v.path || '').trim(), isPublic: this.isAdminUser() && v.isPublic, isActive: v.isActive, name: (v.name || '').trim() || 'Unnamed Image', assettype: v.assettype || 'Other' };
     const editingId = this.editingLibImageId();
     const request$ = editingId
       ? this.http.put<{ result: number; error?: string }>(`${API_BASE_URL}/images/${editingId}`, { userkey, image: payload })
@@ -12157,6 +12233,7 @@ export class Creator implements OnInit {
           fd.append('name', payload.name);
           fd.append('isPublic', payload.isPublic ? 'true' : 'false');
           fd.append('isActive', payload.isActive ? 'true' : 'false');
+          fd.append('assettype', payload.assettype);
           fd.append('image', file);
           return this.http.post<{ result: number; error?: string }>(`${API_BASE_URL}/images`, fd);
         })();
@@ -12179,7 +12256,7 @@ export class Creator implements OnInit {
     const userkey = this.account.getKey();
     if (!userkey) { this.libSoundSaveMessage.set('Please log in to save sounds.'); return; }
     const v = this.libSoundForm.getRawValue();
-    const payload: LibSoundWritePayload = { path: (v.path || '').trim(), isPublic: this.isAdminUser() && v.isPublic, isActive: v.isActive, name: (v.name || '').trim() || 'Unnamed Sound' };
+    const payload: LibSoundWritePayload = { path: (v.path || '').trim(), isPublic: this.isAdminUser() && v.isPublic, isActive: v.isActive, name: (v.name || '').trim() || 'Unnamed Sound', assettype: v.assettype || 'Other' };
     const editingId = this.editingLibSoundId();
     const request$ = editingId
       ? this.http.put<{ result: number; error?: string }>(`${API_BASE_URL}/sounds/${editingId}`, { userkey, sound: payload })
@@ -12191,6 +12268,7 @@ export class Creator implements OnInit {
           fd.append('name', payload.name);
           fd.append('isPublic', payload.isPublic ? 'true' : 'false');
           fd.append('isActive', payload.isActive ? 'true' : 'false');
+          fd.append('assettype', payload.assettype);
           fd.append('sound', file);
           return this.http.post<{ result: number; error?: string }>(`${API_BASE_URL}/sounds`, fd);
         })();
@@ -12206,6 +12284,52 @@ export class Creator implements OnInit {
       },
       error: () => this.libSoundSaveMessage.set('Failed to save sound.'),
     });
+  }
+
+  deleteLibImage(id: number): void {
+    if (this.isDeletingLibImageId() !== null) return;
+    const userkey = this.account.getKey();
+    if (!userkey) return;
+    this.isDeletingLibImageId.set(id);
+    this.libImageDeleteError.set(null);
+    this.http
+      .delete<{ result: number; error?: string }>(`${API_BASE_URL}/images/${id}`, { params: { userkey } })
+      .pipe(finalize(() => this.isDeletingLibImageId.set(null)))
+      .subscribe({
+        next: (r) => {
+          if (r.result !== 1) { this.libImageDeleteError.set(r.error || 'Failed to delete image.'); return; }
+          this.libUserImages.update((items) => items.filter((i) => i.id !== id));
+          this.libImageOptions.update((opts) => opts.filter((o) => o.id !== id));
+          this.rawLibImageOptions = this.rawLibImageOptions.filter((o) => o.id !== id);
+        },
+        error: (e) => {
+          const msg = e?.error?.error || 'Failed to delete image.';
+          this.libImageDeleteError.set(msg);
+        },
+      });
+  }
+
+  deleteLibSound(id: number): void {
+    if (this.isDeletingLibSoundId() !== null) return;
+    const userkey = this.account.getKey();
+    if (!userkey) return;
+    this.isDeletingLibSoundId.set(id);
+    this.libSoundDeleteError.set(null);
+    this.http
+      .delete<{ result: number; error?: string }>(`${API_BASE_URL}/sounds/${id}`, { params: { userkey } })
+      .pipe(finalize(() => this.isDeletingLibSoundId.set(null)))
+      .subscribe({
+        next: (r) => {
+          if (r.result !== 1) { this.libSoundDeleteError.set(r.error || 'Failed to delete sound.'); return; }
+          this.libUserSounds.update((items) => items.filter((i) => i.id !== id));
+          this.libSoundOptions.update((opts) => opts.filter((o) => o.id !== id));
+          this.rawLibSoundOptions = this.rawLibSoundOptions.filter((o) => o.id !== id);
+        },
+        error: (e) => {
+          const msg = e?.error?.error || 'Failed to delete sound.';
+          this.libSoundDeleteError.set(msg);
+        },
+      });
   }
 
   saveLibSpell(): void {

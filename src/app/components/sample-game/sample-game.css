@@ -304,6 +304,10 @@
   .sg-pc-choice-img {
     height: 250px;
   }
+
+  .sg-guide-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* PC Picker */
@@ -417,7 +421,116 @@
 .sg-change-pc:hover {
   color: #d2b8ff;
 }
+/* ── Beta notice ────────────────────────────────────────────── */
+.sg-beta {
+	background: rgba(150, 85, 0, 0.22);
+	border: 1px solid rgba(220, 140, 40, 0.5);
+	border-radius: 8px;
+	padding: 0.55rem 0.9rem;
+	margin-bottom: 1rem;
+	color: #f5c878;
+	font-size: 0.87rem;
+	line-height: 1.5;
+}
 
+.sg-beta strong {
+	color: #ffd96a;
+}
+
+/* ── PC Guide section ──────────────────────────────────────── */
+.sg-guide {
+	margin-top: 1rem;
+	margin-bottom: 1rem;
+}
+
+.sg-guide-title {
+	margin: 0 0 0.6rem;
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: #cdb3ff;
+	letter-spacing: 0.01em;
+}
+
+.sg-guide-type {
+	color: #e2d4ff;
+	font-style: italic;
+}
+
+.sg-guide-grid {
+	display: grid;
+	grid-template-columns: 1.25fr 1fr 1fr;
+	gap: 0.7rem;
+}
+
+.sg-guide-card {
+	background: rgba(17, 25, 40, 0.7);
+	border: 1px solid rgba(160, 184, 220, 0.2);
+	border-radius: 9px;
+	padding: 0.75rem 0.85rem;
+}
+
+.sg-guide-adv {
+	border-color: rgba(80, 200, 120, 0.35);
+}
+
+.sg-guide-dis {
+	border-color: rgba(255, 140, 60, 0.35);
+}
+
+.sg-guide-card-hd {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: #7ea8d8;
+	margin-bottom: 0.5rem;
+}
+
+.sg-guide-adv .sg-guide-card-hd {
+	color: #6fdd9a;
+}
+
+.sg-guide-dis .sg-guide-card-hd {
+	color: #ffaa60;
+}
+
+.sg-guide-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	gap: 0.32rem;
+}
+
+.sg-guide-list li {
+	font-size: 0.82rem;
+	line-height: 1.42;
+	color: #c0d0e8;
+}
+
+/* Controls card — kbd + description */
+.sg-ctrl-key {
+	display: inline-block;
+	background: rgba(60, 110, 190, 0.2);
+	border: 1px solid rgba(100, 160, 240, 0.35);
+	border-radius: 4px;
+	padding: 0.07rem 0.38rem;
+	font-size: 0.72rem;
+	font-family: monospace;
+	color: #8cc8ff;
+	margin-right: 0.4rem;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+/* Advantage / disadvantage bullets */
+.sg-guide-bullets li::before {
+	content: '›';
+	margin-right: 0.3rem;
+	color: #7ea8d8;
+	font-weight: 700;
+}
 /* ── Tavern Tutorial Overlay ───────────────────────────────────── */
 .tut-backdrop {
   position: fixed;

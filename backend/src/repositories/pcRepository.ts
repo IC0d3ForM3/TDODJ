@@ -42,6 +42,7 @@ export interface PcRecord {
   sp: number;
   numberOfAttacks: number;
   numberOfDefends: number;
+  username?: string;
 }
 
 export interface UpsertPcPayload {
@@ -132,6 +133,45 @@ export const getPcsByUserGuid = async (userguid: string): Promise<PcRecord[]> =>
     [userguid]
   );
 
+  return rows;
+};
+
+export const getAllPcsWithUsername = async (): Promise<PcRecord[]> => {
+  const { rows } = await pool.query<PcRecord>(
+    `SELECT
+       p.id,
+       p.userguid::text AS userguid,
+       p.name, p.species, p.type,
+       p.imageid AS "imageId",
+       p.maxhp AS "maxHP", p.currenthp AS "currentHP", p.ac,
+       p.actioneconomy AS "actionEconomy", p.poisonresest AS "poisonResest",
+       p.mp AS "magicPower", p.mind, p.stamina,
+       COALESCE(p.sp, 0) AS sp, p.level, p.strength,
+       p.rangeofview AS "rangeOfView",
+       p.primarytresherid AS "primaryTresherId",
+       p.weapontresherid AS "weaponTresherId",
+       COALESCE(p.tresherids, '[]'::jsonb) AS "tresherIds",
+       p.headarmortresherid AS "headArmorTresherId",
+       p.bodyarmortresherid AS "bodyArmorTresherId",
+       p.leftarmarmortresherid AS "leftArmArmorTresherId",
+       p.rightarmarmortresherid AS "rightArmArmorTresherId",
+       p.leftlegarmortresherid AS "leftLegArmorTresherId",
+       p.rightlegarmortresherid AS "rightLegArmorTresherId",
+       p.ring1itemid AS "ring1ItemId", p.ring2itemid AS "ring2ItemId",
+       p.ring3itemid AS "ring3ItemId", p.ring4itemid AS "ring4ItemId",
+       p.ring5itemid AS "ring5ItemId",
+       p.necklaceitemid AS "necklaceItemId",
+       p.hand1itemid AS "hand1ItemId", p.hand2itemid AS "hand2ItemId",
+       COALESCE(p.numberofattacks, 1) AS "numberOfAttacks",
+       COALESCE(p.numberofdefends, 1) AS "numberOfDefends",
+       COALESCE(p.issample, FALSE) AS issample,
+       COALESCE(p.ismaingame, FALSE) AS ismaingame,
+       p.createdat::text AS "createdAt", p.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM pcs p
+     LEFT JOIN users u ON u.key::text = p.userguid::text
+     ORDER BY u.username ASC, p.updatedat DESC, p.id DESC`
+  );
   return rows;
 };
 

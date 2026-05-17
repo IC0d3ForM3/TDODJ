@@ -47,6 +47,9 @@ const getPcs = async (req, res) => {
         return res.status(400).json({ error: 'Valid userkey query parameter is required' });
     }
     try {
+        if (await (0, userRepository_1.isMasterAdminByGuid)(userkey.trim())) {
+            return res.json(await pcService.fetchAllPcsWithUsername());
+        }
         const pcs = await pcService.fetchPcsByUserGuid(userkey.trim());
         console.log('PC load response tresher state:', pcs.map((pc) => ({
             id: pc.id,

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUserByKey = exports.getActiveUserByCredentials = exports.updateUserFlags = exports.insertUser = exports.isEmailUsed = exports.getUserById = exports.getAllUsers = void 0;
+exports.getUserByKey = exports.getActiveUserByCredentials = exports.updateUserFlags = exports.insertUser = exports.isMasterAdminByGuid = exports.isEmailUsed = exports.getUserById = exports.getAllUsers = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const SALT_ROUNDS = 12;
 const getAllUsers = async () => {
@@ -22,6 +22,11 @@ const isEmailUsed = async (email) => {
     return rows.length > 0;
 };
 exports.isEmailUsed = isEmailUsed;
+const isMasterAdminByGuid = async (userkey) => {
+    const { rows } = await db_1.default.query('SELECT ismasteradmin FROM users WHERE key = $1', [userkey]);
+    return rows[0]?.ismasteradmin === true;
+};
+exports.isMasterAdminByGuid = isMasterAdminByGuid;
 const insertUser = async (user) => {
     try {
         const hashedPassword = await bcrypt_1.default.hash(user.password, SALT_ROUNDS);

@@ -1,11 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.savePotionForUser = exports.createPotionForUser = exports.checkUserIsAdminByGuid = exports.fetchPotionsByIds = exports.fetchPotionsByUserGuid = void 0;
+exports.savePotionForUser = exports.createPotionForUser = exports.checkUserIsAdminByGuid = exports.fetchPotionsByIds = exports.fetchAllPotionsWithUsername = exports.fetchPotionsByUserGuid = void 0;
 const potionRepository_1 = require("../repositories/potionRepository");
 const fetchPotionsByUserGuid = async (userguid) => {
     return await (0, potionRepository_1.getPotionsByUserGuid)(userguid);
 };
 exports.fetchPotionsByUserGuid = fetchPotionsByUserGuid;
+const fetchAllPotionsWithUsername = async () => {
+    return await (0, potionRepository_1.getAllPotionsWithUsername)();
+};
+exports.fetchAllPotionsWithUsername = fetchAllPotionsWithUsername;
 const fetchPotionsByIds = async (ids) => {
     return await (0, potionRepository_1.getPotionsByIds)(ids);
 };

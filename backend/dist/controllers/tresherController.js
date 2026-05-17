@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateTresher = exports.createTresher = exports.getTreshers = void 0;
+const userRepository_1 = require("../repositories/userRepository");
 const tresherService = __importStar(require("../services/tresherService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const getTreshers = async (req, res) => {
@@ -44,6 +45,9 @@ const getTreshers = async (req, res) => {
     }
     try {
         const shouldIncludePublic = typeof scope === 'string' && scope.toLowerCase() === 'library';
+        if (shouldIncludePublic && await (0, userRepository_1.isMasterAdminByGuid)(userkey.trim())) {
+            return res.json(await tresherService.fetchAllTreshersWithUsername());
+        }
         const treshers = shouldIncludePublic
             ? await tresherService.fetchTresherLibraryByUserGuid(userkey.trim())
             : await tresherService.fetchTreshersByUserGuid(userkey.trim());

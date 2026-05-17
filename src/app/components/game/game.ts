@@ -89,7 +89,9 @@ interface GameSessionPayload {
   dungonSpReward?: number;
   monsterImages?: { id: number; path: string }[];
   lootImages?: { id: number; path: string }[];
+  obstacleImages?: { id: number; path: string }[];
   soundPaths?: { id: number; path: string }[];
+  dungonCoverImagePath?: string | null;
 }
 
 interface ImageRecordPayload {
@@ -179,6 +181,8 @@ export class Game implements OnInit {
   }
 
   readonly isLoadingGame = signal(false);
+  readonly isPreloadingAssets = signal(false);
+  readonly dungonCoverImageUrl = signal<string | null>(null);
   readonly gameLoadError = signal<string | null>(null);
   readonly gameName = signal('Game');
   readonly gameLastUpdated = signal<string | null>(null);
@@ -4299,60 +4303,25 @@ export class Game implements OnInit {
                 return merged;
               });
             }
-            this.setInitialPreviewContext(game.dungonid);
-            // Pre-populate monster image cache from paths returned by the server
-            if (Array.isArray(game.monsterImages)) {
-              for (const mi of game.monsterImages) {
-                if (typeof mi.id !== 'number' || !mi.path) continue;
-                if (this.monsterImageCache.has(mi.id)) continue;
-                const url = this.resolveImageUrl(mi.path);
-                if (!url) continue;
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                  this.monsterImageCache.set(mi.id, img);
-                  this.monsterImageCacheVersion.update((v) => v + 1);
-                  this.drawFirstPersonViewCanvas();
-                };
-                img.src = url;
-              }
-            }
-            if (Array.isArray(game.lootImages)) {
-              for (const asset of game.lootImages) {
-                if (typeof asset.id !== 'number' || !asset.path) continue;
-                if (this.lootImageCache.has(asset.id)) continue;
-                const url = this.resolveImageUrl(asset.path);
-                if (!url) continue;
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                  this.lootImageCache.set(asset.id, img);
-                  this.lootImageCacheVersion.update((v) => v + 1);
-                  this.drawFirstPersonViewCanvas();
-                };
-                img.src = url;
-              }
-            }
-            if (Array.isArray(game.soundPaths) && game.soundPaths.length > 0) {
-              this.soundPathById.update((existingMap) => {
-                const merged = new Map(existingMap);
-                for (const asset of game.soundPaths ?? []) {
-                  if (typeof asset.id !== 'number' || typeof asset.path !== 'string') continue;
-                  const trimmedPath = asset.path.trim();
-                  if (!trimmedPath) continue;
-                  merged.set(asset.id, trimmedPath);
-                }
-                return merged;
-              });
-            }
-            this.loadMonsterImages(game.dungonid);
-            this.loadObstacleImages(game.dungonid);
-            this.loadLootImages(game.dungonid);
             this.playerType.set(typeof game.pcType === 'string' ? game.pcType : null);
             this.playerSpecies.set(typeof game.pcSpecies === 'string' ? game.pcSpecies : null);
             this.playerName.set(typeof game.pcName === 'string' ? game.pcName : null);
             this.playerPortraitUrl.set(typeof game.pcImagePath === 'string' ? (this.resolveImageUrl(game.pcImagePath) || null) : null);
-            this.initializeCombatState(game.dungonid);
+            this.dungonCoverImageUrl.set(
+              typeof game.dungonCoverImagePath === 'string' && game.dungonCoverImagePath
+                ? (this.resolveImageUrl(game.dungonCoverImagePath) || null)
+                : null
+            );
+            this.isPreloadingAssets.set(true);
+            this.preloadGameAssets(game).then(() => {
+              this.isPreloadingAssets.set(false);
+              this.setInitialPreviewContext(game.dungonid);
+              this.initializeCombatState(game.dungonid);
+              // Keep loadMonsterImages/Obstacle/Loot as fallback for any IDs not returned by the server
+              this.loadMonsterImages(game.dungonid);
+              this.loadObstacleImages(game.dungonid);
+              this.loadLootImages(game.dungonid);
+            });
           },
         });
       return;
@@ -4462,18 +4431,81 @@ export class Game implements OnInit {
               return merged;
             });
           }
-          this.setInitialPreviewContext(game.dungonid);
-          this.loadMonsterImages(game.dungonid);
-          this.loadObstacleImages(game.dungonid);
-          this.loadLootImages(game.dungonid);
-          this.initializeCombatState(game.dungonid);
-          this.showTavernModal.set(true);
-          this.startTavernMusic();
+          this.dungonCoverImageUrl.set(
+            typeof game.dungonCoverImagePath === 'string' && game.dungonCoverImagePath
+              ? (this.resolveImageUrl(game.dungonCoverImagePath) || null)
+              : null
+          );
+          this.isPreloadingAssets.set(true);
+          this.preloadGameAssets(game).then(() => {
+            this.isPreloadingAssets.set(false);
+            this.setInitialPreviewContext(game.dungonid);
+            this.initializeCombatState(game.dungonid);
+            // Keep load*Images as fallback for any IDs not bundled by the server
+            this.loadMonsterImages(game.dungonid);
+            this.loadObstacleImages(game.dungonid);
+            this.loadLootImages(game.dungonid);
+            this.showTavernModal.set(true);
+            this.startTavernMusic();
+          });
         },
         error: () => {
           this.gameLoadError.set('Failed to load game.');
         },
       });
+  }
+
+  private preloadGameAssets(game: GameSessionPayload): Promise<void> {
+    // Populate sound path map synchronously from bundled server data
+    if (Array.isArray(game.soundPaths) && game.soundPaths.length > 0) {
+      this.soundPathById.update((existingMap) => {
+        const merged = new Map(existingMap);
+        for (const asset of game.soundPaths!) {
+          if (typeof asset.id !== 'number' || typeof asset.path !== 'string') continue;
+          const trimmed = asset.path.trim();
+          if (!trimmed) continue;
+          merged.set(asset.id, trimmed);
+        }
+        return merged;
+      });
+    }
+
+    const imageAssets: { cacheType: 'monster' | 'obstacle' | 'loot'; id: number; path: string }[] = [
+      ...(game.monsterImages ?? []).map((a) => ({ cacheType: 'monster' as const, ...a })),
+      ...(game.obstacleImages ?? []).map((a) => ({ cacheType: 'obstacle' as const, ...a })),
+      ...(game.lootImages ?? []).map((a) => ({ cacheType: 'loot' as const, ...a })),
+    ];
+
+    if (imageAssets.length === 0) return Promise.resolve();
+
+    const timeoutPromise = new Promise<void>((resolve) => window.setTimeout(resolve, 10000));
+
+    const loadPromise = new Promise<void>((resolve) => {
+      let remaining = imageAssets.length;
+      const tick = () => { if (--remaining <= 0) resolve(); };
+      for (const asset of imageAssets) {
+        const url = this.resolveImageUrl(asset.path);
+        if (!url) { tick(); continue; }
+        const img = new Image();
+        img.onload = () => {
+          if (asset.cacheType === 'monster') {
+            this.monsterImageCache.set(asset.id, img);
+            this.monsterImageCacheVersion.update((v) => v + 1);
+          } else if (asset.cacheType === 'obstacle') {
+            this.obstacleImageCache.set(asset.id, img);
+            this.obstacleImageCacheVersion.update((v) => v + 1);
+          } else {
+            this.lootImageCache.set(asset.id, img);
+            this.lootImageCacheVersion.update((v) => v + 1);
+          }
+          tick();
+        };
+        img.onerror = () => tick();
+        img.src = url;
+      }
+    });
+
+    return Promise.race([loadPromise, timeoutPromise]);
   }
 
   private loadMonsterImages(dungonId: number): void {
@@ -4499,6 +4531,7 @@ export class Game implements OnInit {
         })
         .subscribe({
           next: (images) => {
+            console.log('[game] loadMonsterImages /by-ids response:', images.length);
             for (const image of images) {
               if (!imageIds.has(image.id) || !image.path) {
                 continue;
@@ -4508,11 +4541,14 @@ export class Game implements OnInit {
                 continue;
               }
               const img = new Image();
-              img.crossOrigin = 'anonymous';
               img.onload = () => {
+                console.log('[game] loadMonsterImages image LOADED id=', image.id);
                 this.monsterImageCache.set(image.id, img);
                 this.monsterImageCacheVersion.update((v) => v + 1);
                 this.drawFirstPersonViewCanvas();
+              };
+              img.onerror = () => {
+                console.error('[game] loadMonsterImages image FAILED id=', image.id, 'url=', url);
               };
               img.src = url;
             }
@@ -4538,7 +4574,6 @@ export class Game implements OnInit {
             }
 
             const img = new Image();
-            img.crossOrigin = 'anonymous';
             img.onload = () => {
               this.monsterImageCache.set(image.id, img);
               this.monsterImageCacheVersion.update((v) => v + 1);
@@ -4598,15 +4633,18 @@ export class Game implements OnInit {
 
   private loadSoundCatalog(userKey: string, forceRefresh = false): void {
     if (this.soundPathById().size > 0 && !forceRefresh) {
+      console.log('[sound] loadSoundCatalog skipped — already have', this.soundPathById().size, 'entries');
       return;
     }
 
+    console.log('[sound] loadSoundCatalog fetching from API (forceRefresh=' + forceRefresh + ')');
     this.http
       .get<SoundRecordPayload[]>(`${API_BASE_URL}/sounds`, {
         params: { userkey: userKey, scope: 'library' },
       })
       .subscribe({
         next: (items) => {
+          console.log('[sound] loadSoundCatalog response:', items?.length ?? 0, 'items');
           if (!Array.isArray(items) || items.length === 0) {
             return;
           }
@@ -4625,6 +4663,7 @@ export class Game implements OnInit {
             map.set(item.id, trimmedPath);
           }
 
+          console.log('[sound] loadSoundCatalog built map with', map.size, 'entries');
           if (map.size > 0) {
             this.soundPathById.update((existingMap) => {
               const merged = new Map(existingMap);
@@ -4633,10 +4672,11 @@ export class Game implements OnInit {
               }
               return merged;
             });
+            console.log('[sound] soundPathById now has', this.soundPathById().size, 'entries');
           }
         },
-        error: () => {
-          // Best-effort lookup source only.
+        error: (err) => {
+          console.error('[sound] loadSoundCatalog ERROR:', err);
         },
       });
   }
@@ -4675,7 +4715,6 @@ export class Game implements OnInit {
               const url = this.resolveImageUrl(image.path);
               if (!url) continue;
               const img = new Image();
-              img.crossOrigin = 'anonymous';
               img.onload = () => {
                 this.obstacleImageCache.set(image.id, img);
                 this.obstacleImageCacheVersion.update((v) => v + 1);
@@ -4697,7 +4736,6 @@ export class Game implements OnInit {
             const url = this.resolveImageUrl(image.path);
             if (!url) continue;
             const img = new Image();
-            img.crossOrigin = 'anonymous';
             img.onload = () => {
               this.obstacleImageCache.set(image.id, img);
               this.obstacleImageCacheVersion.update((v) => v + 1);
@@ -4746,7 +4784,6 @@ export class Game implements OnInit {
       }
 
       const img = new Image();
-      img.crossOrigin = 'anonymous';
       img.onload = () => {
         this.lootImageCache.set(id, img);
         this.lootImageCacheVersion.update((v) => v + 1);
@@ -4847,6 +4884,8 @@ export class Game implements OnInit {
         ? spell.soundPath.trim()
       : null;
 
+    console.log('[sound] playSpellSound spell.id=', spell.id, 'soundId=', soundId, 'selectedPath=', selectedPath, 'directPath=', directPath, 'soundPathById.size=', this.soundPathById().size);
+
     if (soundId === null && !directPath) {
       const userKey = this.account.getKey();
       if (userKey) {
@@ -4860,6 +4899,7 @@ export class Game implements OnInit {
       }
     }
     const soundPath = selectedPath ?? directPath ?? this.defaultSpellSoundPath;
+    console.log('[sound] playSpellSound final soundPath=', soundPath);
     this.playSoundPath(soundPath);
   }
 
@@ -4911,10 +4951,14 @@ export class Game implements OnInit {
 
   private playSoundFromUrls(soundUrls: string[], index: number): void {
     if (index >= soundUrls.length || this.soundMuted()) {
+      if (index >= soundUrls.length) {
+        console.warn('[sound] playSoundFromUrls exhausted all candidates:', soundUrls);
+      }
       return;
     }
 
     const soundUrl = soundUrls[index];
+    console.log('[sound] playSoundFromUrls trying [' + index + '/' + soundUrls.length + ']:', soundUrl);
 
     try {
       const audio = new Audio(soundUrl);
@@ -4926,12 +4970,16 @@ export class Game implements OnInit {
           return;
         }
         advanced = true;
+        console.warn('[sound] playSoundFromUrls FAILED:', soundUrl);
         this.playSoundFromUrls(soundUrls, index + 1);
       };
 
       audio.addEventListener('error', tryNext, { once: true });
-      void audio.play().catch(tryNext);
+      void audio.play().then(() => {
+        console.log('[sound] playSoundFromUrls OK:', soundUrl);
+      }).catch(tryNext);
     } catch {
+      console.warn('[sound] playSoundFromUrls exception for:', soundUrl);
       this.playSoundFromUrls(soundUrls, index + 1);
     }
   }

@@ -1,17 +1,13 @@
-import fs from 'node:fs';
 import path from 'node:path';
-import { randomBytes } from 'node:crypto';
 import { Request, Response } from 'express';
 import multer from 'multer';
 import { CreateImagePayload, UpdateImagePayload } from '../repositories/imageRepository';
+import { isMasterAdminByGuid } from '../repositories/userRepository';
 import * as imageService from '../services/imageService';
+import * as s3Service from '../services/s3Service';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-const IMAGE_STORAGE_DIR = process.env['PUBLIC_DIR']
-  ? path.join(process.env['PUBLIC_DIR'], 'images')
-  : path.resolve(__dirname, '../../../public/images');
 
 interface ImageWriteRequestBody {
   userkey?: unknown;
@@ -25,23 +21,11 @@ interface ImageWriteInput {
   ispublic?: unknown;
   isActive?: unknown;
   isactive?: unknown;
+  assettype?: unknown;
 }
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, callback) => {
-    fs.mkdirSync(IMAGE_STORAGE_DIR, { recursive: true });
-    callback(null, IMAGE_STORAGE_DIR);
-  },
-  filename: (_req, file, callback) => {
-    const extension = normalizeFileExtension(file.originalname);
-    const baseName = sanitizeFileBaseName(file.originalname);
-    const randomSuffix = randomBytes(4).toString('hex');
-    callback(null, `${Date.now()}-${randomSuffix}-${baseName}${extension}`);
-  },
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter: (_req, file, callback) => {
     if (typeof file.mimetype === 'string' && file.mimetype.toLowerCase().startsWith('image/')) {
       callback(null, true);
@@ -55,6 +39,11 @@ const upload = multer({
   },
 });
 
+const VALID_ASSET_TYPES = new Set([
+  'Other', 'Curse', 'Item-Weapon', 'Item-Armor', 'Item-Pick', 'Item-Ring', 'Item-Gem',
+  'Item-Other', 'Potion', 'Spell', 'Monster', 'Tresher', 'Dungon', 'PC',
+]);
+
 export const uploadImageMiddleware = upload.single('image');
 
 export const getImages = async (req: Request, res: Response) => {
@@ -66,6 +55,9 @@ export const getImages = async (req: Request, res: Response) => {
 
   try {
     const shouldIncludePublic = typeof scope === 'string' && scope.toLowerCase() === 'library';
+    if (shouldIncludePublic && await isMasterAdminByGuid(userkey.trim())) {
+      return res.json(await imageService.fetchAllImagesWithUsername());
+    }
     const images = shouldIncludePublic
       ? await imageService.fetchImageLibraryByUserGuid(userkey.trim())
       : await imageService.fetchImagesByUserGuid(userkey.trim());
@@ -92,7 +84,7 @@ export const getPublicImagesByIds = async (req: Request, res: Response) => {
   }
 
   try {
-    const images = await imageService.fetchPublicImagesByIds(ids);
+    const images = await imageService.fetchImagesByIds(ids);
     return res.json(images);
   } catch (error) {
     console.error('Error fetching public images by ids:', error);
@@ -103,7 +95,6 @@ export const getPublicImagesByIds = async (req: Request, res: Response) => {
 export const createImage = async (req: Request, res: Response) => {
   const userkeyRaw = req.body?.['userkey'];
   if (typeof userkeyRaw !== 'string' || !UUID_REGEX.test(userkeyRaw.trim())) {
-    cleanupUploadedFile(req.file?.path);
     return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
   }
 
@@ -112,26 +103,35 @@ export const createImage = async (req: Request, res: Response) => {
   }
 
   const userkey = userkeyRaw.trim();
-  const normalized = normalizeCreatePayload(req.body, req.file.filename);
 
   try {
     const isAdmin = await imageService.checkUserIsAdminByGuid(userkey);
-    if (normalized.isPublic && !isAdmin) {
-      cleanupUploadedFile(req.file.path);
-      return res
-        .status(403)
-        .json({ result: -1, error: 'Only admin users can set an image as public.' });
-    }
+    const isPublicRequested = normalizeBoolean(req.body['isPublic'] ?? req.body['ispublic']);
+
+    const s3Url = await s3Service.uploadUserFile(
+      userkey,
+      'images',
+      req.file.originalname,
+      req.file.buffer,
+      req.file.mimetype
+    );
+
+    const name = normalizeText(
+      req.body['name'],
+      defaultNameFromFile(req.file.originalname)
+    );
 
     const payload: CreateImagePayload = {
-      ...normalized,
-      isPublic: normalized.isPublic && isAdmin,
+      name,
+      path: s3Url,
+      isPublic: isPublicRequested && isAdmin,
+      isActive: normalizeBoolean(req.body['isActive'] ?? req.body['isactive'], true),
+      assettype: normalizeAssetType(req.body['assettype']),
     };
 
     const created = await imageService.createImageForUser(userkey, payload);
     return res.status(201).json({ result: 1, image: created });
   } catch (error) {
-    cleanupUploadedFile(req.file.path);
     console.error('Error creating image:', error);
     return res.status(500).json({ result: -1, error: 'Failed to create image' });
   }
@@ -178,19 +178,6 @@ export const updateImage = async (req: Request, res: Response) => {
   }
 };
 
-const normalizeCreatePayload = (
-  body: Record<string, unknown>,
-  uploadedFileName: string
-): CreateImagePayload => {
-  const name = normalizeText(body['name'], defaultNameFromFile(uploadedFileName));
-  return {
-    name,
-    path: `/images/${uploadedFileName}`,
-    isPublic: normalizeBoolean(body['isPublic'] ?? body['ispublic']),
-    isActive: normalizeBoolean(body['isActive'] ?? body['isactive'], true),
-  };
-};
-
 const normalizeUpdatePayload = (value: unknown): UpdateImagePayload | null => {
   if (!value || typeof value !== 'object') {
     return null;
@@ -207,20 +194,37 @@ const normalizeUpdatePayload = (value: unknown): UpdateImagePayload | null => {
     name: normalizeText(input.name, 'Unnamed Image'),
     isPublic: normalizeBoolean(input.isPublic ?? input.ispublic),
     isActive: normalizeBoolean(input.isActive ?? input.isactive, true),
+    assettype: normalizeAssetType(input.assettype),
   };
 };
 
-const cleanupUploadedFile = (filePath: string | undefined): void => {
-  if (!filePath) {
-    return;
+export const deleteImage = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const userkey = req.query['userkey'];
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid image id is required' });
+  }
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
   }
 
   try {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    const inUse = await imageService.isImageInUse(id);
+    if (inUse) {
+      return res.status(409).json({ result: -1, error: 'Image is in use and cannot be deleted.' });
     }
+
+    const deleted = await imageService.removeImageForUser(id, userkey.trim());
+    if (!deleted) {
+      return res.status(404).json({ result: -1, error: 'Image not found or not owned by user.' });
+    }
+
+    return res.json({ result: 1 });
   } catch (error) {
-    console.warn('Failed to cleanup uploaded image file:', error);
+    console.error('Error deleting image:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to delete image' });
   }
 };
 
@@ -256,6 +260,13 @@ const normalizeBoolean = (value: unknown, fallback: boolean = false): boolean =>
   }
 
   return fallback;
+};
+
+const normalizeAssetType = (value: unknown): string => {
+  if (typeof value === 'string' && VALID_ASSET_TYPES.has(value.trim())) {
+    return value.trim();
+  }
+  return 'Other';
 };
 
 const normalizeFileExtension = (fileName: string): string => {

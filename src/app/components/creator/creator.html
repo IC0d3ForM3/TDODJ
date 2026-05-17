@@ -151,7 +151,7 @@
 						<img class="dungon-image-preview" [src]="createDungonImagePreviewUrl()" alt="dungeon image" />
 						<button type="button" class="cancel-button" (click)="clearCreateDungonImage()">Remove Image</button>
 					} @else {
-						<app-upload-popup mediaType="image" (mediaUploaded)="onCreateDungonImageUploaded($event)" />
+						<app-upload-popup mediaType="image" [assettype]="'Dungon'" (mediaUploaded)="onCreateDungonImageUploaded($event)" />
 					}
 				</div>
 
@@ -592,6 +592,13 @@
 									(click)="removeSelectedSpellPlacement()"
 								>Remove</button>
 							}
+							@if (selItem.type === 'door') {
+								<button
+									type="button"
+									class="cancel-button remove-button"
+									(click)="removeSelectedDoorPlacement()"
+								>Remove</button>
+							}
 							<button
 								type="button"
 								class="cancel-button"
@@ -844,7 +851,7 @@
 									<img class="dungon-image-preview" [src]="editDungonImagePreviewUrl()" alt="dungeon image" />
 									<button type="button" class="cancel-button" (click)="clearEditDungonImage()">Remove Image</button>
 								} @else {
-									<app-upload-popup mediaType="image" (mediaUploaded)="onEditDungonImageUploaded($event)" />
+									<app-upload-popup mediaType="image" [assettype]="'Dungon'" (mediaUploaded)="onEditDungonImageUploaded($event)" />
 								}
 							</div>
 
@@ -877,8 +884,8 @@
 
 @if (isCreatorTabActive('treshers')) {
 <app-treshers
-	[imageOptions]="libImageOptions()"
-	[soundOptions]="libSoundOptions()"
+	[imageOptions]="libFilteredImageOptions('Tresher')"
+	[soundOptions]="libFilteredSoundOptions('Tresher')"
 	[itemOptions]="libItems()"
 	[spellOptions]="libSpells()"
 	[curseOptions]="libCurses()"
@@ -888,8 +895,8 @@
 
 @if (isCreatorTabActive('monsters')) {
 <app-monsters
-	[imageOptions]="libImageOptions()"
-	[soundOptions]="libSoundOptions()"
+	[imageOptions]="libFilteredImageOptions('Monster')"
+	[soundOptions]="libFilteredSoundOptions('Monster')"
 	[itemOptions]="libItems()"
 	[spellOptions]="libSpells()"
 	[curseOptions]="libCurses()"
@@ -918,10 +925,13 @@
 								<div class="tresher-list-row">
 									<div>
 										<p class="dashboard-game-name">{{ item.name }}</p>
-										<small class="dashboard-game-meta">ID {{ item.id }} | {{ item.isActive ? 'Active' : 'Inactive' }}{{ item.isPublic ? ' | Public' : '' }}</small>
+										<small class="dashboard-game-meta">ID {{ item.id }} | {{ item.assettype }} | {{ item.isActive ? 'Active' : 'Inactive' }}{{ item.isPublic ? ' | Public' : '' }}{{ item.username ? ' | ' + item.username : '' }}</small>
 										@if (libResolveImageUrl(item.path)) { <img class="dashboard-image-thumb" [src]="libResolveImageUrl(item.path)" [alt]="item.name" style="max-height:60px;margin-top:0.25rem" /> }
 									</div>
-									<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editLibImage(item)">Edit</button>
+									<div style="display:flex;flex-direction:column;gap:0.25rem;align-items:flex-end">
+										<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editLibImage(item)">Edit</button>
+										<button type="button" class="dashboard-action-button dashboard-action-button-small dashboard-action-button-danger" (click)="deleteLibImage(item.id)" [disabled]="isDeletingLibImageId() !== null">{{ isDeletingLibImageId() === item.id ? 'Deleting...' : 'Delete' }}</button>
+									</div>
 								</div>
 							</li>
 						}
@@ -930,26 +940,43 @@
 			</div>
 			<!-- RIGHT 2/3: form -->
 			<div class="creator-panel-form">
-				<form class="tresher-form" [formGroup]="libImageForm" (ngSubmit)="saveLibImage()">
-					<div class="tresher-form-grid">
-						<label class="tresher-field"><span>Name</span><input type="text" formControlName="name" placeholder="Image name" /></label>
-						@if (editingLibImageId() !== null) {
-							<label class="tresher-field tresher-field-wide"><span>Current Path</span><input type="text" formControlName="path" readonly /></label>
+				<div class="lib-form-with-preview">
+					<form class="tresher-form" [formGroup]="libImageForm" (ngSubmit)="saveLibImage()">
+						<div class="tresher-form-grid">
+							<label class="tresher-field" style="grid-column: 1 / -1"><span>Name</span><input type="text" formControlName="name" placeholder="Image name" /></label>
+							<label class="tresher-field" style="grid-column: 1 / -1"><span>Asset Type</span>
+								<select formControlName="assettype">
+									@for (t of assetTypes; track t) { <option [value]="t">{{ t }}</option> }
+								</select>
+							</label>
+							@if (editingLibImageId() !== null) {
+								<label class="tresher-field" style="grid-column: 1 / -1"><span>Current Path</span><input type="text" formControlName="path" readonly /></label>
+							} @else {
+								<label class="tresher-field" style="grid-column: 1 / -1"><span>Image File</span><input type="file" accept="image/*" (change)="onLibImageFileSelected($event)" /></label>
+								@if (libImageUploadName()) { <p class="dashboard-message dashboard-subtle" style="margin:0">Selected: {{ libImageUploadName() }}</p> }
+							}
+							<div style="grid-column: 1 / -1; display: flex; gap: 1rem; align-items: center;">
+								<label class="tresher-field-checkbox"><input type="checkbox" formControlName="isActive" /><span>Active</span></label>
+								@if (isAdminUser()) { <label class="tresher-field-checkbox"><input type="checkbox" formControlName="isPublic" /><span>Public</span></label> }
+							</div>
+						</div>
+						<div class="tresher-form-actions">
+							<button type="submit" class="dashboard-action-button" [disabled]="isSavingLibImage()">
+								@if (isSavingLibImage()) { Saving... } @else if (editingLibImageId() !== null) { Update Image } @else { Upload Image }
+							</button>
+							@if (editingLibImageId() !== null) { <button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="cancelEditLibImage()">Cancel Edit</button> }
+						</div>
+					</form>
+					<div class="lib-media-preview">
+						@if (editingLibImagePreviewUrl) {
+							<img [src]="editingLibImagePreviewUrl" alt="Preview" class="lib-media-preview-img" />
 						} @else {
-							<label class="tresher-field tresher-field-wide"><span>Image File</span><input type="file" accept="image/*" (change)="onLibImageFileSelected($event)" /></label>
-							@if (libImageUploadName()) { <p class="dashboard-message dashboard-subtle" style="margin:0">Selected: {{ libImageUploadName() }}</p> }
+							<p class="lib-media-preview-empty">Select an image to preview</p>
 						}
-						<label class="tresher-field-checkbox"><input type="checkbox" formControlName="isActive" /><span>Active</span></label>
-						@if (isAdminUser()) { <label class="tresher-field-checkbox"><input type="checkbox" formControlName="isPublic" /><span>Public</span></label> }
 					</div>
-					<div class="tresher-form-actions">
-						<button type="submit" class="dashboard-action-button" [disabled]="isSavingLibImage()">
-							@if (isSavingLibImage()) { Saving... } @else if (editingLibImageId() !== null) { Update Image } @else { Upload Image }
-						</button>
-						@if (editingLibImageId() !== null) { <button type="button" class="dashboard-action-button dashboard-action-button-muted" (click)="cancelEditLibImage()">Cancel Edit</button> }
-					</div>
-				</form>
+				</div>
 				@if (libImageSaveMessage()) { <p class="dashboard-message" style="margin-top:0.6rem">{{ libImageSaveMessage() }}</p> }
+				@if (libImageDeleteError()) { <p class="dashboard-message dashboard-message-error" style="margin-top:0.6rem">{{ libImageDeleteError() }}</p> }
 			</div>
 		</div>
 	}
@@ -976,12 +1003,15 @@
 						@for (item of libUserSounds(); track item.id) {
 							<li class="dashboard-list-item">
 								<div class="tresher-list-row">
-									<div>
+									<div style="flex:1">
 										<p class="dashboard-game-name">{{ item.name }}</p>
-										<small class="dashboard-game-meta">ID {{ item.id }} | {{ item.isActive ? 'Active' : 'Inactive' }}{{ item.isPublic ? ' | Public' : '' }}</small>
+										<small class="dashboard-game-meta">ID {{ item.id }} | {{ item.assettype }} | {{ item.isActive ? 'Active' : 'Inactive' }}{{ item.isPublic ? ' | Public' : '' }}{{ item.username ? ' | ' + item.username : '' }}</small>
+										<div style="display:flex;gap:0.25rem;margin-top:0.3rem">
+											<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editLibSound(item)">Edit</button>
+											<button type="button" class="dashboard-action-button dashboard-action-button-small dashboard-action-button-danger" (click)="deleteLibSound(item.id)" [disabled]="isDeletingLibSoundId() !== null">{{ isDeletingLibSoundId() === item.id ? 'Deleting...' : 'Delete' }}</button>
+										</div>
 										@if (libResolveSoundUrl(item.path)) { <audio controls style="max-width:100%;margin-top:0.25rem"><source [src]="libResolveSoundUrl(item.path)" /></audio> }
 									</div>
-									<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editLibSound(item)">Edit</button>
 								</div>
 							</li>
 						}
@@ -992,15 +1022,22 @@
 			<div class="creator-panel-form">
 				<form class="tresher-form" [formGroup]="libSoundForm" (ngSubmit)="saveLibSound()">
 					<div class="tresher-form-grid">
-						<label class="tresher-field"><span>Name</span><input type="text" formControlName="name" placeholder="Sound name" /></label>
+						<label class="tresher-field" style="grid-column: 1 / -1"><span>Name</span><input type="text" formControlName="name" placeholder="Sound name" /></label>
+						<label class="tresher-field" style="grid-column: 1 / -1"><span>Asset Type</span>
+							<select formControlName="assettype">
+								@for (t of assetTypes; track t) { <option [value]="t">{{ t }}</option> }
+							</select>
+						</label>
 						@if (editingLibSoundId() !== null) {
-							<label class="tresher-field tresher-field-wide"><span>Current Path</span><input type="text" formControlName="path" readonly /></label>
+							<label class="tresher-field" style="grid-column: 1 / -1"><span>Current Path</span><input type="text" formControlName="path" readonly /></label>
 						} @else {
-							<label class="tresher-field tresher-field-wide"><span>Sound File</span><input type="file" accept="audio/*" (change)="onLibSoundFileSelected($event)" /></label>
+							<label class="tresher-field" style="grid-column: 1 / -1"><span>Sound File</span><input type="file" accept="audio/*" (change)="onLibSoundFileSelected($event)" /></label>
 							@if (libSoundUploadName()) { <p class="dashboard-message dashboard-subtle" style="margin:0">Selected: {{ libSoundUploadName() }}</p> }
 						}
-						<label class="tresher-field-checkbox"><input type="checkbox" formControlName="isActive" /><span>Active</span></label>
-						@if (isAdminUser()) { <label class="tresher-field-checkbox"><input type="checkbox" formControlName="isPublic" /><span>Public</span></label> }
+						<div style="grid-column: 1 / -1; display: flex; gap: 1rem; align-items: center;">
+							<label class="tresher-field-checkbox"><input type="checkbox" formControlName="isActive" /><span>Active</span></label>
+							@if (isAdminUser()) { <label class="tresher-field-checkbox"><input type="checkbox" formControlName="isPublic" /><span>Public</span></label> }
+						</div>
 					</div>
 					<div class="tresher-form-actions">
 						<button type="submit" class="dashboard-action-button" [disabled]="isSavingLibSound()">
@@ -1010,6 +1047,7 @@
 					</div>
 				</form>
 				@if (libSoundSaveMessage()) { <p class="dashboard-message" style="margin-top:0.6rem">{{ libSoundSaveMessage() }}</p> }
+				@if (libSoundDeleteError()) { <p class="dashboard-message dashboard-message-error" style="margin-top:0.6rem">{{ libSoundDeleteError() }}</p> }
 			</div>
 		</div>
 	}
@@ -1037,7 +1075,7 @@
 								<div class="tresher-list-row">
 									<div>
 										<p class="dashboard-game-name">{{ item.name }}</p>
-										<small class="dashboard-game-meta">ID {{ item.id }} | {{ item.effectOn }}{{ item.effectOn2 ? '/' + item.effectOn2 : '' }}</small>
+										<small class="dashboard-game-meta">ID {{ item.id }} | {{ item.effectOn }}{{ item.effectOn2 ? '/' + item.effectOn2 : '' }}{{ item.username ? ' | ' + item.username : '' }}</small>
 										<p class="tresher-description">{{ item.description }}</p>
 									</div>
 									<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="editLibSpell(item)">Edit</button>
@@ -1093,7 +1131,7 @@
 										</optgroup>
 									}
 								</select>
-								<app-upload-popup mediaType="image" (mediaUploaded)="onLibSpellImageUploaded($event)" />
+								<app-upload-popup mediaType="image" [assettype]="'Spell'" (mediaUploaded)="onLibSpellImageUploaded($event)" />
 							</div>
 							@if (libSelectedSpellImageUrl()) { <div class="monster-selected-image-wrap spell-image-preview"><img class="dashboard-image-thumb" [src]="libSelectedSpellImageUrl()" alt="spell image" /></div> }
 						</label>
@@ -1117,7 +1155,7 @@
 									}
 								</select>
 								<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="playLibSelectedSpellSound()" [disabled]="!libSelectedSpellSoundUrl()">Play</button>
-								<app-upload-popup mediaType="sound" (mediaUploaded)="onLibSpellSoundUploaded($event)" />
+								<app-upload-popup mediaType="sound" [assettype]="'Spell'" (mediaUploaded)="onLibSpellSoundUploaded($event)" />
 							</div>
 						</label>
 						@if (isAdminUser()) { <label class="tresher-field-checkbox"><input type="checkbox" formControlName="isPublic" /><span>Public</span></label> }
@@ -1137,15 +1175,15 @@
 }
 
 @if (isCreatorTabActive('potions')) {
-<app-potions [imageOptions]="libImageOptions()" [soundOptions]="libSoundOptions()" />
+<app-potions [imageOptions]="libFilteredImageOptions('Potion')" [soundOptions]="libFilteredSoundOptions('Potion')" />
 }
 
 @if (isCreatorTabActive('items')) {
-<app-items [imageOptions]="libImageOptions()" [soundOptions]="libSoundOptions()" [curseOptions]="libCurses()" />
+<app-items [imageOptions]="libItemImageOptions()" [soundOptions]="libItemSoundOptions()" [curseOptions]="libCurses()" />
 }
 
 @if (isCreatorTabActive('curses')) {
-<app-curses [imageOptions]="libImageOptions()" [soundOptions]="libSoundOptions()" />
+<app-curses [imageOptions]="libFilteredImageOptions('Curse')" [soundOptions]="libFilteredSoundOptions('Curse')" />
 }
 
 @if (isGenerateDialogVisible()) {

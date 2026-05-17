@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { UpsertSpellPayload } from '../repositories/spellRepository';
+import { isMasterAdminByGuid } from '../repositories/userRepository';
 import * as spellService from '../services/spellService';
 
 const UUID_REGEX =
@@ -144,6 +145,9 @@ export const getSpells = async (req: Request, res: Response) => {
   }
 
   try {
+    if (await isMasterAdminByGuid(userkey.trim())) {
+      return res.json(await spellService.fetchAllSpellsWithUsername());
+    }
     const spells = await spellService.fetchSpellsByUserGuid(userkey.trim());
     return res.json(spells);
   } catch {

@@ -30,6 +30,7 @@ export interface TresherRecord {
   potion1Id: number | null;
   potion2Id: number | null;
   potion3Id: number | null;
+  username?: string;
 }
 
 export interface UpsertTresherPayload {
@@ -123,16 +124,61 @@ export const getTresherLibraryByUserGuid = async (
   userguid: string
 ): Promise<TresherRecord[]> => {
   const { rows } = await pool.query<TresherRecord>(
-    `SELECT ${SELECT_TRESHER_FIELDS}
-     FROM treshers
-     WHERE userguid = $1 OR ispublic = true
+    `SELECT
+       t.id,
+       t.userguid::text AS userguid,
+       t.type, t.name, t.description,
+       COALESCE(t.gold, 0) AS gold,
+       COALESCE(t.silver, 0) AS silver,
+       COALESCE(t.copper, 0) AS copper,
+       COALESCE(t.zinc, 0) AS zinc,
+       t.item1id AS "item1Id", t.item2id AS "item2Id", t.item3id AS "item3Id", t.item4id AS "item4Id",
+       t.spell1id AS "spell1Id", t.spell2id AS "spell2Id", t.spell3id AS "spell3Id", t.spell4id AS "spell4Id",
+       t.curse1id AS "curse1Id", t.curse2id AS "curse2Id",
+       t.ispublic AS "isPublic",
+       t.createdat::text AS "createdAt", t.updatedat::text AS "updatedAt",
+       COALESCE(t.spreward, 0) AS "spReward",
+       t.imageid AS "imageId", t.soundid AS "soundId",
+       t.potion1id AS "potion1Id", t.potion2id AS "potion2Id", t.potion3id AS "potion3Id",
+       COALESCE(t.isquest, FALSE) AS isquest,
+       COALESCE(u.username, '') AS username
+     FROM treshers t
+     LEFT JOIN users u ON u.key::text = t.userguid::text
+     WHERE t.userguid = $1 OR t.ispublic = true
      ORDER BY
-       CASE WHEN userguid = $1 THEN 0 ELSE 1 END,
-       updatedat DESC,
-       id DESC`,
+       CASE WHEN t.userguid = $1 THEN 0 ELSE 1 END,
+       t.updatedat DESC,
+       t.id DESC`,
     [userguid]
   );
 
+  return rows;
+};
+
+export const getAllTreshersWithUsername = async (): Promise<TresherRecord[]> => {
+  const { rows } = await pool.query<TresherRecord>(
+    `SELECT
+       t.id,
+       t.userguid::text AS userguid,
+       t.type, t.name, t.description,
+       COALESCE(t.gold, 0) AS gold,
+       COALESCE(t.silver, 0) AS silver,
+       COALESCE(t.copper, 0) AS copper,
+       COALESCE(t.zinc, 0) AS zinc,
+       t.item1id AS "item1Id", t.item2id AS "item2Id", t.item3id AS "item3Id", t.item4id AS "item4Id",
+       t.spell1id AS "spell1Id", t.spell2id AS "spell2Id", t.spell3id AS "spell3Id", t.spell4id AS "spell4Id",
+       t.curse1id AS "curse1Id", t.curse2id AS "curse2Id",
+       t.ispublic AS "isPublic",
+       t.createdat::text AS "createdAt", t.updatedat::text AS "updatedAt",
+       COALESCE(t.spreward, 0) AS "spReward",
+       t.imageid AS "imageId", t.soundid AS "soundId",
+       t.potion1id AS "potion1Id", t.potion2id AS "potion2Id", t.potion3id AS "potion3Id",
+       COALESCE(t.isquest, FALSE) AS isquest,
+       COALESCE(u.username, '') AS username
+     FROM treshers t
+     LEFT JOIN users u ON u.key::text = t.userguid::text
+     ORDER BY LOWER(t.name) ASC, t.id ASC`
+  );
   return rows;
 };
 

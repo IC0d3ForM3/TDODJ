@@ -16,6 +16,7 @@ export interface PotionRecord {
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
+  username?: string;
 }
 
 export interface UpsertPotionPayload {
@@ -65,6 +66,23 @@ export const getPotionsByUserGuid = async (userguid: string): Promise<PotionReco
      WHERE userguid = $1
      ORDER BY LOWER(name) ASC, id ASC`,
     [userguid]
+  );
+  return rows;
+};
+
+export const getAllPotionsWithUsername = async (): Promise<PotionRecord[]> => {
+  const { rows } = await pool.query<PotionRecord>(
+    `SELECT p.id, p.userguid::text AS userguid, p.name, p.description,
+       p.effectto AS "effectTo", p.effectto2 AS "effectTo2",
+       p.effecttime AS "lastFor", p.effectnumber AS "effectAmount",
+       COALESCE(p.effectamount2, 0) AS "effectAmount2",
+       p.value, p.imageid AS "imageId", p.soundid AS "soundId",
+       p.ispublic AS "isPublic",
+       p.createdat::text AS "createdAt", p.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM potions p
+     LEFT JOIN users u ON u.key::text = p.userguid::text
+     ORDER BY LOWER(p.name) ASC, p.id ASC`
   );
   return rows;
 };

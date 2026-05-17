@@ -2,8 +2,11 @@ import {
   CreateSoundPayload,
   SoundRecord,
   UpdateSoundPayload,
+  checkSoundInUse,
+  deleteSoundForUser,
   getSoundLibraryByUserGuid,
   getSoundsByUserGuid,
+  getAllSoundsWithUsername,
   insertSoundForUser,
   isAdminUserByGuid,
   isSoundAccessibleByIdForUser,
@@ -17,6 +20,10 @@ export const fetchSoundsByUserGuid = async (userguid: string): Promise<SoundReco
 
 export const fetchSoundLibraryByUserGuid = async (userguid: string): Promise<SoundRecord[]> => {
   return await getSoundLibraryByUserGuid(userguid);
+};
+
+export const fetchAllSoundsWithUsername = async (): Promise<SoundRecord[]> => {
+  return await getAllSoundsWithUsername();
 };
 
 export const fetchSoundsByIds = async (ids: number[]): Promise<SoundRecord[]> => {
@@ -47,4 +54,12 @@ export const saveSoundForUser = async (
   payload: UpdateSoundPayload
 ): Promise<SoundRecord | null> => {
   return await updateSoundForUser(id, userguid, payload);
+};
+
+export const isSoundInUse = async (id: number): Promise<boolean> => {
+  return await checkSoundInUse(id);
+};
+
+export const removeSoundForUser = async (id: number, userguid: string): Promise<boolean> => {
+  return await deleteSoundForUser(id, userguid);
 };

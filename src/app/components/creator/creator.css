@@ -930,6 +930,17 @@
 	color: #1e293b;
 }
 
+.dashboard-action-button-danger {
+	border-color: #ef4444;
+	background-color: #fff5f5;
+	color: #b91c1c;
+}
+
+.dashboard-action-button-danger:hover:not(:disabled) {
+	background-color: #ef4444;
+	color: #fff;
+}
+
 .dashboard-action-button-small {
 	padding: 0.3rem 0.52rem;
 	font-size: 0.82rem;
@@ -945,6 +956,65 @@
 	color: #64748b;
 }
 
+.lib-media-thumb-wrap {
+	position: relative;
+	margin-top: 0.3rem;
+	border-radius: 5px;
+	overflow: hidden;
+	max-height: 90px;
+}
+
+.lib-media-thumb-actions {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: row;
+	gap: 0.3rem;
+	align-items: flex-start;
+	justify-content: flex-end;
+	padding: 0.3rem;
+	background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 0%, transparent 65%);
+}
+
+.lib-form-with-preview {
+	display: flex;
+	gap: 1rem;
+	align-items: flex-start;
+}
+
+.lib-form-with-preview > .tresher-form {
+	flex: 1;
+	min-width: 0;
+}
+
+.lib-media-preview {
+	width: 200px;
+	min-width: 140px;
+	min-height: 140px;
+	flex-shrink: 0;
+	background: rgba(0, 0, 0, 0.15);
+	border: 1px dashed rgba(160, 180, 220, 0.35);
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+
+.lib-media-preview-img {
+	max-width: 100%;
+	max-height: 260px;
+	object-fit: contain;
+	display: block;
+}
+
+.lib-media-preview-empty {
+	color: rgba(160, 180, 220, 0.45);
+	font-size: 0.8rem;
+	text-align: center;
+	padding: 1rem;
+}
+
 .tresher-form {
 	margin: 0;
 	padding: 0.7rem;
@@ -956,7 +1026,7 @@
 }
 
 /* When tresher-form is inside the brown panel wrapper, let the wrapper provide styling */
-.creator-panel-form > .tresher-form {
+.creator-panel-form .tresher-form {
 	background: transparent;
 	border: none;
 	border-radius: 0;

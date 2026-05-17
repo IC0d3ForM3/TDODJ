@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { UpsertItemPayload } from '../repositories/itemRepository';
+import { isMasterAdminByGuid } from '../repositories/userRepository';
 import * as itemService from '../services/itemService';
 
 const UUID_REGEX =
@@ -146,7 +147,15 @@ export const getItems = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Valid userkey query parameter is required' });
   }
 
+  const scope = req.query['scope'];
+
   try {
+    if (await isMasterAdminByGuid(userkey.trim())) {
+      return res.json(await itemService.fetchAllItemsWithUsername());
+    }
+    if (scope === 'library') {
+      return res.json(await itemService.fetchItemsLibraryByUserGuid(userkey.trim()));
+    }
     const items = await itemService.fetchItemsByUserGuid(userkey.trim());
     return res.json(items);
   } catch {

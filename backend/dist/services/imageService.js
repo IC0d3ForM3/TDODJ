@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.fetchImagesByIds = exports.fetchPublicImagesByIds = exports.saveImageForUser = exports.createImageForUser = exports.checkImageAccessibleByIdForUser = exports.checkUserIsAdminByGuid = exports.fetchImageLibraryByUserGuid = exports.fetchImagesByUserGuid = void 0;
+exports.removeImageForUser = exports.isImageInUse = exports.fetchImagesByIds = exports.fetchPublicImagesByIds = exports.saveImageForUser = exports.createImageForUser = exports.checkImageAccessibleByIdForUser = exports.checkUserIsAdminByGuid = exports.fetchAllImagesWithUsername = exports.fetchImageLibraryByUserGuid = exports.fetchImagesByUserGuid = void 0;
 const imageRepository_1 = require("../repositories/imageRepository");
 const fetchImagesByUserGuid = async (userguid) => {
     return await (0, imageRepository_1.getImagesByUserGuid)(userguid);
@@ -10,6 +10,10 @@ const fetchImageLibraryByUserGuid = async (userguid) => {
     return await (0, imageRepository_1.getImageLibraryByUserGuid)(userguid);
 };
 exports.fetchImageLibraryByUserGuid = fetchImageLibraryByUserGuid;
+const fetchAllImagesWithUsername = async () => {
+    return await (0, imageRepository_1.getAllImagesWithUsername)();
+};
+exports.fetchAllImagesWithUsername = fetchAllImagesWithUsername;
 const checkUserIsAdminByGuid = async (userguid) => {
     return await (0, imageRepository_1.isAdminUserByGuid)(userguid);
 };
@@ -34,3 +38,11 @@ const fetchImagesByIds = async (ids) => {
     return await (0, imageRepository_1.getImagesByIds)(ids);
 };
 exports.fetchImagesByIds = fetchImagesByIds;
+const isImageInUse = async (id) => {
+    return await (0, imageRepository_1.checkImageInUse)(id);
+};
+exports.isImageInUse = isImageInUse;
+const removeImageForUser = async (id, userguid) => {
+    return await (0, imageRepository_1.deleteImageForUser)(id, userguid);
+};
+exports.removeImageForUser = removeImageForUser;

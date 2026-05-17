@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveMonsterForUser = exports.createMonsterForUser = exports.checkUserIsAdminByGuid = exports.fetchMonsterLibraryByUserGuid = exports.fetchMonstersByUserGuid = void 0;
+exports.saveMonsterForUser = exports.createMonsterForUser = exports.checkUserIsAdminByGuid = exports.fetchAllMonstersWithUsername = exports.fetchMonsterLibraryByUserGuid = exports.fetchMonstersByUserGuid = void 0;
 const monsterRepository_1 = require("../repositories/monsterRepository");
 const fetchMonstersByUserGuid = async (userguid) => {
     return await (0, monsterRepository_1.getMonstersByUserGuid)(userguid);
@@ -10,6 +10,10 @@ const fetchMonsterLibraryByUserGuid = async (userguid) => {
     return await (0, monsterRepository_1.getMonsterLibraryByUserGuid)(userguid);
 };
 exports.fetchMonsterLibraryByUserGuid = fetchMonsterLibraryByUserGuid;
+const fetchAllMonstersWithUsername = async () => {
+    return await (0, monsterRepository_1.getAllMonstersWithUsername)();
+};
+exports.fetchAllMonstersWithUsername = fetchAllMonstersWithUsername;
 const checkUserIsAdminByGuid = async (userguid) => {
     return await (0, monsterRepository_1.isAdminUserByGuid)(userguid);
 };

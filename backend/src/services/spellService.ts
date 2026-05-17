@@ -3,6 +3,7 @@ import {
   UpsertSpellPayload,
   fetchSpellsByIds,
   getSpellsByUserGuid,
+  getAllSpellsWithUsername,
   insertSpellForUser,
   isAdminUserByGuid,
   updateSpellForUser,
@@ -14,6 +15,10 @@ export const fetchSpellsByIdsForGame = async (ids: number[]): Promise<SpellRecor
 
 export const fetchSpellsByUserGuid = async (userguid: string): Promise<SpellRecord[]> => {
   return await getSpellsByUserGuid(userguid);
+};
+
+export const fetchAllSpellsWithUsername = async (): Promise<SpellRecord[]> => {
+  return await getAllSpellsWithUsername();
 };
 
 export const checkUserIsAdminByGuid = async (userguid: string): Promise<boolean> => {

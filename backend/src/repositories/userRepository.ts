@@ -40,6 +40,14 @@ export const isEmailUsed = async (email: string): Promise<boolean> => {
     return rows.length > 0;
 };
 
+export const isMasterAdminByGuid = async (userkey: string): Promise<boolean> => {
+    const { rows } = await pool.query<{ ismasteradmin: boolean }>(
+        'SELECT ismasteradmin FROM users WHERE key = $1',
+        [userkey]
+    );
+    return rows[0]?.ismasteradmin === true;
+};
+
 export interface NewUser {
     username: string;
     email: string;

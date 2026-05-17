@@ -243,6 +243,13 @@
 
 	@if (isLoadingGame()) {
 		<p class="status-message">Loading game...</p>
+	} @else if (isPreloadingAssets()) {
+		<div class="preload-overlay" [style.background-image]="dungonCoverImageUrl() ? 'url(' + dungonCoverImageUrl() + ')' : 'none'">
+			<div class="preload-overlay-inner">
+				<div class="preload-spinner"></div>
+				<p class="preload-label">Entering dungeon&hellip;</p>
+			</div>
+		</div>
 	} @else if (gameLoadError(); as loadErrorText) {
 		<p class="status-message status-message-error">{{ loadErrorText }}</p>
 	} @else {

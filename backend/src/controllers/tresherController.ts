@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import {
   UpsertTresherPayload,
 } from '../repositories/tresherRepository';
+import { isMasterAdminByGuid } from '../repositories/userRepository';
 import * as tresherService from '../services/tresherService';
 
 const UUID_REGEX =
@@ -51,6 +52,9 @@ export const getTreshers = async (req: Request, res: Response) => {
 
   try {
     const shouldIncludePublic = typeof scope === 'string' && scope.toLowerCase() === 'library';
+    if (shouldIncludePublic && await isMasterAdminByGuid(userkey.trim())) {
+      return res.json(await tresherService.fetchAllTreshersWithUsername());
+    }
     const treshers = shouldIncludePublic
       ? await tresherService.fetchTresherLibraryByUserGuid(userkey.trim())
       : await tresherService.fetchTreshersByUserGuid(userkey.trim());

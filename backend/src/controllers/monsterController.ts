@@ -3,6 +3,7 @@ import {
   MonsterAttackRecord,
   UpsertMonsterPayload,
 } from '../repositories/monsterRepository';
+import { isMasterAdminByGuid } from '../repositories/userRepository';
 import * as monsterService from '../services/monsterService';
 import * as imageService from '../services/imageService';
 import * as tresherService from '../services/tresherService';
@@ -79,6 +80,9 @@ export const getMonsters = async (req: Request, res: Response) => {
 
   try {
     const shouldIncludePublic = typeof scope === 'string' && scope.toLowerCase() === 'library';
+    if (shouldIncludePublic && await isMasterAdminByGuid(userkey.trim())) {
+      return res.json(await monsterService.fetchAllMonstersWithUsername());
+    }
     const monsters = shouldIncludePublic
       ? await monsterService.fetchMonsterLibraryByUserGuid(userkey.trim())
       : await monsterService.fetchMonstersByUserGuid(userkey.trim());

@@ -71,7 +71,7 @@
 									</optgroup>
 								}
 							</select>
-							<app-upload-popup mediaType="image" (mediaUploaded)="onImageUploaded($event)" />
+							<app-upload-popup mediaType="image" [assettype]="'Potion'" (mediaUploaded)="onImageUploaded($event)" />
 						</div>
 					</label>
 					@if (selectedImageUrl()) { <div class="pt-field pt-field-wide"><img class="pt-thumb" [src]="selectedImageUrl()" [alt]="selectedImageName() || 'Selected potion image'" /></div> }
@@ -95,7 +95,7 @@
 								}
 							</select>
 							<button type="button" class="pt-btn-muted" (click)="playSelectedSound()" [disabled]="!selectedSoundUrl()">Play</button>
-							<app-upload-popup mediaType="sound" (mediaUploaded)="onSoundUploaded($event)" />
+							<app-upload-popup mediaType="sound" [assettype]="'Potion'" (mediaUploaded)="onSoundUploaded($event)" />
 						</div>
 					</label>
 					@if (isAdminUser()) {

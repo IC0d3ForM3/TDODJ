@@ -588,9 +588,10 @@ export const getGameById = async (req: Request, res: Response) => {
       }
     }
 
-    const [dungonSpReward, dungonStatus] = await Promise.all([
+    const [dungonSpReward, dungonStatus, dungonCoverImageId] = await Promise.all([
       dungonService.fetchDungonSpReward(game.dungonid),
       dungonService.fetchDungonIsMainGameStatus(game.dungonid),
+      dungonService.fetchDungonImageId(game.dungonid),
     ]);
 
     // Also include items from dungeon treshers so players can equip them after pickup
@@ -635,7 +636,84 @@ export const getGameById = async (req: Request, res: Response) => {
       // non-fatal — proceed without dungeon tresher items
     }
 
-    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, pcImagePath, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false });
+    // Bundle dungeon asset paths (monster images, obstacle images, loot images, sound paths, cover image)
+    let monsterImages: { id: number; path: string }[] = [];
+    let obstacleImages: { id: number; path: string }[] = [];
+    let lootImages: { id: number; path: string }[] = [];
+    let soundPaths: { id: number; path: string; clientPath?: string }[] = [];
+    let dungonCoverImagePath: string | null = null;
+    try {
+      const dungonJsonObj = typeof game.dungenJson === 'string'
+        ? JSON.parse(game.dungenJson as string)
+        : game.dungenJson;
+
+      const monsterList: unknown[] = Array.isArray((dungonJsonObj as Record<string, unknown>)?.monsterList)
+        ? (dungonJsonObj as Record<string, unknown[]>).monsterList
+        : Array.isArray((dungonJsonObj as Record<string, unknown>)?.monsters)
+          ? (dungonJsonObj as Record<string, unknown[]>).monsters
+          : [];
+
+      const obstaclePlacements: unknown[] = Array.isArray((dungonJsonObj as Record<string, unknown>)?.obstaclePlacements)
+        ? (dungonJsonObj as Record<string, unknown[]>).obstaclePlacements
+        : [];
+
+      const tresherList: unknown[] = Array.isArray((dungonJsonObj as Record<string, unknown>)?.tresherList)
+        ? (dungonJsonObj as Record<string, unknown[]>).tresherList
+        : Array.isArray((dungonJsonObj as Record<string, unknown>)?.trasherList)
+          ? (dungonJsonObj as Record<string, unknown[]>).trasherList
+          : Array.isArray((dungonJsonObj as Record<string, unknown>)?.tresher)
+            ? (dungonJsonObj as Record<string, unknown[]>).tresher
+            : [];
+
+      const monsterImageIds: number[] = Array.from(new Set(
+        monsterList.map((m) => (m as Record<string, unknown>)?.imageId)
+          .filter((id): id is number => typeof id === 'number' && id > 0)
+      ));
+      const obstacleImageIds: number[] = Array.from(new Set([
+        ...obstaclePlacements.map((o) => (o as Record<string, unknown>)?.imageId)
+          .filter((id): id is number => typeof id === 'number' && id > 0),
+        ...obstaclePlacements.map((o) => (o as Record<string, unknown>)?.textImageId)
+          .filter((id): id is number => typeof id === 'number' && id > 0),
+      ]));
+      const lootImageIds: number[] = Array.from(new Set(
+        tresherList.map((t) => (t as Record<string, unknown>)?.imageId)
+          .filter((id): id is number => typeof id === 'number' && id > 0)
+      ));
+      const spellSoundIds: number[] = Array.from(new Set([
+        ...pcTresherSpells.map((s) => (s as Record<string, unknown>)?.soundId)
+          .filter((id): id is number => typeof id === 'number' && id > 0),
+        ...monsterList.map((m) => (m as Record<string, unknown>)?.soundId)
+          .filter((id): id is number => typeof id === 'number' && id > 0),
+      ]));
+
+      const allImageIds = Array.from(new Set([...monsterImageIds, ...obstacleImageIds, ...lootImageIds]));
+      if (allImageIds.length > 0) {
+        const images = await imageService.fetchImagesByIds(allImageIds);
+        const pathMap = new Map(images
+          .filter((img) => typeof img.path === 'string' && img.path.trim())
+          .map((img) => [img.id, img.path]));
+        monsterImages = monsterImageIds.filter((id) => pathMap.has(id)).map((id) => ({ id, path: pathMap.get(id)! }));
+        obstacleImages = obstacleImageIds.filter((id) => pathMap.has(id)).map((id) => ({ id, path: pathMap.get(id)! }));
+        lootImages = lootImageIds.filter((id) => pathMap.has(id)).map((id) => ({ id, path: pathMap.get(id)! }));
+      }
+
+      if (spellSoundIds.length > 0) {
+        const sounds = await soundService.fetchSoundsByIds(spellSoundIds);
+        soundPaths = sounds
+          .filter((s) => typeof s.path === 'string' && s.path.trim())
+          .map((s) => ({ id: s.id, path: s.path }));
+      }
+
+      if (typeof dungonCoverImageId === 'number' && dungonCoverImageId > 0) {
+        const coverImages = await imageService.fetchImagesByIds([dungonCoverImageId]);
+        const coverImg = coverImages.find((img) => typeof img.path === 'string' && img.path.trim());
+        dungonCoverImagePath = coverImg?.path ?? null;
+      }
+    } catch {
+      // non-fatal — proceed without pre-bundled assets
+    }
+
+    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, pcImagePath, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false, monsterImages, obstacleImages, lootImages, soundPaths, dungonCoverImagePath });
   } catch (error) {
     console.error('Error fetching game by id:', error);
     return res.status(500).json({ error: 'Failed to fetch game' });
@@ -966,8 +1044,21 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
       }
     }
 
+    // Resolve dungeon cover image path
+    let dungonCoverImagePath: string | null = null;
+    try {
+      if (typeof dungon.imageid === 'number' && dungon.imageid > 0) {
+        const coverImages = await imageService.fetchImagesByIds([dungon.imageid]);
+        const coverImg = coverImages.find((img) => typeof img.path === 'string' && img.path.trim());
+        dungonCoverImagePath = coverImg?.path ?? null;
+      }
+    } catch {
+      // non-fatal
+    }
+
     // Extract monster image IDs from dungeon JSON and fetch their paths
     let monsterImages: { id: number; path: string }[] = [];
+    let obstacleImages: { id: number; path: string }[] = [];
     try {
       const dungonJsonObj = typeof dungon.dungenJson === 'string'
         ? JSON.parse(dungon.dungenJson)
@@ -982,11 +1073,31 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
           .map((m: unknown) => (m as Record<string, unknown>)?.imageId)
           .filter((id: unknown): id is number => typeof id === 'number' && id > 0)
       ));
-      if (monsterImageIds.length > 0) {
-        const images = await imageService.fetchImagesByIds(monsterImageIds);
-        monsterImages = images
+
+      const obstaclePlacements: unknown[] = Array.isArray(dungonJsonObj?.obstaclePlacements)
+        ? dungonJsonObj.obstaclePlacements
+        : [];
+      const obstacleImageIds: number[] = Array.from(new Set([
+        ...obstaclePlacements
+          .map((o: unknown) => (o as Record<string, unknown>)?.imageId)
+          .filter((id: unknown): id is number => typeof id === 'number' && id > 0),
+        ...obstaclePlacements
+          .map((o: unknown) => (o as Record<string, unknown>)?.textImageId)
+          .filter((id: unknown): id is number => typeof id === 'number' && id > 0),
+      ]));
+
+      const allImageIds = Array.from(new Set([...monsterImageIds, ...obstacleImageIds]));
+      if (allImageIds.length > 0) {
+        const images = await imageService.fetchImagesByIds(allImageIds);
+        const pathMap = new Map(images
           .filter((img) => typeof img.path === 'string' && img.path.trim())
-          .map((img) => ({ id: img.id, path: img.path }));
+          .map((img) => [img.id, img.path]));
+        monsterImages = monsterImageIds
+          .filter((id) => pathMap.has(id))
+          .map((id) => ({ id, path: pathMap.get(id)! }));
+        obstacleImages = obstacleImageIds
+          .filter((id) => pathMap.has(id))
+          .map((id) => ({ id, path: pathMap.get(id)! }));
       }
     } catch {
       // non-fatal — just proceed without images
@@ -1159,8 +1270,10 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
       currentPcId: null,
       dungonSpReward: dungon.spreward,
       monsterImages,
+      obstacleImages,
       lootImages,
       soundPaths,
+      dungonCoverImagePath,
     });
   } catch (error) {
     console.error('Error building sample game session:', error);

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllPublishedDungonsForAdmin = exports.setSampleDungonInDb = exports.getSampleDungonFullFromDb = exports.getSampleDungonFromDb = exports.getDungonSpRewardById = exports.approveDungon = exports.updateDungonMetadataForUser = exports.insertDungon = exports.deleteDungonForUser = exports.deleteGameForUser = exports.updateGameDungenJson = exports.getGameByIdForUser = exports.getGamesForUser = exports.startGameFromPublishedDungon = exports.publishDungonForUser = exports.updateDungonJsonForUser = exports.getDungonByIdForUser = exports.getDungonIsMainGameStatusById = exports.getPublishedDungons = exports.getDungonsByUserKey = void 0;
+exports.getAllPublishedDungonsForAdmin = exports.setSampleDungonInDb = exports.getSampleDungonFullFromDb = exports.getSampleDungonFromDb = exports.getDungonImageIdById = exports.getDungonSpRewardById = exports.approveDungon = exports.updateDungonMetadataForUser = exports.insertDungon = exports.deleteDungonForUser = exports.deleteGameForUser = exports.updateGameDungenJson = exports.getGameByIdForUser = exports.getGamesForUser = exports.startGameFromPublishedDungon = exports.publishDungonForUser = exports.updateDungonJsonForUser = exports.getDungonByIdForUser = exports.getDungonIsMainGameStatusById = exports.getPublishedDungons = exports.getDungonsByUserKey = void 0;
 const db_1 = __importDefault(require("../db"));
 const getDungonsByUserKey = async (userkey) => {
     const { rows } = await db_1.default.query(`SELECT id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid
@@ -319,6 +319,11 @@ const getDungonSpRewardById = async (id) => {
     return rows[0]?.spreward ?? 0;
 };
 exports.getDungonSpRewardById = getDungonSpRewardById;
+const getDungonImageIdById = async (id) => {
+    const { rows } = await db_1.default.query(`SELECT imageid FROM dungons WHERE id = $1`, [id]);
+    return rows[0]?.imageid ?? null;
+};
+exports.getDungonImageIdById = getDungonImageIdById;
 const getSampleDungonFromDb = async () => {
     const { rows } = await db_1.default.query(`SELECT id, name, description, intro
      FROM dungons
@@ -328,7 +333,7 @@ const getSampleDungonFromDb = async () => {
 };
 exports.getSampleDungonFromDb = getSampleDungonFromDb;
 const getSampleDungonFullFromDb = async () => {
-    const { rows } = await db_1.default.query(`SELECT id, name, description, intro, "dungenJson" AS "dungenJson", COALESCE(spreward, 0) AS spreward
+    const { rows } = await db_1.default.query(`SELECT id, name, description, intro, "dungenJson" AS "dungenJson", COALESCE(spreward, 0) AS spreward, imageid
      FROM dungons
      WHERE issample = TRUE AND status = 'published'
      LIMIT 1`);

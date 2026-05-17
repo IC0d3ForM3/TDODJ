@@ -1,9 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveItemForUser = exports.createItemForUser = exports.checkUserIsAdminByGuid = exports.fetchItemsByIds = exports.fetchItemsByUserGuid = void 0;
+exports.saveItemForUser = exports.createItemForUser = exports.checkUserIsAdminByGuid = exports.fetchItemsByIds = exports.fetchAllItemsWithUsername = exports.fetchItemsLibraryByUserGuid = exports.fetchItemsByUserGuid = void 0;
 const itemRepository_1 = require("../repositories/itemRepository");
 const fetchItemsByUserGuid = (userguid) => (0, itemRepository_1.getItemsByUserGuid)(userguid);
 exports.fetchItemsByUserGuid = fetchItemsByUserGuid;
+const fetchItemsLibraryByUserGuid = (userguid) => (0, itemRepository_1.getItemsLibraryByUserGuid)(userguid);
+exports.fetchItemsLibraryByUserGuid = fetchItemsLibraryByUserGuid;
+const fetchAllItemsWithUsername = () => (0, itemRepository_1.getAllItemsWithUsername)();
+exports.fetchAllItemsWithUsername = fetchAllItemsWithUsername;
 const fetchItemsByIds = (ids) => (0, itemRepository_1.getItemsByIds)(ids);
 exports.fetchItemsByIds = fetchItemsByIds;
 const checkUserIsAdminByGuid = (userguid) => (0, itemRepository_1.isAdminUserByGuid)(userguid);

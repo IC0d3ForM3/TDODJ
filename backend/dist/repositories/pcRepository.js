@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllPcsForAdmin = exports.upgradeStat = exports.getPcByIdPublic = exports.setIsMainGamePcInDb = exports.setSamplePcInDb = exports.getSamplePcsFromDb = exports.upgradeNod = exports.upgradeNoa = exports.updatePcForUser = exports.insertPcForUser = exports.addTresherIdToPcInDb = exports.addSpToPc = exports.getPcByIdForUser = exports.getPcsByUserGuid = void 0;
+exports.getAllPcsForAdmin = exports.upgradeStat = exports.getPcByIdPublic = exports.setIsMainGamePcInDb = exports.setSamplePcInDb = exports.getSamplePcsFromDb = exports.upgradeNod = exports.upgradeNoa = exports.updatePcForUser = exports.insertPcForUser = exports.addTresherIdToPcInDb = exports.addSpToPc = exports.getPcByIdForUser = exports.getAllPcsWithUsername = exports.getPcsByUserGuid = void 0;
 const db_1 = __importDefault(require("../db"));
 const getPcsByUserGuid = async (userguid) => {
     const { rows } = await db_1.default.query(`SELECT
@@ -54,6 +54,43 @@ const getPcsByUserGuid = async (userguid) => {
     return rows;
 };
 exports.getPcsByUserGuid = getPcsByUserGuid;
+const getAllPcsWithUsername = async () => {
+    const { rows } = await db_1.default.query(`SELECT
+       p.id,
+       p.userguid::text AS userguid,
+       p.name, p.species, p.type,
+       p.imageid AS "imageId",
+       p.maxhp AS "maxHP", p.currenthp AS "currentHP", p.ac,
+       p.actioneconomy AS "actionEconomy", p.poisonresest AS "poisonResest",
+       p.mp AS "magicPower", p.mind, p.stamina,
+       COALESCE(p.sp, 0) AS sp, p.level, p.strength,
+       p.rangeofview AS "rangeOfView",
+       p.primarytresherid AS "primaryTresherId",
+       p.weapontresherid AS "weaponTresherId",
+       COALESCE(p.tresherids, '[]'::jsonb) AS "tresherIds",
+       p.headarmortresherid AS "headArmorTresherId",
+       p.bodyarmortresherid AS "bodyArmorTresherId",
+       p.leftarmarmortresherid AS "leftArmArmorTresherId",
+       p.rightarmarmortresherid AS "rightArmArmorTresherId",
+       p.leftlegarmortresherid AS "leftLegArmorTresherId",
+       p.rightlegarmortresherid AS "rightLegArmorTresherId",
+       p.ring1itemid AS "ring1ItemId", p.ring2itemid AS "ring2ItemId",
+       p.ring3itemid AS "ring3ItemId", p.ring4itemid AS "ring4ItemId",
+       p.ring5itemid AS "ring5ItemId",
+       p.necklaceitemid AS "necklaceItemId",
+       p.hand1itemid AS "hand1ItemId", p.hand2itemid AS "hand2ItemId",
+       COALESCE(p.numberofattacks, 1) AS "numberOfAttacks",
+       COALESCE(p.numberofdefends, 1) AS "numberOfDefends",
+       COALESCE(p.issample, FALSE) AS issample,
+       COALESCE(p.ismaingame, FALSE) AS ismaingame,
+       p.createdat::text AS "createdAt", p.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM pcs p
+     LEFT JOIN users u ON u.key::text = p.userguid::text
+     ORDER BY u.username ASC, p.updatedat DESC, p.id DESC`);
+    return rows;
+};
+exports.getAllPcsWithUsername = getAllPcsWithUsername;
 const getPcByIdForUser = async (id, userguid) => {
     const { rows } = await db_1.default.query(`SELECT
        id,

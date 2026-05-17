@@ -27,7 +27,7 @@ export class Login {
       this.isSubmitting = false;
     })).subscribe({
       next: (res) => {
-        this.account.setKey(res.key, res.isAdmin, res.isCreator, res.username);
+        this.account.setKey(res.key, res.isAdmin, res.isCreator, res.username, res.isMasterAdmin);
         this.error = null;
         this.router.navigate(['/dashboard']);
       },

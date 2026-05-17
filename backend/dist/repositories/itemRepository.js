@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPublicItemsByNames = exports.getItemsByIds = exports.updateItemForUser = exports.insertItemForUser = exports.getItemsByUserGuid = exports.isAdminUserByGuid = void 0;
+exports.getPublicItemsByNames = exports.getItemsByIds = exports.updateItemForUser = exports.insertItemForUser = exports.getAllItemsWithUsername = exports.getItemsLibraryByUserGuid = exports.getItemsByUserGuid = exports.isAdminUserByGuid = void 0;
 const db_1 = __importDefault(require("../db"));
 const SELECT_ITEM_FIELDS = `
   id,
@@ -43,6 +43,34 @@ const getItemsByUserGuid = async (userguid) => {
     return rows;
 };
 exports.getItemsByUserGuid = getItemsByUserGuid;
+const getItemsLibraryByUserGuid = async (userguid) => {
+    const { rows } = await db_1.default.query(`SELECT ${SELECT_ITEM_FIELDS}
+     FROM items
+     WHERE userguid = $1 OR ispublic = true
+     ORDER BY LOWER(name) ASC, id ASC`, [userguid]);
+    return rows;
+};
+exports.getItemsLibraryByUserGuid = getItemsLibraryByUserGuid;
+const getAllItemsWithUsername = async () => {
+    const { rows } = await db_1.default.query(`SELECT i.id, i.userguid::text AS userguid, i.name, i.description, i.type,
+       COALESCE(NULLIF(i.range, '')::int, 0) AS range,
+       i.value, i.weight, i.curseid AS "curseId",
+       COALESCE(i.effectvalue, 0) AS "effectValue", COALESCE(i.damage, 0) AS "damage",
+       i.armorslot AS "armorSlot", i.effecton AS "effectOn",
+       i.effecttopc AS "effectToPc", COALESCE(i.effecttopcvalue, 0) AS "effectToPcValue",
+       COALESCE(i.weaponeffecttype, 'Blood') AS "weaponEffectType",
+       COALESCE(i.weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
+       i.imageid AS "imageId", i.soundid AS "soundId",
+       i.ispublic AS "isPublic",
+       COALESCE(i.istwohanded, false) AS "isTwoHanded",
+       i.createdat::text AS "createdAt", i.updatedat::text AS "updatedAt",
+       COALESCE(u.username, '') AS username
+     FROM items i
+     LEFT JOIN users u ON u.key::text = i.userguid::text
+     ORDER BY LOWER(i.name) ASC, i.id ASC`);
+    return rows;
+};
+exports.getAllItemsWithUsername = getAllItemsWithUsername;
 const insertItemForUser = async (userguid, payload) => {
     const { rows } = await db_1.default.query(`INSERT INTO items
        (userguid, name, description, type, range, value, weight, curseid,
