@@ -609,12 +609,25 @@
 
 					<div class="grid-canvas-row">
 						<div class="grid-canvas-wrap">
-							<canvas
-								#dungonGridCanvas
-								class="dungon-grid-canvas"
-								(click)="onGridCanvasClick($event)"
-								aria-label="Dungeon grid canvas"
-							></canvas>
+							<div class="dungon-grid-shell">
+								<div class="dungon-grid-corner" aria-hidden="true"></div>
+								<div class="dungon-grid-top-labels" aria-hidden="true">
+									@for (column of gridColumnNumbers; track column) {
+										<span class="dungon-grid-label-cell">{{ column }}</span>
+									}
+								</div>
+								<div class="dungon-grid-left-labels" aria-hidden="true">
+									@for (row of gridRowNumbers; track row) {
+										<span class="dungon-grid-label-cell">{{ row }}</span>
+									}
+								</div>
+								<canvas
+									#dungonGridCanvas
+									class="dungon-grid-canvas"
+									(click)="onGridCanvasClick($event)"
+									aria-label="Dungeon grid canvas"
+								></canvas>
+							</div>
 						</div>
 						<div class="placement-inspector">
 							<label class="placement-inspector-label" for="pi-monsters">Monsters</label>

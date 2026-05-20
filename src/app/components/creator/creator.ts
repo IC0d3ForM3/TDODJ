@@ -595,6 +595,8 @@ export class Creator implements OnInit {
   readonly gridCellSize = 20;
   readonly gridColumnCount = 45;
   readonly gridRowCount = 50;
+  readonly gridColumnNumbers = Array.from({ length: this.gridColumnCount }, (_, index) => index);
+  readonly gridRowNumbers = Array.from({ length: this.gridRowCount }, (_, index) => index);
   readonly gridCanvasWidth = this.gridCellSize * this.gridColumnCount;
   readonly gridCanvasHeight = this.gridCellSize * this.gridRowCount;
   readonly previewGridCellSize = 18;
