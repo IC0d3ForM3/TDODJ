@@ -47,6 +47,11 @@ export class Curses implements OnInit {
   readonly isSavingUserCurse = signal(false);
   readonly editingUserCurseId = signal<number | null>(null);
   readonly userCurseSaveMessage = signal<string | null>(null);
+  readonly filterQuery = signal('');
+  readonly filteredItems = computed(() => {
+    const q = this.filterQuery().toLowerCase().trim();
+    return q ? this.items().filter(i => i.name.toLowerCase().includes(q)) : this.items();
+  });
 
   readonly isLoading = this.curseService.isLoading;
   readonly error = this.curseService.error;

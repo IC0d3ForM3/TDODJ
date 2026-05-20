@@ -22,8 +22,12 @@
         } @else if (items().length === 0) {
           <p class="mn-message">No monsters yet.</p>
         } @else {
+          <input class="lib-filter-input" type="text" placeholder="Filter by name..." [value]="filterQuery()" (input)="filterQuery.set($any($event.target).value)" />
+          @if (filteredItems().length === 0) {
+            <p class="mn-message">No monsters match "{{ filterQuery() }}".</p>
+          } @else {
           <ul class="mn-list">
-            @for (item of items(); track item.id) {
+            @for (item of filteredItems(); track item.id) {
               <li class="mn-list-item">
                 <div class="mn-item-img-row">
                   @if (imageUrlForMonster(item)) {
@@ -50,6 +54,7 @@
               </li>
             }
           </ul>
+          }
         }
       </aside>
 

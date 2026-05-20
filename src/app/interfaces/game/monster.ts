@@ -3,6 +3,7 @@ export interface MonsterAttack {
   description: string;
   plusToHit: number;
   damage: number;
+  damageFormula?: string;
   range: number;
   weaponItemId: number | null;
   spellId: number | null;

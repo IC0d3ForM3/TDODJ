@@ -438,6 +438,8 @@ export const getGameById = async (req: Request, res: Response) => {
     let pcCurrentHP: number | null = null;
     let pcMaxHP: number | null = null;
     let pcSp: number | null = null;
+    let pcSpLifetime: number | null = null;
+    let pcAgility: number = 3;
     let pcMind: number = 0;
     let pcStamina: number = 0;
     let pcAc: number = 10;
@@ -456,6 +458,8 @@ export const getGameById = async (req: Request, res: Response) => {
         pcCurrentHP = pc.currentHP;
         pcMaxHP = pc.maxHP;
         pcSp = pc.sp;
+        pcSpLifetime = pc.spLifetime ?? null;
+        pcAgility = pc.agility ?? 3;
         pcMind = pc.mind;
         pcStamina = pc.stamina ?? 0;
         pcAc = pc.ac ?? 10;
@@ -717,7 +721,7 @@ export const getGameById = async (req: Request, res: Response) => {
       // non-fatal — proceed without pre-bundled assets
     }
 
-    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, pcImagePath, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false, monsterImages, obstacleImages, lootImages, soundPaths, dungonCoverImagePath });
+    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcSpLifetime, pcAgility, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, pcImagePath, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false, monsterImages, obstacleImages, lootImages, soundPaths, dungonCoverImagePath });
   } catch (error) {
     console.error('Error fetching game by id:', error);
     return res.status(500).json({ error: 'Failed to fetch game' });
@@ -1268,6 +1272,8 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
       pcCurrentHP: pc.maxHP,
       pcMaxHP: pc.maxHP,
       pcSp: 0,
+      pcSpLifetime: 0,
+      pcAgility: pc.agility ?? 3,
       pcMind: pc.mind,
       pcStamina: pc.stamina,
       pcAc: pc.ac ?? 10,

@@ -40,6 +40,8 @@ export interface PcRecord {
   createdAt: string;
   updatedAt: string;
   sp: number;
+  spLifetime: number;
+  agility: number;
   numberOfAttacks: number;
   numberOfDefends: number;
   username?: string;
@@ -80,6 +82,7 @@ export interface UpsertPcPayload {
   hand2ItemId: number | null;
   numberOfAttacks: number;
   numberOfDefends: number;
+  agility: number;
   ismaingame?: boolean;
 }
 
@@ -100,7 +103,9 @@ export const getPcsByUserGuid = async (userguid: string): Promise<PcRecord[]> =>
        mp AS "magicPower",
        mind,
        stamina,
-       COALESCE(sp, 0) AS sp,
+       COALESCE(sp_bank, 0) AS sp,
+       COALESCE(sp_lifetime, 0) AS "spLifetime",
+       COALESCE(agility, 3) AS agility,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -146,7 +151,10 @@ export const getAllPcsWithUsername = async (): Promise<PcRecord[]> => {
        p.maxhp AS "maxHP", p.currenthp AS "currentHP", p.ac,
        p.actioneconomy AS "actionEconomy", p.poisonresest AS "poisonResest",
        p.mp AS "magicPower", p.mind, p.stamina,
-       COALESCE(p.sp, 0) AS sp, p.level, p.strength,
+       COALESCE(p.sp_bank, 0) AS sp,
+       COALESCE(p.sp_lifetime, 0) AS "spLifetime",
+       COALESCE(p.agility, 3) AS agility,
+       p.level, p.strength,
        p.rangeofview AS "rangeOfView",
        p.primarytresherid AS "primaryTresherId",
        p.weapontresherid AS "weaponTresherId",
@@ -195,7 +203,9 @@ export const getPcByIdForUser = async (
        mp AS "magicPower",
        mind,
        stamina,
-       COALESCE(sp, 0) AS sp,
+       COALESCE(sp_bank, 0) AS sp,
+       COALESCE(sp_lifetime, 0) AS "spLifetime",
+       COALESCE(agility, 3) AS agility,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -234,17 +244,19 @@ export const addSpToPc = async (
   id: number,
   userguid: string,
   amount: number
-): Promise<number | null> => {
-  const { rows } = await pool.query<{ sp: number }>(
+): Promise<{ sp: number; spLifetime: number } | null> => {
+  const safeAmount = Math.max(0, Math.floor(amount));
+  const { rows } = await pool.query<{ sp: number; spLifetime: number }>(
     `UPDATE pcs
-     SET sp = COALESCE(sp, 0) + $3,
+     SET sp_lifetime = COALESCE(sp_lifetime, 0) + $3,
+         sp_bank = COALESCE(sp_bank, 0) + $3,
          updatedat = NOW()
      WHERE id = $1 AND userguid = $2
-     RETURNING COALESCE(sp, 0) AS sp`,
-    [id, userguid, Math.max(0, Math.floor(amount))]
+     RETURNING COALESCE(sp_bank, 0) AS sp, COALESCE(sp_lifetime, 0) AS "spLifetime"`,
+    [id, userguid, safeAmount]
   );
 
-  return rows[0]?.sp ?? null;
+  return rows[0] ?? null;
 };
 
 /** Append a single tresher id to the PC's tresherids JSON array. */
@@ -298,6 +310,7 @@ export const insertPcForUser = async (
        hand1itemid,
        hand2itemid,
        numberofattacks,
+       agility,
        ismaingame,
        updatedat
      )
@@ -337,6 +350,7 @@ export const insertPcForUser = async (
        $33,
        $34,
        $35,
+       $36,
        NOW()
      )
      RETURNING
@@ -354,6 +368,9 @@ export const insertPcForUser = async (
        mp AS "magicPower",
        mind,
        stamina,
+       COALESCE(sp_bank, 0) AS sp,
+       COALESCE(sp_lifetime, 0) AS "spLifetime",
+       COALESCE(agility, 3) AS agility,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -415,6 +432,7 @@ export const insertPcForUser = async (
       payload.hand1ItemId,
       payload.hand2ItemId,
       Math.max(1, Math.floor(payload.numberOfAttacks ?? 1)),
+      Math.max(0, Math.floor(payload.agility ?? 3)),
       payload.ismaingame === true,
     ]
   );
@@ -463,6 +481,7 @@ export const updatePcForUser = async (
        hand1itemid = $33,
        hand2itemid = $34,
        numberofattacks = $35,
+       agility = $36,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING
@@ -480,6 +499,9 @@ export const updatePcForUser = async (
        mp AS "magicPower",
        mind,
        stamina,
+       COALESCE(sp_bank, 0) AS sp,
+       COALESCE(sp_lifetime, 0) AS "spLifetime",
+       COALESCE(agility, 3) AS agility,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -542,6 +564,7 @@ export const updatePcForUser = async (
       payload.hand1ItemId,
       payload.hand2ItemId,
       Math.max(1, Math.floor(payload.numberOfAttacks ?? 1)),
+      Math.max(0, Math.floor(payload.agility ?? 3)),
     ]
   );
 
@@ -561,11 +584,11 @@ export const upgradeNoa = async (
 
     const { rows } = await client.query<{ sp: number; numberofattacks: number }>(
       `UPDATE pcs
-       SET sp = GREATEST(0, COALESCE(sp, 0) - $3),
+       SET sp_bank = GREATEST(0, COALESCE(sp_bank, 0) - $3),
            numberofattacks = COALESCE(numberofattacks, 1) + 1,
            updatedat = NOW()
-       WHERE id = $1 AND userguid = $2 AND COALESCE(sp, 0) >= $3
-       RETURNING COALESCE(sp, 0) AS sp, COALESCE(numberofattacks, 1) AS numberofattacks`,
+       WHERE id = $1 AND userguid = $2 AND COALESCE(sp_bank, 0) >= $3
+       RETURNING COALESCE(sp_bank, 0) AS sp, COALESCE(numberofattacks, 1) AS numberofattacks`,
       [id, userguid, spCost]
     );
 
@@ -614,11 +637,11 @@ export const upgradeNod = async (
 
     const { rows } = await client.query<{ sp: number; numberofdefends: number }>(
       `UPDATE pcs
-       SET sp = GREATEST(0, COALESCE(sp, 0) - $3),
+       SET sp_bank = GREATEST(0, COALESCE(sp_bank, 0) - $3),
            numberofdefends = COALESCE(numberofdefends, 1) + 1,
            updatedat = NOW()
-       WHERE id = $1 AND userguid = $2 AND COALESCE(sp, 0) >= $3
-       RETURNING COALESCE(sp, 0) AS sp, COALESCE(numberofdefends, 1) AS numberofdefends`,
+       WHERE id = $1 AND userguid = $2 AND COALESCE(sp_bank, 0) >= $3
+       RETURNING COALESCE(sp_bank, 0) AS sp, COALESCE(numberofdefends, 1) AS numberofdefends`,
       [id, userguid, spCost]
     );
 
@@ -768,13 +791,14 @@ export const getPcByIdPublic = async (id: number): Promise<PcRecord | null> => {
   return rows[0] ?? null;
 };
 
-export type UpgradeStatName = 'strength' | 'stamina' | 'mind' | 'magicPower' | 'numberOfAttacks' | 'numberOfDefends';
+export type UpgradeStatName = 'strength' | 'stamina' | 'mind' | 'magicPower' | 'agility' | 'numberOfAttacks' | 'numberOfDefends';
 
 const STAT_COLUMN_MAP: Record<UpgradeStatName, { column: string; cost: number }> = {
   strength:        { column: 'strength',        cost: 1 },
   stamina:         { column: 'stamina',          cost: 1 },
   mind:            { column: 'mind',             cost: 1 },
   magicPower:      { column: 'mp',               cost: 1 },
+  agility:         { column: 'agility',          cost: 1 },
   numberOfAttacks: { column: 'numberofattacks',  cost: 5 },
   numberOfDefends: { column: 'numberofdefends',  cost: 5 },
 };
@@ -790,11 +814,11 @@ export const upgradeStat = async (
   // column is safe: it comes from our hardcoded whitelist, not user input.
   const { rows } = await pool.query<{ sp: number; newvalue: number }>(
     `UPDATE pcs
-     SET sp = GREATEST(0, COALESCE(sp, 0) - $3),
+     SET sp_bank = GREATEST(0, COALESCE(sp_bank, 0) - $3),
          ${column} = COALESCE(${column}, 0) + 1,
          updatedat = NOW()
-     WHERE id = $1 AND userguid = $2 AND COALESCE(sp, 0) >= $3
-     RETURNING COALESCE(sp, 0) AS sp, COALESCE(${column}, 0) AS newvalue`,
+     WHERE id = $1 AND userguid = $2 AND COALESCE(sp_bank, 0) >= $3
+     RETURNING COALESCE(sp_bank, 0) AS sp, COALESCE(${column}, 0) AS newvalue`,
     [id, userguid, cost]
   );
   if (!rows[0]) return null;

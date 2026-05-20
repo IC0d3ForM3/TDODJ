@@ -833,7 +833,8 @@ export class Game implements OnInit {
     for (const instance of this.monsterInstances().filter((monster) => this.shouldRenderMonsterInstance(monster))) {
       const squareKey = this.getSquareKey(instance.row, instance.column);
       const monster = monstersById.get(instance.monsterId);
-      const imageId = monster?.imageId ?? null;
+      // Dox uses a synthetic cache key (-666) loaded from client assets
+      const imageId = instance.monsterId === -666 ? -666 : (monster?.imageId ?? null);
       const image = imageId !== null ? (this.monsterImageCache.get(imageId) ?? null) : null;
       imageBySquare.set(squareKey, image);
     }
@@ -4579,6 +4580,18 @@ export class Game implements OnInit {
       if (monster.imageId !== null && !this.monsterImageCache.has(monster.imageId)) {
         imageIds.add(monster.imageId);
       }
+    }
+
+    // Dox: load image from client assets if a Dox template is present in this dungeon
+    if (monsters.some(m => m.id === -666) && !this.monsterImageCache.has(-666)) {
+      const doxImg = new Image();
+      doxImg.onload = () => {
+        this.monsterImageCache.set(-666, doxImg);
+        this.monsterImageCacheVersion.update(v => v + 1);
+        this.drawPreviewGridCanvas();
+        this.drawFirstPersonViewCanvas();
+      };
+      doxImg.src = '/images/Doxs.png';
     }
 
     if (imageIds.size === 0) {
@@ -12900,6 +12913,10 @@ export class Game implements OnInit {
     this.playSoundPath('/sounds/game sounds/Claw.wav');
   }
 
+  private playDoxScreamSound(): void {
+    this.playSoundPath('/sounds/game sounds/DoxScreem.wav');
+  }
+
   private monsterHasRangedAttackInRange(template: Monster, dist: number): boolean {
     return template.attacks.some((a) => (a.range ?? 1) > 1 && (a.range ?? 1) >= dist);
   }
@@ -13222,7 +13239,9 @@ export class Game implements OnInit {
     const maxDamage = Math.max(1, (attack?.damage ?? 1) + monsterStrength);
     const attackLabel = this.getMonsterAttackLabel(attack);
 
-    if (attack?.type === 'Weapon') {
+    if (attack?.type === 'Mind') {
+      this.playDoxScreamSound();
+    } else if (attack?.type === 'Weapon') {
       this.playClangSound();
     } else if (attack?.type === 'Claw') {
       this.playClawSound();
@@ -13240,17 +13259,31 @@ export class Game implements OnInit {
 
     if (hitRoll >= playerAC) {
       const damage = maxDamage <= 1 ? 1 : this.randomInt(1, maxDamage);
-      this.playerHp.update((hp) => Math.max(0, hp - damage));
-      this.triggerPlayerHitFlash();
-      this.addCombatLog(
-        `${template.name} hits you with ${attackLabel} for ${damage} dmg! (rolled ${hitRoll} vs AC ${playerAC})`
-      );
-
-      if (this.playerHp() <= 0) {
-        this.playerDeathCause.set(`Slain by ${template.name}`);
-        this.turnPhase.set('gameover');
-        this.addCombatLog('You have been slain. Game Over!');
-        setTimeout(() => this.goHome(), 3500);
+      if (attack?.type === 'Mind') {
+        // Dox mind drain — damages Mind stat, not HP
+        this.playerMind.update(m => Math.max(0, m - damage));
+        this.triggerPlayerHitFlash();
+        this.addCombatLog(
+          `${template.name} drains ${damage} Mind! (rolled ${hitRoll} vs AC ${playerAC}) [Mind remaining: ${this.playerMind()}]`
+        );
+        if (this.playerMind() <= 0) {
+          this.playerDeathCause.set(`Mind shattered by ${template.name}`);
+          this.turnPhase.set('gameover');
+          this.addCombatLog('Your mind has been shattered by the Dox. Game Over!');
+          setTimeout(() => this.goHome(), 3500);
+        }
+      } else {
+        this.playerHp.update((hp) => Math.max(0, hp - damage));
+        this.triggerPlayerHitFlash();
+        this.addCombatLog(
+          `${template.name} hits you with ${attackLabel} for ${damage} dmg! (rolled ${hitRoll} vs AC ${playerAC})`
+        );
+        if (this.playerHp() <= 0) {
+          this.playerDeathCause.set(`Slain by ${template.name}`);
+          this.turnPhase.set('gameover');
+          this.addCombatLog('You have been slain. Game Over!');
+          setTimeout(() => this.goHome(), 3500);
+        }
       }
     } else {
       this.addCombatLog(
@@ -13473,6 +13506,139 @@ export class Game implements OnInit {
     return spawned;
   }
 
+  private spawnDox(dungonId: number, playerRow: number, playerCol: number): void {
+    // Don't stack — only one living Dox at a time
+    if (this.monsterInstances().some(m => m.monsterId === -666 && !m.isDead)) {
+      return;
+    }
+
+    // Find an adjacent open square to the player
+    const instances = this.monsterInstances();
+    const candidates: { row: number; column: number }[] = [];
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const r = playerRow + dr;
+        const c = playerCol + dc;
+        if (this.canSpawnMonsterAtSquare(dungonId, r, c, instances, [])) {
+          candidates.push({ row: r, column: c });
+        }
+      }
+    }
+    if (candidates.length === 0) return;
+
+    const spawn = candidates[Math.floor(Math.random() * candidates.length)];
+    const doxHp = Math.floor(Math.random() * 20) + 1 + 13; // 1d20 + 13 (14–33)
+
+    const doxTemplate: Monster = {
+      id: -666,
+      imageId: null,
+      soundId: null,
+      tresherIds: [],
+      keyIds: [],
+      name: 'Dox',
+      type: 'Aberration',
+      description: 'A mind-devouring spirit summoned by magical rest.',
+      hp: doxHp,
+      movementEconomy: 1,
+      ac: 12,
+      runAt: 0,
+      numberOfAttacks: 1,
+      spReward: 0,
+      magic: 0,
+      magicResistance: 0,
+      toHitPlusNeeded: 1,
+      callsReinforcements: false,
+      reinforcementCount: 0,
+      reinforcementMonsterName: null,
+      npcGreeting: null,
+      npcInfo1: null,
+      npcInfo2: null,
+      npcInfo3: null,
+      npcOnlyAttackWhenAttacked: false,
+      npcGivesInfoAfterDamaged: false,
+      npcAttacksAfterInfo: false,
+      npcCanTrade: false,
+      awareness: 10,
+      attacks: [{
+        type: 'Mind',
+        description: 'Mind Drain',
+        plusToHit: 2,
+        damage: 3,
+        range: 1,
+        weaponItemId: null,
+        spellId: null,
+        curseId: null,
+      }],
+    };
+
+    // Register template (replace any dead previous Dox template)
+    this.monsterListByDungon.update((all) => {
+      const existing = (all[dungonId] ?? []).some(m => m.id === -666);
+      if (existing) {
+        return {
+          ...all,
+          [dungonId]: (all[dungonId] ?? []).map(m => m.id === -666 ? { ...doxTemplate } : m),
+        };
+      }
+      return {
+        ...all,
+        [dungonId]: [...(all[dungonId] ?? []), doxTemplate],
+      };
+    });
+
+    const newInstance: GameMonsterInstance = {
+      placementIndex: this.monsterInstances().length,
+      monsterId: -666,
+      row: spawn.row,
+      column: spawn.column,
+      roam: false,
+      currentHp: doxHp,
+      currentMagic: 0,
+      permanentStatModifiers: {},
+      isDead: false,
+      remainingAE: 0,
+      attacksUsedThisTurn: 0,
+      hasCastSpellThisTurn: false,
+      dropTresherIds: [],
+      dropKeyIds: [],
+      dropItemIds: [],
+      dropSpellIds: [],
+      dropPotionIds: [],
+      activeEffects: [],
+      isDormant: false,
+      guardRow: null,
+      guardColumn: null,
+      isStationary: false,
+      stationaryTriggerRow: null,
+      stationaryTriggerCol: null,
+      noAttackUnlessAttacked: false,
+      hasCalledReinforcements: false,
+      hasGreeted: false,
+      hasSharedInfo: false,
+      isSpared: false,
+      npcIsHostile: false,
+    };
+
+    this.monsterInstances.update(arr => [...arr, newInstance]);
+    this.syncMonsterPlacementsFromInstances(dungonId);
+
+    // Load Dox image into the monster image cache if not already present
+    if (!this.monsterImageCache.has(-666)) {
+      const img = new Image();
+      img.onload = () => {
+        this.monsterImageCache.set(-666, img);
+        this.monsterImageCacheVersion.update(v => v + 1);
+        this.drawPreviewGridCanvas();
+        this.drawFirstPersonViewCanvas();
+      };
+      img.src = '/images/Doxs.png';
+    }
+
+    this.addCombatLog(`A Dox materialises next to you! (${doxHp} HP) [Requires magic weapon or spell to hit]`);
+    this.drawPreviewGridCanvas();
+  }
+
   private canSpawnMonsterAtSquare(
     dungonId: number,
     row: number,
@@ -13649,6 +13815,10 @@ export class Game implements OnInit {
       this.playerSneekRoundsRemaining.update(n => Math.max(0, n - 1));
       this.playerSneekUsedThisRound.set(false);
       if (this.playerSneekRoundsRemaining() === 0) this.playerSneekStable.set(false);
+      // Dox: 1-in-12 chance to summon when a Mage's MP is restored at round start
+      if (preview && this.playerType()?.toLowerCase() === 'mage' && Math.floor(Math.random() * 12) === 0) {
+        this.spawnDox(preview.dungonId, preview.centerRow, preview.centerColumn);
+      }
       this.turnPhase.set('player');
       this.addCombatLog('Your turn. AE: ' + this.getEffectivePlayerMaxAE());
     }

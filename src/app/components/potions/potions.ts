@@ -47,6 +47,11 @@ export class Potions implements OnInit {
   readonly isSavingUserPotion = signal(false);
   readonly editingUserPotionId = signal<number | null>(null);
   readonly userPotionSaveMessage = signal<string | null>(null);
+  readonly filterQuery = signal('');
+  readonly filteredItems = computed(() => {
+    const q = this.filterQuery().toLowerCase().trim();
+    return q ? this.items().filter(i => i.name.toLowerCase().includes(q)) : this.items();
+  });
 
   readonly isLoading = this.potionService.isLoading;
   readonly error = this.potionService.error;

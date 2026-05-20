@@ -139,6 +139,10 @@
 								<input class="pc-stat-num" type="number" formControlName="mind" readonly />
 							</label>
 							<label class="tresher-field pc-stat-field">
+								<span>Agility</span>
+								<input class="pc-stat-num" type="number" formControlName="agility" readonly />
+							</label>
+							<label class="tresher-field pc-stat-field">
 								<span>Magic Power</span>
 								<input class="pc-stat-num" type="number" formControlName="magicPower" readonly />
 							</label>
@@ -489,7 +493,7 @@
 												[alt]="item.name"
 											/>
 										}
-										<p class="tresher-description pc-item-desc">HP {{ item.currentHP }}/{{ item.maxHP }} | AC {{ item.ac }} | AE {{ item.actionEconomy }} | NOA {{ item.numberOfAttacks }} | SP {{ item.sp }} | MP {{ item.magicPower }} | Mind {{ item.mind }} | Stamina {{ item.stamina }} | POV {{ item.rangeOfView }}</p>
+										<p class="tresher-description pc-item-desc">HP {{ item.currentHP }}/{{ item.maxHP }} | AC {{ item.ac }} | AE {{ item.actionEconomy }} | NOA {{ item.numberOfAttacks }} | SP {{ item.sp }} ({{ item.spLifetime }} lifetime) | MP {{ item.magicPower }} | Mind {{ item.mind }} | Stamina {{ item.stamina }} | Agility {{ item.agility }} | POV {{ item.rangeOfView }}</p>
 										<p class="tresher-description pc-item-desc">Treshers: {{ pcTresherSummaryForPc(item) }}</p>
 										<div class="pc-accordion-actions">
 											<button type="button" class="dashboard-action-button dashboard-action-button-small pc-edit-btn" (click)="editPc(item)">
@@ -561,6 +565,10 @@
 				<label class="tresher-field pc-stat-field">
 					<span>Mind</span>
 					<input class="pc-stat-num" type="number" formControlName="mind" readonly />
+				</label>
+				<label class="tresher-field pc-stat-field">
+					<span>Agility</span>
+					<input class="pc-stat-num" type="number" formControlName="agility" readonly />
 				</label>
 				<label class="tresher-field pc-stat-field">
 					<span>Magic Power</span>

@@ -12,7 +12,22 @@
 @if (isCreatorTabActive('dungons')) {
 @if (!creatorLayout.isHeaderCollapsed()) {
 	<section class="creator-header">
-		<h3 class="creator-title">Dungeons</h3>
+		<div class="creator-header-row">
+			<h3 class="creator-title">Dungeons</h3>
+			@if (selectedDungon(); as selected) {
+				<span class="creator-header-sep">›</span>
+				<span class="creator-header-dungon-name">{{ selected.name }} ({{ selected.id }})</span>
+				<button
+					type="button"
+					class="details-toggle"
+					(click)="toggleSelectedDungonDetails()"
+					[attr.aria-label]="isSelectedDungonExpanded() ? 'Hide dungeon details' : 'Show dungeon details'"
+					[attr.aria-expanded]="!isSelectedDungonExpanded()"
+				>
+					{{ isSelectedDungonExpanded() ? '▼' : '▶' }}
+				</button>
+			}
+		</div>
 		<div class="creator-divider" aria-hidden="true"></div>
 	</section>
 }
@@ -178,18 +193,20 @@
 			<p class="details-message details-message-error">{{ selectedDungonError() }}</p>
 		} @else if (selectedDungon(); as selected) {
 			<section class="dungon-details" aria-label="Selected dungeon details">
-				<div class="details-title-row">
-					<h4 class="details-title">{{ selected.name }}</h4>
-					<button
-						type="button"
-						class="details-toggle"
-						(click)="toggleSelectedDungonDetails()"
-						[attr.aria-label]="isSelectedDungonExpanded() ? 'Hide dungeon details' : 'Show dungeon details'"
-						[attr.aria-expanded]="isSelectedDungonExpanded()"
-					>
-						{{ isSelectedDungonExpanded() ? '▼' : '▶' }}
-					</button>
-				</div>
+				@if (creatorLayout.isHeaderCollapsed()) {
+					<div class="details-title-row">
+						<h4 class="details-title">{{ selected.name }} ({{ selected.id }})</h4>
+						<button
+							type="button"
+							class="details-toggle"
+							(click)="toggleSelectedDungonDetails()"
+							[attr.aria-label]="isSelectedDungonExpanded() ? 'Hide dungeon details' : 'Show dungeon details'"
+							[attr.aria-expanded]="!isSelectedDungonExpanded()"
+						>
+							{{ isSelectedDungonExpanded() ? '▼' : '▶' }}
+						</button>
+					</div>
+				}
 
 				@if (!isSelectedDungonExpanded()) {
 					<div class="open-block-row" aria-label="Open block options">
@@ -932,8 +949,12 @@
 				@else if (libImagesError()) { <p class="dashboard-message dashboard-message-error">{{ libImagesError() }}</p> }
 				@else if (libUserImages().length === 0) { <p class="dashboard-message">No images yet.</p> }
 				@else {
+					<input class="lib-filter-input" type="text" placeholder="Filter by name..." [value]="libImageFilter()" (input)="libImageFilter.set($any($event.target).value)" />
+					@if (filteredLibImages().length === 0) {
+						<p class="dashboard-message">No images match "{{ libImageFilter() }}".</p>
+					} @else {
 					<ul class="dashboard-list">
-						@for (item of libUserImages(); track item.id) {
+						@for (item of filteredLibImages(); track item.id) {
 							<li class="dashboard-list-item">
 								<div class="tresher-list-row">
 									<div>
@@ -949,6 +970,7 @@
 							</li>
 						}
 					</ul>
+					}
 				}
 			</div>
 			<!-- RIGHT 2/3: form -->
@@ -1012,8 +1034,12 @@
 				@else if (libSoundsError()) { <p class="dashboard-message dashboard-message-error">{{ libSoundsError() }}</p> }
 				@else if (libUserSounds().length === 0) { <p class="dashboard-message">No sounds yet.</p> }
 				@else {
+					<input class="lib-filter-input" type="text" placeholder="Filter by name..." [value]="libSoundFilter()" (input)="libSoundFilter.set($any($event.target).value)" />
+					@if (filteredLibSounds().length === 0) {
+						<p class="dashboard-message">No sounds match "{{ libSoundFilter() }}".</p>
+					} @else {
 					<ul class="dashboard-list">
-						@for (item of libUserSounds(); track item.id) {
+						@for (item of filteredLibSounds(); track item.id) {
 							<li class="dashboard-list-item">
 								<div class="tresher-list-row">
 									<div style="flex:1">
@@ -1029,6 +1055,7 @@
 							</li>
 						}
 					</ul>
+					}
 				}
 			</div>
 			<!-- RIGHT 2/3: form -->
@@ -1082,8 +1109,12 @@
 				@else if (libSpellsError()) { <p class="dashboard-message dashboard-message-error">{{ libSpellsError() }}</p> }
 				@else if (libUserSpells().length === 0) { <p class="dashboard-message">No spells yet.</p> }
 				@else {
+					<input class="lib-filter-input" type="text" placeholder="Filter by name..." [value]="libSpellFilter()" (input)="libSpellFilter.set($any($event.target).value)" />
+					@if (filteredLibSpells().length === 0) {
+						<p class="dashboard-message">No spells match "{{ libSpellFilter() }}".</p>
+					} @else {
 					<ul class="dashboard-list">
-						@for (item of libUserSpells(); track item.id) {
+						@for (item of filteredLibSpells(); track item.id) {
 							<li class="dashboard-list-item">
 								<div class="tresher-list-row">
 									<div>
@@ -1096,6 +1127,7 @@
 							</li>
 						}
 					</ul>
+					}
 				}
 			</div>
 			<div class="creator-panel-form">
@@ -1436,8 +1468,8 @@
 					Hidden Door
 				</label>
 				@if (doorForm.controls.isHidden.value) {
-					<label class="form-label" for="door-to-find">Find DC (Mind + d12 vs DC, 1–6)</label>
-					<input id="door-to-find" class="form-input" type="number" min="1" max="6" formControlName="toFind" />
+					<label class="form-label" for="door-to-find">Find DC (Mind + d12 vs DC, 5–20)</label>
+					<input id="door-to-find" class="form-input" type="number" min="5" max="20" formControlName="toFind" />
 				}
 
 				<label class="door-locked-toggle">
@@ -1459,8 +1491,13 @@
 						<option value="AE">AE (Action Economy)</option>
 						<option value="ROS">ROS (Range of Sight)</option>
 					</select>
-					<label class="form-label" for="door-trap-curse-id">Curse ID (optional)</label>
-					<input id="door-trap-curse-id" class="form-input" type="number" formControlName="trapCurseId" />
+					<label class="form-label" for="door-trap-curse-id">Curse (optional)</label>
+					<select id="door-trap-curse-id" class="form-input" formControlName="trapCurseId">
+						<option [ngValue]="null">— None —</option>
+						@for (curse of libCurses(); track curse.id) {
+							<option [ngValue]="curse.id">{{ curse.name }}</option>
+						}
+					</select>
 					<label class="form-label" for="door-trap-to-detect">To Detect DC (Mind + d4)</label>
 					<input id="door-trap-to-detect" class="form-input" type="number" min="0" formControlName="trapToDetect" />
 					<label class="form-label" for="door-trap-to-disarm">To Disarm DC (Mind + d4)</label>
@@ -1577,8 +1614,13 @@
 						<option value="AE">AE (Action Economy)</option>
 						<option value="ROS">ROS (Range of Sight)</option>
 					</select>
-					<label class="form-label" for="tresher-trap-curse-id">Curse ID (optional)</label>
-					<input id="tresher-trap-curse-id" class="form-input" type="number" formControlName="trapCurseId" />
+					<label class="form-label" for="tresher-trap-curse-id">Curse (optional)</label>
+					<select id="tresher-trap-curse-id" class="form-input" formControlName="trapCurseId">
+						<option [ngValue]="null">— None —</option>
+						@for (curse of libCurses(); track curse.id) {
+							<option [ngValue]="curse.id">{{ curse.name }}</option>
+						}
+					</select>
 					<label class="form-label" for="tresher-trap-to-detect">To Detect DC (Mind + d4)</label>
 					<input id="tresher-trap-to-detect" class="form-input" type="number" min="0" formControlName="trapToDetect" />
 					<label class="form-label" for="tresher-trap-to-disarm">To Disarm DC (Mind + d4)</label>
@@ -2719,8 +2761,13 @@
 					<option value="ROS">ROS (Range of Sight)</option>
 				</select>
 
-				<label class="form-label" for="floor-trap-curse-id">Curse ID (optional)</label>
-				<input id="floor-trap-curse-id" class="form-input" type="number" formControlName="trapCurseId" />
+				<label class="form-label" for="floor-trap-curse-id">Curse (optional)</label>
+				<select id="floor-trap-curse-id" class="form-input" formControlName="trapCurseId">
+					<option [ngValue]="null">— None —</option>
+					@for (curse of libCurses(); track curse.id) {
+						<option [ngValue]="curse.id">{{ curse.name }}</option>
+					}
+				</select>
 
 				<label class="form-label" for="floor-trap-to-detect">To Detect DC (Mind + d4)</label>
 				<input id="floor-trap-to-detect" class="form-input" type="number" min="0" formControlName="trapToDetect" />
@@ -2935,8 +2982,13 @@
 						<option value="ROS">ROS</option>
 					</select>
 
-					<label class="form-label" for="obstacle-trap-curse-id">Curse ID (optional)</label>
-					<input id="obstacle-trap-curse-id" class="form-input" type="number" formControlName="trapCurseId" />
+					<label class="form-label" for="obstacle-trap-curse-id">Curse (optional)</label>
+					<select id="obstacle-trap-curse-id" class="form-input" formControlName="trapCurseId">
+						<option [ngValue]="null">— None —</option>
+						@for (curse of libCurses(); track curse.id) {
+							<option [ngValue]="curse.id">{{ curse.name }}</option>
+						}
+					</select>
 
 					<label class="form-label" for="obstacle-trap-to-detect">To Detect DC (Mind + d12)</label>
 					<input id="obstacle-trap-to-detect" class="form-input" type="number" min="0" formControlName="trapToDetect" />

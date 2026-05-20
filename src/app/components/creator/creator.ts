@@ -536,6 +536,22 @@ export class Creator implements OnInit {
 
   get libSpellEffectToOptions() { return this.libraryService.libSpellEffectToOptions; }
 
+  readonly libImageFilter = signal('');
+  readonly libSoundFilter = signal('');
+  readonly libSpellFilter = signal('');
+  readonly filteredLibImages = computed(() => {
+    const q = this.libImageFilter().toLowerCase().trim();
+    return q ? this.libUserImages().filter(i => i.name.toLowerCase().includes(q)) : this.libUserImages();
+  });
+  readonly filteredLibSounds = computed(() => {
+    const q = this.libSoundFilter().toLowerCase().trim();
+    return q ? this.libUserSounds().filter(i => i.name.toLowerCase().includes(q)) : this.libUserSounds();
+  });
+  readonly filteredLibSpells = computed(() => {
+    const q = this.libSpellFilter().toLowerCase().trim();
+    return q ? this.libUserSpells().filter(i => i.name.toLowerCase().includes(q)) : this.libUserSpells();
+  });
+
   readonly libImageForm = new FormGroup({
     path: new FormControl<string>('', { nonNullable: true }),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
@@ -746,7 +762,25 @@ export class Creator implements OnInit {
     trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
   });
 
-  readonly monsterTypeOptions = ['Humanoid', 'Beast', 'Specter', 'Other'] as const;
+  readonly monsterTypeOptions = [
+    'Aberration',
+    'Beast',
+    'Celestial',
+    'Construct',
+    'Dragon',
+    'Elemental',
+    'Fey',
+    'Fiend',
+    'Giant',
+    'Humanoid',
+    'Monstrosity',
+    'Ooze',
+    'Plant',
+    'Specter',
+    'Swarm of Tiny beasts',
+    'Undead',
+    'Other',
+  ] as const;
 
   readonly monsterForm = new FormGroup({
     name: new FormControl<string>('', { nonNullable: true }),

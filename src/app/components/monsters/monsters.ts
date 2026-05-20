@@ -63,6 +63,11 @@ export class Monsters implements OnInit {
   readonly isSaving = signal(false);
   readonly editingId = signal<number | null>(null);
   readonly saveMessage = signal<string | null>(null);
+  readonly filterQuery = signal('');
+  readonly filteredItems = computed(() => {
+    const q = this.filterQuery().toLowerCase().trim();
+    return q ? this.items().filter(i => i.name.toLowerCase().includes(q)) : this.items();
+  });
 
   readonly isLoading = this.monsterService.isLoading;
   readonly error = this.monsterService.error;

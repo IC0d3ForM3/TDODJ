@@ -118,6 +118,11 @@ export class Items implements OnInit {
   readonly isSavingUserItem = signal(false);
   readonly editingUserItemId = signal<number | null>(null);
   readonly userItemSaveMessage = signal<string | null>(null);
+  readonly filterQuery = signal('');
+  readonly filteredItems = computed(() => {
+    const q = this.filterQuery().toLowerCase().trim();
+    return q ? this.items().filter(i => i.name.toLowerCase().includes(q)) : this.items();
+  });
 
   readonly isLoading = this.itemService.isLoading;
   readonly error = this.itemService.error;

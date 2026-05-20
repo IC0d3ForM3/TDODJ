@@ -31,7 +31,7 @@ interface UserFriendListItem {
 }
 
 type PcSpeciesOption = 'Human' | 'Elph' | 'DwarPh' | 'Shorties';
-type PcTypeOption = 'Fighter' | 'Mage' | 'Thieph' | 'Healer';
+type PcTypeOption = 'Fighter' | 'Mage' | 'Thieph' | 'Healer' | 'Ranger';
 
 interface UserPcListItem {
   id: number;
@@ -71,7 +71,9 @@ interface UserPcListItem {
   createdAt: string;
   updatedAt: string;
   sp: number;
+  spLifetime: number;
   numberOfAttacks: number;
+  agility: number;
   ismaingame: boolean;
 }
 
@@ -117,6 +119,7 @@ interface UserPcWritePayload {
   hand1ItemId: number | null;
   hand2ItemId: number | null;
   numberOfAttacks: number;
+  agility: number;
 }
 
 type PcTresherControl = FormControl<number | null>;
@@ -226,7 +229,7 @@ export class Dashboard implements OnInit {
   readonly noaUpgradeMessage = signal<string | null>(null);
 
   readonly pcSpeciesOptions: PcSpeciesOption[] = ['Human', 'Elph', 'DwarPh', 'Shorties'];
-  readonly pcTypeOptions: PcTypeOption[] = ['Fighter', 'Mage', 'Thieph', 'Healer'];
+  readonly pcTypeOptions: PcTypeOption[] = ['Fighter', 'Ranger', 'Mage', 'Thieph', 'Healer'];
 
   readonly userFriendForm = new FormGroup({
     email: new FormControl<string>('', { nonNullable: true }),
@@ -270,6 +273,7 @@ export class Dashboard implements OnInit {
     hand1ItemId: new FormControl<number | null>(null),
     hand2ItemId: new FormControl<number | null>(null),
     numberOfAttacks: new FormControl<number>(1, { nonNullable: true }),
+    agility: new FormControl<number>(3, { nonNullable: true }),
   });
 
   ngOnInit(): void {
@@ -804,6 +808,7 @@ export class Dashboard implements OnInit {
     controls.hand1ItemId.setValue(this.normalizeNullableNumber(source.hand1ItemId));
     controls.hand2ItemId.setValue(this.normalizeNullableNumber(source.hand2ItemId));
     controls.numberOfAttacks.setValue(Math.max(1, this.normalizeNumber(source.numberOfAttacks, 1)));
+    controls.agility.setValue(Math.max(0, this.normalizeNumber((source as UserPcListItem & Record<string, unknown>)['agility'] as number ?? source.agility ?? 3, 3)));
     this.pcStatsRolled.set(true);
   }
 
@@ -1119,6 +1124,7 @@ export class Dashboard implements OnInit {
       hand1ItemId: this.normalizeNullableNumber(controls.hand1ItemId.value),
       hand2ItemId: this.normalizeNullableNumber(controls.hand2ItemId.value),
       numberOfAttacks: Math.max(1, this.normalizeNumber(controls.numberOfAttacks.value, 1)),
+      agility: Math.max(0, this.normalizeNumber(controls.agility.value, 3)),
     };
   }
 
@@ -1160,6 +1166,7 @@ export class Dashboard implements OnInit {
     controls.hand1ItemId.setValue(null);
     controls.hand2ItemId.setValue(null);
     controls.numberOfAttacks.setValue(1);
+    controls.agility.setValue(3);
   }
 
   private replacePcTresherForms(tresherIds: number[]): void {
@@ -1346,6 +1353,10 @@ export class Dashboard implements OnInit {
       return 'Healer';
     }
 
+    if (lower === 'ranger') {
+      return 'Ranger';
+    }
+
     return 'Fighter';
   }
 
@@ -1444,6 +1455,8 @@ export class Dashboard implements OnInit {
       necklaceItemId: this.normalizeNullableNumber(
         (source['necklaceItemId'] ?? source['necklaceitemid'] ?? item.necklaceItemId) as number | string | null
       ),
+      spLifetime: Math.max(0, this.normalizeNumber((source['spLifetime'] as number | null | undefined) ?? item.spLifetime ?? 0, 0)),
+      agility: Math.max(0, this.normalizeNumber((source['agility'] as number | null | undefined) ?? item.agility ?? 3, 3)),
     };
   }
 

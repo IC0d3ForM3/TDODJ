@@ -45,7 +45,7 @@ export const awardSpToPc = async (
   id: number,
   userguid: string,
   amount: number
-): Promise<number | null> => {
+): Promise<{ sp: number; spLifetime: number } | null> => {
   return await addSpToPc(id, userguid, amount);
 };
 

@@ -1,1 +1,17 @@
 /* You can add global styles to this file, and also import other style files */
+
+/* Library filter input — used across all library list panels */
+.lib-filter-input {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #1e1e1e;
+  color: #e0e0e0;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+.lib-filter-input::placeholder { color: #888; }
+.lib-filter-input:focus { outline: none; border-color: #c0392b; }

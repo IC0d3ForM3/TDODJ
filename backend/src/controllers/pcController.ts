@@ -9,7 +9,7 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const VALID_SPECIES = ['Human', 'Elph', 'DwarPh', 'Shorties'] as const;
-const VALID_TYPES = ['Fighter', 'Mage', 'thieph', 'Healer'] as const;
+const VALID_TYPES = ['Fighter', 'Mage', 'thieph', 'Healer', 'Ranger'] as const;
 
 type PcSpecies = (typeof VALID_SPECIES)[number];
 type PcType = (typeof VALID_TYPES)[number];
@@ -90,6 +90,7 @@ interface PcWriteInput {
   numberOfAttacks?: unknown;
   numberofattacks?: unknown;
   numberOfDefends?: unknown;
+  agility?: unknown;
   ismaingame?: unknown;
 }
 
@@ -189,7 +190,7 @@ export const awardSpToPc = async (req: Request, res: Response) => {
       return res.status(404).json({ result: -1, error: 'PC not found' });
     }
 
-    return res.json({ result: 1, sp: newSp });
+    return res.json({ result: 1, sp: newSp.sp, spLifetime: newSp.spLifetime });
   } catch (error) {
     console.error('Error awarding SP to pc:', error);
     return res.status(500).json({ result: -1, error: 'Failed to award SP' });
@@ -339,6 +340,7 @@ const normalizePcPayload = (value: unknown): UpsertPcPayload | null => {
     hand2ItemId: normalizeNullableNumber(input.hand2ItemId ?? input.hand2itemid),
     numberOfAttacks: Math.max(1, normalizeNumber(input.numberOfAttacks ?? input.numberofattacks, 1)),
     numberOfDefends: Math.max(1, normalizeNumber(input.numberOfDefends, 1)),
+    agility: Math.max(0, normalizeNumber(input.agility, 3)),
     ismaingame: input.ismaingame === true,
   };
 };
@@ -428,6 +430,10 @@ const normalizePcType = (value: unknown): PcType | null => {
 
   if (lower === 'healer') {
     return 'Healer';
+  }
+
+  if (lower === 'ranger') {
+    return 'Ranger';
   }
 
   return null;
@@ -600,7 +606,7 @@ export const upgradeStatController = async (req: Request, res: Response) => {
   if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
     return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
   }
-  const allowed = ['strength', 'stamina', 'mind', 'magicPower'] as const;
+  const allowed = ['strength', 'stamina', 'mind', 'magicPower', 'agility'] as const;
   type AllowedStat = typeof allowed[number];
   if (typeof stat !== 'string' || !(allowed as readonly string[]).includes(stat)) {
     return res.status(400).json({ result: -1, error: 'Valid stat name is required' });
