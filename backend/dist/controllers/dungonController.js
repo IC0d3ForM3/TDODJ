@@ -455,6 +455,7 @@ const getGameById = async (req, res) => {
                             name: it.name,
                             description: it.description,
                             type: it.type,
+                            soundId: it.soundId ?? null,
                             effectValue: it.effectValue,
                             damage: it.damage ?? 0,
                             range: Math.max(1, parseInt(String(it.range), 10) || 1),
@@ -540,6 +541,7 @@ const getGameById = async (req, res) => {
                         name: it.name,
                         description: it.description,
                         type: it.type,
+                        soundId: it.soundId ?? null,
                         effectValue: it.effectValue,
                         damage: it.damage ?? 0,
                         range: Math.max(1, parseInt(String(it.range), 10) || 1),
@@ -589,8 +591,10 @@ const getGameById = async (req, res) => {
             ]));
             const lootImageIds = Array.from(new Set(tresherList.map((t) => t?.imageId)
                 .filter((id) => typeof id === 'number' && id > 0)));
-            const spellSoundIds = Array.from(new Set([
+            const soundIds = Array.from(new Set([
                 ...pcTresherSpells.map((s) => s?.soundId)
+                    .filter((id) => typeof id === 'number' && id > 0),
+                ...pcTresherItems.map((it) => it?.soundId)
                     .filter((id) => typeof id === 'number' && id > 0),
                 ...monsterList.map((m) => m?.soundId)
                     .filter((id) => typeof id === 'number' && id > 0),
@@ -605,8 +609,8 @@ const getGameById = async (req, res) => {
                 obstacleImages = obstacleImageIds.filter((id) => pathMap.has(id)).map((id) => ({ id, path: pathMap.get(id) }));
                 lootImages = lootImageIds.filter((id) => pathMap.has(id)).map((id) => ({ id, path: pathMap.get(id) }));
             }
-            if (spellSoundIds.length > 0) {
-                const sounds = await soundService.fetchSoundsByIds(spellSoundIds);
+            if (soundIds.length > 0) {
+                const sounds = await soundService.fetchSoundsByIds(soundIds);
                 soundPaths = sounds
                     .filter((s) => typeof s.path === 'string' && s.path.trim())
                     .map((s) => ({ id: s.id, path: s.path }));
@@ -864,6 +868,7 @@ const getSampleGameSession = async (req, res) => {
                     description: it.description,
                     type: it.type,
                     imageId: it.imageId,
+                    soundId: it.soundId ?? null,
                     effectValue: it.effectValue,
                     damage: it.damage ?? 0,
                     range: Math.max(1, parseInt(String(it.range), 10) || 1),
@@ -998,6 +1003,7 @@ const getSampleGameSession = async (req, res) => {
                         description: it.description,
                         type: it.type,
                         imageId: it.imageId,
+                        soundId: it.soundId ?? null,
                         effectValue: it.effectValue,
                         damage: it.damage ?? 0,
                         range: Math.max(1, parseInt(String(it.range), 10) || 1),
@@ -1071,6 +1077,12 @@ const getSampleGameSession = async (req, res) => {
             const spellSoundIds = new Set();
             for (const spell of pcTresherSpells) {
                 const soundId = asRecord(spell)['soundId'];
+                if (typeof soundId === 'number' && soundId > 0) {
+                    spellSoundIds.add(soundId);
+                }
+            }
+            for (const item of pcTresherItems) {
+                const soundId = asRecord(item)['soundId'];
                 if (typeof soundId === 'number' && soundId > 0) {
                     spellSoundIds.add(soundId);
                 }

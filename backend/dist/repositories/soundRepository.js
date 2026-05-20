@@ -26,7 +26,7 @@ const getSoundsByUserGuid = async (userguid) => {
        updatedat::text AS "updatedAt"
      FROM sounds
      WHERE userguid = $1
-     ORDER BY updatedat DESC, id DESC`, [userguid]);
+     ORDER BY LOWER(name) ASC, id ASC`, [userguid]);
     return rows;
 };
 exports.getSoundsByUserGuid = getSoundsByUserGuid;
@@ -45,10 +45,7 @@ const getSoundLibraryByUserGuid = async (userguid) => {
      FROM sounds s
      LEFT JOIN users u ON u.key::text = s.userguid::text
      WHERE (s.userguid = $1 OR s.ispublic = true) AND s.isactive = true
-     ORDER BY
-       CASE WHEN s.userguid = $1 THEN 0 ELSE 1 END,
-       s.updatedat DESC,
-       s.id DESC`, [userguid]);
+     ORDER BY LOWER(s.name) ASC, s.id ASC`, [userguid]);
     return rows;
 };
 exports.getSoundLibraryByUserGuid = getSoundLibraryByUserGuid;
@@ -67,7 +64,7 @@ const getAllSoundsWithUsername = async () => {
      FROM sounds s
      LEFT JOIN users u ON u.key::text = s.userguid::text
      WHERE s.isactive = true
-     ORDER BY u.username ASC, s.updatedat DESC, s.id DESC`);
+      ORDER BY LOWER(s.name) ASC, s.id ASC`);
     return rows;
 };
 exports.getAllSoundsWithUsername = getAllSoundsWithUsername;

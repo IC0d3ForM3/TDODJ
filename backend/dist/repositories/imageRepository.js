@@ -26,7 +26,7 @@ const getImagesByUserGuid = async (userguid) => {
        updatedat::text AS "updatedAt"
      FROM images
      WHERE userguid = $1
-     ORDER BY updatedat DESC, id DESC`, [userguid]);
+     ORDER BY LOWER(name) ASC, id ASC`, [userguid]);
     return rows;
 };
 exports.getImagesByUserGuid = getImagesByUserGuid;
@@ -45,10 +45,7 @@ const getImageLibraryByUserGuid = async (userguid) => {
      FROM images i
      LEFT JOIN users u ON u.key::text = i.userguid::text
      WHERE (i.userguid = $1 OR i.ispublic = true) AND i.isactive = true
-     ORDER BY
-       CASE WHEN i.userguid = $1 THEN 0 ELSE 1 END,
-       i.updatedat DESC,
-       i.id DESC`, [userguid]);
+     ORDER BY LOWER(i.name) ASC, i.id ASC`, [userguid]);
     return rows;
 };
 exports.getImageLibraryByUserGuid = getImageLibraryByUserGuid;
@@ -67,7 +64,7 @@ const getAllImagesWithUsername = async () => {
      FROM images i
      LEFT JOIN users u ON u.key::text = i.userguid::text
      WHERE i.isactive = true
-     ORDER BY u.username ASC, i.updatedat DESC, i.id DESC`);
+      ORDER BY LOWER(i.name) ASC, i.id ASC`);
     return rows;
 };
 exports.getAllImagesWithUsername = getAllImagesWithUsername;

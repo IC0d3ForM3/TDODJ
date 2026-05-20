@@ -17,6 +17,7 @@ interface UserImageListItem {
   isPublic: boolean;
   isActive: boolean;
   name: string;
+  assettype?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -206,6 +207,9 @@ export class Dashboard implements OnInit {
   readonly isLoadingMonsterImageOptions = signal(false);
   private readonly _localPcImages = signal<UserImageListItem[]>([]);
   readonly allMonsterImageOptions = computed(() => [...this.monsterImageOptions(), ...this._localPcImages()]);
+  readonly pcImageOptions = computed(() =>
+    this.allMonsterImageOptions().filter((item) => item.assettype === 'PC')
+  );
 
   readonly isLoadingUserPcs = signal(false);
   readonly userPcsError = signal<string | null>(null);
@@ -404,6 +408,15 @@ export class Dashboard implements OnInit {
       return;
     }
 
+    this.startPublishedGame(game, pcId);
+  }
+
+  startSelectedPcGame(pcId: number): void {
+    const game = this.pendingStartGame();
+    if (!game) {
+      return;
+    }
+    this.selectedStartPcId.set(pcId);
     this.startPublishedGame(game, pcId);
   }
 
@@ -643,7 +656,7 @@ export class Dashboard implements OnInit {
       return null;
     }
 
-    return this.monsterImageOptions().find((item) => item.id === selectedId) ?? null;
+    return this.allMonsterImageOptions().find((item) => item.id === selectedId) ?? null;
   }
 
   selectedPcImageUrl(): string {
@@ -661,7 +674,7 @@ export class Dashboard implements OnInit {
       return null;
     }
 
-    return this.monsterImageOptions().find((item) => item.id === pc.imageId) ?? null;
+    return this.allMonsterImageOptions().find((item) => item.id === pc.imageId) ?? null;
   }
 
   pcImageUrlForPc(pc: UserPcListItem): string {

@@ -93,7 +93,7 @@
 						<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
 					}
 
-					@if (userItemForm.controls.type.value === 'ring' || userItemForm.controls.type.value === 'necklace') {
+						@if (userItemForm.controls.type.value === 'ring' || userItemForm.controls.type.value === 'necklace' || userItemForm.controls.type.value === 'neckless') {
 						<label class="it-field"><span>Effect (to PC)</span>
 							<select formControlName="effectOn"><option [ngValue]="null">-- Choose Effect --</option>@for (opt of effectOnAccessoryOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }</select>
 						</label>

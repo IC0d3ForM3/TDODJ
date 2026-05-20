@@ -50,7 +50,7 @@ const getPcsByUserGuid = async (userguid) => {
        updatedat::text AS "updatedAt"
      FROM pcs
      WHERE userguid = $1
-     ORDER BY updatedat DESC, id DESC`, [userguid]);
+     ORDER BY LOWER(name) ASC, id ASC`, [userguid]);
     return rows;
 };
 exports.getPcsByUserGuid = getPcsByUserGuid;
@@ -87,7 +87,7 @@ const getAllPcsWithUsername = async () => {
        COALESCE(u.username, '') AS username
      FROM pcs p
      LEFT JOIN users u ON u.key::text = p.userguid::text
-     ORDER BY u.username ASC, p.updatedat DESC, p.id DESC`);
+      ORDER BY LOWER(p.name) ASC, p.id ASC`);
     return rows;
 };
 exports.getAllPcsWithUsername = getAllPcsWithUsername;
@@ -620,7 +620,7 @@ const getAllPcsForAdmin = async () => {
        COALESCE(issample, FALSE) AS issample,
        COALESCE(ismaingame, FALSE) AS ismaingame
      FROM pcs
-     ORDER BY id DESC`);
+     ORDER BY LOWER(name) ASC, id ASC`);
     return rows;
 };
 exports.getAllPcsForAdmin = getAllPcsForAdmin;

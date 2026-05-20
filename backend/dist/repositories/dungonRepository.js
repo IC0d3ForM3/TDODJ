@@ -9,7 +9,7 @@ const getDungonsByUserKey = async (userkey) => {
     const { rows } = await db_1.default.query(`SELECT id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid
      FROM dungons
      WHERE userkey = $1
-     ORDER BY id DESC`, [userkey]);
+     ORDER BY LOWER(name) ASC, id ASC`, [userkey]);
     return rows;
 };
 exports.getDungonsByUserKey = getDungonsByUserKey;
@@ -30,14 +30,14 @@ const getPublishedDungons = async (userkey = null) => {
                AND df.isactivefriend = TRUE
            )
          )
-       ORDER BY d.id DESC`, [userkey]);
+       ORDER BY LOWER(d.name) ASC, d.id ASC`, [userkey]);
         return rows;
     }
     const { rows } = await db_1.default.query(`SELECT d.id, d.name, d.status, COALESCE(d.ismaingame, FALSE) AS ismaingame, COALESCE(d.issample, FALSE) AS issample, i.path AS "imagePath"
      FROM dungons d
      LEFT JOIN images i ON i.id = d.imageid
      WHERE d.status = 'published' AND d.ispublic = TRUE
-     ORDER BY d.id DESC`);
+      ORDER BY LOWER(d.name) ASC, d.id ASC`);
     return rows;
 };
 exports.getPublishedDungons = getPublishedDungons;
@@ -200,7 +200,7 @@ const getGamesForUser = async (userkey) => {
        createdat::text AS createdat
      FROM games
      WHERE userkey = $1
-     ORDER BY lastupdated DESC`, [userkey]);
+     ORDER BY LOWER(name) ASC, id ASC`, [userkey]);
     return rows;
 };
 exports.getGamesForUser = getGamesForUser;
@@ -350,7 +350,7 @@ const getAllPublishedDungonsForAdmin = async () => {
     const { rows } = await db_1.default.query(`SELECT id, name, issample
      FROM dungons
      WHERE status = 'published'
-     ORDER BY id DESC`);
+     ORDER BY LOWER(name) ASC, id ASC`);
     return rows;
 };
 exports.getAllPublishedDungonsForAdmin = getAllPublishedDungonsForAdmin;

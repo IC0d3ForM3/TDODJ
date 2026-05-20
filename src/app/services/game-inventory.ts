@@ -43,6 +43,7 @@ export type PcTresherItemData = {
   description: string;
   type: string;
   imageId?: number | null;
+  soundId?: number | null;
   effectValue: number | null;
   damage: number;
   range: number;
@@ -62,6 +63,7 @@ export type FloorItemData = {
   description: string;
   type: string;
   imageId?: number | null;
+  soundId?: number | null;
   effectValue: number;
   damage: number;
   range: number;
@@ -130,7 +132,8 @@ export class GameInventoryService {
   }
 
   isItemEquipable(type: string): boolean {
-    return type === 'weapon' || type === 'armor' || type === 'ring' || type === 'necklace';
+    const normalized = (type ?? '').trim().toLowerCase();
+    return normalized === 'weapon' || normalized === 'armor' || normalized === 'ring' || normalized === 'necklace' || normalized === 'neckless' || normalized === 'amulet';
   }
 
   getInventoryTresherMeta(tresher: Tresher): string {

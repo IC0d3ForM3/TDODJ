@@ -1,4 +1,5 @@
 import pool from '../db';
+import { PoolClient } from 'pg';
 
 export interface CurseRecord {
   id: number;
@@ -47,6 +48,69 @@ const SELECT_CURSE_FIELDS = `
   updatedat::text AS "updatedAt"
 `;
 
+const CURSE_CURE_SPELL_RANGE = 5;
+
+function buildCurseCureName(curseName: string): string {
+  const trimmed = (curseName ?? '').trim();
+  return `Cures-${trimmed || 'Unnamed Curse'}`;
+}
+
+async function ensureCurseCureSpellAndPotion(
+  client: PoolClient,
+  userguid: string,
+  curseName: string,
+  isPublic: boolean,
+  imageId: number | null,
+  soundId: number | null
+): Promise<void> {
+  const cureName = buildCurseCureName(curseName);
+  const cureDescription = `Removes the effects of ${curseName || 'a curse'}.`;
+
+  const spellExists = await client.query<{ id: number }>(
+    `SELECT id
+     FROM spells
+     WHERE userguid = $1 AND LOWER(name) = LOWER($2)
+     LIMIT 1`,
+    [userguid, cureName]
+  );
+
+  if (spellExists.rowCount === 0) {
+    await client.query(
+      `INSERT INTO spells
+         (userguid, name, description, range, effecton, effecton2, lastfor, damage,
+         effectamount2, value, sp, successtestvalue, magiccost, costtolearn,
+          imageid, soundid, ispublic, numberoftargets, effecttype, effectcolor,
+          effectonpc1, effectonpc2, range1, range2, lastfor1, lastfor2)
+       VALUES
+         ($1, $2, $3, $4, 'Remove Curse', '', 0, 0,
+         0, 0, 0, 0, 1, 0,
+          $5, $6, $7, 1, 'Other', '#ffffff',
+          FALSE, FALSE, $4, $4, 0, 0)`,
+      [userguid, cureName, cureDescription, CURSE_CURE_SPELL_RANGE, imageId, soundId, isPublic]
+    );
+  }
+
+  const potionExists = await client.query<{ id: number }>(
+    `SELECT id
+     FROM potions
+     WHERE userguid = $1 AND LOWER(name) = LOWER($2)
+     LIMIT 1`,
+    [userguid, cureName]
+  );
+
+  if (potionExists.rowCount === 0) {
+    await client.query(
+      `INSERT INTO potions
+         (userguid, name, description, effectto, effectto2, effecttime, effectnumber,
+          effectamount2, value, imageid, soundid, ispublic)
+       VALUES
+         ($1, $2, $3, 'Remove Curse', NULL, 0, 0,
+          0, 0, $4, $5, $6)`,
+      [userguid, cureName, cureDescription, imageId, soundId, isPublic]
+    );
+  }
+}
+
 export const isAdminUserByGuid = async (userguid: string): Promise<boolean> => {
   const { rows } = await pool.query<{ isadmin: boolean }>(
     'SELECT isadmin FROM users WHERE key = $1',
@@ -70,26 +134,48 @@ export const insertCurseForUser = async (
   userguid: string,
   payload: UpsertCursePayload
 ): Promise<CurseRecord> => {
-  const { rows } = await pool.query<CurseRecord>(
-    `INSERT INTO curses
-       (userguid, name, description, effectto, effectto2, damage, damage2, lastfor, imageid, soundid, ispublic)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-     RETURNING ${SELECT_CURSE_FIELDS}`,
-    [
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query<CurseRecord>(
+      `INSERT INTO curses
+         (userguid, name, description, effectto, effectto2, damage, damage2, lastfor, imageid, soundid, ispublic)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING ${SELECT_CURSE_FIELDS}`,
+      [
+        userguid,
+        payload.name,
+        payload.description,
+        payload.effectTo,
+        payload.effectTo2,
+        payload.damage,
+        payload.damage2,
+        payload.lastFor,
+        payload.imageId,
+        payload.soundId,
+        payload.isPublic,
+      ]
+    );
+
+    const created = rows[0];
+    await ensureCurseCureSpellAndPotion(
+      client,
       userguid,
-      payload.name,
-      payload.description,
-      payload.effectTo,
-      payload.effectTo2,
-      payload.damage,
-      payload.damage2,
-      payload.lastFor,
-      payload.imageId,
-      payload.soundId,
-      payload.isPublic,
-    ]
-  );
-  return rows[0];
+      created.name,
+      created.isPublic,
+      created.imageId,
+      created.soundId
+    );
+
+    await client.query('COMMIT');
+    return created;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 export const updateCurseForUser = async (
@@ -97,35 +183,59 @@ export const updateCurseForUser = async (
   userguid: string,
   payload: UpsertCursePayload
 ): Promise<CurseRecord | null> => {
-  const { rows } = await pool.query<CurseRecord>(
-    `UPDATE curses
-     SET name = $1,
-         description = $2,
-         effectto = $3,
-         effectto2 = $4,
-         damage = $5,
-         damage2 = $6,
-         lastfor = $7,
-         imageid = $8,
-         soundid = $9,
-         ispublic = $10,
-         updatedat = NOW()
-     WHERE id = $11 AND userguid = $12
-     RETURNING ${SELECT_CURSE_FIELDS}`,
-    [
-      payload.name,
-      payload.description,
-      payload.effectTo,
-      payload.effectTo2,
-      payload.damage,
-      payload.damage2,
-      payload.lastFor,
-      payload.imageId,
-      payload.soundId,
-      payload.isPublic,
-      id,
-      userguid,
-    ]
-  );
-  return rows[0] ?? null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query<CurseRecord>(
+      `UPDATE curses
+       SET name = $1,
+           description = $2,
+           effectto = $3,
+           effectto2 = $4,
+           damage = $5,
+           damage2 = $6,
+           lastfor = $7,
+           imageid = $8,
+           soundid = $9,
+           ispublic = $10,
+           updatedat = NOW()
+       WHERE id = $11 AND userguid = $12
+       RETURNING ${SELECT_CURSE_FIELDS}`,
+      [
+        payload.name,
+        payload.description,
+        payload.effectTo,
+        payload.effectTo2,
+        payload.damage,
+        payload.damage2,
+        payload.lastFor,
+        payload.imageId,
+        payload.soundId,
+        payload.isPublic,
+        id,
+        userguid,
+      ]
+    );
+
+    const updated = rows[0] ?? null;
+    if (updated) {
+      await ensureCurseCureSpellAndPotion(
+        client,
+        userguid,
+        updated.name,
+        updated.isPublic,
+        updated.imageId,
+        updated.soundId
+      );
+    }
+
+    await client.query('COMMIT');
+    return updated;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };

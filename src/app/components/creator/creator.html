@@ -1116,19 +1116,8 @@
 							<div style="display:flex;gap:0.4rem;align-items:center">
 								<select formControlName="imageId">
 									<option [ngValue]="null">No Image</option>
-									@if (libGameImageOptions().length > 0) {
-										<optgroup label="Game Images">
-											@for (img of libGameImageOptions(); track img.id) {
-												<option [ngValue]="img.id">{{ mediaOptionName(img.name) }}</option>
-											}
-										</optgroup>
-									}
-									@if (libUploadedImageOptions().length > 0) {
-										<optgroup label="Uploaded Images">
-											@for (img of libUploadedImageOptions(); track img.id) {
-												<option [ngValue]="img.id">{{ mediaOptionName(img.name) }}</option>
-											}
-										</optgroup>
+									@for (img of libFilteredImageOptions('Spell'); track img.id) {
+										<option [ngValue]="img.id">{{ mediaOptionName(img.name) }}</option>
 									}
 								</select>
 								<app-upload-popup mediaType="image" [assettype]="'Spell'" (mediaUploaded)="onLibSpellImageUploaded($event)" />
@@ -1139,19 +1128,8 @@
 							<div style="display:flex;gap:0.4rem;align-items:center">
 								<select formControlName="soundId">
 									<option [ngValue]="null">No Sound</option>
-									@if (libGameSoundOptions().length > 0) {
-										<optgroup label="Game Sounds">
-											@for (snd of libGameSoundOptions(); track snd.id) {
-												<option [ngValue]="snd.id">{{ mediaOptionName(snd.name) }}</option>
-											}
-										</optgroup>
-									}
-									@if (libUploadedSoundOptions().length > 0) {
-										<optgroup label="Uploaded Sounds">
-											@for (snd of libUploadedSoundOptions(); track snd.id) {
-												<option [ngValue]="snd.id">{{ mediaOptionName(snd.name) }}</option>
-											}
-										</optgroup>
+									@for (snd of libFilteredSoundOptions('Spell'); track snd.id) {
+										<option [ngValue]="snd.id">{{ mediaOptionName(snd.name) }}</option>
 									}
 								</select>
 								<button type="button" class="dashboard-action-button dashboard-action-button-small" (click)="playLibSelectedSpellSound()" [disabled]="!libSelectedSpellSoundUrl()">Play</button>
@@ -2014,6 +1992,9 @@
 				<label class="form-label" for="monster-run-at">Run At (HP)</label>
 				<input id="monster-run-at" class="form-input" type="number" min="0" formControlName="runAt" />
 
+				<label class="form-label" for="monster-number-of-attacks"># Attacks (per turn)</label>
+				<input id="monster-number-of-attacks" class="form-input" type="number" min="1" max="10" [value]="editingMonsterNumberOfAttacks()" (input)="setMonsterNumberOfAttacks($any($event.target).value)" title="How many times this monster attacks per turn (independent of how many attack types it has)" />
+
 				<label class="form-label" for="monster-sp-reward">Skill Points Reward</label>
 				<input id="monster-sp-reward" class="form-input" type="number" min="0" formControlName="spReward" />
 
@@ -2063,11 +2044,11 @@
 						<div class="monster-attack-stats">
 							<div>
 								<label class="form-label" style="font-size: 0.8rem">Damage</label>
-								<input class="form-input" type="number" min="0" [value]="attack.damage" (change)="setMonsterAttackDamage(i, $any($event.target).value)" />
+								<input class="form-input" type="number" min="0" [value]="attack.damage" (input)="setMonsterAttackDamage(i, $any($event.target).value)" />
 							</div>
 							<div>
 								<label class="form-label" style="font-size: 0.8rem">+To Hit</label>
-								<input class="form-input" type="number" [value]="attack.plusToHit" (change)="setMonsterAttackHit(i, $any($event.target).value)" />
+								<input class="form-input" type="number" [value]="attack.plusToHit" (input)="setMonsterAttackHit(i, $any($event.target).value)" />
 							</div>
 						</div>
 						@if (attack.type === 'Weapon') {

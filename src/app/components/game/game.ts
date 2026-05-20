@@ -760,11 +760,11 @@ export class Game implements OnInit {
   }
 
   collectedArmorItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean }> {
-    return this.collectedFloorItemsForPreview().filter((item) => this.isArmorItemType(item.type));
+    return this.collectedFloorItemsForPreview().filter((item) => this.isArmorItemType(item.type, item.name));
   }
 
   collectedOtherItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean }> {
-    return this.collectedFloorItemsForPreview().filter((item) => !this.isWeaponItemType(item.type) && !this.isArmorItemType(item.type));
+    return this.collectedFloorItemsForPreview().filter((item) => !this.isWeaponItemType(item.type) && !this.isArmorItemType(item.type, item.name));
   }
 
   previewDetectedFloorTrapsForView(): FloorTrapPlacement[] {
@@ -1350,7 +1350,8 @@ export class Game implements OnInit {
     const applyItemId = (itemId: number) => {
       const item = itemsMap.get(itemId);
       if (!item) return;
-      switch (item.type) {
+      const itemType = this.normalizeItemType(item.type);
+      switch (itemType) {
         case 'armor':
           if (item.armorSlot === 'head') result.head = true;
           else if (item.armorSlot === 'body') result.body = true;
@@ -1374,7 +1375,13 @@ export class Game implements OnInit {
           result.hasRing = true;
           break;
         case 'necklace':
+        case 'neckless':
           result.hasNecklace = true;
+          break;
+        default:
+          if (this.isNecklaceLikeItem(itemType, item.name)) {
+            result.hasNecklace = true;
+          }
           break;
       }
     };
@@ -1397,14 +1404,14 @@ export class Game implements OnInit {
   readonly allTresherItemsGrouped = computed(() => {
     const treshers = this.inventoryTreshersForPreview();
     const itemsMap = this.pcTresherItemsById();
-    type FlatItem = { id: number; name: string; description: string; type: string; effectValue: number | null; armorSlot: string | null; damage: number; range: number; effectToPc?: string | null; effectToPcValue?: number; tresherIdx: number };
+    type FlatItem = { id: number; name: string; description: string; type: string; effectValue: number | null; armorSlot: string | null; damage: number; range: number; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; tresherIdx: number };
     const flat: FlatItem[] = [];
     for (let i = 0; i < treshers.length; i++) {
       const t = treshers[i];
       for (const itemId of [t.item1Id, t.item2Id, t.item3Id, t.item4Id]) {
         if (itemId != null) {
           const item = itemsMap.get(itemId);
-          if (item) flat.push({ id: item.id, name: item.name, description: item.description, type: item.type, effectValue: item.effectValue, armorSlot: item.armorSlot, damage: item.damage, range: item.range, effectToPc: item.effectToPc ?? null, effectToPcValue: item.effectToPcValue ?? 0, tresherIdx: i });
+          if (item) flat.push({ id: item.id, name: item.name, description: item.description, type: item.type, effectValue: item.effectValue, armorSlot: item.armorSlot, damage: item.damage, range: item.range, effectOn: item.effectOn ?? null, effectToPc: item.effectToPc ?? null, effectToPcValue: item.effectToPcValue ?? 0, tresherIdx: i });
         }
       }
     }
@@ -1698,6 +1705,21 @@ export class Game implements OnInit {
     const maxMonsterRange = this.getSpellMaxMonsterRange(spell);
     const target = this.getTargetMonster(preview.dungonId, preview.centerRow, preview.centerColumn, maxMonsterRange);
     if (!target) {
+      const hasMonsterCureSlot = effectSlots.some((slot) => !slot.effectOnPc && this.normalizeEffectToPcStat(slot.effectOn) === 'RemoveCurse');
+      if (hasMonsterCureSlot) {
+        const spellFlavor = this.formatSpellFlavor(spell);
+        for (const slot of effectSlots) {
+          if (!slot.effectOnPc && this.normalizeEffectToPcStat(slot.effectOn) === 'RemoveCurse') {
+            this.applySpellEffectToPlayer(spell, { ...slot, effectOnPc: true, range: 0 }, spellFlavor);
+          }
+        }
+        this.consumePlayerAE(actionCost, preview.dungonId);
+        this.playerMp.update(v => Math.max(0, v - spellMpCost));
+        if (this.playerAE() <= 0) {
+          this.startMonsterTurns();
+        }
+        return;
+      }
       this.addCombatLog(`No target in range (${maxMonsterRange}) for ${spell.name}.`);
       return;
     }
@@ -1903,6 +1925,10 @@ export class Game implements OnInit {
   private applyPermanentPlayerSpellEffect(effectOn: string, amount: number): void {
     const target = this.normalizeEffectToPcStat(effectOn);
     const preview = this.gridPreviewContext();
+    if (target === 'RemoveCurse' && preview) {
+      this.clearPlayerCursesForDungon(preview.dungonId);
+      return;
+    }
     if (target === 'HP') {
       const nextHp = Math.max(0, Math.min(this.playerHp() + amount, this.getEffectivePlayerMaxHp()));
       this.playerHp.set(nextHp);
@@ -1964,6 +1990,18 @@ export class Game implements OnInit {
     spellFlavor: string
   ): void {
     const amount = this.rollSpellEffectDelta(this.getSpellEffectAmountWithMagicBonus(slot.effectAmount));
+    if (this.normalizeEffectToPcStat(slot.effectOn) === 'RemoveCurse') {
+      const preview = this.gridPreviewContext();
+      const removedCount = preview ? this.clearPlayerCursesForDungon(preview.dungonId) : 0;
+      this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '');
+      this.addCombatLog(
+        removedCount > 0
+          ? `${spell.name}${spellFlavor} removes your curses.`
+          : `${spell.name}${spellFlavor} finds no curse to remove.`
+      );
+      return;
+    }
+
     if (slot.lastFor === 0) {
       this.applyPermanentPlayerSpellEffect(slot.effectOn, amount);
       this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '');
@@ -2014,6 +2052,17 @@ export class Game implements OnInit {
   ): void {
     const amount = this.rollSpellEffectDelta(this.getSpellEffectAmountWithMagicBonus(slot.effectAmount));
     const detrimentalAmount = amount >= 0 ? -amount : amount;
+
+    if (this.normalizeEffectToPcStat(slot.effectOn) === 'RemoveCurse') {
+      const removedCount = this.clearMonsterCurses(target);
+      this.triggerMonsterGlow(target.row, target.column, spell.name, slot.effectOn, spell.effectType ?? '');
+      this.addCombatLog(
+        removedCount > 0
+          ? `${spell.name}${spellFlavor} removes curses from ${monsterName}.`
+          : `${spell.name}${spellFlavor} finds no curse on ${monsterName}.`
+      );
+      return;
+    }
 
     if (slot.lastFor === 0 && slot.effectOn !== 'HP') {
       if ((slot.effectOn ?? '').trim().toLowerCase() === 'magic') {
@@ -2328,6 +2377,18 @@ export class Game implements OnInit {
       return false;
     }
 
+    if (target === 'RemoveCurse') {
+      const preview = this.gridPreviewContext();
+      if (!preview) {
+        this.previewActionMessage.set(`${potionName} fizzles with no active dungeon context.`);
+        return false;
+      }
+      const removedCount = this.clearPlayerCursesForDungon(preview.dungonId);
+      this.previewActionMessage.set(removedCount > 0 ? `${potionName}: curses removed.` : `${potionName}: no curses to remove.`);
+      this.addCombatLog(removedCount > 0 ? `You drink ${potionName}. Your curses are lifted.` : `You drink ${potionName}, but no curse is affecting you.`);
+      return true;
+    }
+
     const amount = potion.effectAmount;
     if (potion.lastFor > 1) {
       if (target === 'HP' || target === 'Magic') {
@@ -2431,8 +2492,8 @@ export class Game implements OnInit {
     }
   }
 
-  isItemEquipable(type: string): boolean {
-    return this.inventoryService.isItemEquipable(type);
+  isItemEquipable(type: string, name?: string): boolean {
+    return this.inventoryService.isItemEquipable(type) || this.isNecklaceLikeItem(type, name);
   }
 
   isItemEquippedById(itemId: number): boolean {
@@ -2472,8 +2533,9 @@ export class Game implements OnInit {
       this.addCombatLog(`${itemName} unequipped.`);
       this.previewActionMessage.set(`${itemName} unequipped.`);
     } else {
+      const itemType = this.normalizeItemType(item.type);
       // Weapons use a hand slot — enforce the hand limit before equipping
-      if (item.type === 'weapon') {
+      if (itemType === 'weapon') {
         const handsNeeded = item.isTwoHanded ? 2 : 1;
         if (this.inventoryHandsUsedForPreview() + handsNeeded > this.maxEquippableHands) {
           const msg = item.isTwoHanded
@@ -2484,7 +2546,7 @@ export class Game implements OnInit {
         }
       }
       // Shield-type armor (no body slot) also occupies 1 hand
-      if (item.type === 'armor') {
+      if (itemType === 'armor') {
         const bodyArmorSlots = new Set(['head', 'body', 'left-arm', 'right-arm', 'left-leg', 'right-leg']);
         if (!item.armorSlot || !bodyArmorSlots.has(item.armorSlot)) {
           if (this.inventoryHandsUsedForPreview() + 1 > this.maxEquippableHands) {
@@ -4268,11 +4330,12 @@ export class Game implements OnInit {
             this.setPcInventoryInitialized(game.dungonid, false);
             this.seedPcTreshersIntoInventory(game.dungonid, game.pcTreshers);
             if (Array.isArray(game.pcTresherItems)) {
-              const itemMap = new Map<number, { id: number; name: string; description: string; type: string; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>();
+              const itemMap = new Map<number, { id: number; name: string; description: string; type: string; soundId?: number | null; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>();
               for (const raw of game.pcTresherItems) {
-                const it = raw as { id: number; name: string; description: string; type: string; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean };
+                const it = raw as { id: number; name: string; description: string; type: string; soundId?: number | null; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean };
+                const itemRaw = raw as Record<string, unknown>;
                 if (typeof it.id === 'number') {
-                  itemMap.set(it.id, { ...it, damage: typeof it.damage === 'number' ? it.damage : 6, range: typeof it.range === 'number' ? Math.max(1, it.range) : 1, effectToPc: typeof it.effectToPc === 'string' ? it.effectToPc : null, effectToPcValue: typeof it.effectToPcValue === 'number' ? it.effectToPcValue : 0, weaponEffectType: typeof it.weaponEffectType === 'string' ? it.weaponEffectType : 'Blood', weaponEffectColor: typeof it.weaponEffectColor === 'string' ? it.weaponEffectColor : '#cc0000', isTwoHanded: it.isTwoHanded === true });
+                  itemMap.set(it.id, { ...it, soundId: typeof it.soundId === 'number' ? it.soundId : (typeof itemRaw['soundid'] === 'number' ? itemRaw['soundid'] as number : null), damage: typeof it.damage === 'number' ? it.damage : 6, range: typeof it.range === 'number' ? Math.max(1, it.range) : 1, effectToPc: typeof it.effectToPc === 'string' ? it.effectToPc : null, effectToPcValue: typeof it.effectToPcValue === 'number' ? it.effectToPcValue : 0, weaponEffectType: typeof it.weaponEffectType === 'string' ? it.weaponEffectType : 'Blood', weaponEffectColor: typeof it.weaponEffectColor === 'string' ? it.weaponEffectColor : '#cc0000', isTwoHanded: it.isTwoHanded === true });
                 }
               }
               this.pcTresherItemsById.set(itemMap);
@@ -4379,11 +4442,12 @@ export class Game implements OnInit {
           this.loadDungonJsonState(game.dungonid, game.dungenJson);
           this.seedPcTreshersIntoInventory(game.dungonid, game.pcTreshers);
           if (Array.isArray(game.pcTresherItems)) {
-            const itemMap = new Map<number, { id: number; name: string; description: string; type: string; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>();
+            const itemMap = new Map<number, { id: number; name: string; description: string; type: string; soundId?: number | null; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>();
             for (const raw of game.pcTresherItems) {
-              const it = raw as { id: number; name: string; description: string; type: string; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean };
+              const it = raw as { id: number; name: string; description: string; type: string; soundId?: number | null; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean };
+              const itemRaw = raw as Record<string, unknown>;
               if (typeof it.id === 'number') {
-                itemMap.set(it.id, { ...it, damage: typeof it.damage === 'number' ? it.damage : 6, range: typeof it.range === 'number' ? Math.max(1, it.range) : 1, effectToPc: typeof it.effectToPc === 'string' ? it.effectToPc : null, effectToPcValue: typeof it.effectToPcValue === 'number' ? it.effectToPcValue : 0, weaponEffectType: typeof it.weaponEffectType === 'string' ? it.weaponEffectType : 'Blood', weaponEffectColor: typeof it.weaponEffectColor === 'string' ? it.weaponEffectColor : '#cc0000', isTwoHanded: it.isTwoHanded === true });
+                itemMap.set(it.id, { ...it, soundId: typeof it.soundId === 'number' ? it.soundId : (typeof itemRaw['soundid'] === 'number' ? itemRaw['soundid'] as number : null), damage: typeof it.damage === 'number' ? it.damage : 6, range: typeof it.range === 'number' ? Math.max(1, it.range) : 1, effectToPc: typeof it.effectToPc === 'string' ? it.effectToPc : null, effectToPcValue: typeof it.effectToPcValue === 'number' ? it.effectToPcValue : 0, weaponEffectType: typeof it.weaponEffectType === 'string' ? it.weaponEffectType : 'Blood', weaponEffectColor: typeof it.weaponEffectColor === 'string' ? it.weaponEffectColor : '#cc0000', isTwoHanded: it.isTwoHanded === true });
               }
             }
             this.pcTresherItemsById.set(itemMap);
@@ -5165,12 +5229,31 @@ export class Game implements OnInit {
     return kind === 'Key' || kind === 'Tresher' || kind === 'Item' || kind === 'Potion' || kind === 'Spell';
   }
 
-  private isArmorItemType(type: string): boolean {
-    return type === 'armor' || type === 'ring' || type === 'necklace';
+  private normalizeItemType(type: string | null | undefined): string {
+    return (type ?? '').trim().toLowerCase();
+  }
+
+  private normalizeItemName(name: string | null | undefined): string {
+    return (name ?? '').trim().toLowerCase();
+  }
+
+  private isNecklaceLikeItem(type: string | null | undefined, name: string | null | undefined): boolean {
+    const normalizedType = this.normalizeItemType(type);
+    if (normalizedType === 'necklace' || normalizedType === 'neckless' || normalizedType === 'amulet') {
+      return true;
+    }
+    const normalizedName = this.normalizeItemName(name);
+    return normalizedName.includes('amulet') || normalizedName.includes('necklace') || normalizedName.includes('neckless');
+  }
+
+  private isArmorItemType(type: string, name?: string): boolean {
+    const normalized = this.normalizeItemType(type);
+    return normalized === 'armor' || normalized === 'ring' || this.isNecklaceLikeItem(type, name);
   }
 
   private isWeaponItemType(type: string): boolean {
-    return type === 'weapon' || type === 'shield' || type === 'wand';
+    const normalized = this.normalizeItemType(type);
+    return normalized === 'weapon' || normalized === 'shield' || normalized === 'wand';
   }
 
   private getInventoryContextForPreview():
@@ -9300,10 +9383,10 @@ export class Game implements OnInit {
     itemPlacements: ItemPlacement[];
     potionPlacements: PotionPlacement[];
     spellPlacements: SpellPlacement[];
-    floorItemList: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>;
+    floorItemList: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>;
     floorPotionList: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>;
     floorSpellList: PcTresherSpellData[];
-    collectedFloorItems: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>;
+    collectedFloorItems: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>;
     collectedFloorPotions: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>;
     collectedFloorSpells: PcTresherSpellData[];
     learnedFloorSpellIds: number[];
@@ -9638,7 +9721,7 @@ export class Game implements OnInit {
           .filter((x): x is SpellPlacement => x !== null)
       : [];
 
-    const floorItemList: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }> =
+    const floorItemList: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }> =
       Array.isArray(source.floorItemList)
         ? source.floorItemList
             .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
@@ -9651,14 +9734,32 @@ export class Game implements OnInit {
                 description: typeof x['description'] === 'string' ? x['description'] : '',
                 type: typeof x['type'] === 'string' ? x['type'] : 'other',
                 imageId: typeof x['imageId'] === 'number' ? x['imageId'] : (typeof x['imageid'] === 'number' ? x['imageid'] : null),
-                effectValue: typeof x['effectValue'] === 'number' ? x['effectValue'] : 0,
+                soundId: typeof x['soundId'] === 'number' ? x['soundId'] : (typeof x['soundid'] === 'number' ? x['soundid'] : null),
+                effectValue:
+                  typeof x['effectValue'] === 'number'
+                    ? x['effectValue']
+                    : (typeof x['effectvalue'] === 'number' ? x['effectvalue'] : 0),
                 damage: typeof x['damage'] === 'number' ? x['damage'] : 6,
                 range: typeof x['range'] === 'number' ? Math.max(1, x['range']) : 1,
-                armorSlot: typeof x['armorSlot'] === 'string' ? x['armorSlot'] : null,
-                effectOn: typeof x['effectOn'] === 'string' ? x['effectOn'] : null,
+                armorSlot:
+                  typeof x['armorSlot'] === 'string'
+                    ? x['armorSlot']
+                    : (typeof x['armorslot'] === 'string' ? x['armorslot'] : null),
+                effectOn:
+                  typeof x['effectOn'] === 'string'
+                    ? x['effectOn']
+                    : (typeof x['effecton'] === 'string' ? x['effecton'] : null),
+                effectToPc:
+                  typeof x['effectToPc'] === 'string'
+                    ? x['effectToPc']
+                    : (typeof x['effecttopc'] === 'string' ? x['effecttopc'] : null),
+                effectToPcValue:
+                  typeof x['effectToPcValue'] === 'number'
+                    ? x['effectToPcValue']
+                    : (typeof x['effecttopcvalue'] === 'number' ? x['effecttopcvalue'] : 0),
                 weaponEffectType: typeof x['weaponEffectType'] === 'string' ? x['weaponEffectType'] : 'Blood',
                 weaponEffectColor: typeof x['weaponEffectColor'] === 'string' ? x['weaponEffectColor'] : '#cc0000',
-                isTwoHanded: x['isTwoHanded'] === true,
+                isTwoHanded: x['isTwoHanded'] === true || x['istwohanded'] === true,
               };
             })
             .filter((x): x is NonNullable<typeof x> => x !== null)
@@ -9687,7 +9788,7 @@ export class Game implements OnInit {
       ? source.npcTradesPurchased.filter((x): x is number => typeof x === 'number')
       : [];
 
-    const parseItemArray = (raw: unknown[]): Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }> =>
+    const parseItemArray = (raw: unknown[]): Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }> =>
       raw
         .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
         .map((x) => {
@@ -9699,14 +9800,32 @@ export class Game implements OnInit {
             description: typeof x['description'] === 'string' ? x['description'] : '',
             type: typeof x['type'] === 'string' ? x['type'] : 'other',
             imageId: typeof x['imageId'] === 'number' ? x['imageId'] : (typeof x['imageid'] === 'number' ? x['imageid'] : null),
-            effectValue: typeof x['effectValue'] === 'number' ? x['effectValue'] : 0,
+            soundId: typeof x['soundId'] === 'number' ? x['soundId'] : (typeof x['soundid'] === 'number' ? x['soundid'] : null),
+            effectValue:
+              typeof x['effectValue'] === 'number'
+                ? x['effectValue']
+                : (typeof x['effectvalue'] === 'number' ? x['effectvalue'] : 0),
             damage: typeof x['damage'] === 'number' ? x['damage'] : 6,
             range: typeof x['range'] === 'number' ? Math.max(1, x['range']) : 1,
-            armorSlot: typeof x['armorSlot'] === 'string' ? x['armorSlot'] : null,
-            effectOn: typeof x['effectOn'] === 'string' ? x['effectOn'] : null,
+            armorSlot:
+              typeof x['armorSlot'] === 'string'
+                ? x['armorSlot']
+                : (typeof x['armorslot'] === 'string' ? x['armorslot'] : null),
+            effectOn:
+              typeof x['effectOn'] === 'string'
+                ? x['effectOn']
+                : (typeof x['effecton'] === 'string' ? x['effecton'] : null),
+            effectToPc:
+              typeof x['effectToPc'] === 'string'
+                ? x['effectToPc']
+                : (typeof x['effecttopc'] === 'string' ? x['effecttopc'] : null),
+            effectToPcValue:
+              typeof x['effectToPcValue'] === 'number'
+                ? x['effectToPcValue']
+                : (typeof x['effecttopcvalue'] === 'number' ? x['effecttopcvalue'] : 0),
             weaponEffectType: typeof x['weaponEffectType'] === 'string' ? x['weaponEffectType'] : 'Blood',
             weaponEffectColor: typeof x['weaponEffectColor'] === 'string' ? x['weaponEffectColor'] : '#cc0000',
-            isTwoHanded: x['isTwoHanded'] === true,
+            isTwoHanded: x['isTwoHanded'] === true || x['istwohanded'] === true,
           };
         })
         .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -10069,6 +10188,7 @@ export class Game implements OnInit {
             0,
             this.normalizeNumber(this.toFiniteNumber(source.plusToHit ?? source.plus_to_hit), 0)
           ),
+          range: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source.range), 1)),
           weaponItemId: typeof source.weaponItemId === 'number' ? source.weaponItemId : null,
           spellId: typeof source.spellId === 'number' ? source.spellId : null,
           curseId: typeof source.curseId === 'number' ? source.curseId : null,
@@ -10331,7 +10451,7 @@ export class Game implements OnInit {
     if (dungonId === null) return;
 
     const hasInventoryCurse = this.inventoryTreshersForPreview().some((t) => t.curse1Id !== null || t.curse2Id !== null);
-    const hasActiveCurse = this.playerActiveEffects().some((e) => e.effectAmount < 0 || e.effectOn === 'Boost Dice');
+    const hasActiveCurse = this.playerActiveEffects().some((e) => this.isCurseEffectEntry(e.effectOn, e.effectAmount));
     if (!hasInventoryCurse && !hasActiveCurse) {
       this.yeOldMagiceShopMessage.set('No curse is currently affecting you.');
       return;
@@ -10342,6 +10462,19 @@ export class Game implements OnInit {
     }
 
     this.playerSp.update((sp) => sp - this.shopCurseClearCost);
+    this.clearPlayerCursesForDungon(dungonId);
+    this.yeOldMagiceShopMessage.set('A cleansing ritual clears your curses.');
+    this.saveGameState();
+  }
+
+  private isCurseEffectEntry(effectOn: string, effectAmount: number): boolean {
+    const normalized = (effectOn ?? '').trim().toLowerCase();
+    return effectAmount < 0 || normalized === 'boost dice';
+  }
+
+  private clearPlayerCursesForDungon(dungonId: number): number {
+    const activeBefore = this.playerActiveEffects().length;
+
     this.cheaterByDungon.update((all) => {
       const existing = all[dungonId] ?? { ...DEFAULT_CHEATER };
       return {
@@ -10355,9 +10488,20 @@ export class Game implements OnInit {
         },
       };
     });
-    this.playerActiveEffects.update((effects) => effects.filter((e) => !(e.effectAmount < 0 || e.effectOn === 'Boost Dice')));
-    this.yeOldMagiceShopMessage.set('A cleansing ritual clears your curses.');
-    this.saveGameState();
+
+    this.playerActiveEffects.update((effects) =>
+      effects.filter((e) => !this.isCurseEffectEntry(e.effectOn, e.effectAmount))
+    );
+
+    return activeBefore - this.playerActiveEffects().length;
+  }
+
+  private clearMonsterCurses(monster: GameMonsterInstance): number {
+    const before = monster.activeEffects.length;
+    monster.activeEffects = monster.activeEffects.filter(
+      (e) => !this.isCurseEffectEntry(e.effectOn, e.effectAmount)
+    );
+    return before - monster.activeEffects.length;
   }
 
   buyShopItem(itemId: number): void {
@@ -11179,11 +11323,11 @@ export class Game implements OnInit {
     this.combatLog.update((log) => [...log.slice(-49), { text }]);
   }
 
-  private normalizeEffectToPcStat(stat: string | null | undefined): 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS' | null {
+  private normalizeEffectToPcStat(stat: string | null | undefined): 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS' | 'RemoveCurse' | null {
     if (!stat) return null;
     const s = stat.trim().toLowerCase();
     if (s === 'hp') return 'HP';
-    if (s === 'ac') return 'AC';
+    if (s === 'ac' || s === 'armor class' || s === 'ac (armor class)') return 'AC';
     if (s === 'magic' || s === 'mp') return 'Magic';
     if (s === 'mind') return 'Mind';
     if (s === 'stamina' || s === 'staman') return 'Stamina';
@@ -11191,6 +11335,7 @@ export class Game implements OnInit {
     if (s === 'ae' || s === 'action economy') return 'AE';
     if (s === 'noa' || s === '# of attacks' || s === '#oa' || s === 'number of attacks') return 'NOA';
     if (s === 'ros' || s === 'sight' || s === 'range of sight') return 'ROS';
+    if (s === 'remove curse' || s === 'cure curse' || s === 'cures curse') return 'RemoveCurse';
     return null;
   }
 
@@ -11251,18 +11396,55 @@ export class Game implements OnInit {
     const equippedItemIds = this.equippedItemIdsByDungon()[dungonId] ?? [];
     const itemsMap = this.pcTresherItemsById();
     let total = 0;
+
     for (const itemId of equippedItemIds) {
       const item = itemsMap.get(itemId);
       if (!item) continue;
-      const rawTarget = item.effectToPc ?? item.effectOn;
-      const target = this.normalizeEffectToPcStat(rawTarget ?? null);
-      if (target !== stat) continue;
-      const value = typeof item.effectToPcValue === 'number'
-        ? item.effectToPcValue
-        : (item.effectValue ?? 0);
-      total += value;
+      const effectToPcTarget = this.normalizeEffectToPcStat(item.effectToPc ?? null);
+      const effectOnTarget = this.normalizeEffectToPcStat(item.effectOn ?? null);
+      const effectToPcValue = typeof item.effectToPcValue === 'number' ? item.effectToPcValue : 0;
+      const effectOnValue = item.effectValue ?? 0;
+
+      // effectToPc/effectToPcValue is an additional stat channel and should stack with effectOn/effectValue.
+      if (effectToPcTarget === stat) {
+        total += effectToPcValue;
+      }
+
+      // effectOn/effectValue applies directly to the chosen stat (used heavily by accessories).
+      if (effectOnTarget === stat) {
+        total += effectOnValue;
+      }
+
+      // Legacy armor behavior: armor effectValue contributes to AC even if effectOn is unset.
+      const itemType = this.normalizeItemType(item.type);
+      if (
+        stat === 'AC' &&
+        itemType === 'armor' &&
+        effectOnTarget !== 'AC' &&
+        effectToPcTarget !== 'AC'
+      ) {
+        total += effectOnValue;
+      }
     }
     return total;
+  }
+
+  inventoryItemEffectsForView(item: { effectOn: string | null; effectValue: number | null; effectToPc?: string | null; effectToPcValue?: number }): string[] {
+    const lines: string[] = [];
+
+    const effectOnStat = this.normalizeEffectToPcStat(item.effectOn ?? null);
+    const effectOnValue = typeof item.effectValue === 'number' ? item.effectValue : 0;
+    if (effectOnStat && effectOnValue !== 0) {
+      lines.push(`Effect: ${effectOnValue > 0 ? '+' : ''}${effectOnValue} ${effectOnStat}`);
+    }
+
+    const toPcStat = this.normalizeEffectToPcStat(item.effectToPc ?? null);
+    const toPcValue = typeof item.effectToPcValue === 'number' ? item.effectToPcValue : 0;
+    if (toPcStat && toPcValue !== 0) {
+      lines.push(`To PC: ${toPcValue > 0 ? '+' : ''}${toPcValue} ${toPcStat}`);
+    }
+
+    return lines;
   }
 
   private getPlayerModifierEffectBonus(stat: 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS'): number {
@@ -11323,11 +11505,12 @@ export class Game implements OnInit {
   }
 
   private normalizePotionEffectToPcStat(effectTo: string | null | undefined):
-    'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS' | 'TempHP' | 'PoisonResistance' | null {
+    'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS' | 'TempHP' | 'PoisonResistance' | 'RemoveCurse' | null {
     const normalized = (effectTo ?? '').trim().toLowerCase();
     if (!normalized) return null;
     if (normalized === 'temp hp' || normalized === 'temporary hp') return 'TempHP';
     if (normalized === 'poison resistance' || normalized === 'poisonresistance') return 'PoisonResistance';
+    if (normalized === 'remove curse' || normalized === 'cure curse' || normalized === 'cures curse') return 'RemoveCurse';
     if (normalized === 'magic power') return 'Magic';
     if (normalized === 'range of view' || normalized === 'range of sight' || normalized === 'view range') return 'ROS';
     if (normalized === 'number of attacts per round(noa)' || normalized === 'number of attacks per round(noa)' || normalized === 'noa') return 'NOA';
@@ -11433,16 +11616,7 @@ export class Game implements OnInit {
       }
     }
     const equippedItemIds = this.equippedItemIdsByDungon()[preview.dungonId] ?? [];
-    const itemsMap = this.pcTresherItemsById();
-    let armorItemBonus = this.getEquippedItemBonusForStat(preview.dungonId, 'AC');
-    for (const itemId of equippedItemIds) {
-      const item = itemsMap.get(itemId);
-      if (!item || item.effectValue == null) continue;
-      const hasLegacyAcEffect = item.type === 'armor' || ((item.type === 'ring' || item.type === 'necklace') && item.effectOn === 'AC');
-      if (hasLegacyAcEffect && this.normalizeEffectToPcStat(item.effectToPc ?? item.effectOn ?? null) !== 'AC') {
-        armorItemBonus += item.effectValue;
-      }
-    }
+    const armorItemBonus = this.getEquippedItemBonusForStat(preview.dungonId, 'AC');
     return this.playerBaseAC() + armorCount + armorItemBonus + this.getPlayerModifierEffectBonus('AC') - this.playerBoostAttackACPenalty();
   }
 
@@ -11767,7 +11941,7 @@ export class Game implements OnInit {
       this.playerSneekRoundsRemaining.set(0);
       this.addCombatLog('Sneek cancelled — you attacked!');
     }
-    this.playClangSound();
+    this.playWeaponHitSound(bestWeapon?.weaponSoundId ?? null);
     const monsterAC = template ? this.getEffectiveMonsterAC(adjacentMonster, template) : 10;
 
     const prevCombo = this.comboTracker();
@@ -11888,7 +12062,7 @@ export class Game implements OnInit {
       this.playerSneekRoundsRemaining.set(0);
       this.addCombatLog('Sneek cancelled — you attacked!');
     }
-    this.playClangSound();
+    this.playWeaponHitSound(bestWeapon?.weaponSoundId ?? null);
     const monsterAC = template ? this.getEffectiveMonsterAC(adjacentMonster, template) : 10;
 
     const prevCombo = this.comboTracker();
@@ -11979,6 +12153,7 @@ export class Game implements OnInit {
     weaponName: string;
     weaponEffectType: string;
     weaponEffectColor: string | null;
+    weaponSoundId: number | null;
   } | null {
     const equippedItemIds = this.equippedItemIdsByDungon()[dungonId] ?? [];
     const itemsMap = this.pcTresherItemsById();
@@ -11989,6 +12164,7 @@ export class Game implements OnInit {
     let weaponName = '';
     let weaponEffectType = 'Blood';
     let weaponEffectColor: string | null = '#cc0000';
+    let weaponSoundId: number | null = null;
 
     for (const itemId of equippedItemIds) {
       const item = itemsMap.get(itemId);
@@ -12007,6 +12183,7 @@ export class Game implements OnInit {
         weaponName = item.name || '';
         weaponEffectType = item.weaponEffectType || 'Blood';
         weaponEffectColor = item.weaponEffectColor || '#cc0000';
+        weaponSoundId = item.soundId ?? null;
       }
     }
 
@@ -12021,6 +12198,7 @@ export class Game implements OnInit {
       weaponName,
       weaponEffectType,
       weaponEffectColor,
+      weaponSoundId,
     };
   }
 
@@ -12636,6 +12814,22 @@ export class Game implements OnInit {
     } catch { /* audio not supported */ }
   }
 
+  private playWeaponHitSound(soundId: number | null): void {
+    if (soundId !== null) {
+      const soundPath = this.soundPathById().get(soundId);
+      if (soundPath) {
+        this.playSoundPath(soundPath);
+        return;
+      }
+
+      const userKey = this.account.getKey();
+      if (userKey) {
+        this.loadSoundCatalog(userKey, true);
+      }
+    }
+    this.playClangSound();
+  }
+
   private playClangSound(): void {
     if (this.soundMuted()) return;
     try {
@@ -12696,6 +12890,18 @@ export class Game implements OnInit {
 
       setTimeout(() => ctx.close(), 300);
     } catch { /* audio not supported */ }
+  }
+
+  private playBiteSound(): void {
+    this.playSoundPath('/sounds/game sounds/Bite.wav');
+  }
+
+  private playClawSound(): void {
+    this.playSoundPath('/sounds/game sounds/Claw.wav');
+  }
+
+  private monsterHasRangedAttackInRange(template: Monster, dist: number): boolean {
+    return template.attacks.some((a) => (a.range ?? 1) > 1 && (a.range ?? 1) >= dist);
   }
 
   private activateTresherGuards(dungonId: number, row: number, column: number): void {
@@ -12798,7 +13004,10 @@ export class Game implements OnInit {
 
       const maxAttacks = this.getEffectiveMonsterNumberOfAttacks(monster, template);
       const isAdjacent = this.canUseAdjacentMeleeAttack(dungonId, monster.row, monster.column, playerRow, playerCol);
-      const canDetectPlayer = isAdjacent || this.isMonsterWithinRangeOfPlayer(monster, playerRow, playerCol, 5, dungonId);
+      const distToPlayer = this.chebyshevDistance(monster.row, monster.column, playerRow, playerCol);
+      const canRangedAttack = !isAdjacent && this.monsterHasRangedAttackInRange(template, distToPlayer);
+      const canDetectPlayer = isAdjacent || canRangedAttack || this.isMonsterWithinRangeOfPlayer(monster, playerRow, playerCol, 5, dungonId);
+      const canSeePlayer = this.hasLineOfSight(dungonId, monster.row, monster.column, playerRow, playerCol);
       const shouldFlee = monster.currentHp <= template.runAt && template.runAt > 0;
       const isPassive = (template.npcOnlyAttackWhenAttacked || monster.noAttackUnlessAttacked) && !monster.npcIsHostile;
 
@@ -12824,18 +13033,18 @@ export class Game implements OnInit {
         const spellAttack = this.selectMonsterSpellAttack(monster, template, dungonId, playerRow, playerCol);
         if (spellAttack !== null) {
           this.monsterCastSpellOnPlayer(monster, template, spellAttack, dungonId, playerRow, playerCol);
-        } else if (isAdjacent) {
+        } else if (isAdjacent || canRangedAttack) {
           this.monsterAttackPlayer(monster, template, dungonId, playerRow, playerCol);
-        } else if (canDetectPlayer && !monster.isStationary) {
+        } else if (canDetectPlayer && canSeePlayer && !monster.isStationary) {
           this.monsterMoveToward(monster, dungonId, playerRow, playerCol);
         } else if (monster.roam && !monster.isStationary) {
           this.monsterMoveRandom(monster, dungonId);
         } else {
           monster.remainingAE = 0;
         }
-      } else if (isAdjacent && monster.attacksUsedThisTurn < maxAttacks) {
+      } else if ((isAdjacent || canRangedAttack) && monster.attacksUsedThisTurn < maxAttacks) {
         this.monsterAttackPlayer(monster, template, dungonId, playerRow, playerCol);
-      } else if (!isAdjacent && canDetectPlayer && !monster.isStationary) {
+      } else if (!isAdjacent && canDetectPlayer && canSeePlayer && !monster.isStationary) {
         this.monsterMoveToward(monster, dungonId, playerRow, playerCol);
       } else if (monster.roam && !monster.isStationary) {
         this.monsterMoveRandom(monster, dungonId);
@@ -12994,7 +13203,20 @@ export class Game implements OnInit {
       return;
     }
 
-    const attack = template.attacks[monster.attacksUsedThisTurn - 1] ?? template.attacks[0];
+    // Pick attack randomly from those in range (each attack independent when multi-attack)
+    const distToPlayer = this.chebyshevDistance(monster.row, monster.column, playerRow, playerCol);
+    const adjacentToPlayer = distToPlayer <= 1;
+    let eligibleAttacks: MonsterAttack[];
+    if (adjacentToPlayer) {
+      // When adjacent prefer melee (range 1); fall back to all if monster is ranged-only
+      const meleePool = template.attacks.filter((a) => (a.range ?? 1) === 1);
+      eligibleAttacks = meleePool.length > 0 ? meleePool : template.attacks;
+    } else {
+      // At range, only use attacks that reach the player
+      const rangedPool = template.attacks.filter((a) => (a.range ?? 1) >= distToPlayer);
+      eligibleAttacks = rangedPool.length > 0 ? rangedPool : template.attacks;
+    }
+    const attack = eligibleAttacks[Math.floor(Math.random() * eligibleAttacks.length)] ?? template.attacks[0];
     const monsterStrength = this.getEffectiveMonsterStrength(monster, template);
     const plusToHit = (attack?.plusToHit ?? 0) + monsterStrength;
     const maxDamage = Math.max(1, (attack?.damage ?? 1) + monsterStrength);
@@ -13002,6 +13224,10 @@ export class Game implements OnInit {
 
     if (attack?.type === 'Weapon') {
       this.playClangSound();
+    } else if (attack?.type === 'Claw') {
+      this.playClawSound();
+    } else if (attack?.type === 'Bite') {
+      this.playBiteSound();
     }
 
     const coverPenalty = this.getAttackCoverPenalty(dungonId, monster.row, monster.column, playerRow, playerCol);

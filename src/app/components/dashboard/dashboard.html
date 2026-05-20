@@ -153,7 +153,7 @@
 							<div style="display:flex;gap:0.4rem;align-items:center">
 								<select formControlName="imageId">
 									<option [ngValue]="null">No Image</option>
-									@for (image of allMonsterImageOptions(); track image.id) {
+									@for (image of pcImageOptions(); track image.id) {
 										<option [ngValue]="image.id">{{ image.name }}</option>
 									}
 								</select>
@@ -206,6 +206,22 @@
 										<span class="dashboard-game-name">{{ pc.name }}</span>
 										<small class="dashboard-game-meta">{{ pc.species }} {{ pc.type }} | Lvl {{ pc.level }} | HP {{ pc.currentHP }}/{{ pc.maxHP }}</small>
 									</button>
+									@if (selectedStartPcId() === pc.id) {
+										<div class="avail-pc-card-actions">
+											<button
+												type="button"
+												class="dashboard-action-button dashboard-action-button-small"
+												[disabled]="isStartingGameId() !== null"
+												(click)="startSelectedPcGame(pc.id)"
+											>
+												@if (isStartingGameId() !== null && selectedStartPcId() === pc.id) {
+													Starting...
+												} @else {
+													Start Game
+												}
+											</button>
+										</div>
+									}
 									@if (selectedStartPcId() === pc.id && selectedPcForGameImageUrl()) {
 										<img class="avail-dungon-img" [src]="selectedPcForGameImageUrl()" alt="PC image" />
 									}
@@ -237,6 +253,22 @@
 								<span class="dashboard-game-name">{{ pc.name }}</span>
 								<small class="dashboard-game-meta">{{ pc.species }} {{ pc.type }} | Lvl {{ pc.level }} | HP {{ pc.currentHP }}/{{ pc.maxHP }}</small>
 							</button>
+							@if (selectedStartPcId() === pc.id) {
+								<div class="avail-pc-card-actions">
+									<button
+										type="button"
+										class="dashboard-action-button dashboard-action-button-small"
+										[disabled]="isStartingGameId() !== null"
+										(click)="startSelectedPcGame(pc.id)"
+									>
+										@if (isStartingGameId() !== null && selectedStartPcId() === pc.id) {
+											Starting...
+										} @else {
+											Start Game
+										}
+									</button>
+								</div>
+							}
 							@if (selectedStartPcId() === pc.id && selectedPcForGameImageUrl()) {
 								<img class="avail-dungon-img" [src]="selectedPcForGameImageUrl()" alt="PC image" />
 							}
@@ -247,23 +279,9 @@
 		</div>
 	</div>
 
-	<!-- Start / Cancel actions -->
+	<!-- Cancel action -->
 	@if (pendingStartGame()) {
 		<div class="tresher-form-actions avail-actions">
-			@if (!(pendingStartGame()!.ismaingame && mainGamePcChoice() === 'create')) {
-				<button
-					type="button"
-					class="dashboard-action-button"
-					[disabled]="!selectedStartPcId() || isStartingGameId() !== null"
-					(click)="confirmStartGame()"
-				>
-					@if (isStartingGameId() !== null) {
-						Starting...
-					} @else {
-						Start Game
-					}
-				</button>
-			}
 			<button
 				type="button"
 				class="dashboard-action-button dashboard-action-button-muted"

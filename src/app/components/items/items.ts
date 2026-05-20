@@ -50,7 +50,7 @@ export class Items implements OnInit {
     { value: 'armor', label: 'Armor' },
     { value: 'pick', label: 'Pick' },
     { value: 'ring', label: 'Ring (4 Equipped)' },
-    { value: 'necklace', label: 'Ring (1 Equipped)' },
+    { value: 'necklace', label: 'Necklace (1 Equipped)' },
     { value: 'gem', label: 'Gem' },
     { value: 'other', label: 'Other' },
   ];
@@ -159,7 +159,7 @@ export class Items implements OnInit {
 
   showRange(): boolean {
     const type = this.userItemForm.controls.type.value;
-    return type !== 'armor' && type !== 'ring' && type !== 'necklace' && type !== 'gem';
+    return type !== 'armor' && type !== 'ring' && type !== 'necklace' && type !== 'neckless' && type !== 'gem';
   }
 
   showDamage(): boolean {
@@ -169,12 +169,12 @@ export class Items implements OnInit {
 
   showEffectOn(): boolean {
     const type = this.userItemForm.controls.type.value;
-    return type === 'ring' || type === 'necklace' || type === 'other';
+    return type === 'ring' || type === 'necklace' || type === 'neckless' || type === 'other';
   }
 
   showEffectToPc(): boolean {
     const type = this.userItemForm.controls.type.value;
-    return type === 'weapon' || type === 'armor' || type === 'ring' || type === 'necklace' || type === 'other';
+    return type === 'weapon' || type === 'armor' || type === 'ring' || type === 'necklace' || type === 'neckless' || type === 'other';
   }
 
   showEquippedAs(): boolean {
@@ -183,6 +183,7 @@ export class Items implements OnInit {
 
   itemTypeLabel(type: string | null | undefined): string {
     if (!type) return 'Other';
+    if (type === 'neckless' || type === 'amulet') return 'Necklace (1 Equipped)';
     const match = this.itemTypeOptions.find((opt) => opt.value === type);
     if (match) return match.label;
     return type.charAt(0).toUpperCase() + type.slice(1);
@@ -283,10 +284,11 @@ export class Items implements OnInit {
   editItem(item: UserItemListItem): void {
     this.editingUserItemId.set(item.id);
     this.userItemSaveMessage.set(null);
+    const formType = this.normalizeItemTypeForForm(item.type);
     this.userItemForm.reset({
       name: item.name || '',
       description: item.description || '',
-      type: item.type || 'other',
+      type: formType,
       armorSlot: item.armorSlot ?? null,
       effectOn: item.effectOn ?? null,
       effectToPc: item.effectToPc ?? null,
@@ -374,8 +376,9 @@ export class Items implements OnInit {
 
   private buildPayload(): UserItemWritePayload {
     const c = this.userItemForm.controls;
-    const type = c.type.value || 'other';
-    const isAccessory = type === 'ring' || type === 'necklace';
+    const type = this.normalizeItemTypeForForm(c.type.value || 'other');
+    const payloadType: ItemType = type;
+    const isAccessory = type === 'ring' || type === 'necklace' || type === 'neckless';
     const canApplyPcEffect = type === 'weapon' || type === 'armor' || isAccessory || type === 'other';
     const supportsEffectOn = isAccessory || type === 'other';
     const supportsEffectVisuals = type === 'weapon' || type === 'other';
@@ -385,7 +388,7 @@ export class Items implements OnInit {
     return {
       name: (c.name.value || '').trim() || 'Unnamed Item',
       description: (c.description.value || '').trim(),
-      type,
+      type: payloadType,
       armorSlot: type === 'armor' || type === 'other' ? (c.armorSlot.value || null) : null,
       effectOn: supportsEffectOn ? (c.effectOn.value || null) : null,
       effectToPc: canApplyPcEffect ? (c.effectToPc.value || null) : null,
@@ -437,5 +440,24 @@ export class Items implements OnInit {
   private normalizeNullableNumber(value: number | null): number | null {
     if (value === null || typeof value !== 'number' || !Number.isFinite(value)) return null;
     return Math.trunc(value);
+  }
+
+  private normalizeItemTypeForForm(type: string | null | undefined): ItemType {
+    const normalized = (type ?? '').trim().toLowerCase();
+    if (normalized === 'neckless' || normalized === 'amulet') {
+      return 'necklace';
+    }
+    if (
+      normalized === 'weapon' ||
+      normalized === 'armor' ||
+      normalized === 'pick' ||
+      normalized === 'ring' ||
+      normalized === 'necklace' ||
+      normalized === 'gem' ||
+      normalized === 'other'
+    ) {
+      return normalized;
+    }
+    return 'other';
   }
 }

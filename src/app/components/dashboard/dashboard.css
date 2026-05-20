@@ -198,6 +198,12 @@
 	color: #c8deff;
 }
 
+.avail-pc-card-actions {
+	display: flex;
+	justify-content: flex-end;
+	padding: 0 0.7rem 0.6rem;
+}
+
 .avail-maingame-note {
 	margin-bottom: 0.2rem;
 }

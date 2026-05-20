@@ -6,7 +6,7 @@ import * as itemService from '../services/itemService';
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const ITEM_TYPES = new Set(['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'gem', 'other']);
+const ITEM_TYPES = new Set(['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'neckless', 'gem', 'other']);
 const ARMOR_SLOTS = new Set(['none', 'hand', 'shield', 'head', 'body', 'left-arm', 'right-arm', 'left-leg', 'right-leg']);
 const EFFECT_ON_OPTIONS = new Set(['HP', 'AC', 'MP', 'Mind', 'Stamina', 'Strength', 'SP', 'AE', 'NOA', 'ROS', 'Door Trap', 'To Pick', 'Placed Trap']);
 const EFFECT_TO_PC_OPTIONS = new Set(['HP', 'AC', 'Magic', 'Mind', 'Stamina', 'Strength', 'AE', 'NOA', 'ROS']);
@@ -116,12 +116,13 @@ function buildItemPayload(input: ItemWriteInput, isAdmin: boolean): UpsertItemPa
   const weaponEffectType = normalizeWeaponEffectType(input.weaponEffectType ?? input.weaponeffecttype);
   const weaponEffectColor = normalizeWeaponEffectColor(input.weaponEffectColor ?? input.weaponeffectcolor);
   const normalizedType = ITEM_TYPES.has(type) ? type : 'other';
-  const allowsPcEffect = normalizedType === 'weapon' || normalizedType === 'armor' || normalizedType === 'ring' || normalizedType === 'necklace' || normalizedType === 'other';
+  const canonicalType = normalizedType === 'neckless' ? 'necklace' : normalizedType;
+  const allowsPcEffect = canonicalType === 'weapon' || canonicalType === 'armor' || canonicalType === 'ring' || canonicalType === 'necklace' || canonicalType === 'other';
 
   return {
     name: normalizeText(input.name, 'Unnamed Item'),
     description: normalizeText(input.description, ''),
-    type: normalizedType,
+    type: canonicalType,
     range: String(normalizeNumber(input.range, 0)),
     value: Math.max(0, normalizeNumber(input.value, 0)),
     weight: Math.max(0, normalizeNumber(input.weight, 0)),
@@ -132,8 +133,8 @@ function buildItemPayload(input: ItemWriteInput, isAdmin: boolean): UpsertItemPa
     effectOn: EFFECT_ON_OPTIONS.has(rawEffectOn) ? rawEffectOn : null,
     effectToPc: allowsPcEffect ? effectToPc : null,
     effectToPcValue: allowsPcEffect ? effectToPcValue : 0,
-    weaponEffectType: normalizedType === 'weapon' ? weaponEffectType : 'Blood',
-    weaponEffectColor: normalizedType === 'weapon' ? weaponEffectColor : '#cc0000',
+    weaponEffectType: canonicalType === 'weapon' ? weaponEffectType : 'Blood',
+    weaponEffectColor: canonicalType === 'weapon' ? weaponEffectColor : '#cc0000',
     imageId: normalizeNullableInt(input.imageId ?? input.imageid),
     soundId: normalizeNullableInt(input.soundId ?? input.soundid),
     isPublic: isAdmin ? input.isPublic === true || input.ispublic === true : false,

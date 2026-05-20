@@ -82,7 +82,7 @@ export const getDungonsByUserKey = async (
     `SELECT id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid
      FROM dungons
      WHERE userkey = $1
-     ORDER BY id DESC`,
+     ORDER BY LOWER(name) ASC, id ASC`,
     [userkey]
   );
 
@@ -109,7 +109,7 @@ export const getPublishedDungons = async (
                AND df.isactivefriend = TRUE
            )
          )
-       ORDER BY d.id DESC`,
+       ORDER BY LOWER(d.name) ASC, d.id ASC`,
       [userkey]
     );
 
@@ -121,7 +121,7 @@ export const getPublishedDungons = async (
      FROM dungons d
      LEFT JOIN images i ON i.id = d.imageid
      WHERE d.status = 'published' AND d.ispublic = TRUE
-     ORDER BY d.id DESC`
+      ORDER BY LOWER(d.name) ASC, d.id ASC`
   );
 
   return rows;
@@ -346,7 +346,7 @@ export const getGamesForUser = async (
        createdat::text AS createdat
      FROM games
      WHERE userkey = $1
-     ORDER BY lastupdated DESC`,
+     ORDER BY LOWER(name) ASC, id ASC`,
     [userkey]
   );
 
@@ -567,7 +567,7 @@ export const getAllPublishedDungonsForAdmin = async (): Promise<{ id: number; na
     `SELECT id, name, issample
      FROM dungons
      WHERE status = 'published'
-     ORDER BY id DESC`
+     ORDER BY LOWER(name) ASC, id ASC`
   );
   return rows;
 };

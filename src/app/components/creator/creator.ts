@@ -264,6 +264,7 @@ export class Creator implements OnInit {
   get isMoveMode() { return this.placementService.isMoveMode; }
   readonly hasUnsavedDungonJson = signal(false);
   readonly isSavingDungonJson = signal(false);
+  private pendingDungonJsonSave = signal(false);
   readonly isGenerateDialogVisible = signal(false);
   readonly isGeneratingDungon = signal(false);
   readonly isGenerateAnchorPickMode = signal(false);
@@ -326,6 +327,7 @@ export class Creator implements OnInit {
   readonly editingMonsterKeyIds = signal<number[]>([]);
   readonly editingMonsterImageId = signal<number | null>(null);
   readonly editingMonsterSoundId = signal<number | null>(null);
+  readonly editingMonsterNumberOfAttacks = signal<number>(1);
   readonly editingMonsterTresherIds = signal<number[]>([]);
   readonly editingMonsterAttacks = signal<MonsterAttack[]>([]);
   readonly monsterDialogImages = signal<{ id: number; name: string; path: string }[]>([]);
@@ -752,7 +754,6 @@ export class Creator implements OnInit {
     movementEconomy: new FormControl<number>(0, { nonNullable: true }),
     ac: new FormControl<number>(10, { nonNullable: true }),
     runAt: new FormControl<number>(0, { nonNullable: true }),
-    numberOfAttacks: new FormControl<number>(1, { nonNullable: true }),
     spReward: new FormControl<number>(0, {
       nonNullable: true,
       validators: [Validators.min(0)],
@@ -1017,7 +1018,6 @@ export class Creator implements OnInit {
       movementEconomy: 0,
       ac: 10,
       runAt: 0,
-      numberOfAttacks: 1,
     });
     this.createDungonForm.reset({
       name: '',
@@ -3730,6 +3730,7 @@ export class Creator implements OnInit {
     this.isMonsterDialogVisible.set(false);
     this.isPlaceTresherDialogVisible.set(false);
     this.loadMonsterLibrary();
+    this.itemService.loadItems(this.account.getKey()!);
     this.isPlaceMonsterDialogVisible.set(true);
   }
 
@@ -3765,6 +3766,7 @@ export class Creator implements OnInit {
       ),
     }));
     this.markDungonJsonChanged();
+    this.saveDungonJson();
     this.drawGridCanvas();
     this.drawPreviewGridCanvas();
     this.closePlaceMonsterDialog();
@@ -4069,11 +4071,8 @@ export class Creator implements OnInit {
       ac: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.ac), 10)),
       runAt: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.runAt), 0)),
       numberOfAttacks: Math.max(
-        0,
-        Math.max(
-          this.normalizeNumber(this.toFiniteNumber(libraryMonster.numberOfAttacks), attacks.length),
-          attacks.length
-        )
+        1,
+        this.normalizeNumber(this.toFiniteNumber(libraryMonster.numberOfAttacks), 1)
       ),
       attacks,
       magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.magic), 0)),
@@ -4213,7 +4212,7 @@ export class Creator implements OnInit {
       ),
       ac: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.ac.value), 10)),
       runAt: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.runAt.value), 0)),
-      numberOfAttacks: editingAttacks.length,
+      numberOfAttacks: Math.max(1, this.normalizeNumber(this.toFiniteNumber(this.editingMonsterNumberOfAttacks()), 1)),
       attacks: editingAttacks,
       magic: 0,
       magicResistance: 0,
@@ -4249,6 +4248,7 @@ export class Creator implements OnInit {
     }
 
     this.markDungonJsonChanged();
+    this.saveDungonJson();
     this.beginCreateMonster(false);
   }
 
@@ -4260,6 +4260,7 @@ export class Creator implements OnInit {
     this.editingMonsterKeyIds.set([]);
     this.editingMonsterImageId.set(null);
     this.editingMonsterSoundId.set(null);
+    this.editingMonsterNumberOfAttacks.set(1);
     this.editingMonsterTresherIds.set([]);
     this.editingMonsterAttacks.set([]);
 
@@ -4271,7 +4272,6 @@ export class Creator implements OnInit {
       movementEconomy: 0,
       ac: 10,
       runAt: 0,
-      numberOfAttacks: 1,
       toHitPlusNeeded: 0,
     });
   }
@@ -4293,6 +4293,7 @@ export class Creator implements OnInit {
     this.editingMonsterKeyIds.set(this.normalizeIdList(selectedMonster.keyIds));
     this.editingMonsterImageId.set(this.normalizeNullableNumber(this.toFiniteNumber(selectedMonster.imageId)));
     this.editingMonsterSoundId.set(this.normalizeNullableNumber(this.toFiniteNumber(selectedMonster.soundId)));
+    this.editingMonsterNumberOfAttacks.set(Math.max(1, this.normalizeNumber(this.toFiniteNumber(selectedMonster.numberOfAttacks), 1)));
     this.editingMonsterTresherIds.set(this.normalizeIdList(selectedMonster.tresherIds));
     this.editingMonsterAttacks.set(this.normalizeMonsterAttacks(selectedMonster.attacks));
     this.monsterForm.reset({
@@ -4303,7 +4304,6 @@ export class Creator implements OnInit {
       movementEconomy: selectedMonster.movementEconomy,
       ac: selectedMonster.ac,
       runAt: selectedMonster.runAt,
-      numberOfAttacks: selectedMonster.numberOfAttacks,
       toHitPlusNeeded: selectedMonster.toHitPlusNeeded ?? 0,
     });
   }
@@ -4395,6 +4395,10 @@ export class Creator implements OnInit {
     this.editingMonsterSoundId.set(value ? (parseInt(value, 10) || null) : null);
   }
 
+  setMonsterNumberOfAttacks(value: string): void {
+    this.editingMonsterNumberOfAttacks.set(Math.max(1, parseInt(value, 10) || 1));
+  }
+
   selectedMonsterDialogSoundUrl(): string {
     const soundId = this.editingMonsterSoundId();
     if (soundId === null) return '';
@@ -4432,7 +4436,7 @@ export class Creator implements OnInit {
   addMonsterAttack(): void {
     this.editingMonsterAttacks.update((attacks) => [
       ...attacks,
-      { type: 'Bite', description: '', damage: 0, plusToHit: 0, weaponItemId: null, spellId: null, curseId: null },
+      { type: 'Bite', description: '', damage: 0, plusToHit: 0, range: 1, weaponItemId: null, spellId: null, curseId: null },
     ]);
   }
 
@@ -4457,6 +4461,13 @@ export class Creator implements OnInit {
     const plusToHit = parseInt(value, 10) || 0;
     this.editingMonsterAttacks.update((attacks) =>
       attacks.map((a, i) => i === idx ? { ...a, plusToHit } : a)
+    );
+  }
+
+  setMonsterAttackRange(idx: number, value: string): void {
+    const range = Math.max(1, parseInt(value, 10) || 1);
+    this.editingMonsterAttacks.update((attacks) =>
+      attacks.map((a, i) => i === idx ? { ...a, range } : a)
     );
   }
 
@@ -5373,6 +5384,7 @@ export class Creator implements OnInit {
 
   saveDungonJson(): void {
     if (this.isSavingDungonJson()) {
+      this.pendingDungonJsonSave.set(true);
       return;
     }
 
@@ -5399,7 +5411,13 @@ export class Creator implements OnInit {
           dungonJson: payload,
         }
       )
-      .pipe(finalize(() => this.isSavingDungonJson.set(false)))
+      .pipe(finalize(() => {
+        this.isSavingDungonJson.set(false);
+        if (this.pendingDungonJsonSave()) {
+          this.pendingDungonJsonSave.set(false);
+          this.saveDungonJson();
+        }
+      }))
       .subscribe({
         next: (response) => {
           if (response.result !== 1) {
@@ -7600,13 +7618,10 @@ export class Creator implements OnInit {
 
     const attacks = this.normalizeMonsterAttacks(source.attacks);
     const numberOfAttacks = Math.max(
-      0,
-      Math.max(
-        this.normalizeNumber(
-          this.toFiniteNumber(
-            source.numberOfAttacks ?? source.numberofattacks ?? source.nuberOfAttacks
-          ),
-          attacks.length
+      1,
+      this.normalizeNumber(
+        this.toFiniteNumber(
+          source.numberOfAttacks ?? source.numberofattacks ?? source.nuberOfAttacks
         ),
         attacks.length
       )
@@ -7676,6 +7691,7 @@ export class Creator implements OnInit {
             : '',
       damage: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.damage), 0)),
       plusToHit: this.normalizeNumber(this.toFiniteNumber(source.plusToHit ?? source.plushToHit), 0),
+      range: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source.range), 1)),
       weaponItemId: this.normalizeNullableNumber(this.toFiniteNumber(source.weaponItemId)),
       spellId: this.normalizeNullableNumber(this.toFiniteNumber(source.spellId)),
       curseId: this.normalizeNullableNumber(this.toFiniteNumber(source.curseId)),

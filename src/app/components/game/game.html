@@ -835,11 +835,11 @@
 											@if (item.type === 'weapon' && item.damage > 0) {
 												<span class="tresher-item-stat">Dmg: 1–{{ item.damage }} | Range: {{ item.range }}</span>
 											}
-											@if ((item.type === 'armor' || item.type === 'ring' || item.type === 'necklace') && item.effectValue) {
-												<span class="tresher-item-stat">+{{ item.effectValue }} AC</span>
+											@for (effectLine of inventoryItemEffectsForView(item); track effectLine) {
+												<span class="tresher-item-desc">{{ effectLine }}</span>
 											}
 											<div class="inventory-item-actions">
-												@if (isItemEquipable(item.type)) {
+												@if (isItemEquipable(item.type, item.name)) {
 													<button
 														type="button"
 														class="action-button"
@@ -983,11 +983,11 @@
 									@if (item.type === 'weapon' && item.damage > 0) {
 										<span class="tresher-item-stat">Dmg: 1–{{ item.damage }} | Range: {{ item.range }}</span>
 									}
-									@if ((item.type === 'armor' || item.type === 'ring' || item.type === 'necklace') && item.effectValue) {
-										<span class="tresher-item-stat">+{{ item.effectValue }} AC</span>
+									@for (effectLine of inventoryItemEffectsForView(item); track effectLine) {
+										<span class="tresher-item-desc">{{ effectLine }}</span>
 									}
 									<div class="inventory-item-actions">
-										@if (isItemEquipable(item.type)) {
+										@if (isItemEquipable(item.type, item.name)) {
 											<button
 												type="button"
 												class="action-button"
@@ -1016,11 +1016,11 @@
 							@for (item of collectedArmorItemsForPreview(); track item.id) {
 								<li class="tresher-inner-item">
 									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
-									@if ((item.type === 'armor' || item.type === 'ring' || item.type === 'necklace') && item.effectValue) {
-										<span class="tresher-item-stat">+{{ item.effectValue }} AC</span>
+									@for (effectLine of inventoryItemEffectsForView(item); track effectLine) {
+										<span class="tresher-item-desc">{{ effectLine }}</span>
 									}
 									<div class="inventory-item-actions">
-										@if (isItemEquipable(item.type)) {
+										@if (isItemEquipable(item.type, item.name)) {
 											<button
 												type="button"
 												class="action-button"
@@ -1049,7 +1049,20 @@
 							@for (item of collectedOtherItemsForPreview(); track item.id) {
 								<li class="tresher-inner-item">
 									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+									@for (effectLine of inventoryItemEffectsForView(item); track effectLine) {
+										<span class="tresher-item-desc">{{ effectLine }}</span>
+									}
 									<div class="inventory-item-actions">
+										@if (isItemEquipable(item.type, item.name)) {
+											<button
+												type="button"
+												class="action-button"
+												[class.action-button-strong]="isItemEquippedById(item.id)"
+												(click)="toggleItemEquipped(item.id)"
+											>
+												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
+											</button>
+										}
 										<button
 											type="button"
 											class="action-button action-button-danger"

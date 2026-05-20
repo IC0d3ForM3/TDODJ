@@ -95,7 +95,7 @@ interface DBItem {
   range: number; effectValue: number; damage: number;
   armorSlot: string | null; effectOn: string | null;
   weaponEffectType: string; weaponEffectColor: string;
-  imageId: number | null; isTwoHanded: boolean;
+  imageId: number | null; soundId: number | null; isTwoHanded: boolean;
 }
 interface DBPotion { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number; }
 interface DBSpell { id: number; name: string; description: string; range: number; effectOn: string; effectAmount: number; successTestValue: number; sp: number; lastFor: number; numberOfTargets: number; magicCost: number; }
@@ -686,7 +686,7 @@ export function buildDungonPayload(layout: Layout, blueprint: AIBlueprint, monst
       const dbI = itemDbMap.get(itemId); if (!dbI) continue;
         const r = room.rowStart, c = room.colStart + Math.min(offset, room.colEnd - room.colStart);
       itemPlacements.push({ itemId, row: r, column: c });
-      if (!seenItemIds.has(itemId)) { seenItemIds.add(itemId); floorItemList.push({ id: dbI.id, name: dbI.name, description: dbI.description, type: dbI.type, imageId: dbI.imageId, effectValue: dbI.effectValue, damage: dbI.damage, range: dbI.range, armorSlot: dbI.armorSlot, effectOn: dbI.effectOn, weaponEffectType: dbI.weaponEffectType, weaponEffectColor: dbI.weaponEffectColor, isTwoHanded: dbI.isTwoHanded }); }
+      if (!seenItemIds.has(itemId)) { seenItemIds.add(itemId); floorItemList.push({ id: dbI.id, name: dbI.name, description: dbI.description, type: dbI.type, imageId: dbI.imageId, soundId: dbI.soundId ?? null, effectValue: dbI.effectValue, damage: dbI.damage, range: dbI.range, armorSlot: dbI.armorSlot, effectOn: dbI.effectOn, weaponEffectType: dbI.weaponEffectType, weaponEffectColor: dbI.weaponEffectColor, isTwoHanded: dbI.isTwoHanded }); }
       offset++;
     }
     offset = 0;
@@ -1630,6 +1630,7 @@ function buildManualFilledDungonPayload(
       description: item.description,
       type: item.type,
       imageId: item.imageId,
+      soundId: item.soundId ?? null,
       effectValue: item.effectValue,
       damage: item.damage,
       range: item.range,
