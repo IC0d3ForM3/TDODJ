@@ -95,7 +95,7 @@ interface DBItem {
   range: number; effectValue: number; damage: number;
   armorSlot: string | null; effectOn: string | null;
   weaponEffectType: string; weaponEffectColor: string;
-  imageId: number | null; soundId: number | null; isTwoHanded: boolean;
+  imageId: number | null; soundId: number | null; isTwoHanded: boolean; uses: number | null;
 }
 interface DBPotion { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number; }
 interface DBSpell { id: number; name: string; description: string; range: number; effectOn: string; effectAmount: number; successTestValue: number; sp: number; lastFor: number; numberOfTargets: number; magicCost: number; }
@@ -267,7 +267,7 @@ async function fetchPublicItems(): Promise<DBItem[]> {
       armorslot AS "armorSlot", effecton AS "effectOn",
       COALESCE(weaponeffecttype, 'Blood') AS "weaponEffectType",
       COALESCE(weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
-      imageid AS "imageId", COALESCE(istwohanded, false) AS "isTwoHanded"
+      imageid AS "imageId", COALESCE(istwohanded, false) AS "isTwoHanded", uses
     FROM items WHERE ispublic = true ORDER BY LOWER(name) LIMIT 30
   `);
   return rows;
@@ -686,7 +686,7 @@ export function buildDungonPayload(layout: Layout, blueprint: AIBlueprint, monst
       const dbI = itemDbMap.get(itemId); if (!dbI) continue;
         const r = room.rowStart, c = room.colStart + Math.min(offset, room.colEnd - room.colStart);
       itemPlacements.push({ itemId, row: r, column: c });
-      if (!seenItemIds.has(itemId)) { seenItemIds.add(itemId); floorItemList.push({ id: dbI.id, name: dbI.name, description: dbI.description, type: dbI.type, imageId: dbI.imageId, soundId: dbI.soundId ?? null, effectValue: dbI.effectValue, damage: dbI.damage, range: dbI.range, armorSlot: dbI.armorSlot, effectOn: dbI.effectOn, weaponEffectType: dbI.weaponEffectType, weaponEffectColor: dbI.weaponEffectColor, isTwoHanded: dbI.isTwoHanded }); }
+      if (!seenItemIds.has(itemId)) { seenItemIds.add(itemId); floorItemList.push({ id: dbI.id, name: dbI.name, description: dbI.description, type: dbI.type, imageId: dbI.imageId, soundId: dbI.soundId ?? null, effectValue: dbI.effectValue, damage: dbI.damage, range: dbI.range, armorSlot: dbI.armorSlot, effectOn: dbI.effectOn, weaponEffectType: dbI.weaponEffectType, weaponEffectColor: dbI.weaponEffectColor, isTwoHanded: dbI.isTwoHanded, uses: dbI.uses ?? null }); }
       offset++;
     }
     offset = 0;
@@ -1639,6 +1639,7 @@ function buildManualFilledDungonPayload(
       weaponEffectType: item.weaponEffectType,
       weaponEffectColor: item.weaponEffectColor,
       isTwoHanded: item.isTwoHanded,
+      uses: item.uses ?? null,
     }));
 
   return {

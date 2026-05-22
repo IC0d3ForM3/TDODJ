@@ -54,6 +54,7 @@ export type PcTresherItemData = {
   weaponEffectType?: string;
   weaponEffectColor?: string;
   isTwoHanded: boolean;
+  uses?: number | null;
 };
 
 /** Item as stored in floor/collected item signals — effectValue is always a number. */
@@ -74,6 +75,7 @@ export type FloorItemData = {
   weaponEffectType?: string;
   weaponEffectColor?: string;
   isTwoHanded: boolean;
+  uses?: number | null;
 };
 
 type PcTresherPotionData = {

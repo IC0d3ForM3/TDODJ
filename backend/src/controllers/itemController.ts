@@ -49,6 +49,7 @@ interface ItemWriteInput {
   ispublic?: unknown;
   isTwoHanded?: unknown;
   istwohanded?: unknown;
+  uses?: unknown;
 }
 
 function normalizeText(value: unknown, fallback: string): string {
@@ -139,6 +140,7 @@ function buildItemPayload(input: ItemWriteInput, isAdmin: boolean): UpsertItemPa
     soundId: normalizeNullableInt(input.soundId ?? input.soundid),
     isPublic: isAdmin ? input.isPublic === true || input.ispublic === true : false,
     isTwoHanded: input.isTwoHanded === true || input.istwohanded === true,
+    uses: normalizeNullableInt(input.uses),
   };
 }
 
@@ -213,5 +215,27 @@ export const updateItem = async (req: Request, res: Response) => {
     return res.json({ result: 1, item });
   } catch {
     return res.status(500).json({ result: 0, error: 'Failed to update item' });
+  }
+};
+
+export const deleteItem = async (req: Request, res: Response) => {
+  const id = parseInt(req.params['id'] ?? '', 10);
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({ result: 0, error: 'Valid item id is required' });
+  }
+
+  const userkey = req.query['userkey'];
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: 0, error: 'Valid userkey is required' });
+  }
+
+  try {
+    const deleted = await itemService.removeItemForUser(id, userkey.trim());
+    if (!deleted) {
+      return res.status(404).json({ result: 0, error: 'Item not found or access denied' });
+    }
+    return res.json({ result: 1 });
+  } catch {
+    return res.status(500).json({ result: 0, error: 'Failed to delete item' });
   }
 };

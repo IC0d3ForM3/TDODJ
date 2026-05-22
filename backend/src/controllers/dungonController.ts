@@ -539,6 +539,7 @@ export const getGameById = async (req: Request, res: Response) => {
               effectOn: it.effectOn ?? null,
               effectToPc: it.effectToPc ?? null,
               effectToPcValue: it.effectToPcValue ?? 0,
+              uses: it.uses ?? null,
             }));
           }
 
@@ -1001,6 +1002,7 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
           effectOn: it.effectOn ?? null,
           effectToPc: it.effectToPc ?? null,
           effectToPcValue: it.effectToPcValue ?? 0,
+          uses: it.uses ?? null,
         }));
       }
 

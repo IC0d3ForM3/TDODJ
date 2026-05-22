@@ -34,7 +34,10 @@
 									<small class="it-item-meta">ID {{ item.id }} | {{ itemTypeLabel(item.type) }}{{ item.armorSlot ? ' · ' + item.armorSlot : '' }}{{ item.effectOn ? ' · ' + item.effectOn : '' }}{{ item.effectToPc ? ' | To PC ' + item.effectToPc + ' ' + item.effectToPcValue : '' }}{{ item.type === 'weapon' || item.type === 'other' ? ' | FX ' + item.weaponEffectType : '' }}{{ item.effectValue ? ' | Eff ' + item.effectValue : '' }}{{ item.value ? ' | Val ' + item.value : '' }}{{ curseNameForItem(item.curseId) ? ' | Curse: ' + curseNameForItem(item.curseId) : '' }}</small>
 									@if (item.description) { <small class="it-item-desc">{{ item.description }}</small> }
 								</div>
-								<button type="button" class="it-edit-btn" (click)="editItem(item)">Edit</button>
+								<div class="it-item-actions">
+									<button type="button" class="it-edit-btn" (click)="editItem(item)">Edit</button>
+									<button type="button" class="it-delete-btn" [disabled]="isDeletingUserItem()" (click)="deleteItem(item)">Delete</button>
+								</div>
 							</li>
 						}
 					</ul>
@@ -53,10 +56,11 @@
 					@if (userItemForm.controls.type.value === 'weapon') {
 						<label class="it-field"><span>Damage (to target)</span>
 							<select formControlName="damage">
-								<option [ngValue]="6">d12/6 - 1d2</option>
-								<option [ngValue]="4">d12/4 - 1d3</option>
-								<option [ngValue]="3">d12/3 - 1d4</option>
-								<option [ngValue]="2">d12/2 - 1d6</option>
+								<option [ngValue]="4">d4 (1–4)</option>
+								<option [ngValue]="6">d6 (1–6)</option>
+								<option [ngValue]="8">d8 (1–8)</option>
+								<option [ngValue]="10">d10 (1–10)</option>
+								<option [ngValue]="12">d12 (1–12)</option>
 							</select>
 						</label>
 						<label class="it-field"><span>Range (squares)</span><input type="number" formControlName="range" min="0" /></label>
@@ -117,10 +121,11 @@
 						<label class="it-field"><span>Range</span><input type="number" formControlName="range" min="0" /></label>
 						<label class="it-field"><span>Damage</span>
 							<select formControlName="damage">
-								<option [ngValue]="6">d12/6 - 1d2</option>
-								<option [ngValue]="4">d12/4 - 1d3</option>
-								<option [ngValue]="3">d12/3 - 1d4</option>
-								<option [ngValue]="2">d12/2 - 1d6</option>
+								<option [ngValue]="4">d4 (1–4)</option>
+								<option [ngValue]="6">d6 (1–6)</option>
+								<option [ngValue]="8">d8 (1–8)</option>
+								<option [ngValue]="10">d10 (1–10)</option>
+								<option [ngValue]="12">d12 (1–12)</option>
 							</select>
 						</label>
 						<div class="it-row-break"></div>
@@ -150,6 +155,7 @@
 						<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
 					}
 
+					<label class="it-field"><span>Uses (blank = unlimited)</span><input type="number" formControlName="uses" min="1" placeholder="Unlimited" /></label>
 					<label class="it-field it-field-wide"><span>Curse</span>
 						<select formControlName="curseId"><option [ngValue]="null">No Curse</option>@for (curse of curseOptions(); track curse.id) { <option [ngValue]="curse.id">{{ curse.name }}</option> }</select>
 					</label>

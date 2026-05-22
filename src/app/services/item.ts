@@ -27,6 +27,7 @@ export interface UserItemListItem {
   soundId: number | null;
   isPublic: boolean;
   isTwoHanded: boolean;
+  uses: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,6 +52,7 @@ export interface UserItemWritePayload {
   soundId: number | null;
   isPublic: boolean;
   isTwoHanded: boolean;
+  uses: number | null;
 }
 
 export interface ItemResponse {
@@ -88,5 +90,9 @@ export class ItemService {
 
   updateItem(id: number, userkey: string, item: UserItemWritePayload): Observable<ItemResponse> {
     return this.http.put<ItemResponse>(`${API_BASE_URL}/items/${id}`, { userkey, item });
+  }
+
+  deleteItem(id: number, userkey: string): Observable<ItemResponse> {
+    return this.http.delete<ItemResponse>(`${API_BASE_URL}/items/${id}`, { params: { userkey } });
   }
 }

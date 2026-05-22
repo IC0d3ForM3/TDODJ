@@ -116,6 +116,7 @@ export class Items implements OnInit {
 
   readonly isItemSectionVisible = signal(true);
   readonly isSavingUserItem = signal(false);
+  readonly isDeletingUserItem = signal(false);
   readonly editingUserItemId = signal<number | null>(null);
   readonly userItemSaveMessage = signal<string | null>(null);
   readonly filterQuery = signal('');
@@ -148,6 +149,7 @@ export class Items implements OnInit {
     soundId: new FormControl<number | null>(null),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
     isTwoHanded: new FormControl<boolean>(false, { nonNullable: true }),
+    uses: new FormControl<number | null>(null),
   });
 
   effectValueLabel(): string {
@@ -310,11 +312,34 @@ export class Items implements OnInit {
       soundId: this.normalizeNullableNumber(item.soundId),
       isPublic: item.isPublic,
       isTwoHanded: item.isTwoHanded,
+      uses: this.normalizeNullableNumber(item.uses),
     });
   }
 
   cancelEdit(): void {
     this.beginCreate();
+  }
+
+  deleteItem(item: UserItemListItem): void {
+    if (!confirm(`Delete "${item.name}"? This cannot be undone.`)) return;
+    const userkey = this.account.getKey();
+    if (!userkey) { this.userItemSaveMessage.set('Please log in.'); return; }
+    this.isDeletingUserItem.set(true);
+    this.userItemSaveMessage.set(null);
+    this.itemService.deleteItem(item.id, userkey)
+      .pipe(finalize(() => this.isDeletingUserItem.set(false)))
+      .subscribe({
+        next: (response) => {
+          if (response.result !== 1) {
+            this.userItemSaveMessage.set(response.error || 'Failed to delete item.');
+            return;
+          }
+          if (this.editingUserItemId() === item.id) this.beginCreate(false);
+          this.itemService.loadItems(userkey);
+          this.userItemSaveMessage.set('Item deleted.');
+        },
+        error: () => this.userItemSaveMessage.set('Failed to delete item.'),
+      });
   }
 
   save(): void {
@@ -410,6 +435,7 @@ export class Items implements OnInit {
       soundId: this.normalizeNullableNumber(c.soundId.value),
       isPublic: this.isAdminUser() ? c.isPublic.value === true : false,
       isTwoHanded: type === 'weapon' ? c.isTwoHanded.value === true : false,
+      uses: this.normalizeNullableNumber(c.uses.value),
     };
   }
 
@@ -434,6 +460,7 @@ export class Items implements OnInit {
       soundId: null,
       isPublic: false,
       isTwoHanded: false,
+      uses: null,
     });
   }
 

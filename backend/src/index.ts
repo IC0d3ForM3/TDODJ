@@ -100,6 +100,7 @@ app.put('/curses/:id', curseController.updateCurse);
 app.get('/items', itemController.getItems);
 app.post('/items', itemController.createItem);
 app.put('/items/:id', itemController.updateItem);
+app.delete('/items/:id', itemController.deleteItem);
 app.get('/sounds', soundController.getSounds);
 app.post('/sounds', soundController.uploadSoundMiddleware, soundController.createSound);
 app.put('/sounds/:id', soundController.updateSound);

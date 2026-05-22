@@ -1053,6 +1053,16 @@
 										<span class="tresher-item-desc">{{ effectLine }}</span>
 									}
 									<div class="inventory-item-actions">
+										@if (isOtherItemUsable(item)) {
+											<button
+												type="button"
+												class="action-button action-button-strong"
+												[disabled]="turnPhase() !== 'player' || playerHp() <= 0 || playerAE() < 1"
+												(click)="useCollectedOtherItem(item.id)"
+											>
+												Use ({{ item.uses }})
+											</button>
+										}
 										@if (isItemEquipable(item.type, item.name)) {
 											<button
 												type="button"

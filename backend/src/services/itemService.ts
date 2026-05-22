@@ -8,6 +8,7 @@ import {
   getAllItemsWithUsername,
   insertItemForUser,
   updateItemForUser,
+  deleteItemForUser,
 } from '../repositories/itemRepository';
 
 export const fetchItemsByUserGuid = (userguid: string): Promise<ItemRecord[]> =>
@@ -35,3 +36,8 @@ export const saveItemForUser = (
   userguid: string,
   payload: UpsertItemPayload
 ): Promise<ItemRecord | null> => updateItemForUser(id, userguid, payload);
+
+export const removeItemForUser = (
+  id: number,
+  userguid: string
+): Promise<boolean> => deleteItemForUser(id, userguid);

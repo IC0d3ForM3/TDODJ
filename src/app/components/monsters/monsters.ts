@@ -57,7 +57,12 @@ export class Monsters implements OnInit {
   readonly spellOptions = input<SpellOption[]>([]);
   readonly curseOptions = input<CurseOption[]>([]);
 
-  readonly monsterTypeOptions = ['Humanoid', 'Beast', 'Specter', 'Other'] as const;
+  readonly monsterTypeOptions = [
+    'Aberration', 'Beast', 'Celestial', 'Construct', 'Dragon',
+    'Elemental', 'Fey', 'Fiend', 'Giant', 'Humanoid',
+    'Monstrosity', 'Ooze', 'Plant', 'Specter', 'Swarm of Tiny Beasts', 'Undead',
+    'Other',
+  ] as const;
 
   readonly isSectionVisible = signal(true);
   readonly isSaving = signal(false);
@@ -162,7 +167,9 @@ export class Monsters implements OnInit {
   }
 
   mediaOptionName(name: string): string {
-    return name.replace(/^\[(Game|Uploaded)\]\s*/i, '');
+    return name
+      .replace(/^\[(Game|Uploaded)\]\s*/i, '')
+      .replace(/^monster-\d+-/i, '');
   }
 
   playSelectedSound(): void {

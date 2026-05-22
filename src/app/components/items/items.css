@@ -70,8 +70,10 @@
 
 .it-list-item {
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
   background: #fff9f4;
   border: 1px solid #f0c8a8;
   border-left: 4px solid #b84c1a;
@@ -81,10 +83,12 @@
 }
 .it-list-item:hover { box-shadow: 0 2px 8px rgba(184, 76, 26, 0.2); }
 
-.it-item-info { display: flex; flex-direction: column; gap: 0.15rem; }
+.it-item-info { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 0; }
 .it-item-name { font-weight: 700; color: #111; font-size: 0.9rem; }
-.it-item-meta { color: #555; font-size: 0.75rem; }
+.it-item-meta { color: #555; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .it-item-desc { color: #777; font-size: 0.72rem; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.it-item-actions { display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; flex-shrink: 0; }
 
 .it-edit-btn {
   align-self: flex-start;
@@ -100,6 +104,21 @@
   transition: background 0.15s, color 0.15s;
 }
 .it-edit-btn:hover { background: #b84c1a; color: #fff; }
+
+.it-delete-btn {
+  align-self: flex-start;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid #b00020;
+  color: #b00020;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.it-delete-btn:hover:not(:disabled) { background: #b00020; color: #fff; }
+.it-delete-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .it-form {
   background: rgba(90, 55, 20, 0.28);

@@ -679,7 +679,7 @@ export class Game implements OnInit {
     return this.floorSpellPlacementsByDungon()[preview.dungonId] ?? [];
   }
 
-  collectedFloorItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean }> {
+  collectedFloorItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean; uses?: number | null }> {
     const preview = this.gridPreviewContext();
     if (!preview) return [];
     return this.collectedFloorItemsByDungon()[preview.dungonId] ?? [];
@@ -763,7 +763,7 @@ export class Game implements OnInit {
     return this.collectedFloorItemsForPreview().filter((item) => this.isArmorItemType(item.type, item.name));
   }
 
-  collectedOtherItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean }> {
+  collectedOtherItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean; uses?: number | null }> {
     return this.collectedFloorItemsForPreview().filter((item) => !this.isWeaponItemType(item.type) && !this.isArmorItemType(item.type, item.name));
   }
 
@@ -2698,6 +2698,87 @@ export class Game implements OnInit {
 
     this.applyPotionEffectToPlayer(potion);
     this.consumePlayerAE(1, dungonId);
+    this.saveGameState();
+    if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
+      this.startMonsterTurns();
+    }
+  }
+
+  isOtherItemUsable(item: { type?: string; uses?: number | null }): boolean {
+    return item.type === 'other' && typeof item.uses === 'number' && item.uses > 0;
+  }
+
+  useCollectedOtherItem(itemId: number): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const { dungonId } = preview;
+
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0) {
+      this.previewActionMessage.set('Items can only be used during your turn.');
+      return;
+    }
+    if (this.playerAE() < 1) {
+      this.previewActionMessage.set('Not enough AE to use item.');
+      return;
+    }
+
+    const items = this.collectedFloorItemsByDungon()[dungonId] ?? [];
+    const item = items.find((it) => it.id === itemId);
+    if (!item) return;
+
+    const itemRange = Math.max(1, item.range ?? 1);
+    const target = this.getTargetMonster(dungonId, preview.centerRow, preview.centerColumn, itemRange);
+    if (!target) {
+      this.previewActionMessage.set(`No target in range (${itemRange}) for ${item.name || 'item'}. Click a monster to target it.`);
+      return;
+    }
+
+    // Consume one use or remove if last use
+    if (typeof item.uses === 'number') {
+      const newUses = item.uses - 1;
+      this.collectedFloorItemsByDungon.update((all) => {
+        const current = all[dungonId] ?? [];
+        const updated = newUses <= 0
+          ? current.filter((it) => it.id !== itemId)
+          : current.map((it) => it.id === itemId ? { ...it, uses: newUses } : it);
+        return { ...all, [dungonId]: updated };
+      });
+    }
+
+    // Roll to hit: d12 + effectValue (item's +toHit bonus) + player stamina
+    const itemToHit = typeof item.effectValue === 'number' ? item.effectValue : 0;
+    const hitRoll = this.rollD12(itemToHit + this.getEffectivePlayerStamina());
+    const template = this.getMonstersByIdForDungon(dungonId).get(target.monsterId);
+    const monsterAC = template ? this.getEffectiveMonsterAC(target, template) : 10;
+
+    if (hitRoll >= monsterAC) {
+      const diceSize = Math.max(4, item.damage ?? 6);
+      const damage = Math.max(1, this.randomInt(1, diceSize) + this.getEffectivePlayerStrength());
+      target.currentHp -= damage;
+      if (!target.npcIsHostile) target.npcIsHostile = true;
+      this.triggerWeaponMonsterImpact(target.row, target.column, 'Blood', '#cc0000');
+      this.addCombatLog(`You throw ${item.name || 'item'} at ${template?.name ?? 'monster'} for ${damage} dmg! (rolled ${hitRoll} vs AC ${monsterAC})`);
+      if (target.currentHp <= 0) {
+        target.isDead = true;
+        target.currentHp = 0;
+        this.addCombatLog(`${template?.name ?? 'Monster'} is dead!`);
+        this.selectedCombatTarget.set(null);
+        this.comboTracker.set(null);
+        this.dropMonsterLoot(dungonId, target, template ?? null);
+        const spGain = template?.spReward ?? 0;
+        if (spGain > 0) {
+          this.playerSp.update((s) => s + spGain);
+          this.addCombatLog(`+${spGain} SP!`);
+          this.awardSpToPC(spGain);
+        }
+      }
+      this.monsterInstances.update((arr) => [...arr]);
+    } else {
+      this.addCombatLog(`You throw ${item.name || 'item'} at ${template?.name ?? 'monster'} but miss! (rolled ${hitRoll} vs AC ${monsterAC})`);
+    }
+
+    this.consumePlayerAE(1, dungonId);
+    this.drawPreviewGridCanvas();
     this.saveGameState();
     if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
       this.startMonsterTurns();
@@ -9396,10 +9477,10 @@ export class Game implements OnInit {
     itemPlacements: ItemPlacement[];
     potionPlacements: PotionPlacement[];
     spellPlacements: SpellPlacement[];
-    floorItemList: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>;
+    floorItemList: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean; uses?: number | null }>;
     floorPotionList: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>;
     floorSpellList: PcTresherSpellData[];
-    collectedFloorItems: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>;
+    collectedFloorItems: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean; uses?: number | null }>;
     collectedFloorPotions: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>;
     collectedFloorSpells: PcTresherSpellData[];
     learnedFloorSpellIds: number[];
@@ -9734,7 +9815,7 @@ export class Game implements OnInit {
           .filter((x): x is SpellPlacement => x !== null)
       : [];
 
-    const floorItemList: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }> =
+    const floorItemList: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean; uses?: number | null }> =
       Array.isArray(source.floorItemList)
         ? source.floorItemList
             .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
@@ -9773,6 +9854,7 @@ export class Game implements OnInit {
                 weaponEffectType: typeof x['weaponEffectType'] === 'string' ? x['weaponEffectType'] : 'Blood',
                 weaponEffectColor: typeof x['weaponEffectColor'] === 'string' ? x['weaponEffectColor'] : '#cc0000',
                 isTwoHanded: x['isTwoHanded'] === true || x['istwohanded'] === true,
+                uses: typeof x['uses'] === 'number' ? x['uses'] : null,
               };
             })
             .filter((x): x is NonNullable<typeof x> => x !== null)
@@ -9801,7 +9883,7 @@ export class Game implements OnInit {
       ? source.npcTradesPurchased.filter((x): x is number => typeof x === 'number')
       : [];
 
-    const parseItemArray = (raw: unknown[]): Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }> =>
+    const parseItemArray = (raw: unknown[]): Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean; uses?: number | null }> =>
       raw
         .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
         .map((x) => {
@@ -9839,6 +9921,7 @@ export class Game implements OnInit {
             weaponEffectType: typeof x['weaponEffectType'] === 'string' ? x['weaponEffectType'] : 'Blood',
             weaponEffectColor: typeof x['weaponEffectColor'] === 'string' ? x['weaponEffectColor'] : '#cc0000',
             isTwoHanded: x['isTwoHanded'] === true || x['istwohanded'] === true,
+            uses: typeof x['uses'] === 'number' ? x['uses'] : null,
           };
         })
         .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -11918,7 +12001,7 @@ export class Game implements OnInit {
     const bestWeapon = this.getBestEquippedWeaponAttackStats(preview.dungonId);
     let bestRange = bestWeapon?.bestRange ?? 0;
     const weaponToHit = bestWeapon?.weaponToHit ?? 0;
-    const weaponDamageDivisor = bestWeapon?.weaponDamageDivisor ?? 6;
+    const weaponDiceSize = bestWeapon?.weaponDiceSize ?? 6;
     const weaponName = bestWeapon?.weaponName ?? '';
 
     const isUnarmed = bestRange === 0;
@@ -11977,7 +12060,7 @@ export class Game implements OnInit {
     if (hitRoll >= monsterAC) {
       const damage = isUnarmed
         ? Math.max(1, 1 + Math.floor(this.getEffectivePlayerStrength() / 2))
-        : Math.max(1, this.randomInt(1, Math.max(1, Math.ceil(12 / Math.max(1, weaponDamageDivisor)))) + this.getEffectivePlayerStrength());
+        : Math.max(1, this.randomInt(1, Math.max(4, weaponDiceSize)) + this.getEffectivePlayerStrength());
       adjacentMonster.currentHp -= damage;
       if (!adjacentMonster.npcIsHostile) {
         adjacentMonster.npcIsHostile = true;
@@ -12041,7 +12124,7 @@ export class Game implements OnInit {
     const bestWeapon = this.getBestEquippedWeaponAttackStats(preview.dungonId);
     let bestRange = bestWeapon?.bestRange ?? 0;
     const weaponToHit = bestWeapon?.weaponToHit ?? 0;
-    const weaponDamageDivisor = bestWeapon?.weaponDamageDivisor ?? 6;
+    const weaponDiceSize = bestWeapon?.weaponDiceSize ?? 6;
     const weaponName = bestWeapon?.weaponName ?? '';
 
     const isUnarmed = bestRange === 0;
@@ -12108,7 +12191,7 @@ export class Game implements OnInit {
     if (hitRoll >= monsterAC) {
       const damage = isUnarmed
         ? Math.max(1, 1 + Math.floor(this.getEffectivePlayerStrength() / 2))
-        : Math.max(1, this.randomInt(1, Math.max(1, Math.ceil(12 / Math.max(1, weaponDamageDivisor)))) + this.getEffectivePlayerStrength());
+        : Math.max(1, this.randomInt(1, Math.max(4, weaponDiceSize)) + this.getEffectivePlayerStrength());
       adjacentMonster.currentHp -= damage;
       // If this is an NPC that only attacks when attacked, mark it hostile now
       if (!adjacentMonster.npcIsHostile) {
@@ -12162,7 +12245,7 @@ export class Game implements OnInit {
   private getBestEquippedWeaponAttackStats(dungonId: number): {
     bestRange: number;
     weaponToHit: number;
-    weaponDamageDivisor: number;
+    weaponDiceSize: number;
     weaponName: string;
     weaponEffectType: string;
     weaponEffectColor: string | null;
@@ -12173,7 +12256,7 @@ export class Game implements OnInit {
     let hasWeapon = false;
     let bestRange = 0;
     let weaponToHit = 0;
-    let weaponDamageDivisor = 6;
+    let weaponDiceSize = 6;
     let weaponName = '';
     let weaponEffectType = 'Blood';
     let weaponEffectColor: string | null = '#cc0000';
@@ -12192,7 +12275,7 @@ export class Game implements OnInit {
 
       if (!weaponName || (item.effectValue ?? 0) > weaponToHit) {
         weaponToHit = item.effectValue ?? 0;
-        weaponDamageDivisor = item.damage > 0 ? item.damage : 6;
+        weaponDiceSize = item.damage > 0 ? item.damage : 6;
         weaponName = item.name || '';
         weaponEffectType = item.weaponEffectType || 'Blood';
         weaponEffectColor = item.weaponEffectColor || '#cc0000';
@@ -12207,7 +12290,7 @@ export class Game implements OnInit {
     return {
       bestRange,
       weaponToHit,
-      weaponDamageDivisor,
+      weaponDiceSize,
       weaponName,
       weaponEffectType,
       weaponEffectColor,

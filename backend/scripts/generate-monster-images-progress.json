@@ -1,0 +1,686 @@
+{
+  "done": [
+    21,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130,
+    131,
+    132,
+    133,
+    134,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    145,
+    146,
+    147,
+    148,
+    149,
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164,
+    165,
+    166,
+    167,
+    168,
+    169,
+    170,
+    171,
+    172,
+    173,
+    174,
+    175,
+    176,
+    177,
+    178,
+    179,
+    180,
+    181,
+    182,
+    183,
+    184,
+    185,
+    186,
+    187,
+    188,
+    189,
+    190,
+    191,
+    192,
+    193,
+    194,
+    195,
+    196,
+    197,
+    198,
+    199,
+    200,
+    201,
+    202,
+    203,
+    204,
+    205,
+    206,
+    207,
+    208,
+    209,
+    210,
+    211,
+    212,
+    213,
+    220,
+    221,
+    222,
+    223,
+    224,
+    225,
+    226,
+    227,
+    228,
+    229,
+    230,
+    231,
+    232,
+    233,
+    234,
+    235,
+    236,
+    237,
+    238,
+    239,
+    240,
+    241,
+    242,
+    243,
+    244,
+    245,
+    246,
+    247,
+    248,
+    249,
+    250,
+    251,
+    252,
+    253,
+    254,
+    255,
+    256,
+    257,
+    258,
+    259,
+    260,
+    261,
+    262,
+    263,
+    264,
+    265,
+    266,
+    267,
+    268,
+    269,
+    270,
+    271,
+    272,
+    273,
+    274,
+    275,
+    276,
+    277,
+    278,
+    279,
+    280,
+    281,
+    282,
+    283,
+    284,
+    214,
+    215,
+    216,
+    217,
+    218,
+    219,
+    285,
+    286,
+    287,
+    288,
+    289,
+    290,
+    291,
+    292,
+    293,
+    294,
+    295,
+    296,
+    297,
+    298,
+    299,
+    300,
+    301,
+    302,
+    303,
+    304,
+    305,
+    306,
+    307,
+    308,
+    309,
+    310,
+    311,
+    312,
+    313,
+    314,
+    315,
+    316,
+    317,
+    318,
+    319,
+    320,
+    321,
+    322,
+    323,
+    324,
+    325,
+    326,
+    327,
+    328,
+    329,
+    330,
+    331,
+    332,
+    333,
+    334,
+    335,
+    336,
+    337,
+    338,
+    339,
+    340,
+    341,
+    342,
+    343,
+    344,
+    345,
+    346,
+    347,
+    348,
+    349
+  ],
+  "failed": [
+    {
+      "id": 214,
+      "name": "Mastiphph",
+      "error": "fetch failed"
+    },
+    {
+      "id": 215,
+      "name": "Medusa",
+      "error": "fetch failed"
+    },
+    {
+      "id": 216,
+      "name": "Merpholk",
+      "error": "fetch failed"
+    },
+    {
+      "id": 217,
+      "name": "Merrow",
+      "error": "fetch failed"
+    },
+    {
+      "id": 218,
+      "name": "Mimic",
+      "error": "fetch failed"
+    },
+    {
+      "id": 219,
+      "name": "Minotaur",
+      "error": "fetch failed"
+    },
+    {
+      "id": 285,
+      "name": "Succubus/Incubus",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"13799a26f1b6509274bb6e687f675d01\",\"n"
+    },
+    {
+      "id": 286,
+      "name": "Swarm oph Bats",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"62ff22e40f3096a0682360394694e5c8\",\"n"
+    },
+    {
+      "id": 287,
+      "name": "Swarm oph Beetles",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"4a4c13534bd95249e9dc9215babaca38\",\"n"
+    },
+    {
+      "id": 288,
+      "name": "Swarm oph Centipedes",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"cefd170ba6ff33ae2476a1c4749e854c\",\"n"
+    },
+    {
+      "id": 289,
+      "name": "Swarm oph Insects",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"c963ed9f1b6c66b770043e23590ba902\",\"n"
+    },
+    {
+      "id": 290,
+      "name": "Swarm oph Poisonous Snakes",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"8976f9b96c4d48df37ad68befbdeae53\",\"n"
+    },
+    {
+      "id": 291,
+      "name": "Swarm oph Quippers",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"895f277531fbbc1f4d65b611aa58237c\",\"n"
+    },
+    {
+      "id": 292,
+      "name": "Swarm oph Rats",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"86e5f2dbcc9a6a4a87b3587c609a997d\",\"n"
+    },
+    {
+      "id": 293,
+      "name": "Swarm oph Ravens",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"40f876db556c6f834b7da48f3a1ae185\",\"n"
+    },
+    {
+      "id": 294,
+      "name": "Swarm oph Spiders",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"34a636cb99e89eb7d579a472bd011671\",\"n"
+    },
+    {
+      "id": 295,
+      "name": "Swarm oph Wasps",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"5c71acb4955d75f6f393b7ff84c5b4db\",\"n"
+    },
+    {
+      "id": 296,
+      "name": "Tarrasque",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"ad87aa1157c7d3c353ccee8c1a7b93fc\",\"n"
+    },
+    {
+      "id": 297,
+      "name": "Thug",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"7761249edd2b5505fc6fc54ed825380b\",\"n"
+    },
+    {
+      "id": 298,
+      "name": "Tiger",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"680ffbab187b9ccc8e5dde2aef66c3ae\",\"n"
+    },
+    {
+      "id": 299,
+      "name": "Treant",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"03b66d189fa207222530d34b814d1312\",\"n"
+    },
+    {
+      "id": 300,
+      "name": "Tribal Warrior",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"53a1322b3e03333738cf658f2c3a5f59\",\"n"
+    },
+    {
+      "id": 301,
+      "name": "Triceratops",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"9d707b94829e7ffdef34772185e310f7\",\"n"
+    },
+    {
+      "id": 302,
+      "name": "Tyrannosaurus Rex",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"c8216f6ac3cc1dcd9433b3655abac52d\",\"n"
+    },
+    {
+      "id": 303,
+      "name": "Unicorn",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"84bf419ad29dd14b609edb2d4b92d25f\",\"n"
+    },
+    {
+      "id": 304,
+      "name": "Vampire, Bat Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"1afce7e159d3b0165e708d599455ad0b\",\"n"
+    },
+    {
+      "id": 305,
+      "name": "Vampire, Mist Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"4a638e000161994c5bd78b0f668407ca\",\"n"
+    },
+    {
+      "id": 306,
+      "name": "Vampire Spawn",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"5f0efc9219fe696167f3c5cdba8009f1\",\"n"
+    },
+    {
+      "id": 307,
+      "name": "Vampire, Vampire Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"00894ff0a231e15fc4a24ad47dacb798\",\"n"
+    },
+    {
+      "id": 308,
+      "name": "Veteran",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"e06a5a96441050a89b9f1240c7a75fbd\",\"n"
+    },
+    {
+      "id": 309,
+      "name": "Violet Phungus",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"ccfff324d864f9f98253ee965854dcd6\",\"n"
+    },
+    {
+      "id": 310,
+      "name": "Vrock",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"8610ed44de2dbac41fa4b53b20f82284\",\"n"
+    },
+    {
+      "id": 311,
+      "name": "Vulture",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"9e5b8aeefdfad846d80b14546b513f0b\",\"n"
+    },
+    {
+      "id": 312,
+      "name": "Warhorse",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"f4d0a766f581681f4c428a6c532f96fd\",\"n"
+    },
+    {
+      "id": 313,
+      "name": "Warhorse Skeleton",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"49853bf69ae5bf0513980dd38b704cce\",\"n"
+    },
+    {
+      "id": 314,
+      "name": "Water Elemental",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"de0acdcce7abaaa731723b4f35e00993\",\"n"
+    },
+    {
+      "id": 315,
+      "name": "Weasel",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"1e90000a0abb15e08bf5a143888a668e\",\"n"
+    },
+    {
+      "id": 316,
+      "name": "Werebear, Bear Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"cba5fde07b3fb4c8579fc2d7b8a97cd2\",\"n"
+    },
+    {
+      "id": 317,
+      "name": "Werebear, Human Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"ef19d5e0576660f98b7f40920067ac03\",\"n"
+    },
+    {
+      "id": 318,
+      "name": "Werebear, Hybrid Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"b37b6628eea83c8a05d48e231b3c250c\",\"n"
+    },
+    {
+      "id": 319,
+      "name": "Wereboar, Boar Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"c70b9435d59c0960c5dbb82e4441bb28\",\"n"
+    },
+    {
+      "id": 320,
+      "name": "Wereboar, Human Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"9fccb9a276b98877266804427c3f7ea6\",\"n"
+    },
+    {
+      "id": 321,
+      "name": "Wereboar, Hybrid Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"155c8c8a826883545a3a83d2830efc24\",\"n"
+    },
+    {
+      "id": 322,
+      "name": "Wererat, Human Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"d69b8444cc450f4e63e827dc2e2ad69b\",\"n"
+    },
+    {
+      "id": 323,
+      "name": "Wererat, Hybrid Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"df085407128796416417e307680ea588\",\"n"
+    },
+    {
+      "id": 324,
+      "name": "Wererat, Rat Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"3a4573874de11288a6f1837ef7a4468d\",\"n"
+    },
+    {
+      "id": 325,
+      "name": "Weretiger, Human Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"178c1eaec4734f3df4f8149e0e858f32\",\"n"
+    },
+    {
+      "id": 326,
+      "name": "Weretiger, Hybrid Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"b93fb06e711bc59ed41ba35d7f37bcfc\",\"n"
+    },
+    {
+      "id": 327,
+      "name": "Weretiger, Tiger Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"f8c95aa253b9475037ae7dc087b370de\",\"n"
+    },
+    {
+      "id": 328,
+      "name": "Werewolph, Human Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"b399fa6ec242be9657e6f6446fab53d3\",\"n"
+    },
+    {
+      "id": 329,
+      "name": "Werewolph, Hybrid Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"08b0555011e0f3e02742be133093e762\",\"n"
+    },
+    {
+      "id": 330,
+      "name": "Werewolph, Wolph Phorm",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"7e0d1cce419f7648147043ef985af670\",\"n"
+    },
+    {
+      "id": 331,
+      "name": "White Dragon Wyrmling",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"962b362616d78362a53098e5a20751e6\",\"n"
+    },
+    {
+      "id": 332,
+      "name": "Wight",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"e775cd17971e39262cc5c9536063b552\",\"n"
+    },
+    {
+      "id": 333,
+      "name": "Will-o'-Wisp",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"6f925de29ba7437f6984e35e2fc9c169\",\"n"
+    },
+    {
+      "id": 334,
+      "name": "Winter Wolph",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"b1fcdf124380e97fe0315b77ee21b8e2\",\"n"
+    },
+    {
+      "id": 335,
+      "name": "Wolph",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"7337df2365373fcbb85fed3b853a5622\",\"n"
+    },
+    {
+      "id": 336,
+      "name": "Worg",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"15cd09cba69876c3d5cf961bf33f4a37\",\"n"
+    },
+    {
+      "id": 337,
+      "name": "Wraith",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"9f950f6197fe7ee397f010e8762e010b\",\"n"
+    },
+    {
+      "id": 338,
+      "name": "Wyvern",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"a049fc7f203aaa0b48303e7d69de2f32\",\"n"
+    },
+    {
+      "id": 339,
+      "name": "Xorn",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"fabff28b9224b01fb48ba0d5de6aaadd\",\"n"
+    },
+    {
+      "id": 340,
+      "name": "Young Black Dragon",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"1b7aeb44cb9478444f13c9e5919474b5\",\"n"
+    },
+    {
+      "id": 341,
+      "name": "Young Blue Dragon",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"6293f5ef2dccba74589842a76dd625a6\",\"n"
+    },
+    {
+      "id": 342,
+      "name": "Young Brass Dragon",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"b97af33bc8f3fa17d1df9fb19796f467\",\"n"
+    },
+    {
+      "id": 343,
+      "name": "Young Bronze Dragon",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"17674df13f859e5734f4a79d1e825f3e\",\"n"
+    },
+    {
+      "id": 344,
+      "name": "Young Copper Dragon",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"7748c5fd2ee2e69ee14dd1f8cc7401c7\",\"n"
+    },
+    {
+      "id": 345,
+      "name": "Young Gold Dragon",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"2e1ed8c437a1ff00b5ca80aa573b83b4\",\"n"
+    },
+    {
+      "id": 346,
+      "name": "Young Green Dragon",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"02f0b2a537667aa371bf9f3acd850ec0\",\"n"
+    },
+    {
+      "id": 347,
+      "name": "Young Red Dragon",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"8214748faa0aa3a6289ebcd3a2ccfbb7\",\"n"
+    },
+    {
+      "id": 348,
+      "name": "Young Silver Dragon",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"0b414c6659c21266347f295a68284dfa\",\"n"
+    },
+    {
+      "id": 349,
+      "name": "Young White Dragon",
+      "error": "Stability generate failed 402: {\"errors\":[\"You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again.\"],\"id\":\"7cbdac8e6b939346456473d9dfaab696\",\"n"
+    }
+  ]
+}

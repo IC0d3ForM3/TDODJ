@@ -22,6 +22,7 @@ export interface ItemRecord {
   soundId: number | null;
   isPublic: boolean;
   isTwoHanded: boolean;
+  uses: number | null;
   createdAt: string;
   updatedAt: string;
   username?: string;
@@ -47,6 +48,7 @@ export interface UpsertItemPayload {
   soundId: number | null;
   isPublic: boolean;
   isTwoHanded: boolean;
+  uses: number | null;
 }
 
 const SELECT_ITEM_FIELDS = `
@@ -71,6 +73,7 @@ const SELECT_ITEM_FIELDS = `
   soundid AS "soundId",
   ispublic AS "isPublic",
   COALESCE(istwohanded, false) AS "isTwoHanded",
+  uses,
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -118,6 +121,7 @@ export const getAllItemsWithUsername = async (): Promise<ItemRecord[]> => {
        i.imageid AS "imageId", i.soundid AS "soundId",
        i.ispublic AS "isPublic",
        COALESCE(i.istwohanded, false) AS "isTwoHanded",
+       i.uses,
        i.createdat::text AS "createdAt", i.updatedat::text AS "updatedAt",
        COALESCE(u.username, '') AS username
      FROM items i
@@ -134,8 +138,8 @@ export const insertItemForUser = async (
   const { rows } = await pool.query<ItemRecord>(
     `INSERT INTO items
        (userguid, name, description, type, range, value, weight, curseid,
-        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded, uses)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
      RETURNING ${SELECT_ITEM_FIELDS}`,
     [
       userguid,
@@ -158,6 +162,7 @@ export const insertItemForUser = async (
       payload.soundId,
       payload.isPublic,
       payload.isTwoHanded,
+      payload.uses,
     ]
   );
   return rows[0];
@@ -189,8 +194,9 @@ export const updateItemForUser = async (
          soundid = $17,
          ispublic = $18,
          istwohanded = $19,
+         uses = $20,
          updatedat = NOW()
-       WHERE id = $20 AND userguid = $21
+       WHERE id = $21 AND userguid = $22
      RETURNING ${SELECT_ITEM_FIELDS}`,
     [
       payload.name,
@@ -212,6 +218,7 @@ export const updateItemForUser = async (
       payload.soundId,
       payload.isPublic,
       payload.isTwoHanded,
+      payload.uses,
       id,
       userguid,
     ]
@@ -233,6 +240,14 @@ export const getItemsByIds = async (ids: number[]): Promise<ItemRecord[]> => {
   );
 
   return rows;
+};
+
+export const deleteItemForUser = async (id: number, userguid: string): Promise<boolean> => {
+  const { rowCount } = await pool.query(
+    'DELETE FROM items WHERE id = $1 AND userguid = $2',
+    [id, userguid]
+  );
+  return (rowCount ?? 0) > 0;
 };
 
 /** Look up public items by exact name and return their id + name. */
