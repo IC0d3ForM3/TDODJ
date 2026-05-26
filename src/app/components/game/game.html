@@ -275,6 +275,7 @@
 									[squareTexts]="previewSquareTextsForView()"
 									[monsterImagesBySquare]="previewMonsterImagesBySquareForView()"
 									[exits]="previewExitsForView()"
+									[portalPlacements]="previewPortalPlacementsForView()"
 									[floorTrapPlacements]="previewDetectedFloorTrapsForView()"
 									[itemPlacements]="previewItemPlacementsForView()"
 									[potionPlacements]="previewPotionPlacementsForView()"
@@ -286,6 +287,7 @@
 								[obstacleImagesBySquare]="previewObstacleImagesBySquareForView()"
 								[playerHp]="playerHp()"
 								[playerMaxHp]="playerMaxHpForView()"
+									[startPoint]="previewStartPointForView()"
 														></app-dungeon-first-person>
 								@if (!showYeOldMagiceShopModal() && frontFacingYeOldMagiceShop(); as frontShop) {
 									<div class="shop-front-prompt">
@@ -420,6 +422,7 @@
 								[itemPlacements]="previewItemPlacementsForView()"
 								[potionPlacements]="previewPotionPlacementsForView()"
 								[spellPlacements]="previewSpellPlacementsForView()"
+								[portalPlacements]="previewPortalPlacementsForView()"
 								(cellClicked)="onMapCellClicked($event)"
 							></app-dungeon-preview-grid>
 						</div>
@@ -565,6 +568,11 @@
 								Boost
 							</button>
 						}
+						@if (canMageRest()) {
+							<button type="button" class="action-button action-button-mage-rest" (click)="mageRest()" title="Rest — roll 1d12 per AE. Each non-Dox roll restores 1 MP. No Dox: AE restored to max. Dox: turn ends immediately.">
+								Rest ✨
+							</button>
+						}
 							@if (hasCurrencyInInventory()) {
 								<span class="currency-badge" title="Coins in inventory">
 									@if (totalInventoryCurrency().gold > 0) {<span class="currency-coin currency-gold">G:{{ totalInventoryCurrency().gold }}</span>}
@@ -644,6 +652,8 @@
 									<p class="discovery-description">
 										@if (doorInfo.door.state === 'open') {
 											This door is open.
+										} @else if (doorInfo.isOneWayBlocked) {
+											This door only opens from the other side.
 										} @else if (doorInfo.door.isLocked) {
 											This door is locked.
 											@if (doorInfo.canUnlock) {

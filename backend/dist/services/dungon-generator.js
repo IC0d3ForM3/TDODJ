@@ -162,7 +162,7 @@ async function fetchPublicItems() {
       armorslot AS "armorSlot", effecton AS "effectOn",
       COALESCE(weaponeffecttype, 'Blood') AS "weaponEffectType",
       COALESCE(weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
-      imageid AS "imageId", COALESCE(istwohanded, false) AS "isTwoHanded"
+      imageid AS "imageId", COALESCE(istwohanded, false) AS "isTwoHanded", uses
     FROM items WHERE ispublic = true ORDER BY LOWER(name) LIMIT 30
   `);
     return rows;
@@ -587,7 +587,7 @@ function buildDungonPayload(layout, blueprint, monsters, items, potions, spells)
             itemPlacements.push({ itemId, row: r, column: c });
             if (!seenItemIds.has(itemId)) {
                 seenItemIds.add(itemId);
-                floorItemList.push({ id: dbI.id, name: dbI.name, description: dbI.description, type: dbI.type, imageId: dbI.imageId, soundId: dbI.soundId ?? null, effectValue: dbI.effectValue, damage: dbI.damage, range: dbI.range, armorSlot: dbI.armorSlot, effectOn: dbI.effectOn, weaponEffectType: dbI.weaponEffectType, weaponEffectColor: dbI.weaponEffectColor, isTwoHanded: dbI.isTwoHanded });
+                floorItemList.push({ id: dbI.id, name: dbI.name, description: dbI.description, type: dbI.type, imageId: dbI.imageId, soundId: dbI.soundId ?? null, effectValue: dbI.effectValue, damage: dbI.damage, range: dbI.range, armorSlot: dbI.armorSlot, effectOn: dbI.effectOn, weaponEffectType: dbI.weaponEffectType, weaponEffectColor: dbI.weaponEffectColor, isTwoHanded: dbI.isTwoHanded, uses: dbI.uses ?? null });
             }
             offset++;
         }
@@ -1328,6 +1328,7 @@ function buildManualFilledDungonPayload(payload, params, blueprint, monsters, it
         weaponEffectType: item.weaponEffectType,
         weaponEffectColor: item.weaponEffectColor,
         isTwoHanded: item.isTwoHanded,
+        uses: item.uses ?? null,
     }));
     return {
         ...output,

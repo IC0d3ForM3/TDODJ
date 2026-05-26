@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveItemForUser = exports.createItemForUser = exports.checkUserIsAdminByGuid = exports.fetchItemsByIds = exports.fetchAllItemsWithUsername = exports.fetchItemsLibraryByUserGuid = exports.fetchItemsByUserGuid = void 0;
+exports.removeItemForUser = exports.saveItemForUser = exports.createItemForUser = exports.checkUserIsAdminByGuid = exports.fetchItemsByIds = exports.fetchAllItemsWithUsername = exports.fetchItemsLibraryByUserGuid = exports.fetchItemsByUserGuid = void 0;
 const itemRepository_1 = require("../repositories/itemRepository");
 const fetchItemsByUserGuid = (userguid) => (0, itemRepository_1.getItemsByUserGuid)(userguid);
 exports.fetchItemsByUserGuid = fetchItemsByUserGuid;
@@ -16,3 +16,5 @@ const createItemForUser = (userguid, payload) => (0, itemRepository_1.insertItem
 exports.createItemForUser = createItemForUser;
 const saveItemForUser = (id, userguid, payload) => (0, itemRepository_1.updateItemForUser)(id, userguid, payload);
 exports.saveItemForUser = saveItemForUser;
+const removeItemForUser = (id, userguid) => (0, itemRepository_1.deleteItemForUser)(id, userguid);
+exports.removeItemForUser = removeItemForUser;

@@ -3,7 +3,12 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { API_BASE_URL } from '../../api-config';
 import { Account } from '../../services/account';
-import { CurseService, UserCurseListItem, UserCurseWritePayload } from '../../services/curse';
+import {
+  CurseService,
+  UserCurseListItem,
+  UserCurseWritePayload,
+  normalizeCurseEffectTarget,
+} from '../../services/curse';
 import { UploadPopup, UploadedMediaItem } from '../upload-popup/upload-popup';
 
 interface ImageOption {
@@ -40,7 +45,7 @@ export class Curses implements OnInit {
   readonly groupedSoundOptions = computed(() => this.groupMediaOptions(this.allSoundOptions()));
 
   readonly effectToOptions = [
-    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'ROS', 'AE', 'Action Economy', '# of Attacks', 'Boost Dice',
+    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'ROS', 'AE', '# of Attacks', 'Boost Dice',
   ] as const;
 
   readonly isCurseSectionVisible = signal(true);
@@ -153,8 +158,8 @@ export class Curses implements OnInit {
     this.userCurseForm.reset({
       name: item.name || '',
       description: item.description || '',
-      effectTo: item.effectTo || 'HP',
-      effectTo2: item.effectTo2 ?? null,
+      effectTo: normalizeCurseEffectTarget(item.effectTo),
+      effectTo2: item.effectTo2 ? normalizeCurseEffectTarget(item.effectTo2) : null,
       damage: this.normalizeNumber(item.damage, 0),
       damage2: this.normalizeNumber(item.damage2, 0),
       lastFor: Math.max(0, this.normalizeNumber(item.lastFor, 0)),
@@ -233,11 +238,14 @@ export class Curses implements OnInit {
   private buildPayload(): UserCurseWritePayload {
     const c = this.userCurseForm.controls;
     const effectTo2Raw = c.effectTo2.value;
-    const effectTo2 = typeof effectTo2Raw === 'string' && effectTo2Raw.trim() ? effectTo2Raw.trim() : null;
+    const effectTo2 =
+      typeof effectTo2Raw === 'string' && effectTo2Raw.trim()
+        ? normalizeCurseEffectTarget(effectTo2Raw)
+        : null;
     return {
       name: (c.name.value || '').trim() || 'Unnamed Curse',
       description: (c.description.value || '').trim(),
-      effectTo: (c.effectTo.value || 'HP').trim(),
+      effectTo: normalizeCurseEffectTarget(c.effectTo.value || 'HP'),
       effectTo2,
       damage: this.normalizeNumber(c.damage.value, 0),
       damage2: this.normalizeNumber(c.damage2.value, 0),

@@ -253,6 +253,34 @@ export const updatePc = async (req: Request, res: Response) => {
   }
 };
 
+export const deletePc = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const { userkey } = req.body as Partial<{ userkey: string }>;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
+  }
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+
+  try {
+    const removed = await pcService.removePcForUser(id, userkey.trim());
+    if (!removed) {
+      return res.status(404).json({ result: -1, error: 'PC not found' });
+    }
+    return res.json({ result: 1 });
+  } catch (error) {
+    console.error('Error deleting pc:', error);
+    const err = error as { code?: string };
+    if (err.code === '23503') {
+      return res.status(409).json({ result: -1, error: 'Cannot delete this PC because it is used by existing game data.' });
+    }
+    return res.status(500).json({ result: -1, error: 'Failed to delete pc' });
+  }
+};
+
 const normalizePcPayload = (value: unknown): UpsertPcPayload | null => {
   if (!value || typeof value !== 'object') {
     return null;

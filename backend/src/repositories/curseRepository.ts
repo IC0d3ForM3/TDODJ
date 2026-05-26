@@ -130,6 +130,22 @@ export const getCursesByUserGuid = async (userguid: string): Promise<CurseRecord
   return rows;
 };
 
+export const getCursesByIds = async (ids: number[]): Promise<CurseRecord[]> => {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const { rows } = await pool.query<CurseRecord>(
+    `SELECT ${SELECT_CURSE_FIELDS}
+     FROM curses
+     WHERE id = ANY($1::int[])
+     ORDER BY id ASC`,
+    [ids]
+  );
+
+  return rows;
+};
+
 export const insertCurseForUser = async (
   userguid: string,
   payload: UpsertCursePayload

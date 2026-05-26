@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllPcsForAdmin = exports.upgradeStat = exports.getPcByIdPublic = exports.setIsMainGamePcInDb = exports.setSamplePcInDb = exports.getSamplePcsFromDb = exports.upgradeNod = exports.upgradeNoa = exports.updatePcForUser = exports.insertPcForUser = exports.addTresherIdToPcInDb = exports.addSpToPc = exports.getPcByIdForUser = exports.getAllPcsWithUsername = exports.getPcsByUserGuid = void 0;
+exports.getAllPcsForAdmin = exports.upgradeStat = exports.getPcByIdPublic = exports.setIsMainGamePcInDb = exports.setSamplePcInDb = exports.getSamplePcsFromDb = exports.upgradeNod = exports.upgradeNoa = exports.deletePcForUser = exports.updatePcForUser = exports.insertPcForUser = exports.addTresherIdToPcInDb = exports.addSpToPc = exports.getPcByIdForUser = exports.getAllPcsWithUsername = exports.getPcsByUserGuid = void 0;
 const db_1 = __importDefault(require("../db"));
 const getPcsByUserGuid = async (userguid) => {
     const { rows } = await db_1.default.query(`SELECT
@@ -21,7 +21,9 @@ const getPcsByUserGuid = async (userguid) => {
        mp AS "magicPower",
        mind,
        stamina,
-       COALESCE(sp, 0) AS sp,
+       COALESCE(sp_bank, 0) AS sp,
+       COALESCE(sp_lifetime, 0) AS "spLifetime",
+       COALESCE(agility, 3) AS agility,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -63,7 +65,10 @@ const getAllPcsWithUsername = async () => {
        p.maxhp AS "maxHP", p.currenthp AS "currentHP", p.ac,
        p.actioneconomy AS "actionEconomy", p.poisonresest AS "poisonResest",
        p.mp AS "magicPower", p.mind, p.stamina,
-       COALESCE(p.sp, 0) AS sp, p.level, p.strength,
+       COALESCE(p.sp_bank, 0) AS sp,
+       COALESCE(p.sp_lifetime, 0) AS "spLifetime",
+       COALESCE(p.agility, 3) AS agility,
+       p.level, p.strength,
        p.rangeofview AS "rangeOfView",
        p.primarytresherid AS "primaryTresherId",
        p.weapontresherid AS "weaponTresherId",
@@ -107,7 +112,9 @@ const getPcByIdForUser = async (id, userguid) => {
        mp AS "magicPower",
        mind,
        stamina,
-       COALESCE(sp, 0) AS sp,
+       COALESCE(sp_bank, 0) AS sp,
+       COALESCE(sp_lifetime, 0) AS "spLifetime",
+       COALESCE(agility, 3) AS agility,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -140,12 +147,14 @@ const getPcByIdForUser = async (id, userguid) => {
 };
 exports.getPcByIdForUser = getPcByIdForUser;
 const addSpToPc = async (id, userguid, amount) => {
+    const safeAmount = Math.max(0, Math.floor(amount));
     const { rows } = await db_1.default.query(`UPDATE pcs
-     SET sp = COALESCE(sp, 0) + $3,
+     SET sp_lifetime = COALESCE(sp_lifetime, 0) + $3,
+         sp_bank = COALESCE(sp_bank, 0) + $3,
          updatedat = NOW()
      WHERE id = $1 AND userguid = $2
-     RETURNING COALESCE(sp, 0) AS sp`, [id, userguid, Math.max(0, Math.floor(amount))]);
-    return rows[0]?.sp ?? null;
+     RETURNING COALESCE(sp_bank, 0) AS sp, COALESCE(sp_lifetime, 0) AS "spLifetime"`, [id, userguid, safeAmount]);
+    return rows[0] ?? null;
 };
 exports.addSpToPc = addSpToPc;
 /** Append a single tresher id to the PC's tresherids JSON array. */
@@ -192,6 +201,7 @@ const insertPcForUser = async (userguid, payload) => {
        hand1itemid,
        hand2itemid,
        numberofattacks,
+       agility,
        ismaingame,
        updatedat
      )
@@ -231,6 +241,7 @@ const insertPcForUser = async (userguid, payload) => {
        $33,
        $34,
        $35,
+       $36,
        NOW()
      )
      RETURNING
@@ -248,6 +259,9 @@ const insertPcForUser = async (userguid, payload) => {
        mp AS "magicPower",
        mind,
        stamina,
+       COALESCE(sp_bank, 0) AS sp,
+       COALESCE(sp_lifetime, 0) AS "spLifetime",
+       COALESCE(agility, 3) AS agility,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -308,6 +322,7 @@ const insertPcForUser = async (userguid, payload) => {
         payload.hand1ItemId,
         payload.hand2ItemId,
         Math.max(1, Math.floor(payload.numberOfAttacks ?? 1)),
+        Math.max(0, Math.floor(payload.agility ?? 3)),
         payload.ismaingame === true,
     ]);
     return rows[0];
@@ -349,6 +364,7 @@ const updatePcForUser = async (id, userguid, payload) => {
        hand1itemid = $33,
        hand2itemid = $34,
        numberofattacks = $35,
+       agility = $36,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING
@@ -366,6 +382,9 @@ const updatePcForUser = async (id, userguid, payload) => {
        mp AS "magicPower",
        mind,
        stamina,
+       COALESCE(sp_bank, 0) AS sp,
+       COALESCE(sp_lifetime, 0) AS "spLifetime",
+       COALESCE(agility, 3) AS agility,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -427,20 +446,26 @@ const updatePcForUser = async (id, userguid, payload) => {
         payload.hand1ItemId,
         payload.hand2ItemId,
         Math.max(1, Math.floor(payload.numberOfAttacks ?? 1)),
+        Math.max(0, Math.floor(payload.agility ?? 3)),
     ]);
     return rows[0] ?? null;
 };
 exports.updatePcForUser = updatePcForUser;
+const deletePcForUser = async (id, userguid) => {
+    const { rowCount } = await db_1.default.query('DELETE FROM pcs WHERE id = $1 AND userguid = $2', [id, userguid]);
+    return (rowCount ?? 0) > 0;
+};
+exports.deletePcForUser = deletePcForUser;
 const upgradeNoa = async (id, userguid, spCost, goldCost, tresherId) => {
     const client = await db_1.default.connect();
     try {
         await client.query('BEGIN');
         const { rows } = await client.query(`UPDATE pcs
-       SET sp = GREATEST(0, COALESCE(sp, 0) - $3),
+       SET sp_bank = GREATEST(0, COALESCE(sp_bank, 0) - $3),
            numberofattacks = COALESCE(numberofattacks, 1) + 1,
            updatedat = NOW()
-       WHERE id = $1 AND userguid = $2 AND COALESCE(sp, 0) >= $3
-       RETURNING COALESCE(sp, 0) AS sp, COALESCE(numberofattacks, 1) AS numberofattacks`, [id, userguid, spCost]);
+       WHERE id = $1 AND userguid = $2 AND COALESCE(sp_bank, 0) >= $3
+       RETURNING COALESCE(sp_bank, 0) AS sp, COALESCE(numberofattacks, 1) AS numberofattacks`, [id, userguid, spCost]);
         if (!rows[0]) {
             await client.query('ROLLBACK');
             return null;
@@ -475,11 +500,11 @@ const upgradeNod = async (id, userguid, spCost, goldCost, tresherId) => {
     try {
         await client.query('BEGIN');
         const { rows } = await client.query(`UPDATE pcs
-       SET sp = GREATEST(0, COALESCE(sp, 0) - $3),
+       SET sp_bank = GREATEST(0, COALESCE(sp_bank, 0) - $3),
            numberofdefends = COALESCE(numberofdefends, 1) + 1,
            updatedat = NOW()
-       WHERE id = $1 AND userguid = $2 AND COALESCE(sp, 0) >= $3
-       RETURNING COALESCE(sp, 0) AS sp, COALESCE(numberofdefends, 1) AS numberofdefends`, [id, userguid, spCost]);
+       WHERE id = $1 AND userguid = $2 AND COALESCE(sp_bank, 0) >= $3
+       RETURNING COALESCE(sp_bank, 0) AS sp, COALESCE(numberofdefends, 1) AS numberofdefends`, [id, userguid, spCost]);
         if (!rows[0]) {
             await client.query('ROLLBACK');
             return null;
@@ -558,7 +583,7 @@ const getPcByIdPublic = async (id) => {
        mp AS "magicPower",
        mind,
        stamina,
-       COALESCE(sp, 0) AS sp,
+      COALESCE(sp_bank, 0) AS sp,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -591,6 +616,7 @@ const STAT_COLUMN_MAP = {
     stamina: { column: 'stamina', cost: 1 },
     mind: { column: 'mind', cost: 1 },
     magicPower: { column: 'mp', cost: 1 },
+    agility: { column: 'agility', cost: 1 },
     numberOfAttacks: { column: 'numberofattacks', cost: 5 },
     numberOfDefends: { column: 'numberofdefends', cost: 5 },
 };
@@ -601,11 +627,11 @@ const upgradeStat = async (id, userguid, stat) => {
     const { column, cost } = mapping;
     // column is safe: it comes from our hardcoded whitelist, not user input.
     const { rows } = await db_1.default.query(`UPDATE pcs
-     SET sp = GREATEST(0, COALESCE(sp, 0) - $3),
+     SET sp_bank = GREATEST(0, COALESCE(sp_bank, 0) - $3),
          ${column} = COALESCE(${column}, 0) + 1,
          updatedat = NOW()
-     WHERE id = $1 AND userguid = $2 AND COALESCE(sp, 0) >= $3
-     RETURNING COALESCE(sp, 0) AS sp, COALESCE(${column}, 0) AS newvalue`, [id, userguid, cost]);
+     WHERE id = $1 AND userguid = $2 AND COALESCE(sp_bank, 0) >= $3
+     RETURNING COALESCE(sp_bank, 0) AS sp, COALESCE(${column}, 0) AS newvalue`, [id, userguid, cost]);
     if (!rows[0])
         return null;
     return { sp: rows[0].sp, newValue: rows[0].newvalue };

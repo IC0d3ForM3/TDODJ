@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tavernTurnIn = exports.fetchSamplePcById = exports.fetchAllPcsForAdmin = exports.setMainGamePc = exports.setSamplePc = exports.fetchSamplePcs = exports.savePcForUser = exports.upgradeStat = exports.createPcForUser = exports.upgradeNod = exports.upgradeNoa = exports.awardSpToPc = exports.fetchPcByIdForUser = exports.fetchAllPcsWithUsername = exports.fetchPcsByUserGuid = void 0;
+exports.tavernTurnIn = exports.fetchSamplePcById = exports.fetchAllPcsForAdmin = exports.setMainGamePc = exports.setSamplePc = exports.fetchSamplePcs = exports.removePcForUser = exports.savePcForUser = exports.upgradeStat = exports.createPcForUser = exports.upgradeNod = exports.upgradeNoa = exports.awardSpToPc = exports.fetchPcByIdForUser = exports.fetchAllPcsWithUsername = exports.fetchPcsByUserGuid = void 0;
 const pcRepository_1 = require("../repositories/pcRepository");
 const tresherRepository_1 = require("../repositories/tresherRepository");
 const tresherRepository_2 = require("../repositories/tresherRepository");
@@ -136,6 +136,10 @@ const savePcForUser = async (id, userguid, payload) => {
     return await (0, pcRepository_1.updatePcForUser)(id, userguid, payload);
 };
 exports.savePcForUser = savePcForUser;
+const removePcForUser = async (id, userguid) => {
+    return await (0, pcRepository_1.deletePcForUser)(id, userguid);
+};
+exports.removePcForUser = removePcForUser;
 const fetchSamplePcs = async () => {
     return await (0, pcRepository_1.getSamplePcsFromDb)();
 };

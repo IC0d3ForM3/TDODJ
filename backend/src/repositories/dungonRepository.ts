@@ -99,7 +99,8 @@ export const getPublishedDungons = async (
        LEFT JOIN images i ON i.id = d.imageid
        WHERE d.status = 'published'
          AND (
-           d.ispublic = TRUE
+           COALESCE(d.issample, FALSE) = TRUE
+           OR d.ispublic = TRUE
            OR d.userkey = $1
            OR EXISTS (
              SELECT 1
@@ -120,7 +121,11 @@ export const getPublishedDungons = async (
     `SELECT d.id, d.name, d.status, COALESCE(d.ismaingame, FALSE) AS ismaingame, COALESCE(d.issample, FALSE) AS issample, i.path AS "imagePath"
      FROM dungons d
      LEFT JOIN images i ON i.id = d.imageid
-     WHERE d.status = 'published' AND d.ispublic = TRUE
+     WHERE d.status = 'published'
+       AND (
+         d.ispublic = TRUE
+         OR COALESCE(d.issample, FALSE) = TRUE
+       )
       ORDER BY LOWER(d.name) ASC, d.id ASC`
   );
 

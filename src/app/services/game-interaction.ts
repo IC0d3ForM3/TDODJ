@@ -17,6 +17,7 @@ export interface NearbyDoorInfo {
   canPick: boolean;
   matchingKeyIndex: number | null;
   canPassWithItem: boolean;
+  isOneWayBlocked: boolean;
 }
 
 export interface StashItem {

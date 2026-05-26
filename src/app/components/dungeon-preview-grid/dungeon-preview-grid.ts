@@ -23,6 +23,7 @@ import {
   ItemPlacement,
   MonsterPlacement,
   ObstaclePlacement,
+  PortalPlacement,
   SpellPlacement,
   PotionPlacement,
   SquareSide,
@@ -61,6 +62,7 @@ export class DungeonPreviewGridComponent {
   readonly monsterPlacements = input<MonsterPlacement[]>([]);
   readonly keyList = input<Key[]>([]);
   readonly exits = input<DungonExit[]>([]);
+  readonly portalPlacements = input<PortalPlacement[]>([]);
   readonly startPoint = input<StartPoint | null>(null);
   readonly squareTexts = input<SquareText[]>([]);
   readonly floorTrapPlacements = input<FloorTrapPlacement[]>([]);
@@ -100,6 +102,7 @@ export class DungeonPreviewGridComponent {
       this.monsterPlacements();
       this.keyList();
       this.exits();
+      this.portalPlacements();
       this.startPoint();
       this.squareTexts();
       this.floorTrapPlacements();
@@ -324,6 +327,43 @@ export class DungeonPreviewGridComponent {
       this.drawExitMarker(context, centerX, centerY, this.cellSize * 0.48, exit.transitionType);
     }
 
+    for (const portal of this.portalPlacements()) {
+      if (portal.look !== 'magicDoor') continue;
+
+      const portalPoints: Array<{ row: number; column: number; mode: 'oneWay' | 'twoWay' }> = [];
+      if (portal.startRow !== null && portal.startColumn !== null) {
+        portalPoints.push({
+          row: portal.startRow,
+          column: portal.startColumn,
+          mode: portal.isTwoWay === false ? 'oneWay' : 'twoWay',
+        });
+      }
+      if (portal.isTwoWay !== false && portal.endRow !== null && portal.endColumn !== null) {
+        portalPoints.push({
+          row: portal.endRow,
+          column: portal.endColumn,
+          mode: 'twoWay',
+        });
+      }
+
+      for (const point of portalPoints) {
+        const portalSquareKey = this.getSquareKey(point.row, point.column);
+        if (!visibleSquareKeys.has(portalSquareKey)) continue;
+        const previewRow = point.row - preview.startRow;
+        const previewColumn = point.column - preview.startColumn;
+        if (previewRow < 0 || previewColumn < 0 || previewRow >= this.dimension || previewColumn >= this.dimension) continue;
+        const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+        const centerY = previewRow * this.cellSize + this.cellSize / 2;
+        context.fillStyle = point.mode === 'oneWay' ? '#ff3b30' : '#b56dff';
+        context.beginPath();
+        context.arc(centerX, centerY, 2.6, 0, Math.PI * 2);
+        context.fill();
+        context.strokeStyle = point.mode === 'oneWay' ? '#ffd8d5' : '#ecd8ff';
+        context.lineWidth = 0.9;
+        context.stroke();
+      }
+    }
+
     const startpoint = this.startPoint();
     if (startpoint && visibleSquareKeys.has(this.getSquareKey(startpoint.row, startpoint.col))) {
       const previewRow = startpoint.row - preview.startRow;
@@ -483,6 +523,49 @@ export class DungeonPreviewGridComponent {
     const row = preview.startRow + cellY;
     const col = preview.startColumn + cellX;
     if (cellX >= 0 && cellX < this.dimension && cellY >= 0 && cellY < this.dimension) {
+      // Log square data for debugging
+      const squareKey = this.getSquareKey(row, col);
+      const squareData = this.squares()[squareKey];
+      const isFilled = this.filledSquares()[squareKey] ?? false;
+      const monsters = this.monsterPlacements().filter(m => m.row === row && m.column === col);
+      const treshers = this.tresherPlacements().filter(t => t.row === row && t.column === col);
+      const startPoint = this.startPoint();
+      const isStartPoint = startPoint ? startPoint.row === row && startPoint.col === col : false;
+      const items = this.itemPlacements().filter(i => i.row === row && i.column === col);
+      const potions = this.potionPlacements().filter(p => p.row === row && p.column === col);
+      const spells = this.spellPlacements().filter(s => s.row === row && s.column === col);
+      const obstacles = this.obstaclePlacements().filter(o => o.row === row && o.column === col);
+      const traps = this.floorTrapPlacements().filter(t => t.row === row && t.column === col);
+      const keys = this.keyList().filter(k => k.rownId === row && k.columnId === col);
+      const portals = this.portalPlacements().filter(p =>
+        (p.startRow === row && p.startColumn === col) ||
+        (p.isTwoWay !== false && p.endRow === row && p.endColumn === col)
+      );
+      
+      const payload = {
+        row,
+        column: col,
+        squareKey,
+        isFilled,
+        squareData,
+        isStartPoint,
+        startPoint: isStartPoint ? startPoint : null,
+        monsters: monsters.length > 0 ? monsters : null,
+        treshers: treshers.length > 0 ? treshers : null,
+        items: items.length > 0 ? items : null,
+        potions: potions.length > 0 ? potions : null,
+        spells: spells.length > 0 ? spells : null,
+        obstacles: obstacles.length > 0 ? obstacles : null,
+        traps: traps.length > 0 ? traps : null,
+        keys: keys.length > 0 ? keys : null,
+        portals: portals.length > 0 ? portals : null,
+      };
+      const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+      if (isLocalhost) {
+        (window as any).__tdodjLastPreviewSquareClick = payload;
+      }
+      console.warn('[TDODJ][PreviewGrid] Square clicked', payload);
+      
       this.cellClicked.emit({ row, column: col });
     }
   }

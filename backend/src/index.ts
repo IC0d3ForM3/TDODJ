@@ -75,6 +75,7 @@ app.post('/pcs', pcController.createPc);
 app.get('/pcs/sample', pcController.getSamplePcs);
 app.get('/pcs/admin-all', pcController.getAdminPcs);
 app.put('/pcs/:id', pcController.updatePc);
+app.delete('/pcs/:id', pcController.deletePc);
 app.put('/pcs/:id/set-sample', pcController.setSamplePc);
 app.put('/pcs/:id/set-maingame', pcController.setIsMainGamePc);
 app.patch('/pcs/:id/award-sp', pcController.awardSpToPc);

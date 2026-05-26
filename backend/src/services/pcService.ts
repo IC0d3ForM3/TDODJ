@@ -10,6 +10,7 @@ import {
   getAllPcsWithUsername,
   insertPcForUser,
   updatePcForUser,
+  deletePcForUser,
   addSpToPc,
   addTresherIdToPcInDb,
   upgradeNoa as upgradeNoaInDb,
@@ -197,6 +198,13 @@ export const savePcForUser = async (
   payload: UpsertPcPayload
 ): Promise<PcRecord | null> => {
   return await updatePcForUser(id, userguid, payload);
+};
+
+export const removePcForUser = async (
+  id: number,
+  userguid: string
+): Promise<boolean> => {
+  return await deletePcForUser(id, userguid);
 };
 
 export const fetchSamplePcs = async (): Promise<SamplePcRecord[]> => {

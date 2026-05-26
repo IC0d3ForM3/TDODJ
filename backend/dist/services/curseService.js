@@ -1,9 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveCurseForUser = exports.createCurseForUser = exports.checkUserIsAdminByGuid = exports.fetchCursesByUserGuid = void 0;
+exports.saveCurseForUser = exports.createCurseForUser = exports.checkUserIsAdminByGuid = exports.fetchCursesByIds = exports.fetchCursesByUserGuid = void 0;
 const curseRepository_1 = require("../repositories/curseRepository");
 const fetchCursesByUserGuid = (userguid) => (0, curseRepository_1.getCursesByUserGuid)(userguid);
 exports.fetchCursesByUserGuid = fetchCursesByUserGuid;
+const fetchCursesByIds = (ids) => (0, curseRepository_1.getCursesByIds)(ids);
+exports.fetchCursesByIds = fetchCursesByIds;
 const checkUserIsAdminByGuid = (userguid) => (0, curseRepository_1.isAdminUserByGuid)(userguid);
 exports.checkUserIsAdminByGuid = checkUserIsAdminByGuid;
 const createCurseForUser = (userguid, payload) => (0, curseRepository_1.insertCurseForUser)(userguid, payload);

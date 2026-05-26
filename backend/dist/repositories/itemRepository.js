@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPublicItemsByNames = exports.getItemsByIds = exports.updateItemForUser = exports.insertItemForUser = exports.getAllItemsWithUsername = exports.getItemsLibraryByUserGuid = exports.getItemsByUserGuid = exports.isAdminUserByGuid = void 0;
+exports.getPublicItemsByNames = exports.deleteItemForUser = exports.getItemsByIds = exports.updateItemForUser = exports.insertItemForUser = exports.getAllItemsWithUsername = exports.getItemsLibraryByUserGuid = exports.getItemsByUserGuid = exports.isAdminUserByGuid = void 0;
 const db_1 = __importDefault(require("../db"));
 const SELECT_ITEM_FIELDS = `
   id,
@@ -27,6 +27,7 @@ const SELECT_ITEM_FIELDS = `
   soundid AS "soundId",
   ispublic AS "isPublic",
   COALESCE(istwohanded, false) AS "isTwoHanded",
+  uses,
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -63,6 +64,7 @@ const getAllItemsWithUsername = async () => {
        i.imageid AS "imageId", i.soundid AS "soundId",
        i.ispublic AS "isPublic",
        COALESCE(i.istwohanded, false) AS "isTwoHanded",
+       i.uses,
        i.createdat::text AS "createdAt", i.updatedat::text AS "updatedAt",
        COALESCE(u.username, '') AS username
      FROM items i
@@ -74,8 +76,8 @@ exports.getAllItemsWithUsername = getAllItemsWithUsername;
 const insertItemForUser = async (userguid, payload) => {
     const { rows } = await db_1.default.query(`INSERT INTO items
        (userguid, name, description, type, range, value, weight, curseid,
-        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded, uses)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
      RETURNING ${SELECT_ITEM_FIELDS}`, [
         userguid,
         payload.name,
@@ -97,6 +99,7 @@ const insertItemForUser = async (userguid, payload) => {
         payload.soundId,
         payload.isPublic,
         payload.isTwoHanded,
+        payload.uses,
     ]);
     return rows[0];
 };
@@ -122,8 +125,9 @@ const updateItemForUser = async (id, userguid, payload) => {
          soundid = $17,
          ispublic = $18,
          istwohanded = $19,
+         uses = $20,
          updatedat = NOW()
-       WHERE id = $20 AND userguid = $21
+       WHERE id = $21 AND userguid = $22
      RETURNING ${SELECT_ITEM_FIELDS}`, [
         payload.name,
         payload.description,
@@ -144,6 +148,7 @@ const updateItemForUser = async (id, userguid, payload) => {
         payload.soundId,
         payload.isPublic,
         payload.isTwoHanded,
+        payload.uses,
         id,
         userguid,
     ]);
@@ -161,6 +166,11 @@ const getItemsByIds = async (ids) => {
     return rows;
 };
 exports.getItemsByIds = getItemsByIds;
+const deleteItemForUser = async (id, userguid) => {
+    const { rowCount } = await db_1.default.query('DELETE FROM items WHERE id = $1 AND userguid = $2', [id, userguid]);
+    return (rowCount ?? 0) > 0;
+};
+exports.deleteItemForUser = deleteItemForUser;
 /** Look up public items by exact name and return their id + name. */
 const getPublicItemsByNames = async (names) => {
     if (names.length === 0)

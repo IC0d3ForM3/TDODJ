@@ -1,6 +1,6 @@
 {
   "name": "danddanny-backend",
-  "version": "0.0.2",
+  "version": "0.3.0",
   "description": "Node API for Angular frontend",
   "main": "dist/index.js",
   "scripts": {

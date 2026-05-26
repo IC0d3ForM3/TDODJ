@@ -41,10 +41,64 @@ const tresherService = __importStar(require("../services/tresherService"));
 const itemService = __importStar(require("../services/itemService"));
 const potionService = __importStar(require("../services/potionService"));
 const spellService = __importStar(require("../services/spellService"));
+const curseService = __importStar(require("../services/curseService"));
 const imageService = __importStar(require("../services/imageService"));
 const soundService = __importStar(require("../services/soundService"));
 const userRepository_1 = require("../repositories/userRepository");
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function asRecord(value) {
+    return typeof value === 'object' && value !== null ? value : {};
+}
+function collectCurseIdsFromDungeonJson(dungenJson) {
+    const ids = new Set();
+    const root = asRecord(dungenJson);
+    const readArray = (...keys) => {
+        for (const key of keys) {
+            const value = root[key];
+            if (Array.isArray(value)) {
+                return value;
+            }
+        }
+        return [];
+    };
+    const monsterList = readArray('monsterList', 'monsters');
+    for (const rawMonster of monsterList) {
+        const monster = asRecord(rawMonster);
+        const attacks = Array.isArray(monster['attacks']) ? monster['attacks'] : [];
+        for (const rawAttack of attacks) {
+            const attack = asRecord(rawAttack);
+            const curseId = attack['curseId'];
+            if (typeof curseId === 'number' && Number.isInteger(curseId) && curseId > 0) {
+                ids.add(curseId);
+            }
+        }
+    }
+    const trapList = readArray('trapList', 'traps');
+    for (const rawTrap of trapList) {
+        const trap = asRecord(rawTrap);
+        const curseId = trap['curseId'];
+        if (typeof curseId === 'number' && Number.isInteger(curseId) && curseId > 0) {
+            ids.add(curseId);
+        }
+    }
+    return ids;
+}
+async function resolveSessionCurses(curseIds) {
+    if (curseIds.size === 0) {
+        return [];
+    }
+    const rows = await curseService.fetchCursesByIds(Array.from(curseIds));
+    return rows.map((curse) => ({
+        id: curse.id,
+        name: curse.name,
+        description: curse.description,
+        effectTo: curse.effectTo,
+        effectTo2: curse.effectTo2,
+        damage: curse.damage,
+        damage2: curse.damage2,
+        lastFor: curse.lastFor,
+    }));
+}
 const getPublishedDungons = async (req, res) => {
     const userkeyQuery = req.query['userkey'];
     let userkey = null;
@@ -368,9 +422,13 @@ const getGameById = async (req, res) => {
         let pcTresherItems = [];
         let pcTresherPotions = [];
         let pcTresherSpells = [];
+        let pcTresherCurses = [];
+        const sessionCurseIds = new Set();
         let pcCurrentHP = null;
         let pcMaxHP = null;
         let pcSp = null;
+        let pcSpLifetime = null;
+        let pcAgility = 3;
         let pcMind = 0;
         let pcStamina = 0;
         let pcAc = 10;
@@ -389,6 +447,8 @@ const getGameById = async (req, res) => {
                 pcCurrentHP = pc.currentHP;
                 pcMaxHP = pc.maxHP;
                 pcSp = pc.sp;
+                pcSpLifetime = pc.spLifetime ?? null;
+                pcAgility = pc.agility ?? 3;
                 pcMind = pc.mind;
                 pcStamina = pc.stamina ?? 0;
                 pcAc = pc.ac ?? 10;
@@ -420,6 +480,12 @@ const getGameById = async (req, res) => {
                 ].filter((id) => typeof id === 'number' && id > 0)));
                 if (allPcTresherIds.length > 0) {
                     const treshers = await tresherService.fetchTreshersByIds(allPcTresherIds);
+                    for (const t of treshers) {
+                        if (typeof t.curse1Id === 'number' && t.curse1Id > 0)
+                            sessionCurseIds.add(t.curse1Id);
+                        if (typeof t.curse2Id === 'number' && t.curse2Id > 0)
+                            sessionCurseIds.add(t.curse2Id);
+                    }
                     pcTreshers = treshers.map((t) => ({
                         id: t.id,
                         type: t.type,
@@ -463,6 +529,7 @@ const getGameById = async (req, res) => {
                             effectOn: it.effectOn ?? null,
                             effectToPc: it.effectToPc ?? null,
                             effectToPcValue: it.effectToPcValue ?? 0,
+                            uses: it.uses ?? null,
                         }));
                     }
                     const allPotionIds = Array.from(new Set(treshers.flatMap((t) => [t.potion1Id, t.potion2Id, t.potion3Id]
@@ -520,6 +587,9 @@ const getGameById = async (req, res) => {
             const dungonJsonObj = typeof game.dungenJson === 'string'
                 ? JSON.parse(game.dungenJson)
                 : game.dungenJson;
+            for (const curseId of collectCurseIdsFromDungeonJson(dungonJsonObj)) {
+                sessionCurseIds.add(curseId);
+            }
             const rawTresherList = Array.isArray(dungonJsonObj?.['tresherList'])
                 ? dungonJsonObj['tresherList']
                 : Array.isArray(dungonJsonObj?.['trasherList'])
@@ -624,7 +694,13 @@ const getGameById = async (req, res) => {
         catch {
             // non-fatal — proceed without pre-bundled assets
         }
-        return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcCurrentHP, pcMaxHP, pcSp, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, pcImagePath, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false, monsterImages, obstacleImages, lootImages, soundPaths, dungonCoverImagePath });
+        try {
+            pcTresherCurses = await resolveSessionCurses(sessionCurseIds);
+        }
+        catch {
+            pcTresherCurses = [];
+        }
+        return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcTresherCurses, pcCurrentHP, pcMaxHP, pcSp, pcSpLifetime, pcAgility, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, pcImagePath, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false, monsterImages, obstacleImages, lootImages, soundPaths, dungonCoverImagePath });
     }
     catch (error) {
         console.error('Error fetching game by id:', error);
@@ -811,115 +887,134 @@ const getSampleGameSession = async (req, res) => {
         let pcTresherItems = [];
         let pcTresherPotions = [];
         let pcTresherSpells = [];
+        let pcTresherCurses = [];
+        const sessionCurseIds = new Set();
         let pcImagePath = null;
         let lootImages = [];
         let soundPaths = [];
-        if (typeof pc.imageId === 'number' && pc.imageId > 0) {
-            const pcImages = await imageService.fetchImagesByIds([pc.imageId]);
-            const pcImage = pcImages.find((img) => img.id === pc.imageId && typeof img.path === 'string' && img.path.trim().length > 0);
-            pcImagePath = pcImage?.path ?? null;
+        try {
+            if (typeof pc.imageId === 'number' && pc.imageId > 0) {
+                const pcImages = await imageService.fetchImagesByIds([pc.imageId]);
+                const pcImage = pcImages.find((img) => img.id === pc.imageId && typeof img.path === 'string' && img.path.trim().length > 0);
+                pcImagePath = pcImage?.path ?? null;
+            }
+            const allPcTresherIds = Array.from(new Set([
+                ...(Array.isArray(pc.tresherIds) ? pc.tresherIds : []),
+                pc.weaponTresherId,
+                pc.primaryTresherId,
+                pc.headArmorTresherId,
+                pc.bodyArmorTresherId,
+                pc.leftArmArmorTresherId,
+                pc.rightArmArmorTresherId,
+                pc.leftLegArmorTresherId,
+                pc.rightLegArmorTresherId,
+            ].filter((id) => typeof id === 'number' && id > 0)));
+            if (allPcTresherIds.length > 0) {
+                const treshers = await tresherService.fetchTreshersByIds(allPcTresherIds);
+                for (const t of treshers) {
+                    if (typeof t.curse1Id === 'number' && t.curse1Id > 0)
+                        sessionCurseIds.add(t.curse1Id);
+                    if (typeof t.curse2Id === 'number' && t.curse2Id > 0)
+                        sessionCurseIds.add(t.curse2Id);
+                }
+                pcTreshers = treshers.map((t) => ({
+                    id: t.id,
+                    type: t.type,
+                    name: t.name,
+                    description: t.description,
+                    gold: t.gold,
+                    silver: t.silver,
+                    copper: t.copper,
+                    zinc: t.zinc,
+                    item1Id: t.item1Id,
+                    item2Id: t.item2Id,
+                    item3Id: t.item3Id,
+                    item4Id: t.item4Id,
+                    spell1Id: t.spell1Id,
+                    spell2Id: t.spell2Id,
+                    spell3Id: t.spell3Id,
+                    spell4Id: t.spell4Id,
+                    curse1Id: t.curse1Id,
+                    curse2Id: t.curse2Id,
+                    potion1Id: t.potion1Id,
+                    potion2Id: t.potion2Id,
+                    potion3Id: t.potion3Id,
+                    imageId: t.imageId,
+                    soundId: t.soundId,
+                    spReward: t.spReward,
+                }));
+                const allItemIds = Array.from(new Set(treshers.flatMap((t) => [t.item1Id, t.item2Id, t.item3Id, t.item4Id]
+                    .filter((id) => typeof id === 'number' && id > 0))));
+                if (allItemIds.length > 0) {
+                    const items = await itemService.fetchItemsByIds(allItemIds);
+                    pcTresherItems = items.map((it) => ({
+                        id: it.id,
+                        name: it.name,
+                        description: it.description,
+                        type: it.type,
+                        imageId: it.imageId,
+                        soundId: it.soundId ?? null,
+                        effectValue: it.effectValue,
+                        damage: it.damage ?? 0,
+                        range: Math.max(1, parseInt(String(it.range), 10) || 1),
+                        armorSlot: it.armorSlot ?? null,
+                        effectOn: it.effectOn ?? null,
+                        effectToPc: it.effectToPc ?? null,
+                        effectToPcValue: it.effectToPcValue ?? 0,
+                        uses: it.uses ?? null,
+                    }));
+                }
+                const allPotionIds = Array.from(new Set(treshers.flatMap((t) => [t.potion1Id, t.potion2Id, t.potion3Id]
+                    .filter((id) => typeof id === 'number' && id > 0))));
+                if (allPotionIds.length > 0) {
+                    const potions = await potionService.fetchPotionsByIds(allPotionIds);
+                    pcTresherPotions = potions.map((p) => ({
+                        id: p.id,
+                        name: p.name,
+                        description: p.description,
+                        effectTo: p.effectTo,
+                        effectAmount: p.effectAmount,
+                        lastFor: p.lastFor,
+                    }));
+                }
+                const allSpellIds = Array.from(new Set(treshers.flatMap((t) => [t.spell1Id, t.spell2Id, t.spell3Id, t.spell4Id]
+                    .filter((id) => typeof id === 'number' && id > 0))));
+                if (allSpellIds.length > 0) {
+                    const spells = await spellService.fetchSpellsByIdsForGame(allSpellIds);
+                    pcTresherSpells = spells.map((s) => ({
+                        id: s.id,
+                        name: s.name,
+                        description: s.description,
+                        soundId: s.soundId,
+                        range: s.range,
+                        effectOn: s.effectOn,
+                        effectOn2: s.effectOn2,
+                        effectAmount: s.effectAmount,
+                        effectAmount2: s.effectAmount2,
+                        successTestValue: s.successTestValue,
+                        sp: s.sp,
+                        lastFor: s.lastFor,
+                        numberOfTargets: s.numberOfTargets,
+                        magicCost: s.magicCost,
+                        effectType: s.effectType,
+                        effectColor: s.effectColor,
+                        effectOnPc1: s.effectOnPc1,
+                        effectOnPc2: s.effectOnPc2,
+                        range1: s.range1,
+                        range2: s.range2,
+                        lastFor1: s.lastFor1,
+                        lastFor2: s.lastFor2,
+                    }));
+                }
+            }
         }
-        const allPcTresherIds = Array.from(new Set([
-            ...(Array.isArray(pc.tresherIds) ? pc.tresherIds : []),
-            pc.weaponTresherId,
-            pc.primaryTresherId,
-            pc.headArmorTresherId,
-            pc.bodyArmorTresherId,
-            pc.leftArmArmorTresherId,
-            pc.rightArmArmorTresherId,
-            pc.leftLegArmorTresherId,
-            pc.rightLegArmorTresherId,
-        ].filter((id) => typeof id === 'number' && id > 0)));
-        if (allPcTresherIds.length > 0) {
-            const treshers = await tresherService.fetchTreshersByIds(allPcTresherIds);
-            pcTreshers = treshers.map((t) => ({
-                id: t.id,
-                type: t.type,
-                name: t.name,
-                description: t.description,
-                gold: t.gold,
-                silver: t.silver,
-                copper: t.copper,
-                zinc: t.zinc,
-                item1Id: t.item1Id,
-                item2Id: t.item2Id,
-                item3Id: t.item3Id,
-                item4Id: t.item4Id,
-                spell1Id: t.spell1Id,
-                spell2Id: t.spell2Id,
-                spell3Id: t.spell3Id,
-                spell4Id: t.spell4Id,
-                curse1Id: t.curse1Id,
-                curse2Id: t.curse2Id,
-                potion1Id: t.potion1Id,
-                potion2Id: t.potion2Id,
-                potion3Id: t.potion3Id,
-                imageId: t.imageId,
-                soundId: t.soundId,
-                spReward: t.spReward,
-            }));
-            const allItemIds = Array.from(new Set(treshers.flatMap((t) => [t.item1Id, t.item2Id, t.item3Id, t.item4Id]
-                .filter((id) => typeof id === 'number' && id > 0))));
-            if (allItemIds.length > 0) {
-                const items = await itemService.fetchItemsByIds(allItemIds);
-                pcTresherItems = items.map((it) => ({
-                    id: it.id,
-                    name: it.name,
-                    description: it.description,
-                    type: it.type,
-                    imageId: it.imageId,
-                    soundId: it.soundId ?? null,
-                    effectValue: it.effectValue,
-                    damage: it.damage ?? 0,
-                    range: Math.max(1, parseInt(String(it.range), 10) || 1),
-                    armorSlot: it.armorSlot ?? null,
-                    effectOn: it.effectOn ?? null,
-                    effectToPc: it.effectToPc ?? null,
-                    effectToPcValue: it.effectToPcValue ?? 0,
-                }));
-            }
-            const allPotionIds = Array.from(new Set(treshers.flatMap((t) => [t.potion1Id, t.potion2Id, t.potion3Id]
-                .filter((id) => typeof id === 'number' && id > 0))));
-            if (allPotionIds.length > 0) {
-                const potions = await potionService.fetchPotionsByIds(allPotionIds);
-                pcTresherPotions = potions.map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                    description: p.description,
-                    effectTo: p.effectTo,
-                    effectAmount: p.effectAmount,
-                    lastFor: p.lastFor,
-                }));
-            }
-            const allSpellIds = Array.from(new Set(treshers.flatMap((t) => [t.spell1Id, t.spell2Id, t.spell3Id, t.spell4Id]
-                .filter((id) => typeof id === 'number' && id > 0))));
-            if (allSpellIds.length > 0) {
-                const spells = await spellService.fetchSpellsByIdsForGame(allSpellIds);
-                pcTresherSpells = spells.map((s) => ({
-                    id: s.id,
-                    name: s.name,
-                    description: s.description,
-                    soundId: s.soundId,
-                    range: s.range,
-                    effectOn: s.effectOn,
-                    effectOn2: s.effectOn2,
-                    effectAmount: s.effectAmount,
-                    effectAmount2: s.effectAmount2,
-                    successTestValue: s.successTestValue,
-                    sp: s.sp,
-                    lastFor: s.lastFor,
-                    numberOfTargets: s.numberOfTargets,
-                    magicCost: s.magicCost,
-                    effectType: s.effectType,
-                    effectColor: s.effectColor,
-                    effectOnPc1: s.effectOnPc1,
-                    effectOnPc2: s.effectOnPc2,
-                    range1: s.range1,
-                    range2: s.range2,
-                    lastFor1: s.lastFor1,
-                    lastFor2: s.lastFor2,
-                }));
-            }
+        catch (error) {
+            console.error('Error resolving sample PC assets:', error);
+            pcImagePath = null;
+            pcTreshers = [];
+            pcTresherItems = [];
+            pcTresherPotions = [];
+            pcTresherSpells = [];
         }
         // Resolve dungeon cover image path
         let dungonCoverImagePath = null;
@@ -981,6 +1076,9 @@ const getSampleGameSession = async (req, res) => {
             const dungonJsonObj = typeof dungon.dungenJson === 'string'
                 ? JSON.parse(dungon.dungenJson)
                 : dungon.dungenJson;
+            for (const curseId of collectCurseIdsFromDungeonJson(dungonJsonObj)) {
+                sessionCurseIds.add(curseId);
+            }
             const rawTresherList = Array.isArray(dungonJsonObj?.['tresherList'])
                 ? dungonJsonObj['tresherList']
                 : Array.isArray(dungonJsonObj?.['trasherList'])
@@ -1116,6 +1214,12 @@ const getSampleGameSession = async (req, res) => {
         catch {
             // non-fatal — proceed without pre-resolved sample assets
         }
+        try {
+            pcTresherCurses = await resolveSessionCurses(sessionCurseIds);
+        }
+        catch {
+            pcTresherCurses = [];
+        }
         return res.json({
             id: 0,
             dungonid: dungon.id,
@@ -1128,9 +1232,12 @@ const getSampleGameSession = async (req, res) => {
             pcTresherItems,
             pcTresherPotions,
             pcTresherSpells,
+            pcTresherCurses,
             pcCurrentHP: pc.maxHP,
             pcMaxHP: pc.maxHP,
             pcSp: 0,
+            pcSpLifetime: 0,
+            pcAgility: pc.agility ?? 3,
             pcMind: pc.mind,
             pcStamina: pc.stamina,
             pcAc: pc.ac ?? 10,

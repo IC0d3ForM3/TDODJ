@@ -33,6 +33,7 @@ import {
   PortalPlacement,
   SquareSide,
   SquareText,
+  StartPoint,
   TresherPlacement,
 } from '../../interfaces/game';
 
@@ -79,6 +80,7 @@ export class DungeonFirstPersonComponent implements OnDestroy {
   readonly playerMaxHp = input<number>(20);
   readonly showSquareOutlines = input<boolean>(false);
   readonly debugRenderPass = input<number>(-1);
+  readonly startPoint = input<StartPoint | null>(null);
 
   readonly canvasWidth = 330;
   readonly canvasHeight = 220;
@@ -123,6 +125,7 @@ export class DungeonFirstPersonComponent implements OnDestroy {
       this.showSquareOutlines();
       this.debugRenderPass();
       this.portalPulseTick();
+      this.startPoint();
       this.syncPortalPulseTimer(portals);
       untracked(() => this.drawCanvas());
     });
@@ -2857,12 +2860,14 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     const midRight = (nearFrame.right + farFrame.right) / 2;
     const tileWidth = Math.max(6, midRight - midLeft);
     const normalizedOffset =
-      lateralRange <= 0 ? 0 : lateralOffset / (Math.max(1, lateralRange) + 0.65);
-    const centeredX = (midLeft + midRight) / 2 + normalizedOffset * tileWidth * 0.82;
-    const minCenterX = midLeft + tileWidth * 0.08;
-    const maxCenterX = midRight - tileWidth * 0.08;
+      lateralRange <= 0 ? 0 : lateralOffset / Math.max(1, lateralRange);
+    const centeredX = (midLeft + midRight) / 2 + normalizedOffset * tileWidth * 0.75;
+    // For side portals allow the glow center to cross into the adjacent tile area.
+    const isSidePortal = lateralOffset !== 0;
+    const minCenterX = isSidePortal ? midLeft - tileWidth * 0.4 : midLeft + tileWidth * 0.08;
+    const maxCenterX = isSidePortal ? midRight + tileWidth * 0.4 : midRight - tileWidth * 0.08;
     const centerX = Math.max(minCenterX, Math.min(maxCenterX, centeredX));
-    const lateralScale = 1 - Math.min(0.28, Math.abs(normalizedOffset) * 0.2);
+    const lateralScale = 1 - Math.min(0.3, Math.abs(normalizedOffset) * 0.25);
     const midTop = (nearFrame.top + farFrame.top) / 2;
     const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
     const topY = midTop + (midBottom - midTop) * 0.06;
@@ -2928,7 +2933,9 @@ export class DungeonFirstPersonComponent implements OnDestroy {
 
   private syncPortalPulseTimer(portals: PortalPlacement[]): void {
     const hasMagicDoor = portals.some((portal) => portal.look === 'magicDoor');
-    if (!hasMagicDoor) {
+    const hasStartPointGlow = this.startPoint() !== null;
+    
+    if (!hasMagicDoor && !hasStartPointGlow) {
       if (this.portalPulseTimer !== null) {
         clearInterval(this.portalPulseTimer);
         this.portalPulseTimer = null;

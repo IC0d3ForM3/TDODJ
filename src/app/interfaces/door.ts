@@ -7,6 +7,8 @@ export interface DoorItemRequirement {
     consume: boolean;
 }
 
+export type DoorOpenDirection = 'top' | 'bottom' | 'left' | 'right';
+
 export interface Door {
     id: number;
     name: string;
@@ -23,4 +25,6 @@ export interface Door {
     isFound: boolean;
     spReward: number | null;
     itemRequirement: DoorItemRequirement | null;
+    oneWay: boolean;
+    openDirection: DoorOpenDirection | null;
 }

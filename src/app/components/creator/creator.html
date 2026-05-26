@@ -1440,7 +1440,7 @@
 
 				@if (doorForm.controls.state.value === 'closed') {
 					<label class="door-locked-toggle">
-						<input type="checkbox" formControlName="isLocked" />
+						<input type="checkbox" formControlName="isLocked" (change)="onDoorLockedChange($event)" />
 						Locked
 					</label>
 					@if (doorForm.controls.isLocked.value) {
@@ -1469,7 +1469,7 @@
 				</label>
 				@if (doorForm.controls.isHidden.value) {
 					<label class="form-label" for="door-to-find">Find DC (Mind + d12 vs DC, 5–20)</label>
-					<input id="door-to-find" class="form-input" type="number" min="5" max="20" formControlName="toFind" />
+					<input id="door-to-find" class="form-input" type="number" min="1" max="18" formControlName="toFind" />
 				}
 
 				<label class="door-locked-toggle">
@@ -1521,6 +1521,20 @@
 						<input type="checkbox" formControlName="itemRequirementConsume" />
 						Consume item on pass (player gives it up)
 					</label>
+				}
+
+				<label class="door-locked-toggle">
+					<input type="checkbox" formControlName="oneWay" />
+					One-Way Door
+				</label>
+				@if (doorForm.controls.oneWay.value) {
+					<label class="form-label" for="door-open-direction">Passable direction</label>
+					<select id="door-open-direction" class="form-input" formControlName="openDirection">
+						<option value="top">↑ Northward (PC approaches from south)</option>
+						<option value="right">→ Eastward (PC approaches from west)</option>
+						<option value="bottom">↓ Southward (PC approaches from north)</option>
+						<option value="left">← Westward (PC approaches from east)</option>
+					</select>
 				}
 
 				<div class="form-actions">
@@ -1816,6 +1830,7 @@
 							[potionPlacements]="previewPotionPlacementsForModal()"
 							[spellPlacements]="previewSpellPlacementsForModal()"
 							[portalPlacements]="previewPortalPlacementsForModal()"
+					[startPoint]="previewStartPointForModal()"
 					[obstaclePlacements]="previewObstaclePlacementsForModal()"
 					[obstacleImagesBySquare]="previewObstacleImagesBySquareForModal()"
 						></app-dungeon-first-person>
@@ -1940,6 +1955,24 @@
 					row {{ pendingPlacement.row }}, col {{ pendingPlacement.column }}
 				</p>
 			}
+
+			<div class="place-filter-row">
+				<input
+					type="text"
+					class="place-filter-input"
+					placeholder="Filter by name…"
+					[value]="placeTresherFilterText()"
+					(input)="placeTresherFilterText.set($any($event.target).value)"
+				/>
+				<select
+					class="place-sort-select"
+					[value]="placeTresherSortKey()"
+					(change)="placeTresherSortKey.set($any($event.target).value)"
+				>
+					<option value="name-asc">Name A→Z</option>
+					<option value="name-desc">Name Z→A</option>
+				</select>
+			</div>
 
 			@if (selectedDungonTreshers().length > 0) {
 				<p class="details-message" style="margin: 0 0 0.4rem">Current Dungeon Treshers</p>
@@ -2128,6 +2161,35 @@
 				}
 				<button type="button" class="cancel-button" style="margin-top: 0.3rem; width: 100%" (click)="addMonsterAttack()">+ Add Attack</button>
 
+				<label class="door-locked-toggle" style="margin-bottom: 0.6rem; margin-top: 0.6rem">
+					<input
+						type="checkbox"
+						[checked]="editingMonsterCallsReinforcements()"
+						(change)="editingMonsterCallsReinforcements.set($any($event.target).checked)"
+					/>
+					Calls Reinforcements
+				</label>
+
+				@if (editingMonsterCallsReinforcements()) {
+					<label class="form-label">Reinforcement Count</label>
+					<input
+						class="form-input"
+						type="number"
+						min="1"
+						max="12"
+						[value]="editingMonsterReinforcementCount()"
+						(input)="editingMonsterReinforcementCount.set(+$any($event.target).value)"
+					/>
+					<label class="form-label">Reinforcement Monster Name (blank = same monster)</label>
+					<input
+						class="form-input"
+						type="text"
+						placeholder="e.g. Goblin"
+						[value]="editingMonsterReinforcementMonsterName()"
+						(input)="editingMonsterReinforcementMonsterName.set($any($event.target).value)"
+					/>
+				}
+
 				<div class="form-actions">
 					<button type="submit" class="save-button">Save</button>
 					@if (editingMonsterId() !== null) {
@@ -2191,6 +2253,27 @@
 				}
 
 				@if (selectedDungonMonsters().length > 0 || placeDialogLibraryMonsters().length > 0) {
+					<div class="place-filter-row">
+						<input
+							type="text"
+							class="place-filter-input"
+							placeholder="Filter by name…"
+							[value]="placeMonsterFilterText()"
+							(input)="placeMonsterFilterText.set($any($event.target).value)"
+						/>
+						<select
+							class="place-sort-select"
+							[value]="placeMonsterSortKey()"
+							(change)="placeMonsterSortKey.set($any($event.target).value)"
+						>
+							<option value="name-asc">Name A→Z</option>
+							<option value="name-desc">Name Z→A</option>
+							<option value="hp-asc">HP ↑</option>
+							<option value="hp-desc">HP ↓</option>
+							<option value="ac-asc">AC ↑</option>
+							<option value="ac-desc">AC ↓</option>
+						</select>
+					</div>
 					<p class="details-message" style="margin: 0 0 0.4rem">Select a monster to place:</p>
 					<ul class="dungons-list">
 						@for (monster of selectedDungonMonsters(); track monster.id) {
@@ -2364,7 +2447,7 @@
 						>
 							<option value="">Select key...</option>
 							@for (key of keyList; track key.id) {
-								@if (!isKeyPlaced(key.id)) {
+								@if (!isKeyPlaced(key.id) && !isMonsterDropKeySelected(key.id)) {
 									<option [value]="key.id">{{ key.name || 'Unnamed Key' }}</option>
 								}
 							}

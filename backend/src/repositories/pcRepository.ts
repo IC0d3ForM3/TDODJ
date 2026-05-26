@@ -571,6 +571,14 @@ export const updatePcForUser = async (
   return rows[0] ?? null;
 };
 
+export const deletePcForUser = async (id: number, userguid: string): Promise<boolean> => {
+  const { rowCount } = await pool.query(
+    'DELETE FROM pcs WHERE id = $1 AND userguid = $2',
+    [id, userguid]
+  );
+  return (rowCount ?? 0) > 0;
+};
+
 export const upgradeNoa = async (
   id: number,
   userguid: string,
@@ -761,7 +769,7 @@ export const getPcByIdPublic = async (id: number): Promise<PcRecord | null> => {
        mp AS "magicPower",
        mind,
        stamina,
-       COALESCE(sp, 0) AS sp,
+      COALESCE(sp_bank, 0) AS sp,
        level,
        strength,
        rangeofview AS "rangeOfView",

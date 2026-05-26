@@ -33,14 +33,14 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tavernTurnIn = exports.upgradeNod = exports.upgradeNoa = exports.upgradeStatController = exports.getAdminPcs = exports.setSamplePc = exports.setIsMainGamePc = exports.getSamplePcs = exports.updatePc = exports.awardSpToPc = exports.createPc = exports.getPcs = void 0;
+exports.tavernTurnIn = exports.upgradeNod = exports.upgradeNoa = exports.upgradeStatController = exports.getAdminPcs = exports.setSamplePc = exports.setIsMainGamePc = exports.getSamplePcs = exports.deletePc = exports.updatePc = exports.awardSpToPc = exports.createPc = exports.getPcs = void 0;
 const userRepository_1 = require("../repositories/userRepository");
 const imageService = __importStar(require("../services/imageService"));
 const pcService = __importStar(require("../services/pcService"));
 const tresherService = __importStar(require("../services/tresherService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VALID_SPECIES = ['Human', 'Elph', 'DwarPh', 'Shorties'];
-const VALID_TYPES = ['Fighter', 'Mage', 'thieph', 'Healer'];
+const VALID_TYPES = ['Fighter', 'Mage', 'thieph', 'Healer', 'Ranger'];
 const getPcs = async (req, res) => {
     const userkey = req.query['userkey'];
     if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
@@ -125,7 +125,7 @@ const awardSpToPc = async (req, res) => {
         if (newSp === null) {
             return res.status(404).json({ result: -1, error: 'PC not found' });
         }
-        return res.json({ result: 1, sp: newSp });
+        return res.json({ result: 1, sp: newSp.sp, spLifetime: newSp.spLifetime });
     }
     catch (error) {
         console.error('Error awarding SP to pc:', error);
@@ -183,6 +183,32 @@ const updatePc = async (req, res) => {
     }
 };
 exports.updatePc = updatePc;
+const deletePc = async (req, res) => {
+    const id = Number.parseInt(req.params['id'], 10);
+    const { userkey } = req.body;
+    if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
+    }
+    if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+        return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+    }
+    try {
+        const removed = await pcService.removePcForUser(id, userkey.trim());
+        if (!removed) {
+            return res.status(404).json({ result: -1, error: 'PC not found' });
+        }
+        return res.json({ result: 1 });
+    }
+    catch (error) {
+        console.error('Error deleting pc:', error);
+        const err = error;
+        if (err.code === '23503') {
+            return res.status(409).json({ result: -1, error: 'Cannot delete this PC because it is used by existing game data.' });
+        }
+        return res.status(500).json({ result: -1, error: 'Failed to delete pc' });
+    }
+};
+exports.deletePc = deletePc;
 const normalizePcPayload = (value) => {
     if (!value || typeof value !== 'object') {
         return null;
@@ -238,6 +264,7 @@ const normalizePcPayload = (value) => {
         hand2ItemId: normalizeNullableNumber(input.hand2ItemId ?? input.hand2itemid),
         numberOfAttacks: Math.max(1, normalizeNumber(input.numberOfAttacks ?? input.numberofattacks, 1)),
         numberOfDefends: Math.max(1, normalizeNumber(input.numberOfDefends, 1)),
+        agility: Math.max(0, normalizeNumber(input.agility, 3)),
         ismaingame: input.ismaingame === true,
     };
 };
@@ -308,6 +335,9 @@ const normalizePcType = (value) => {
     }
     if (lower === 'healer') {
         return 'Healer';
+    }
+    if (lower === 'ranger') {
+        return 'Ranger';
     }
     return null;
 };
@@ -454,7 +484,7 @@ const upgradeStatController = async (req, res) => {
     if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
         return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
     }
-    const allowed = ['strength', 'stamina', 'mind', 'magicPower'];
+    const allowed = ['strength', 'stamina', 'mind', 'magicPower', 'agility'];
     if (typeof stat !== 'string' || !allowed.includes(stat)) {
         return res.status(400).json({ result: -1, error: 'Valid stat name is required' });
     }

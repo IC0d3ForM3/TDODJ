@@ -3,6 +3,38 @@ import { HttpClient } from '@angular/common/http';
 import { finalize, Observable } from 'rxjs';
 import { API_BASE_URL } from '../api-config';
 
+export function normalizeCurseEffectTarget(value: string | null | undefined): string {
+  const normalized = (value ?? '').trim().toLowerCase();
+  switch (normalized) {
+    case 'hp':
+      return 'HP';
+    case 'defense':
+      return 'Defense';
+    case 'stamina':
+      return 'Stamina';
+    case 'mind':
+      return 'Mind';
+    case 'magic':
+      return 'Magic';
+    case 'sight':
+    case 'range of sight':
+    case 'ros':
+      return 'ROS';
+    case 'ae':
+    case 'action economy':
+    case 'action econame':
+      return 'AE';
+    case '# of attacks':
+    case '# of attacks #oa':
+    case 'noa':
+      return '# of Attacks';
+    case 'boost dice':
+      return 'Boost Dice';
+    default:
+      return 'HP';
+  }
+}
+
 export interface UserCurseListItem {
   id: number;
   userguid: string;
@@ -54,7 +86,14 @@ export class CurseService {
       .get<UserCurseListItem[]>(`${API_BASE_URL}/curses`, { params: { userkey } })
       .pipe(finalize(() => this.isLoading.set(false)))
       .subscribe({
-        next: (items) => this.items.set(items),
+        next: (items) =>
+          this.items.set(
+            items.map((item) => ({
+              ...item,
+              effectTo: normalizeCurseEffectTarget(item.effectTo),
+              effectTo2: item.effectTo2 ? normalizeCurseEffectTarget(item.effectTo2) : null,
+            }))
+          ),
         error: () => {
           this.items.set([]);
           this.error.set('Failed to load curses.');

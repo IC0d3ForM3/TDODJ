@@ -57,6 +57,7 @@ import {
   SpellPlacement,
   PotionPlacement,
   ObstaclePlacement,
+  PortalPlacement,
 } from '../../interfaces/game';
 
 interface GameSessionPayload {
@@ -69,6 +70,7 @@ interface GameSessionPayload {
   pcTresherItems?: unknown[];
   pcTresherPotions?: unknown[];
   pcTresherSpells?: unknown[];
+  pcTresherCurses?: unknown[];
   pcCurrentHP?: number | null;
   pcMaxHP?: number | null;
   pcSp?: number | null;
@@ -102,6 +104,17 @@ interface ImageRecordPayload {
 interface SoundRecordPayload {
   id: number;
   path: string;
+}
+
+interface PcTresherCurseData {
+  id: number;
+  name: string;
+  description: string;
+  effectTo: string;
+  effectTo2: string | null;
+  damage: number;
+  damage2: number;
+  lastFor: number;
 }
 
 type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind';
@@ -225,6 +238,7 @@ export class Game implements OnInit {
   private readonly lootImageCache = new Map<number, HTMLImageElement>();
   private readonly lootImageCacheVersion = signal(0);
   private readonly spellCatalogById = signal<Map<number, PcTresherSpellData>>(new Map());
+  private readonly pcTresherCursesById = signal<Map<number, PcTresherCurseData>>(new Map());
   private readonly soundPathById = signal<Map<number, string>>(new Map());
   private readonly learnedFloorSpellIdsByDungon = signal<Record<number, number[]>>({});
   private readonly doorImageCache = new Map<string, HTMLImageElement>();
@@ -261,6 +275,7 @@ export class Game implements OnInit {
   get pcTresherItemsById() { return this.inventoryService.pcTresherItemsById; }
   get pcTresherPotionsById() { return this.inventoryService.pcTresherPotionsById; }
   get exitsByDungon() { return this.dungeonState.exitsByDungon; }
+  readonly portalPlacementsByDungon = signal<Record<number, PortalPlacement[]>>({});
   get playerSp() { return this.combatService.playerSp; }
   get playerMind() { return this.combatService.playerMind; }
   get playerStamina() { return this.combatService.playerStamina; }
@@ -760,11 +775,11 @@ export class Game implements OnInit {
   }
 
   collectedArmorItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean }> {
-    return this.collectedFloorItemsForPreview().filter((item) => this.isArmorItemType(item.type, item.name));
+    return this.collectedFloorItemsForPreview().filter((item) => this.isArmorItemType(item.type, item.name) || item.armorSlot !== null);
   }
 
   collectedOtherItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean; uses?: number | null }> {
-    return this.collectedFloorItemsForPreview().filter((item) => !this.isWeaponItemType(item.type) && !this.isArmorItemType(item.type, item.name));
+    return this.collectedFloorItemsForPreview().filter((item) => !this.isWeaponItemType(item.type) && !this.isArmorItemType(item.type, item.name) && item.armorSlot === null);
   }
 
   previewDetectedFloorTrapsForView(): FloorTrapPlacement[] {
@@ -818,6 +833,15 @@ export class Game implements OnInit {
     }
 
     return this.exitsByDungon()[preview.dungonId] ?? [];
+  }
+
+  previewPortalPlacementsForView(): PortalPlacement[] {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return [];
+    }
+
+    return this.portalPlacementsByDungon()[preview.dungonId] ?? [];
   }
 
   previewMonsterImagesBySquareForView(): Map<string, HTMLImageElement | null> {
@@ -1011,6 +1035,39 @@ export class Game implements OnInit {
   /** Called when the player clicks a cell on the 10x10 mini-map. */
   onMapCellClicked(cell: { row: number; column: number }): void {
     const preview = this.gridPreviewContext();
+    
+    // Log square data for debugging
+    if (preview) {
+      const squareKey = this.getSquareKey(cell.row, cell.column);
+      const squareData = this.squaresByDungon()[preview.dungonId]?.[squareKey];
+      const isFilled = this.filledSquaresByDungon()[preview.dungonId]?.[squareKey] ?? false;
+      const monsters = this.monsterInstances().filter(m => m.row === cell.row && m.column === cell.column);
+      const startPoint = this.startPointByDungon()[preview.dungonId];
+      const isStartPoint = startPoint ? startPoint.row === cell.row && startPoint.col === cell.column : false;
+      const portals = this.portalPlacementsByDungon()[preview.dungonId]?.filter(p => 
+        (p.startRow === cell.row && p.startColumn === cell.column) ||
+        (p.endRow === cell.row && p.endColumn === cell.column)
+      ) ?? [];
+
+      const payload = {
+        row: cell.row,
+        column: cell.column,
+        squareKey,
+        isFilled,
+        squareData,
+        isStartPoint,
+        startPoint: isStartPoint ? startPoint : null,
+        monsters: monsters.length > 0 ? monsters : null,
+        portals: portals.length > 0 ? portals : null,
+      };
+      const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+      if (isLocalhost) {
+        (window as any).__tdodjLastGameSquareClick = payload;
+        this.previewActionMessage.set(`[debug] Clicked r${cell.row} c${cell.column} (${squareKey})`);
+      }
+      console.warn('[TDODJ][GameMap] Square clicked', payload);
+    }
+    
     if (!preview || this.turnPhase() !== 'player' || this.playerHp() <= 0) return;
 
     // Handle spell multi-target selection mode
@@ -3060,12 +3117,16 @@ export class Game implements OnInit {
       seenDoorIds.add(connection.id);
 
       const neighborKey = this.getSquareKey(row + check.dr, col + check.dc);
-      const canOpen = !connection.isLocked && connection.state === 'closed';
+      const allowedSide = connection.oneWay && connection.openDirection
+        ? (`to${connection.openDirection.charAt(0).toUpperCase()}${connection.openDirection.slice(1)}` as SquareSide)
+        : null;
+      const isOneWayBlocked = allowedSide !== null && check.side !== allowedSide;
+      const canOpen = !isOneWayBlocked && !connection.isLocked && connection.state === 'closed';
       let canUnlock = false;
       let matchingKeyIndex: number | null = null;
       let canPick = false;
 
-      if (connection.isLocked && connection.state === 'closed' && connection.keyLock) {
+      if (!isOneWayBlocked && connection.isLocked && connection.state === 'closed' && connection.keyLock) {
         const keyIdx = inventoryKeys.findIndex(
           (k) => k.doorId === connection.id || k.id === connection.keyLock!.id
         );
@@ -3075,12 +3136,12 @@ export class Game implements OnInit {
         }
       }
 
-      if (connection.isLocked && connection.state === 'closed' && !canUnlock && (connection.toPick ?? 0) > 0) {
+      if (!isOneWayBlocked && connection.isLocked && connection.state === 'closed' && !canUnlock && (connection.toPick ?? 0) > 0) {
         canPick = true;
       }
 
       const itemReq = connection.itemRequirement ?? null;
-      const canPassWithItem = !!(itemReq && connection.state === 'closed' && this.playerHasItem(itemReq.itemId));
+      const canPassWithItem = !!(itemReq && !isOneWayBlocked && connection.state === 'closed' && this.playerHasItem(itemReq.itemId));
 
       doors.push({
         door: connection,
@@ -3094,6 +3155,7 @@ export class Game implements OnInit {
         canPick,
         matchingKeyIndex,
         canPassWithItem,
+        isOneWayBlocked,
       });
     }
 
@@ -4448,6 +4510,18 @@ export class Game implements OnInit {
                 return merged;
               });
             }
+            if (Array.isArray(game.pcTresherCurses)) {
+              const curseMap = new Map<number, PcTresherCurseData>();
+              for (const raw of game.pcTresherCurses) {
+                const curse = this.normalizeCurseRecord(raw);
+                if (curse !== null) {
+                  curseMap.set(curse.id, curse);
+                }
+              }
+              this.pcTresherCursesById.set(curseMap);
+            } else {
+              this.pcTresherCursesById.set(new Map());
+            }
             this.playerType.set(typeof game.pcType === 'string' ? game.pcType : null);
             this.playerSpecies.set(typeof game.pcSpecies === 'string' ? game.pcSpecies : null);
             this.playerName.set(typeof game.pcName === 'string' ? game.pcName : null);
@@ -4576,6 +4650,18 @@ export class Game implements OnInit {
               }
               return merged;
             });
+          }
+          if (Array.isArray(game.pcTresherCurses)) {
+            const curseMap = new Map<number, PcTresherCurseData>();
+            for (const raw of game.pcTresherCurses) {
+              const curse = this.normalizeCurseRecord(raw);
+              if (curse !== null) {
+                curseMap.set(curse.id, curse);
+              }
+            }
+            this.pcTresherCursesById.set(curseMap);
+          } else {
+            this.pcTresherCursesById.set(new Map());
           }
           this.dungonCoverImageUrl.set(
             typeof game.dungonCoverImagePath === 'string' && game.dungonCoverImagePath
@@ -5864,6 +5950,28 @@ export class Game implements OnInit {
         context.textBaseline = 'middle';
         context.fillText('T', centerX, centerY);
       }
+    }
+
+    // Draw portal markers (purple) for start/end points
+    const portalsForMap = this.portalPlacementsByDungon()[preview.dungonId] ?? [];
+    for (const portal of portalsForMap) {
+      const symbol = portal.look === 'starDown' ? '▼' : portal.look === 'magicDoor' ? '⊡' : '▲';
+      const drawPortalDot = (row: number | null, col: number | null): void => {
+        if (row === null || col === null) return;
+        if (!visibleSquareKeys.has(this.getSquareKey(row, col))) return;
+        const pRow = row - preview.startRow;
+        const pCol = col - preview.startColumn;
+        if (pRow < 0 || pCol < 0 || pRow >= this.previewGridDimension || pCol >= this.previewGridDimension) return;
+        const cx = pCol * this.previewGridCellSize + this.previewGridCellSize / 2;
+        const cy = pRow * this.previewGridCellSize + this.previewGridCellSize / 2;
+        context.fillStyle = '#cc44ff';
+        context.font = 'bold 9px sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(symbol, cx, cy);
+      };
+      drawPortalDot(portal.startRow, portal.startColumn);
+      drawPortalDot(portal.endRow, portal.endColumn);
     }
 
     const centerPreviewRow = preview.centerRow - preview.startRow;
@@ -8779,6 +8887,28 @@ export class Game implements OnInit {
       }
     }
 
+    // Check if player stepped onto a portal
+    const portals = this.portalPlacementsByDungon()[preview.dungonId] ?? [];
+    const landedPortal = portals.find((p) =>
+      (p.startRow === nextRow && p.startColumn === nextColumn && p.endRow !== null && p.endColumn !== null) ||
+      (p.isTwoWay && p.endRow === nextRow && p.endColumn === nextColumn && p.startRow !== null && p.startColumn !== null)
+    );
+    if (landedPortal) {
+      const fromStart = landedPortal.startRow === nextRow && landedPortal.startColumn === nextColumn;
+      const destRow = fromStart ? landedPortal.endRow! : landedPortal.startRow!;
+      const destCol = fromStart ? landedPortal.endColumn! : landedPortal.startColumn!;
+      const halfDim = Math.floor(this.previewGridDimension / 2);
+      this.gridPreviewContext.set({
+        ...this.gridPreviewContext()!,
+        centerRow: destRow,
+        centerColumn: destCol,
+        startRow: destRow - halfDim,
+        startColumn: destCol - halfDim,
+      });
+      this.playSoundPath(this.portalTraverseSoundPath);
+      this.logNearbyAfterMove();
+    }
+
     // Check if player stepped onto a floor trap
     this.checkFloorTrapsAtCurrentSquare(preview.dungonId, nextRow, nextColumn);
 
@@ -9026,6 +9156,12 @@ export class Game implements OnInit {
     if (this.isDoorConnection(fromConnection)) {
       if (fromConnection.isHidden && !fromConnection.isFound) {
         return { type: 'wall', door: null };
+      }
+      if (fromConnection.state === 'open' && fromConnection.oneWay && fromConnection.openDirection !== null) {
+        const allowedFromSide = `to${fromConnection.openDirection.charAt(0).toUpperCase()}${fromConnection.openDirection.slice(1)}` as SquareSide;
+        if (fromSide !== allowedFromSide) {
+          return { type: 'wall', door: null };
+        }
       }
       return {
         type: fromConnection.state === 'closed' ? 'closedDoor' : 'openDoor',
@@ -9329,6 +9465,11 @@ export class Game implements OnInit {
       [dungonId]: parsed.exits,
     }));
 
+    this.portalPlacementsByDungon.update((all) => ({
+      ...all,
+      [dungonId]: parsed.portalPlacements,
+    }));
+
     this.setPcInventoryInitialized(dungonId, parsed.pcInventoryInitialized);
 
     this.floorTrapPlacementsByDungon.update((all) => ({
@@ -9472,6 +9613,7 @@ export class Game implements OnInit {
     monsterPlacements: MonsterPlacement[];
     squareTexts: SquareText[];
     exits: DungonExit[];
+    portalPlacements: PortalPlacement[];
     floorTrapPlacements: FloorTrapPlacement[];
     obstaclePlacements: ObstaclePlacement[];
     itemPlacements: ItemPlacement[];
@@ -9507,6 +9649,7 @@ export class Game implements OnInit {
         monsterPlacements: [],
         squareTexts: [],
         exits: [],
+        portalPlacements: [],
         floorTrapPlacements: [],
         obstaclePlacements: [],
         itemPlacements: [],
@@ -9557,6 +9700,7 @@ export class Game implements OnInit {
       playerColumn?: unknown;
       exits?: unknown[];
       exitList?: unknown[];
+      portalPlacements?: unknown[];
       floorTrapPlacements?: unknown[];
       obstaclePlacements?: unknown[];
       itemPlacements?: unknown[];
@@ -10003,6 +10147,29 @@ export class Game implements OnInit {
       }
     }
 
+    const portalPlacements: PortalPlacement[] = Array.isArray(source.portalPlacements)
+      ? source.portalPlacements
+          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+          .map((x): PortalPlacement | null => {
+            const id = typeof x['id'] === 'number' ? Math.floor(x['id']) : 0;
+            const toNullableInt = (v: unknown): number | null =>
+              typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : null;
+            const look = x['look'] === 'starDown' ? 'starDown' : x['look'] === 'magicDoor' ? 'magicDoor' : 'starUp';
+            return {
+              id,
+              name: typeof x['name'] === 'string' ? x['name'] : '',
+              description: typeof x['description'] === 'string' ? x['description'] : '',
+              look,
+              isTwoWay: x['isTwoWay'] !== false,
+              startRow: toNullableInt(x['startRow']),
+              startColumn: toNullableInt(x['startColumn']),
+              endRow: toNullableInt(x['endRow']),
+              endColumn: toNullableInt(x['endColumn']),
+            };
+          })
+          .filter((x): x is PortalPlacement => x !== null)
+      : [];
+
     return {
       filledSquares,
       squares,
@@ -10015,6 +10182,7 @@ export class Game implements OnInit {
       monsterPlacements,
       squareTexts,
       exits,
+      portalPlacements,
       floorTrapPlacements,
       obstaclePlacements,
       itemPlacements,
@@ -10396,6 +10564,111 @@ export class Game implements OnInit {
       lastFor1: this.normalizeNumber(this.toFiniteNumber(source['lastFor1'] ?? source['lastfor1']), 0),
       lastFor2: this.normalizeNumber(this.toFiniteNumber(source['lastFor2'] ?? source['lastfor2']), 0),
     };
+  }
+
+  private normalizeCurseRecord(raw: unknown): PcTresherCurseData | null {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const source = raw as Record<string, unknown>;
+    const id = this.toFiniteNumber(source['id']);
+    if (id === null) {
+      return null;
+    }
+
+    const effectTo = typeof source['effectTo'] === 'string'
+      ? source['effectTo']
+      : (typeof source['effectto'] === 'string' ? source['effectto'] : 'HP');
+    const effectTo2 = typeof source['effectTo2'] === 'string'
+      ? source['effectTo2']
+      : (typeof source['effectto2'] === 'string' ? source['effectto2'] : null);
+
+    return {
+      id: Math.floor(id),
+      name: typeof source['name'] === 'string' && source['name'].trim() ? source['name'].trim() : 'Unnamed Curse',
+      description: typeof source['description'] === 'string' ? source['description'] : '',
+      effectTo,
+      effectTo2: effectTo2 && effectTo2.trim() ? effectTo2 : null,
+      damage: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['damage']), 0)),
+      damage2: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['damage2'] ?? source['effectAmount2']), 0)),
+      lastFor: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['lastFor'] ?? source['lastfor']), 0)),
+    };
+  }
+
+  private applyMonsterAttackCurseToPlayer(monsterName: string, attack: MonsterAttack): void {
+    if (attack.curseId == null) {
+      return;
+    }
+    const curse = this.pcTresherCursesById().get(attack.curseId);
+    if (!curse) {
+      return;
+    }
+
+    const slots: Array<{ effectOn: string; amount: number }> = [];
+    if (curse.effectTo && curse.damage > 0) {
+      slots.push({ effectOn: curse.effectTo, amount: -Math.abs(curse.damage) });
+    }
+    if (curse.effectTo2 && curse.damage2 > 0) {
+      slots.push({ effectOn: curse.effectTo2, amount: -Math.abs(curse.damage2) });
+    }
+    if (slots.length === 0) {
+      return;
+    }
+
+    for (const slot of slots) {
+      const normalizedTarget = (slot.effectOn ?? '').trim().toLowerCase();
+      const sourceName = `${monsterName} / ${curse.name}`;
+      if (normalizedTarget === 'boost dice') {
+        this.playerActiveEffects.update((effects) => [
+          ...effects,
+          {
+            effectOn: 'Boost Dice',
+            effectAmount: -1,
+            remainingAE: this.spellEffectRemainingAE(Math.max(1, curse.lastFor || 1)),
+            sourceName,
+            behavior: 'modifier',
+          },
+        ]);
+        this.addCombatLog(`${monsterName} afflicts you with ${curse.name}. (Boost Dice disabled)`);
+        continue;
+      }
+
+      const target = this.normalizeEffectToPcStat(slot.effectOn);
+      if (target === null) {
+        continue;
+      }
+
+      if (curse.lastFor === 0) {
+        this.applyPermanentPlayerSpellEffect(target, slot.amount);
+      } else if (target === 'HP') {
+        this.playerActiveEffects.update((effects) => [
+          ...effects,
+          {
+            effectOn: 'HP',
+            effectAmount: slot.amount,
+            remainingAE: this.spellEffectRemainingAE(curse.lastFor),
+            sourceName,
+            behavior: 'tick',
+          },
+        ]);
+      } else {
+        this.playerActiveEffects.update((effects) => [
+          ...effects,
+          {
+            effectOn: target,
+            effectAmount: slot.amount,
+            remainingAE: this.spellEffectRemainingAE(curse.lastFor),
+            sourceName,
+            behavior: 'modifier',
+          },
+        ]);
+      }
+
+      this.addCombatLog(
+        `${monsterName} curses you with ${curse.name} ${this.spellEffectDurationLabel(curse.lastFor)}. (${target} ${slot.amount})`
+      );
+    }
   }
 
   private parseExitItem(item: unknown): DungonExit | null {
@@ -11428,8 +11701,8 @@ export class Game implements OnInit {
     if (s === 'mind') return 'Mind';
     if (s === 'stamina' || s === 'staman') return 'Stamina';
     if (s === 'strength' || s === 'strench') return 'Strength';
-    if (s === 'ae' || s === 'action economy') return 'AE';
-    if (s === 'noa' || s === '# of attacks' || s === '#oa' || s === 'number of attacks') return 'NOA';
+    if (s === 'ae' || s === 'action economy' || s === 'action econame') return 'AE';
+    if (s === 'noa' || s === '# of attacks' || s === '# of attacks #oa' || s === '#oa' || s === 'number of attacks') return 'NOA';
     if (s === 'ros' || s === 'sight' || s === 'range of sight') return 'ROS';
     if (s === 'remove curse' || s === 'cure curse' || s === 'cures curse') return 'RemoveCurse';
     return null;
@@ -11721,8 +11994,20 @@ export class Game implements OnInit {
       return;
     }
     this.playerAE.set(0);
-    this.playerMp.set(this.getEffectivePlayerMagicPower());
-    this.addCombatLog('You end your turn early.');
+
+    const isMageOrHealer = this.isMageClass() || this.isHealerClass();
+    const mpRecovered = isMageOrHealer ? this.randomInt(1, 3) : 1;
+    const currentMp = this.playerMp();
+    const maxMp = this.getEffectivePlayerMagicPower();
+    const newMp = Math.min(maxMp, currentMp + mpRecovered);
+    const actualRecovered = newMp - currentMp;
+
+    this.playerMp.set(newMp);
+    this.addCombatLog(
+      actualRecovered > 0
+        ? `You end your turn early and recover ${actualRecovered} MP.`
+        : 'You end your turn early.'
+    );
     this.startMonsterTurns();
   }
 
@@ -11783,6 +12068,49 @@ export class Game implements OnInit {
 
   isHealerClass(): boolean {
     return (this.playerType() ?? '').trim().toLowerCase() === 'healer';
+  }
+
+  isMageClass(): boolean {
+    return (this.playerType() ?? '').trim().toLowerCase() === 'mage';
+  }
+
+  canMageRest(): boolean {
+    return this.isMageClass() && this.turnPhase() === 'player' && this.playerHp() > 0 && this.playerAE() >= 5;
+  }
+
+  mageRest(): void {
+    if (!this.canMageRest()) return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+
+    const rollCount = this.playerAE();
+    let doxRollIndex = -1;
+    let mpGained = 0;
+
+    for (let i = 0; i < rollCount; i++) {
+      const roll = Math.floor(Math.random() * 12);
+      if (roll === 0) {
+        doxRollIndex = i + 1;
+        break;
+      }
+      mpGained++;
+    }
+
+    // Restore MP from successful rolls, capped at max
+    if (mpGained > 0) {
+      const maxMp = this.getEffectivePlayerMagicPower();
+      this.playerMp.set(Math.min(maxMp, this.playerMp() + mpGained));
+    }
+
+    if (doxRollIndex !== -1) {
+      this.addCombatLog(`You attempt to rest... a Dox stirs on roll ${doxRollIndex}! (+${mpGained} MP) Your turn ends.`);
+      this.spawnDox(preview.dungonId, preview.centerRow, preview.centerColumn);
+      this.playerAE.set(0);
+      this.startMonsterTurns();
+    } else {
+      this.addCombatLog(`You rest and recover magic. (+${mpGained} MP, AE restored to max)`);
+      this.playerAE.set(this.getEffectivePlayerMaxAE());
+    }
   }
 
   canUseSneek(): boolean {
@@ -13368,6 +13696,10 @@ export class Game implements OnInit {
           setTimeout(() => this.goHome(), 3500);
         }
       }
+
+      if (this.turnPhase() !== 'gameover' && attack?.curseId != null) {
+        this.applyMonsterAttackCurseToPlayer(template.name, attack);
+      }
     } else {
       this.addCombatLog(
         `${template.name} misses you with ${attackLabel}. (rolled ${hitRoll} vs AC ${playerAC})`
@@ -13576,7 +13908,7 @@ export class Game implements OnInit {
         stationaryTriggerRow: null,
         stationaryTriggerCol: null,
         noAttackUnlessAttacked: reinforcementTemplate.npcOnlyAttackWhenAttacked,
-        hasCalledReinforcements: false,
+        hasCalledReinforcements: true,
         hasGreeted: false,
         hasSharedInfo: false,
         isSpared: false,

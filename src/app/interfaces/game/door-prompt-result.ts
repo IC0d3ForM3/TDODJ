@@ -1,5 +1,5 @@
 import { Trap } from './trap';
-import { DoorItemRequirement } from '../door';
+import { DoorItemRequirement, DoorOpenDirection } from '../door';
 
 export interface DoorPromptResult {
   state: 'open' | 'closed';
@@ -13,4 +13,6 @@ export interface DoorPromptResult {
   trap: Trap | null;
   spReward: number | null;
   itemRequirement: DoorItemRequirement | null;
+  oneWay: boolean;
+  openDirection: DoorOpenDirection | null;
 }

@@ -501,6 +501,18 @@
 											</button>
 											<button
 												type="button"
+												class="dashboard-action-button dashboard-action-button-small dashboard-action-button-muted"
+												(click)="requestDeletePc(item)"
+												[disabled]="isDeletingUserPcId() === item.id"
+											>
+												@if (isDeletingUserPcId() === item.id) {
+													Deleting...
+												} @else {
+													Delete
+												}
+											</button>
+											<button
+												type="button"
 												class="dashboard-action-button dashboard-action-button-small"
 												(click)="upgradeNoa(item.id)"
 												[disabled]="isUpgradingNoa() === item.id || item.sp < 5"
@@ -517,6 +529,9 @@
 				}
 				@if (noaUpgradeMessage()) {
 					<p class="dashboard-message">{{ noaUpgradeMessage() }}</p>
+				}
+				@if (deletePcMessage()) {
+					<p class="dashboard-message">{{ deletePcMessage() }}</p>
 				}
 			</div>
 
@@ -852,6 +867,38 @@
 			}
 
 		</div><!-- /pc-two-panel -->
+	}
+
+	@if (pendingDeletePc(); as pendingPc) {
+		<div class="dashboard-modal-backdrop" (click)="cancelDeletePc()"></div>
+		<div class="dashboard-modal" role="dialog" aria-modal="true" aria-label="Confirm PC delete" (click)="$event.stopPropagation()">
+			<h4 class="dashboard-modal-title">Delete PC</h4>
+			<p class="dashboard-modal-text">
+				Delete <strong>{{ pendingPc.name }}</strong>? This cannot be undone.
+			</p>
+			<div class="dashboard-modal-actions">
+				<button
+					type="button"
+					class="dashboard-action-button dashboard-action-button-muted"
+					(click)="cancelDeletePc()"
+					[disabled]="isDeletingUserPcId() !== null"
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					class="dashboard-action-button"
+					(click)="confirmDeletePc()"
+					[disabled]="isDeletingUserPcId() !== null"
+				>
+					@if (isDeletingUserPcId() !== null) {
+						Deleting...
+					} @else {
+						Delete PC
+					}
+				</button>
+			</div>
+		</div>
 	}
 </section>
 }

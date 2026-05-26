@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateCurseForUser = exports.insertCurseForUser = exports.getCursesByUserGuid = exports.isAdminUserByGuid = void 0;
+exports.updateCurseForUser = exports.insertCurseForUser = exports.getCursesByIds = exports.getCursesByUserGuid = exports.isAdminUserByGuid = void 0;
 const db_1 = __importDefault(require("../db"));
 const SELECT_CURSE_FIELDS = `
   id,
@@ -71,6 +71,17 @@ const getCursesByUserGuid = async (userguid) => {
     return rows;
 };
 exports.getCursesByUserGuid = getCursesByUserGuid;
+const getCursesByIds = async (ids) => {
+    if (ids.length === 0) {
+        return [];
+    }
+    const { rows } = await db_1.default.query(`SELECT ${SELECT_CURSE_FIELDS}
+     FROM curses
+     WHERE id = ANY($1::int[])
+     ORDER BY id ASC`, [ids]);
+    return rows;
+};
+exports.getCursesByIds = getCursesByIds;
 const insertCurseForUser = async (userguid, payload) => {
     const client = await db_1.default.connect();
     try {

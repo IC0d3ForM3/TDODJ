@@ -3,12 +3,16 @@ import {
   UpsertCursePayload,
   isAdminUserByGuid,
   getCursesByUserGuid,
+  getCursesByIds,
   insertCurseForUser,
   updateCurseForUser,
 } from '../repositories/curseRepository';
 
 export const fetchCursesByUserGuid = (userguid: string): Promise<CurseRecord[]> =>
   getCursesByUserGuid(userguid);
+
+export const fetchCursesByIds = (ids: number[]): Promise<CurseRecord[]> =>
+  getCursesByIds(ids);
 
 export const checkUserIsAdminByGuid = (userguid: string): Promise<boolean> =>
   isAdminUserByGuid(userguid);

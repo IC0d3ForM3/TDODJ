@@ -221,8 +221,11 @@ export class Dashboard implements OnInit {
   readonly isSavingUserPc = signal(false);
   readonly editingUserPcId = signal<number | null>(null);
   readonly expandedPcId = signal<number | null>(null);
+  readonly isDeletingUserPcId = signal<number | null>(null);
+  readonly pendingDeletePc = signal<UserPcListItem | null>(null);
   readonly pcStatsRolled = signal(false);
   readonly userPcSaveMessage = signal<string | null>(null);
+  readonly deletePcMessage = signal<string | null>(null);
   readonly userItems = signal<UserItemOption[]>([]);
   readonly isLoadingUserItems = signal(false);
   readonly isUpgradingNoa = signal<number | null>(null);
@@ -810,6 +813,74 @@ export class Dashboard implements OnInit {
     controls.numberOfAttacks.setValue(Math.max(1, this.normalizeNumber(source.numberOfAttacks, 1)));
     controls.agility.setValue(Math.max(0, this.normalizeNumber((source as UserPcListItem & Record<string, unknown>)['agility'] as number ?? source.agility ?? 3, 3)));
     this.pcStatsRolled.set(true);
+  }
+
+  requestDeletePc(item: UserPcListItem): void {
+    if (this.isDeletingUserPcId() !== null) {
+      return;
+    }
+
+    this.pendingDeletePc.set(item);
+  }
+
+  cancelDeletePc(): void {
+    if (this.isDeletingUserPcId() !== null) {
+      return;
+    }
+    this.pendingDeletePc.set(null);
+  }
+
+  confirmDeletePc(): void {
+    const item = this.pendingDeletePc();
+    if (!item) {
+      return;
+    }
+
+    if (this.isDeletingUserPcId() !== null) {
+      return;
+    }
+
+    const userkey = this.account.getKey();
+    if (!userkey) {
+      this.deletePcMessage.set('Please log in to delete PCs.');
+      return;
+    }
+
+    this.deletePcMessage.set(null);
+    this.isDeletingUserPcId.set(item.id);
+
+    this.http
+      .delete<{ result: number; error?: string }>(
+        `${API_BASE_URL}/pcs/${item.id}`,
+        { body: { userkey } }
+      )
+      .pipe(finalize(() => this.isDeletingUserPcId.set(null)))
+      .subscribe({
+        next: (response) => {
+          if (response.result !== 1) {
+            this.deletePcMessage.set(response.error || 'Failed to delete PC.');
+            return;
+          }
+
+          this.userPcs.update((pcs) => pcs.filter((pc) => pc.id !== item.id));
+          this.pendingDeletePc.set(null);
+          if (this.editingUserPcId() === item.id) {
+            this.closePcEditor();
+          }
+          if (this.expandedPcId() === item.id) {
+            this.expandedPcId.set(null);
+          }
+          if (this.selectedStartPcId() === item.id) {
+            this.selectedStartPcId.set(null);
+          }
+          this.deletePcMessage.set('PC deleted.');
+        },
+        error: (errorResponse: { error?: { error?: string } }) => {
+          this.deletePcMessage.set(
+            errorResponse?.error?.error || 'Failed to delete PC.'
+          );
+        },
+      });
   }
 
   cancelEditPc(): void {

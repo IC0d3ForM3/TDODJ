@@ -955,3 +955,44 @@
 	margin-top: 0.3rem;
 	flex-wrap: wrap;
 }
+
+.dashboard-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.45);
+	z-index: 1200;
+}
+
+.dashboard-modal {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: min(92vw, 420px);
+	background: #ffffff;
+	border: 1px solid #d8e5f3;
+	border-radius: 12px;
+	padding: 1rem;
+	box-shadow: 0 20px 46px rgba(0, 0, 0, 0.3);
+	z-index: 1201;
+}
+
+.dashboard-modal-title {
+	margin: 0 0 0.45rem;
+	font-size: 1rem;
+	font-weight: 700;
+	color: #0f172a;
+}
+
+.dashboard-modal-text {
+	margin: 0;
+	font-size: 0.9rem;
+	color: #334155;
+}
+
+.dashboard-modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.55rem;
+	margin-top: 0.95rem;
+}

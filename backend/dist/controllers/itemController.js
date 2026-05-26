@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateItem = exports.createItem = exports.getItems = void 0;
+exports.deleteItem = exports.updateItem = exports.createItem = exports.getItems = void 0;
 const userRepository_1 = require("../repositories/userRepository");
 const itemService = __importStar(require("../services/itemService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -142,6 +142,7 @@ function buildItemPayload(input, isAdmin) {
         soundId: normalizeNullableInt(input.soundId ?? input.soundid),
         isPublic: isAdmin ? input.isPublic === true || input.ispublic === true : false,
         isTwoHanded: input.isTwoHanded === true || input.istwohanded === true,
+        uses: normalizeNullableInt(input.uses),
     };
 }
 const getItems = async (req, res) => {
@@ -210,3 +211,24 @@ const updateItem = async (req, res) => {
     }
 };
 exports.updateItem = updateItem;
+const deleteItem = async (req, res) => {
+    const id = parseInt(req.params['id'] ?? '', 10);
+    if (!Number.isFinite(id) || id <= 0) {
+        return res.status(400).json({ result: 0, error: 'Valid item id is required' });
+    }
+    const userkey = req.query['userkey'];
+    if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+        return res.status(400).json({ result: 0, error: 'Valid userkey is required' });
+    }
+    try {
+        const deleted = await itemService.removeItemForUser(id, userkey.trim());
+        if (!deleted) {
+            return res.status(404).json({ result: 0, error: 'Item not found or access denied' });
+        }
+        return res.json({ result: 1 });
+    }
+    catch {
+        return res.status(500).json({ result: 0, error: 'Failed to delete item' });
+    }
+};
+exports.deleteItem = deleteItem;

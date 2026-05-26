@@ -30,7 +30,7 @@ import { UploadPopup, UploadedMediaItem } from '../upload-popup/upload-popup';
 import { ItemService } from '../../services/item';
 import { CurseService } from '../../services/curse';
 import { PotionService } from '../../services/potion';
-import { Door, DoorItemRequirement } from '../../interfaces/door';
+import { Door, DoorItemRequirement, DoorOpenDirection } from '../../interfaces/door';
 import { Square } from '../../interfaces/square';
 import { Wall } from '../../interfaces/wall';
 import { Key } from '../../interfaces/key';
@@ -299,6 +299,10 @@ export class Creator implements OnInit {
   readonly isMonsterDialogVisible = signal(false);
   readonly isPlaceTresherDialogVisible = signal(false);
   readonly isPlaceMonsterDialogVisible = signal(false);
+  readonly placeMonsterFilterText = signal('');
+  readonly placeMonsterSortKey = signal<'name-asc' | 'name-desc' | 'hp-asc' | 'hp-desc' | 'ac-asc' | 'ac-desc'>('name-asc');
+  readonly placeTresherFilterText = signal('');
+  readonly placeTresherSortKey = signal<'name-asc' | 'name-desc'>('name-asc');
   get isLoadingTresherLibrary() { return this.libraryService.isLoadingTresherLibrary; }
   get isLoadingMonsterLibrary() { return this.libraryService.isLoadingMonsterLibrary; }
   readonly loadError = signal<string | null>(null);
@@ -414,6 +418,10 @@ export class Creator implements OnInit {
   readonly placeMonsterDropItemSelection = signal('');
   readonly placeMonsterDropSpellSelection = signal('');
   readonly placeMonsterDropPotionSelection = signal('');
+
+  readonly editingMonsterCallsReinforcements = signal(false);
+  readonly editingMonsterReinforcementCount = signal(0);
+  readonly editingMonsterReinforcementMonsterName = signal('');
   get placeMonsterSelectedId() { return this.placementService.placeMonsterSelectedId; }
   readonly placeMonsterSelectedInfo = computed(() => {
     const id = this.placeMonsterSelectedId();
@@ -699,7 +707,7 @@ export class Creator implements OnInit {
     isHidden: new FormControl<boolean>(false, { nonNullable: true }),
     toFind: new FormControl<number>(3, {
       nonNullable: true,
-      validators: [Validators.min(1), Validators.max(6)],
+      validators: [Validators.min(1), Validators.max(18)],
     }),
     name: new FormControl<string>('', { nonNullable: true }),
     description: new FormControl<string>('', { nonNullable: true }),
@@ -716,6 +724,8 @@ export class Creator implements OnInit {
     trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
     itemRequirementItemId: new FormControl<number | null>(null),
     itemRequirementConsume: new FormControl<boolean>(false, { nonNullable: true }),
+    oneWay: new FormControl<boolean>(false, { nonNullable: true }),
+    openDirection: new FormControl<DoorOpenDirection>('top', { nonNullable: true }),
   });
 
   readonly startPointForm = new FormGroup({
@@ -1055,6 +1065,9 @@ export class Creator implements OnInit {
       ac: 10,
       runAt: 0,
     });
+    this.editingMonsterCallsReinforcements.set(false);
+    this.editingMonsterReinforcementCount.set(0);
+    this.editingMonsterReinforcementMonsterName.set('');
     this.createDungonForm.reset({
       name: '',
       description: '',
@@ -1111,7 +1124,25 @@ export class Creator implements OnInit {
 
     if (target.value === 'open') {
       this.doorForm.controls.isLocked.setValue(false);
+      this.doorForm.controls.toPick.setValue(null);
     }
+  }
+
+  onDoorLockedChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    if (!target) {
+      return;
+    }
+
+    if (target.checked) {
+      const current = this.doorForm.controls.toPick.value;
+      if (current === null || !Number.isFinite(current)) {
+        this.doorForm.controls.toPick.setValue(0);
+      }
+      return;
+    }
+
+    this.doorForm.controls.toPick.setValue(null);
   }
 
   saveDoorPlacement(): void {
@@ -1122,7 +1153,25 @@ export class Creator implements OnInit {
 
     if (this.doorForm.invalid) {
       this.doorForm.markAllAsTouched();
-      this.doorDialogError.set('Door HP must be 1 or greater.');
+
+      if (this.doorForm.controls.hp.invalid) {
+        this.doorDialogError.set('Door HP must be 1 or greater.');
+        return;
+      }
+      if (this.doorForm.controls.isLocked.value && this.doorForm.controls.toPick.invalid) {
+        this.doorDialogError.set('Pick Lock DC must be 0 or greater.');
+        return;
+      }
+      if (this.doorForm.controls.isHidden.value && this.doorForm.controls.toFind.invalid) {
+        this.doorDialogError.set('Find DC must be between 1 and 18.');
+        return;
+      }
+      if (this.doorForm.controls.spReward.invalid) {
+        this.doorDialogError.set('Skill Points Reward must be 0 or greater.');
+        return;
+      }
+
+      this.doorDialogError.set('Please fix the highlighted door values.');
       return;
     }
 
@@ -1147,13 +1196,15 @@ export class Creator implements OnInit {
     const itemRequirement: DoorItemRequirement | null = itemReqItem
       ? { itemId: itemReqItem.id, itemName: itemReqItem.name, consume: this.doorForm.controls.itemRequirementConsume.value }
       : null;
+    const oneWay = this.doorForm.controls.oneWay.value;
+    const openDirection: DoorOpenDirection | null = oneWay ? this.doorForm.controls.openDirection.value : null;
     const settings: DoorPromptResult = {
       state,
       hp,
       isLocked,
       isHidden: this.doorForm.controls.isHidden.value,
       toFind: this.doorForm.controls.isHidden.value
-        ? Math.min(6, Math.max(1, Math.floor(this.doorForm.controls.toFind.value)))
+        ? Math.min(18, Math.max(1, Math.floor(this.doorForm.controls.toFind.value)))
         : 0,
       name: this.doorForm.controls.name.value.trim(),
       description: this.doorForm.controls.description.value.trim(),
@@ -1161,6 +1212,8 @@ export class Creator implements OnInit {
       trap,
       spReward: this.doorForm.controls.spReward.value ?? null,
       itemRequirement,
+      oneWay,
+      openDirection,
     };
 
     const dungonId = pending.dungonId;
@@ -1276,6 +1329,8 @@ export class Creator implements OnInit {
       trapToDisarm: door.trap?.toDisarm ?? 10,
       itemRequirementItemId: door.itemRequirement?.itemId ?? null,
       itemRequirementConsume: door.itemRequirement?.consume ?? false,
+      oneWay: door.oneWay ?? false,
+      openDirection: door.openDirection ?? 'top',
     });
     this.isDoorDialogVisible.set(true);
   }
@@ -3277,7 +3332,7 @@ export class Creator implements OnInit {
 
   addMonsterDropKey(value: string): void {
     const id = Number(value);
-    if (!Number.isFinite(id) || id <= 0 || this.isKeyPlaced(id)) {
+    if (value === '' || !Number.isFinite(id) || id < 0 || this.placeMonsterDropKeyIds().includes(id)) {
       return;
     }
     this.placeMonsterDropKeyIds.set([...this.placeMonsterDropKeyIds(), id]);
@@ -4253,9 +4308,9 @@ export class Creator implements OnInit {
       magic: 0,
       magicResistance: 0,
       spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.spReward?.value), 0)),
-      callsReinforcements: false,
-      reinforcementCount: 0,
-      reinforcementMonsterName: null,
+      callsReinforcements: this.editingMonsterCallsReinforcements(),
+      reinforcementCount: Math.max(0, this.editingMonsterReinforcementCount()),
+      reinforcementMonsterName: this.editingMonsterReinforcementMonsterName().trim() || null,
       toHitPlusNeeded: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.toHitPlusNeeded?.value), 0)),
       npcGreeting: null,
       npcInfo1: null,
@@ -4332,6 +4387,9 @@ export class Creator implements OnInit {
     this.editingMonsterNumberOfAttacks.set(Math.max(1, this.normalizeNumber(this.toFiniteNumber(selectedMonster.numberOfAttacks), 1)));
     this.editingMonsterTresherIds.set(this.normalizeIdList(selectedMonster.tresherIds));
     this.editingMonsterAttacks.set(this.normalizeMonsterAttacks(selectedMonster.attacks));
+    this.editingMonsterCallsReinforcements.set(selectedMonster.callsReinforcements === true);
+    this.editingMonsterReinforcementCount.set(Math.max(0, selectedMonster.reinforcementCount ?? 0));
+    this.editingMonsterReinforcementMonsterName.set(selectedMonster.reinforcementMonsterName ?? '');
     this.monsterForm.reset({
       name: selectedMonster.name,
       type: selectedMonster.type,
@@ -4368,8 +4426,16 @@ export class Creator implements OnInit {
     }
     const dungonId = this.selectedDungonId();
     if (dungonId !== null) {
+      const editingPos = this.editingMonsterPlacementPos();
       const monsterPlacements = this.monsterPlacementsByDungon()[dungonId] ?? [];
-      if (monsterPlacements.some((p) => p.keyIds?.includes(keyId))) {
+      if (monsterPlacements.some((p) => {
+        // Exclude the placement currently being edited — its key assignments
+        // are tracked live in placeMonsterDropKeyIds(), not the saved state.
+        if (editingPos && p.row === editingPos.row && p.column === editingPos.column) {
+          return false;
+        }
+        return p.keyIds?.includes(keyId);
+      })) {
         return true;
       }
     }
@@ -4660,11 +4726,21 @@ export class Creator implements OnInit {
       return [];
     }
 
-    return this.tresherListByDungon()[dungonId] ?? [];
+    return this.applyTresherFilterSort(this.tresherListByDungon()[dungonId] ?? []);
   }
 
   placeDialogLibraryTreshers(): TresherLibraryItem[] {
-    return this.tresherLibrary();
+    return this.applyTresherFilterSort(this.tresherLibrary());
+  }
+
+  private applyTresherFilterSort<T extends { name: string }>(list: T[]): T[] {
+    const filter = this.placeTresherFilterText().trim().toLowerCase();
+    const sort = this.placeTresherSortKey();
+    let result = filter ? list.filter((t) => t.name.toLowerCase().includes(filter)) : list;
+    result = [...result].sort((a, b) =>
+      sort === 'name-desc' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)
+    );
+    return result;
   }
 
   libraryTresherSourceLabel(tresher: TresherLibraryItem): string {
@@ -4683,11 +4759,28 @@ export class Creator implements OnInit {
       return [];
     }
 
-    return this.monsterListByDungon()[dungonId] ?? [];
+    return this.applyMonsterFilterSort(this.monsterListByDungon()[dungonId] ?? []);
   }
 
   placeDialogLibraryMonsters(): MonsterLibraryItem[] {
-    return this.monsterLibrary();
+    return this.applyMonsterFilterSort(this.monsterLibrary());
+  }
+
+  private applyMonsterFilterSort<T extends { name: string; hp: number; ac: number }>(list: T[]): T[] {
+    const filter = this.placeMonsterFilterText().trim().toLowerCase();
+    const sort = this.placeMonsterSortKey();
+    let result = filter ? list.filter((m) => m.name.toLowerCase().includes(filter)) : list;
+    result = [...result].sort((a, b) => {
+      switch (sort) {
+        case 'name-desc': return b.name.localeCompare(a.name);
+        case 'hp-asc':    return a.hp - b.hp;
+        case 'hp-desc':   return b.hp - a.hp;
+        case 'ac-asc':    return a.ac - b.ac;
+        case 'ac-desc':   return b.ac - a.ac;
+        default:          return a.name.localeCompare(b.name);
+      }
+    });
+    return result;
   }
 
   libraryMonsterSourceLabel(monster: MonsterLibraryItem): string {
@@ -8179,6 +8272,56 @@ export class Creator implements OnInit {
         }
 
         context.stroke();
+
+        // Draw one-way arrows on one-way doors
+        const seenOneWayDoorIds = new Set<number>();
+        for (const square of squares) {
+          const left = square.column * this.gridCellSize;
+          const top = square.row * this.gridCellSize;
+          const right = left + this.gridCellSize;
+          const bottom = top + this.gridCellSize;
+          const midX = left + this.gridCellSize / 2;
+          const midY = top + this.gridCellSize / 2;
+          const arrowSize = Math.max(3, this.gridCellSize * 0.18);
+
+          const drawArrow = (cx: number, cy: number, dx: number, dy: number): void => {
+            const tipX = cx + dx * arrowSize;
+            const tipY = cy + dy * arrowSize;
+            const perpX = -dy;
+            const perpY = dx;
+            context.beginPath();
+            context.moveTo(tipX, tipY);
+            context.lineTo(cx - dx * arrowSize * 0.4 + perpX * arrowSize * 0.5, cy - dy * arrowSize * 0.4 + perpY * arrowSize * 0.5);
+            context.lineTo(cx - dx * arrowSize * 0.4 - perpX * arrowSize * 0.5, cy - dy * arrowSize * 0.4 - perpY * arrowSize * 0.5);
+            context.closePath();
+            context.fill();
+          };
+
+          for (const side of ['toTop', 'toRight', 'toBottom', 'toLeft'] as const) {
+            const conn = square[side];
+            if (!this.isDoorConnection(conn) || !conn.oneWay || conn.openDirection === null) continue;
+            if (seenOneWayDoorIds.has(conn.id)) continue;
+            seenOneWayDoorIds.add(conn.id);
+
+            context.fillStyle = '#ffe04d';
+            // Place arrow at midpoint of the door edge
+            const dir = conn.openDirection;
+            if (side === 'toTop' || side === 'toBottom') {
+              const edgeY = side === 'toTop' ? top : bottom;
+              const cx = midX;
+              const cy = edgeY;
+              // Arrow points in the allowed travel direction
+              const dy = dir === 'top' ? -1 : 1;
+              drawArrow(cx, cy, 0, dy);
+            } else {
+              const edgeX = side === 'toLeft' ? left : right;
+              const cx = edgeX;
+              const cy = midY;
+              const dx = dir === 'left' ? -1 : 1;
+              drawArrow(cx, cy, dx, 0);
+            }
+          }
+        }
 
         // Highlight the selected key's associated door and grid position
         const selectedKeyId = this.selectedKeyIdForPlacement();
@@ -11771,6 +11914,8 @@ export class Creator implements OnInit {
             trap: settings.trap,
             spReward: settings.spReward,
             itemRequirement: settings.itemRequirement,
+            oneWay: settings.oneWay,
+            openDirection: settings.openDirection,
           };
           updatedSquare = this.withSquareSide(updatedSquare, side, updated);
           changed = true;
@@ -11951,6 +12096,8 @@ export class Creator implements OnInit {
       isFound: false,
       spReward: settings.spReward ?? null,
       itemRequirement: settings.itemRequirement ?? null,
+      oneWay: settings.oneWay,
+      openDirection: settings.openDirection,
     };
   }
 

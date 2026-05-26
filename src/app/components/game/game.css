@@ -1132,6 +1132,17 @@
 	cursor: not-allowed;
 }
 
+.action-button-mage-rest {
+	border-color: #2a5a8b;
+	background-color: #0d3560;
+	color: #c8e8ff;
+	font-weight: 700;
+}
+
+.action-button-mage-rest:hover:not(:disabled) {
+	background-color: #174d82;
+}
+
 .action-button-ade:hover:not(:disabled) {
 	background-color: #51400f;
 }
