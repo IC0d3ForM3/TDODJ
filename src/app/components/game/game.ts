@@ -382,6 +382,15 @@ export class Game implements OnInit {
   readonly bugReportSubmitting = signal<boolean>(false);
   readonly bugReportSuccess = signal<boolean>(false);
   readonly bugReportError = signal<string | null>(null);
+  readonly npcResponseDraft = signal<string>('');
+  readonly itemNoteModal = signal<{ itemName: string; note: string; canRead: boolean; minMindToRead: number } | null>(null);
+  readonly showBackpackInventoryModal = signal(false);
+  readonly showDrinkPotionModal = signal(false);
+  readonly showControlsHelpModal = signal(false);
+  readonly defaultSpellIdByDungon = signal<Record<number, number | null>>({});
+  readonly pendingExitAwardsInnReward = signal(true);
+  readonly pendingExitMissingItemName = signal<string | null>(null);
+  readonly lastExitGrantedInnReward = signal(true);
   private tavernMusicAudio: HTMLAudioElement | null = null;
   private readonly tavernWindowSoundPaths = ['/sounds/game sounds/1.mp3', '/sounds/game sounds/2.mp3'];
   private readonly portalTraverseSoundPath = '/sounds/game sounds/portal sound.wav';
@@ -786,7 +795,7 @@ export class Game implements OnInit {
     const preview = this.gridPreviewContext();
     if (!preview) return [];
     return (this.floorTrapPlacementsByDungon()[preview.dungonId] ?? [])
-      .filter(p => p.isDetected && !p.isTriggered && !p.isDisarmed);
+      .filter(p => (p.isDetected || p.isTriggered) && !p.isDisarmed);
   }
 
   previewObstaclePlacementsForView(): ObstaclePlacement[] {
@@ -1101,6 +1110,29 @@ export class Game implements OnInit {
       return;
     }
 
+    const activeSpellId = this.selectedSpellId();
+    if (activeSpellId !== null) {
+      const activeSpell = this.pcTresherSpellsById().get(activeSpellId);
+      if (activeSpell && this.getSpellTargetKind(activeSpell) === 'trap') {
+        const trap = this.getActiveFloorTrapAtSquare(preview.dungonId, cell.row, cell.column);
+        if (!trap) {
+          this.previewActionMessage.set('Click a trap to target it.');
+          return;
+        }
+        const dr = Math.abs(cell.row - preview.centerRow);
+        const dc = Math.abs(cell.column - preview.centerColumn);
+        const range = this.getSpellMaxMonsterRange(activeSpell);
+        if (Math.max(dr, dc) > range || !this.hasLineOfSight(preview.dungonId, preview.centerRow, preview.centerColumn, cell.row, cell.column)) {
+          this.previewActionMessage.set(`${trap.trap.name || 'Trap'} is out of spell range (${range}).`);
+          return;
+        }
+        this.selectedCombatTarget.set({ row: cell.row, column: cell.column });
+        this.previewActionMessage.set(`Target: ${trap.trap.name || 'trap'}.`);
+        this.drawPreviewGridCanvas();
+        return;
+      }
+    }
+
     const monster = this.monsterInstances().find(
       m => !m.isDead && m.row === cell.row && m.column === cell.column
     );
@@ -1352,6 +1384,44 @@ export class Game implements OnInit {
     return c.gold > 0 || c.silver > 0 || c.copper > 0 || c.zinc > 0;
   }
 
+  getTotalGoldInInventory(): number {
+    return this.totalInventoryCurrency().gold;
+  }
+
+  private deductGoldFromInventory(amount: number): void {
+    if (amount <= 0) return;
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+
+    const dungonId = preview.dungonId;
+    const existingCheater = this.cheaterByDungon()[dungonId] ?? { ...DEFAULT_CHEATER };
+    const existingInventory = this.normalizeCheaterInventory(existingCheater.inventory);
+
+    let remaining = amount;
+    const updatedTreshers = existingInventory.treshers.map((tresher) => {
+      if (remaining <= 0) return tresher;
+      const currentGold = Math.max(0, tresher.gold ?? 0);
+      if (currentGold <= 0) return tresher;
+      const deduct = Math.min(remaining, currentGold);
+      remaining -= deduct;
+      return {
+        ...tresher,
+        gold: currentGold - deduct,
+      };
+    });
+
+    this.cheaterByDungon.update((allCheaters) => ({
+      ...allCheaters,
+      [dungonId]: {
+        ...existingCheater,
+        inventory: {
+          keys: existingInventory.keys,
+          treshers: updatedTreshers,
+        },
+      },
+    }));
+  }
+
   readonly bodyPanelBgColor = computed(() => {
     const hp = this.playerHp();
     const max = this.getEffectivePlayerMaxHp();
@@ -1534,6 +1604,31 @@ export class Game implements OnInit {
     return flat.sort((a, b) => a.name.localeCompare(b.name));
   });
 
+  readonly allPotionsUnified = computed(() => {
+    const fromTreshers = this.allTresherPotionsFlat().map((potion) => ({
+      id: potion.id,
+      name: potion.name,
+      description: potion.description,
+      effectTo: potion.effectTo,
+      effectAmount: potion.effectAmount,
+      lastFor: potion.lastFor,
+      source: 'tresher' as const,
+      tresherIdx: potion.tresherIdx,
+    }));
+
+    const fromCollected = this.collectedFloorPotionsForPreview().map((potion) => ({
+      id: potion.id,
+      name: potion.name,
+      description: potion.description,
+      effectTo: potion.effectTo,
+      effectAmount: potion.effectAmount,
+      lastFor: potion.lastFor,
+      source: 'collected' as const,
+    }));
+
+    return [...fromTreshers, ...fromCollected].sort((a, b) => a.name.localeCompare(b.name));
+  });
+
   getTresherInnerItems(tresher: Tresher): Array<{ id: number; name: string; description: string; type: string; effectValue: number | null; armorSlot: string | null; damage: number; range: number; effectToPc?: string | null; effectToPcValue?: number }> {
     return this.inventoryService.getTresherInnerItems(tresher);
   }
@@ -1574,6 +1669,129 @@ export class Game implements OnInit {
     const preview = this.gridPreviewContext();
     if (!preview) return false;
     return this.getKnownSpellIdsForDungon(preview.dungonId).has(spellId);
+  }
+
+  isDefaultSpell(spellId: number): boolean {
+    const preview = this.gridPreviewContext();
+    if (!preview) return false;
+    return (this.defaultSpellIdByDungon()[preview.dungonId] ?? null) === spellId;
+  }
+
+  setDefaultSpell(spellId: number): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    if (!this.isSpellEquippedById(spellId)) return;
+    this.defaultSpellIdByDungon.update((all) => ({
+      ...all,
+      [preview.dungonId]: spellId,
+    }));
+  }
+
+  canUseQuickCastIcon(): boolean {
+    if (this.isFighterClass()) {
+      return false;
+    }
+    const spellId = this.getDefaultSpellIdForPreview();
+    if (spellId === null) {
+      return false;
+    }
+    const spell = this.pcTresherSpellsById().get(spellId);
+    return spell ? this.canCastSpell(spell) : false;
+  }
+
+  quickCastFromIcon(): void {
+    if (this.isFighterClass()) {
+      this.tryBoostAttack();
+      return;
+    }
+
+    const spellId = this.getDefaultSpellIdForPreview();
+    if (spellId === null) {
+      this.previewActionMessage.set('Set a default spell first.');
+      return;
+    }
+
+    this.initSpellCast(spellId);
+  }
+
+  openBackpackInventoryModal(): void {
+    this.showBackpackInventoryModal.set(true);
+  }
+
+  closeBackpackInventoryModal(): void {
+    this.showBackpackInventoryModal.set(false);
+  }
+
+  openDrinkPotionModal(): void {
+    this.showDrinkPotionModal.set(true);
+  }
+
+  closeDrinkPotionModal(): void {
+    this.showDrinkPotionModal.set(false);
+  }
+
+  openControlsHelpModal(): void {
+    this.showControlsHelpModal.set(true);
+  }
+
+  closeControlsHelpModal(): void {
+    this.showControlsHelpModal.set(false);
+  }
+
+  facingWallNoteForPreview(): { name: string; description: string; imageSrc?: string | null } | null {
+    const note = this.nearbyItemsForPreview().find((item) => item.kind === 'Text' && (item.name || '').toLowerCase().includes('wall note'));
+    if (!note) return null;
+    return {
+      name: note.name,
+      description: note.description,
+      imageSrc: note.imageSrc ?? null,
+    };
+  }
+
+  readWallNote(note: { name: string; description: string; imageSrc?: string | null }): void {
+    this.itemNoteModal.set({
+      itemName: note.name || 'Wall Note',
+      note: note.description || '',
+      canRead: true,
+      minMindToRead: 0,
+    });
+  }
+
+  dismissItemNoteModal(): void {
+    this.itemNoteModal.set(null);
+  }
+
+  onNpcResponseInput(value: string): void {
+    this.npcResponseDraft.set(value ?? '');
+  }
+
+  sendNpcResponse(): void {
+    const response = this.npcResponseDraft().trim();
+    if (!response) return;
+    this.addCombatLog(`You: ${response}`);
+    this.npcResponseDraft.set('');
+  }
+
+  closeNpcDialogAndAttack(): void {
+    this.dismissNpcDialog();
+    if (this.turnPhase() === 'player') {
+      this.tryPlayerAttack();
+    }
+  }
+
+  private getDefaultSpellIdForPreview(): number | null {
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return null;
+    }
+
+    const explicit = this.defaultSpellIdByDungon()[preview.dungonId] ?? null;
+    if (explicit !== null && this.isSpellEquippedById(explicit)) {
+      return explicit;
+    }
+
+    const firstEquipped = this.allTresherSpellsFlat().find((spell) => this.isSpellEquippedById(spell.id));
+    return firstEquipped?.id ?? null;
   }
 
   isSpellEquippedById(spellId: number): boolean {
@@ -1633,7 +1851,11 @@ export class Game implements OnInit {
   canLearnCollectedSpell(spell: PcTresherSpellData): boolean {
     if (!spell) return false;
     if (this.isSpellLearned(spell.id)) return false;
-    return this.playerSp() >= Math.max(1, spell.sp);
+    const spLearnCost = Math.max(0, spell.sp ?? 0);
+    const gpLearnCost = Math.max(0, spell.learnCostGp ?? 0);
+    if (this.playerSp() < spLearnCost) return false;
+    if (this.getTotalGoldInInventory() < gpLearnCost) return false;
+    return true;
   }
 
   learnCollectedFloorSpell(spellId: number): void {
@@ -1646,13 +1868,21 @@ export class Game implements OnInit {
       return;
     }
 
-    const spCost = Math.max(1, spell.sp);
+    const spCost = Math.max(0, spell.sp ?? 0);
+    const gpCost = Math.max(0, spell.learnCostGp ?? 0);
     if (this.playerSp() < spCost) {
       this.previewActionMessage.set(`Not enough SP to learn ${spell.name}. Need ${spCost} SP.`);
       return;
     }
+    if (gpCost > 0 && this.getTotalGoldInInventory() < gpCost) {
+      this.previewActionMessage.set(`Not enough GP to learn ${spell.name}. Need ${gpCost} GP.`);
+      return;
+    }
 
     this.playerSp.update((sp) => Math.max(0, sp - spCost));
+    if (gpCost > 0) {
+      this.deductGoldFromInventory(gpCost);
+    }
     const mindBonus = Math.floor(this.getEffectivePlayerMind() / 2);
     const classModifier = this.getSpellLearningClassModifier();
     const totalBonus = mindBonus + classModifier;
@@ -1692,9 +1922,17 @@ export class Game implements OnInit {
     if (this.playerMp() < Math.max(1, spell.magicCost ?? 1)) return false;
     const preview = this.gridPreviewContext();
     if (!preview) return false;
-    const maxTargetRange = this.getSpellMaxMonsterRange(spell);
-    if (maxTargetRange <= 0) return true;
-    return this.findAdjacentLiveMonster(preview.centerRow, preview.centerColumn, maxTargetRange, preview.dungonId) !== null;
+
+    const targetKind = this.getSpellTargetKind(spell);
+    if (targetKind === 'trap') {
+      return this.getTargetFloorTrap(preview.dungonId, preview.centerRow, preview.centerColumn, this.getSpellMaxMonsterRange(spell)) !== null;
+    }
+    if (targetKind === 'monster') {
+      const maxTargetRange = this.getSpellMaxMonsterRange(spell);
+      if (maxTargetRange <= 0) return true;
+      return this.findAdjacentLiveMonster(preview.centerRow, preview.centerColumn, maxTargetRange, preview.dungonId) !== null;
+    }
+    return true;
   }
 
   initSpellCast(spellId: number): void {
@@ -1708,8 +1946,9 @@ export class Game implements OnInit {
       return;
     }
 
-    if (spell.numberOfTargets > 1 && this.hasMonsterTargetEffect(spell)) {
-      this.spellTargetMode.set({ spellId, maxTargets: spell.numberOfTargets, targets: [] });
+    const targetKind = this.getSpellTargetKind(spell);
+    if (spell.numberOfTargets > 1 && targetKind === 'monster' && this.hasMonsterTargetEffect(spell)) {
+      this.spellTargetMode.set({ spellId, maxTargets: spell.numberOfTargets, targets: [], targetType: 'monster' });
       this.selectedSpellId.set(spellId);
       this.previewActionMessage.set(`${spell.name}: click up to ${spell.numberOfTargets} monsters on the map, then press Cast.`);
       this.addCombatLog(`Select up to ${spell.numberOfTargets} targets for ${spell.name}.`);
@@ -1745,8 +1984,30 @@ export class Game implements OnInit {
       this.addCombatLog(`Not enough MP to cast ${spell.name}. Need ${spellMpCost} MP.`);
       return;
     }
+const targetKind = this.getSpellTargetKind(spell);
+    if (targetKind === 'trap') {
+      const maxTrapRange = this.getSpellMaxMonsterRange(spell);
+      const targetTrap = this.getTargetFloorTrap(preview.dungonId, preview.centerRow, preview.centerColumn, maxTrapRange);
+      if (!targetTrap) {
+        this.addCombatLog(`No trap in range (${maxTrapRange}) for ${spell.name}.`);
+        return;
+      }
 
-    if (!this.hasMonsterTargetEffect(spell)) {
+      this.playSpellSound(spell);
+      this.selectedSpellId.set(null);
+      this.consumePlayerAE(actionCost, preview.dungonId);
+      this.playerMp.update(v => Math.max(0, v - spellMpCost));
+
+      const spellFlavor = this.formatSpellFlavor(spell);
+      this.tryDisarmTrapTarget(targetTrap, spell, spellFlavor);
+      this.drawPreviewGridCanvas();
+      if (this.playerAE() <= 0) {
+        this.startMonsterTurns();
+      }
+      return;
+    }
+
+    if (targetKind === 'pc' || !this.hasMonsterTargetEffect(spell)) {
       const spellFlavor = this.formatSpellFlavor(spell);
       this.playSpellSound(spell);
       for (const slot of effectSlots) {
@@ -1763,11 +2024,11 @@ export class Game implements OnInit {
     const maxMonsterRange = this.getSpellMaxMonsterRange(spell);
     const target = this.getTargetMonster(preview.dungonId, preview.centerRow, preview.centerColumn, maxMonsterRange);
     if (!target) {
-      const hasMonsterCureSlot = effectSlots.some((slot) => !slot.effectOnPc && this.normalizeEffectToPcStat(slot.effectOn) === 'RemoveCurse');
+      const hasMonsterCureSlot = effectSlots.some((slot) => slot.targetType === 'monster' && this.normalizeEffectToPcStat(slot.effectOn) === 'RemoveCurse');
       if (hasMonsterCureSlot) {
         const spellFlavor = this.formatSpellFlavor(spell);
         for (const slot of effectSlots) {
-          if (!slot.effectOnPc && this.normalizeEffectToPcStat(slot.effectOn) === 'RemoveCurse') {
+          if (slot.targetType === 'monster' && this.normalizeEffectToPcStat(slot.effectOn) === 'RemoveCurse') {
             this.applySpellEffectToPlayer(spell, { ...slot, effectOnPc: true, range: 0 }, spellFlavor);
           }
         }
@@ -1798,14 +2059,17 @@ export class Game implements OnInit {
 
     if (roll >= dc) {
       const dist = Math.max(Math.abs(target.row - preview.centerRow), Math.abs(target.column - preview.centerColumn));
-      const hasRangedMonsterHit = effectSlots.some((slot) => !slot.effectOnPc && slot.effectOn === 'HP' && slot.range > 1 && dist > 1 && dist <= slot.range);
+      const hasRangedMonsterHit = effectSlots.some((slot) => slot.targetType === 'monster' && slot.effectOn === 'HP' && slot.range > 1 && dist > 1 && dist <= slot.range);
       if (hasRangedMonsterHit) {
         this.triggerSpellBeam(preview.centerRow, preview.centerColumn, target.row, target.column, true);
       }
 
       for (const slot of effectSlots) {
-        if (slot.effectOnPc) {
+        if (slot.targetType === 'pc') {
           this.applySpellEffectToPlayer(spell, slot, spellFlavor);
+          continue;
+        }
+        if (slot.targetType !== 'monster') {
           continue;
         }
 
@@ -1928,6 +2192,7 @@ export class Game implements OnInit {
     effectOnPc: boolean;
     range: number;
     lastFor: number;
+    targetType: 'pc' | 'monster' | 'trap';
   }> {
     const range1 = Math.max(0, spell.range1 ?? spell.range ?? 0);
     const range2 = Math.max(0, spell.range2 ?? spell.range ?? 0);
@@ -1935,40 +2200,71 @@ export class Game implements OnInit {
     const lastFor2 = Math.max(0, spell.lastFor2 ?? spell.lastFor ?? 0);
     const effectAmount2 = typeof spell.effectAmount2 === 'number' ? spell.effectAmount2 : 0;
     const effectOn2 = (spell.effectOn2 ?? '').trim();
+    const explicitTargetType = spell.targetType && spell.targetType !== 'auto' ? spell.targetType : null;
 
-    const slots: Array<{ effectOn: string; effectAmount: number; effectOnPc: boolean; range: number; lastFor: number }> = [];
+    const slots: Array<{ effectOn: string; effectAmount: number; effectOnPc: boolean; range: number; lastFor: number; targetType: 'pc' | 'monster' | 'trap'; }> = [];
 
     const effectOn1 = (spell.effectOn ?? '').trim();
     if (effectOn1) {
+      const inferredTargetType = this.normalizeEffectToPcStat(effectOn1) === 'RemoveTrap'
+        ? 'trap'
+        : ((spell.effectOnPc1 === true) || range1 === 0 || this.normalizeEffectToPcStat(effectOn1) === 'RemoveCurse')
+          ? 'pc'
+          : 'monster';
       slots.push({
         effectOn: effectOn1,
         effectAmount: spell.effectAmount,
-        effectOnPc: (spell.effectOnPc1 === true) || range1 === 0,
+        effectOnPc: explicitTargetType === 'pc' || inferredTargetType === 'pc',
         range: range1,
         lastFor: lastFor1,
+        targetType: explicitTargetType ?? inferredTargetType,
       });
     }
 
     if (effectOn2) {
+      const inferredTargetType = this.normalizeEffectToPcStat(effectOn2) === 'RemoveTrap'
+        ? 'trap'
+        : ((spell.effectOnPc2 === true) || range2 === 0 || this.normalizeEffectToPcStat(effectOn2) === 'RemoveCurse')
+          ? 'pc'
+          : 'monster';
       slots.push({
         effectOn: effectOn2,
         effectAmount: effectAmount2,
-        effectOnPc: (spell.effectOnPc2 === true) || range2 === 0,
+        effectOnPc: explicitTargetType === 'pc' || inferredTargetType === 'pc',
         range: range2,
         lastFor: lastFor2,
+        targetType: explicitTargetType ?? inferredTargetType,
       });
     }
 
     return slots;
   }
 
+  private getSpellTargetKind(spell: PcTresherSpellData): 'self' | 'pc' | 'monster' | 'trap' {
+    const slots = this.getSpellEffectSlots(spell);
+    if (slots.some((slot) => slot.targetType === 'trap')) {
+      return 'trap';
+    }
+    if (slots.some((slot) => slot.targetType === 'monster')) {
+      return 'monster';
+    }
+    if (slots.some((slot) => slot.targetType === 'pc')) {
+      return 'pc';
+    }
+    return 'self';
+  }
+
   private hasMonsterTargetEffect(spell: PcTresherSpellData): boolean {
-    return this.getSpellEffectSlots(spell).some((slot) => !slot.effectOnPc);
+    return this.getSpellEffectSlots(spell).some((slot) => slot.targetType === 'monster');
+  }
+
+  private hasTrapTargetEffect(spell: PcTresherSpellData): boolean {
+    return this.getSpellEffectSlots(spell).some((slot) => slot.targetType === 'trap');
   }
 
   private getSpellMaxMonsterRange(spell: PcTresherSpellData): number {
     return this.getSpellEffectSlots(spell)
-      .filter((slot) => !slot.effectOnPc)
+      .filter((slot) => slot.targetType === 'monster' || slot.targetType === 'trap')
       .reduce((max, slot) => Math.max(max, slot.range), 0);
   }
 
@@ -1985,6 +2281,9 @@ export class Game implements OnInit {
     const preview = this.gridPreviewContext();
     if (target === 'RemoveCurse' && preview) {
       this.clearPlayerCursesForDungon(preview.dungonId);
+      return;
+    }
+    if (target === 'RemoveTrap') {
       return;
     }
     if (target === 'HP') {
@@ -3955,12 +4254,12 @@ export class Game implements OnInit {
     const disarmMindBonus = this.getEffectivePlayerMind();
     let roll: number;
     if (this.isThiephClass()) {
-      const droll1 = this.randomInt(1, 12) + disarmMindBonus;
-      const droll2 = this.randomInt(1, 12) + disarmMindBonus;
+      const droll1 = this.randomInt(1, 20) + disarmMindBonus;
+      const droll2 = this.randomInt(1, 20) + disarmMindBonus;
       roll = Math.max(droll1, droll2);
       this.addCombatLog('Disarm (advantage): rolled ' + droll1 + ' and ' + droll2 + ', kept ' + roll + '.');
     } else {
-      roll = this.randomInt(1, 12) + disarmMindBonus;
+      roll = this.randomInt(1, 20) + disarmMindBonus;
     }
     if (roll >= dc) {
       this.previewActionMessage.set(`Trap disarmed! (rolled ${roll} vs DC ${dc})`);
@@ -3995,8 +4294,51 @@ export class Game implements OnInit {
     }
   }
 
+  private tryDisarmTrapTarget(targetTrap: FloorTrapPlacement, spell: PcTresherSpellData, spellFlavor: string): void {
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+    const dc = targetTrap.trap.toDisarm;
+    const disarmMindBonus = this.getEffectivePlayerMind();
+    let roll: number;
+    if (this.isThiephClass()) {
+      const droll1 = this.randomInt(1, 20) + disarmMindBonus;
+      const droll2 = this.randomInt(1, 20) + disarmMindBonus;
+      roll = Math.max(droll1, droll2);
+      this.addCombatLog('Disarm (advantage): rolled ' + droll1 + ' and ' + droll2 + ', kept ' + roll + '.');
+    } else {
+      roll = this.randomInt(1, 20) + disarmMindBonus;
+    }
+
+    const spellName = `${spell.name}${spellFlavor}`;
+    if (roll >= dc) {
+      this.previewActionMessage.set(`Trap disarmed by ${spellName}! (rolled ${roll} vs DC ${dc})`);
+      this.addCombatLog(`Disarm trap with ${spellName}: rolled ${roll} vs DC ${dc}. Success.`);
+      this.floorTrapPlacementsByDungon.update(all => ({
+        ...all,
+        [preview.dungonId]: (all[preview.dungonId] ?? []).map(p =>
+          p.id === targetTrap.id ? { ...p, isDisarmed: true, isDetected: true } : p
+        )
+      }));
+      this.foundTrap.set(null);
+      this.saveGameState();
+    } else {
+      this.previewActionMessage.set(`Failed to disarm trap with ${spellName}! (rolled ${roll} vs DC ${dc})`);
+      this.addCombatLog(`Disarm trap with ${spellName}: rolled ${roll} vs DC ${dc}. Failed - trap triggers!`);
+      this.floorTrapPlacementsByDungon.update(all => ({
+        ...all,
+        [preview.dungonId]: (all[preview.dungonId] ?? []).map(p =>
+          p.id === targetTrap.id ? { ...p, isTriggered: true, isDetected: true } : p
+        )
+      }));
+      this.triggerTrap(targetTrap.trap);
+      this.foundTrap.set(null);
+      this.saveGameState();
+    }
+  }
+
   private triggerTrap(trap: Trap): void {
     this.previewActionMessage.set(`Trap triggered! ${trap.name || 'A trap'} goes off!`);
+    this.applyTrapSecondaryEffect(trap);
     if (trap.damage <= 0) {
       this.addCombatLog(`Trap triggered! ${trap.name || 'Trap'}`);
       return;
@@ -5899,6 +6241,32 @@ export class Game implements OnInit {
         this.drawMonsterMarkerSelected(context, centerX, centerY, 3.5);
       } else {
         this.drawMonsterMarker(context, centerX, centerY, 3.5);
+      }
+    }
+
+    const selectedTarget = this.selectedCombatTarget();
+    if (selectedTarget) {
+      const selectedMonster = liveMonsterInstancesForMap.find((inst) => inst.row === selectedTarget.row && inst.column === selectedTarget.column);
+      if (!selectedMonster) {
+        const targetKey = this.getSquareKey(selectedTarget.row, selectedTarget.column);
+        if (visibleSquareKeys.has(targetKey)) {
+          const previewRow = selectedTarget.row - preview.startRow;
+          const previewColumn = selectedTarget.column - preview.startColumn;
+          if (
+            previewRow >= 0 &&
+            previewColumn >= 0 &&
+            previewRow < this.previewGridDimension &&
+            previewColumn < this.previewGridDimension
+          ) {
+            const centerX = previewColumn * this.previewGridCellSize + this.previewGridCellSize / 2;
+            const centerY = previewRow * this.previewGridCellSize + this.previewGridCellSize / 2;
+            context.beginPath();
+            context.arc(centerX, centerY, this.previewGridCellSize / 2 - 1, 0, Math.PI * 2);
+            context.strokeStyle = '#ff66cc';
+            context.lineWidth = 2.5;
+            context.stroke();
+          }
+        }
       }
     }
 
@@ -8840,6 +9208,30 @@ export class Game implements OnInit {
       return;
     }
 
+    const activeFloorTrap = this.getActiveFloorTrapAtSquare(preview.dungonId, nextRow, nextColumn);
+    if (activeFloorTrap) {
+      const trapType = this.getTrapType(activeFloorTrap.trap);
+      const isFloorTrap = trapType === 'Pit' || trapType === 'Spiked Pit' || trapType === 'Floor Glue' || trapType === 'Drop Net';
+      if (isFloorTrap) {
+        if (trapType === 'Floor Glue' || trapType === 'Drop Net') {
+          this.previewActionMessage.set(`${activeFloorTrap.trap.name || 'Trap'} blocks the way.`);
+          return;
+        }
+
+        const canCross = this.canSafelyCrossFloorTrap(activeFloorTrap.trap);
+        if (!canCross) {
+          this.floorTrapPlacementsByDungon.update((all) => ({
+            ...all,
+            [preview.dungonId]: (all[preview.dungonId] ?? []).map((p) =>
+              p.id === activeFloorTrap.id ? { ...p, isTriggered: true, isDetected: true } : p
+            ),
+          }));
+          this.triggerTrap(activeFloorTrap.trap);
+          return;
+        }
+      }
+    }
+
     // Block movement into squares that have a non-destroyed obstacle
     const obstaclesForDungon = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
     const hasObstacleAtDest = obstaclesForDungon.some(
@@ -9047,12 +9439,103 @@ export class Game implements OnInit {
     this.floorTrapPlacementsByDungon.update((all) => ({
       ...all,
       [dungonId]: (all[dungonId] ?? []).map((p) =>
-        p.id === activeTrap.id ? { ...p, isTriggered: true } : p
+        p.id === activeTrap.id ? { ...p, isTriggered: true, isDetected: true } : p
       ),
     }));
 
     this.triggerTrap(activeTrap.trap);
     this.saveGameState();
+  }
+
+  private getActiveFloorTrapAtSquare(dungonId: number, row: number, column: number): FloorTrapPlacement | null {
+    return (this.floorTrapPlacementsByDungon()[dungonId] ?? []).find(
+      (p) => p.row === row && p.column === column && !p.isTriggered && !p.isDisarmed
+    ) ?? null;
+  }
+
+  private getTrapType(trap: Trap): string {
+    const explicit = (trap.trapType ?? '').trim();
+    if (explicit) return explicit;
+    const name = (trap.name ?? '').trim().toLowerCase();
+    if (name.includes('spiked pit')) return 'Spiked Pit';
+    if (name.includes('ceiling spikes')) return 'Ceiling Spikes';
+    if (name.includes('floor glue')) return 'Floor Glue';
+    if (name.includes('drop net')) return 'Drop Net';
+    if (name.includes('dart')) return 'Dart';
+    if (name.includes('gas')) return 'Gas Cloud';
+    if (name.includes('wall spikes')) return 'Wall Spikes';
+    if (name.includes('pit')) return 'Pit';
+    return 'Pit';
+  }
+
+  private getTrapCrossingItems(trap: Trap): { itemId: number; itemName: string }[] {
+    return Array.isArray(trap.crossingRequirements) ? trap.crossingRequirements : [];
+  }
+
+  private hasAnyTrapCrossingItem(trap: Trap): boolean {
+    const requirements = this.getTrapCrossingItems(trap);
+    return requirements.some((req) => this.playerHasItem(req.itemId));
+  }
+
+  private canThiephCrossTrap(trap: Trap): boolean {
+    if (!this.isThiephClass()) {
+      return false;
+    }
+    const roll = this.randomInt(1, 10) + this.randomInt(1, 10) + 1;
+    const dc = Math.max(0, trap.toDisarm);
+    this.addCombatLog(`Thieph crossing roll: ${roll} vs DC ${dc}.`);
+    return roll >= dc;
+  }
+
+  private canSafelyCrossFloorTrap(trap: Trap): boolean {
+    const trapType = this.getTrapType(trap);
+    if (this.isThiephClass()) {
+      return this.canThiephCrossTrap(trap);
+    }
+    if (trapType === 'Pit' || trapType === 'Spiked Pit') {
+      return this.hasAnyTrapCrossingItem(trap);
+    }
+    return false;
+  }
+
+  private applyTrapSecondaryEffect(trap: Trap): void {
+    const effectTo = (trap.secondaryEffectTo ?? '').trim();
+    const amount = Math.max(0, trap.secondaryEffectAmount ?? 0);
+    const duration = Math.max(0, trap.secondaryEffectDuration ?? 0);
+    if (!effectTo || amount <= 0) return;
+
+    const normalized = effectTo.toLowerCase();
+    if (normalized === 'ae') {
+      this.playerAE.set(Math.max(0, this.playerAE() - amount));
+      this.addCombatLog(`${trap.name || 'Trap'} also drains ${amount} AE.`);
+      return;
+    }
+
+    if (normalized === 'ros') {
+      const preview = this.gridPreviewContext();
+      if (!preview) return;
+      const existingCheater = this.cheaterByDungon()[preview.dungonId];
+      if (!existingCheater) return;
+      const newROS = Math.max(1, existingCheater.rangeOfSight - amount);
+      this.cheaterByDungon.update((all) => ({
+        ...all,
+        [preview.dungonId]: { ...existingCheater, rangeOfSight: newROS },
+      }));
+      this.addCombatLog(`${trap.name || 'Trap'} also reduces Range of Sight by ${amount} (now ${newROS}).`);
+      return;
+    }
+
+    this.playerActiveEffects.update((effects) => [
+      ...effects,
+      {
+        effectOn: effectTo,
+        effectAmount: amount,
+        remainingAE: this.spellEffectRemainingAE(duration),
+        sourceName: trap.name || 'Trap',
+        behavior: 'modifier',
+      },
+    ]);
+    this.addCombatLog(`${trap.name || 'Trap'} also applies ${effectTo} ${amount} for ${duration} AE.`);
   }
 
   private getMovementDeltaForDisplayFacingDirection(
@@ -10529,6 +11012,11 @@ export class Game implements OnInit {
     const effectColor = typeof effectColorSource === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(effectColorSource.trim())
       ? effectColorSource.trim().toLowerCase()
       : undefined;
+    const targetType = source['targetType'] === 'monster' || source['targetType'] === 'trap' || source['targetType'] === 'pc' || source['targetType'] === 'auto'
+      ? source['targetType'] as 'auto' | 'monster' | 'trap' | 'pc'
+      : source['targettype'] === 'monster' || source['targettype'] === 'trap' || source['targettype'] === 'pc' || source['targettype'] === 'auto'
+        ? source['targettype'] as 'auto' | 'monster' | 'trap' | 'pc'
+        : 'auto';
     const soundPath = typeof source['soundPath'] === 'string'
       ? source['soundPath'].trim()
       : typeof source['path'] === 'string'
@@ -10552,6 +11040,7 @@ export class Game implements OnInit {
       effectAmount2: this.normalizeNumber(this.toFiniteNumber(source['effectAmount2'] ?? source['effectamount2']), 0),
       successTestValue: this.normalizeNumber(this.toFiniteNumber(source['successTestValue'] ?? source['successtestvalue']), 10),
       sp: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['sp']), 1)),
+      targetType,
       lastFor: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['lastFor'] ?? source['lastfor']), 0)),
       numberOfTargets: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['numberOfTargets'] ?? source['numberoftargets']), 1)),
       magicCost: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['magicCost'] ?? source['magiccost']), 1)),
@@ -11594,6 +12083,10 @@ export class Game implements OnInit {
         dropItemIds: Array.isArray(placement.itemIds) ? placement.itemIds : [],
         dropSpellIds: Array.isArray(placement.spellIds) ? placement.spellIds : [],
         dropPotionIds: Array.isArray(placement.potionIds) ? placement.potionIds : [],
+        dropGold: Math.max(0, placement.gold ?? 0),
+        dropSilver: Math.max(0, placement.silver ?? 0),
+        dropCopper: Math.max(0, placement.copper ?? 0),
+        dropZinc: Math.max(0, placement.zinc ?? 0),
         activeEffects: [],
         isDormant: placement.isDormant === true,
         guardRow: typeof placement.guardRow === 'number' ? placement.guardRow : null,
@@ -11692,7 +12185,7 @@ export class Game implements OnInit {
     this.combatLog.update((log) => [...log.slice(-49), { text }]);
   }
 
-  private normalizeEffectToPcStat(stat: string | null | undefined): 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS' | 'RemoveCurse' | null {
+  private normalizeEffectToPcStat(stat: string | null | undefined): 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS' | 'RemoveCurse' | 'RemoveTrap' | null {
     if (!stat) return null;
     const s = stat.trim().toLowerCase();
     if (s === 'hp') return 'HP';
@@ -11705,6 +12198,7 @@ export class Game implements OnInit {
     if (s === 'noa' || s === '# of attacks' || s === '# of attacks #oa' || s === '#oa' || s === 'number of attacks') return 'NOA';
     if (s === 'ros' || s === 'sight' || s === 'range of sight') return 'ROS';
     if (s === 'remove curse' || s === 'cure curse' || s === 'cures curse') return 'RemoveCurse';
+    if (s === 'remove trap' || s === 'cure trap' || s === 'cures trap') return 'RemoveTrap';
     return null;
   }
 
@@ -11883,7 +12377,8 @@ export class Game implements OnInit {
     if (normalized === 'magic power') return 'Magic';
     if (normalized === 'range of view' || normalized === 'range of sight' || normalized === 'view range') return 'ROS';
     if (normalized === 'number of attacts per round(noa)' || normalized === 'number of attacks per round(noa)' || normalized === 'noa') return 'NOA';
-    return this.normalizeEffectToPcStat(effectTo);
+    if (normalized === 'remove trap' || normalized === 'cure trap') return null; // potions can't remove traps
+    return this.normalizeEffectToPcStat(effectTo) as 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS' | null;
   }
 
   private getSpellEffectAmountWithMagicBonus(baseEffectAmount: number): number {
@@ -13139,6 +13634,54 @@ export class Game implements OnInit {
     return auto;
   }
 
+  private findPriorityFloorTrapTarget(
+    dungonId: number,
+    playerRow: number,
+    playerCol: number,
+    range: number
+  ): FloorTrapPlacement | null {
+    const inRange = (this.floorTrapPlacementsByDungon()[dungonId] ?? []).filter((p) => {
+      if (p.isTriggered || p.isDisarmed) return false;
+      const dr = Math.abs(p.row - playerRow);
+      const dc = Math.abs(p.column - playerCol);
+      return dr <= range && dc <= range && (dr + dc) > 0 && this.hasLineOfSight(dungonId, playerRow, playerCol, p.row, p.column);
+    });
+    if (inRange.length === 0) return null;
+    inRange.sort((a, b) => {
+      const ad = Math.max(Math.abs(a.row - playerRow), Math.abs(a.column - playerCol));
+      const bd = Math.max(Math.abs(b.row - playerRow), Math.abs(b.column - playerCol));
+      if (ad !== bd) return ad - bd;
+      if (a.row !== b.row) return a.row - b.row;
+      return a.column - b.column;
+    });
+    return inRange[0];
+  }
+
+  private getTargetFloorTrap(
+    dungonId: number,
+    playerRow: number,
+    playerCol: number,
+    range: number
+  ): FloorTrapPlacement | null {
+    const sel = this.selectedCombatTarget();
+    if (sel) {
+      const dr = Math.abs(sel.row - playerRow);
+      const dc = Math.abs(sel.column - playerCol);
+      if (dr <= range && dc <= range) {
+        const trap = this.getActiveFloorTrapAtSquare(dungonId, sel.row, sel.column);
+        if (trap && this.hasLineOfSight(dungonId, playerRow, playerCol, trap.row, trap.column)) {
+          return trap;
+        }
+      }
+    }
+
+    const auto = this.findPriorityFloorTrapTarget(dungonId, playerRow, playerCol, range);
+    if (auto) {
+      this.selectedCombatTarget.set({ row: auto.row, column: auto.column });
+    }
+    return auto;
+  }
+
   private isAdjacentTo(r1: number, c1: number, r2: number, c2: number): boolean {
     const dr = Math.abs(r1 - r2);
     const dc = Math.abs(c1 - c2);
@@ -13521,6 +14064,12 @@ export class Game implements OnInit {
         if (maxSpellRange <= 0 || monsterRange > maxSpellRange) {
           return null;
         }
+        if (this.getSpellTargetKind(spell) === 'trap') {
+          return null;
+        }
+        if (this.getSpellTargetKind(spell) === 'trap') {
+          return null;
+        }
         if (!this.hasLineOfSight(dungonId, monster.row, monster.column, playerRow, playerCol)) {
           return null;
         }
@@ -13570,7 +14119,7 @@ export class Game implements OnInit {
       return;
     }
 
-    const slots = this.getSpellEffectSlots(spell).filter((slot) => !slot.effectOnPc);
+    const slots = this.getSpellEffectSlots(spell).filter((slot) => slot.targetType === 'monster');
     if (slots.length === 0) {
       this.addCombatLog(`${template.name} casts ${spell.name}, but nothing happens.`);
       return;
@@ -13900,6 +14449,10 @@ export class Game implements OnInit {
         dropItemIds: [],
         dropSpellIds: [],
         dropPotionIds: [],
+        dropGold: 0,
+        dropSilver: 0,
+        dropCopper: 0,
+        dropZinc: 0,
         activeEffects: [],
         isDormant: false,
         guardRow: null,
@@ -14020,6 +14573,10 @@ export class Game implements OnInit {
       dropItemIds: [],
       dropSpellIds: [],
       dropPotionIds: [],
+      dropGold: 0,
+      dropSilver: 0,
+      dropCopper: 0,
+      dropZinc: 0,
       activeEffects: [],
       isDormant: false,
       guardRow: null,

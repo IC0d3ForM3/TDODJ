@@ -31,7 +31,7 @@
 							<li class="pt-list-item">
 								<div class="pt-item-info">
 									<span class="pt-item-name">{{ item.name }}</span>
-									<small class="pt-item-meta">ID {{ item.id }} · {{ item.effectTo }}{{ item.effectTo2 ? '/' + item.effectTo2 : '' }} | Amt {{ item.effectAmount }}{{ item.effectAmount2 ? '/' + item.effectAmount2 : '' }} | Lasts {{ item.lastFor }} rnd | Val {{ item.value }}</small>
+									<small class="pt-item-meta">ID {{ item.id }} · {{ item.effectTo }}{{ item.effectTo2 ? '/' + item.effectTo2 : '' }} | Amt {{ (item.effectAmountMin ?? 0) }}+{{ (item.effectAmountDiceCount ?? 0) }}d{{ (item.effectAmountDiceSides ?? item.effectAmount) }}{{ item.effectTo2 ? ' / ' + (item.effectAmount2Min ?? 0) + '+' + (item.effectAmount2DiceCount ?? 0) + 'd' + (item.effectAmount2DiceSides ?? item.effectAmount2) : '' }} | Lasts {{ item.lastFor }} rnd | Val {{ item.value }}</small>
 									@if (item.description) { <small class="pt-item-desc">{{ item.description }}</small> }
 								</div>
 								<button type="button" class="pt-edit-btn" (click)="editPotion(item)">Edit</button>
@@ -54,8 +54,12 @@
 						<select formControlName="effectTo2"><option [ngValue]="null">None</option>@for (option of effectToOptions; track option) { <option [value]="option">{{ option }}</option> }</select>
 					</label>
 					<label class="pt-field"><span>Last For (rounds)</span><input type="number" formControlName="lastFor" min="0" /></label>
-					<label class="pt-field"><span>Effect Amount 1</span><input type="number" formControlName="effectAmount" /></label>
-					<label class="pt-field"><span>Effect Amount 2</span><input type="number" formControlName="effectAmount2" /></label>
+					<label class="pt-field"><span>Effect 1 Minimum (flat)</span><input type="number" formControlName="effectAmountMin" /></label>
+					<label class="pt-field"><span>Effect 1 Dice Count (X in XdY)</span><input type="number" min="0" formControlName="effectAmountDiceCount" /></label>
+					<label class="pt-field"><span>Effect 1 Dice Sides (Y in XdY)</span><input type="number" min="0" formControlName="effectAmountDiceSides" /></label>
+					<label class="pt-field"><span>Effect 2 Minimum (flat)</span><input type="number" formControlName="effectAmount2Min" /></label>
+					<label class="pt-field"><span>Effect 2 Dice Count (X in XdY)</span><input type="number" min="0" formControlName="effectAmount2DiceCount" /></label>
+					<label class="pt-field"><span>Effect 2 Dice Sides (Y in XdY)</span><input type="number" min="0" formControlName="effectAmount2DiceSides" /></label>
 					<label class="pt-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
 					<label class="pt-field pt-field-wide"><span>Image</span>
 						<div class="pt-upload-row">

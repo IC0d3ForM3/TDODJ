@@ -50,6 +50,8 @@
 				<div class="it-form-grid">
 					<label class="it-field it-field-wide"><span>Name</span><input type="text" formControlName="name" placeholder="Item name" /></label>
 					<label class="it-field it-field-wide"><span>Description</span><input type="text" formControlName="description" placeholder="Description" /></label>
+					<label class="it-field it-field-wide"><span>Item Note (optional)</span><textarea formControlName="note" rows="2" placeholder="Message shown on pickup"></textarea></label>
+					<label class="it-field"><span>Min Mind To Read Note</span><input type="number" formControlName="minMindToRead" min="0" /></label>
 					<label class="it-field"><span>Type</span>
 						<select formControlName="type" (change)="onTypeChange()">@for (option of itemTypeOptions; track option.value) { <option [value]="option.value">{{ option.label }}</option> }</select>
 					</label>

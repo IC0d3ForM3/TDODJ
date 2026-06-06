@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tavernTurnIn = exports.upgradeNod = exports.upgradeNoa = exports.upgradeStatController = exports.getAdminPcs = exports.setSamplePc = exports.setIsMainGamePc = exports.getSamplePcs = exports.deletePc = exports.updatePc = exports.awardSpToPc = exports.createPc = exports.getPcs = void 0;
+exports.tavernTurnIn = exports.upgradeNod = exports.upgradeNoa = exports.upgradeStatController = exports.getAdminPcs = exports.setSamplePc = exports.setIsMainGamePc = exports.getSamplePcs = exports.deletePc = exports.updatePc = exports.completeDungonReward = exports.awardSpToPc = exports.createPc = exports.getPcs = void 0;
 const userRepository_1 = require("../repositories/userRepository");
 const imageService = __importStar(require("../services/imageService"));
 const pcService = __importStar(require("../services/pcService"));
@@ -133,6 +133,37 @@ const awardSpToPc = async (req, res) => {
     }
 };
 exports.awardSpToPc = awardSpToPc;
+const completeDungonReward = async (req, res) => {
+    const id = Number.parseInt(req.params['id'], 10);
+    const { userkey, dungonId, spReward } = req.body;
+    if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
+    }
+    if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+        return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+    }
+    if (typeof dungonId !== 'number' || !Number.isFinite(dungonId) || dungonId <= 0) {
+        return res.status(400).json({ result: -1, error: 'Valid dungonId is required' });
+    }
+    const reward = typeof spReward === 'number' && Number.isFinite(spReward) ? Math.max(0, Math.floor(spReward)) : 0;
+    try {
+        const result = await pcService.completeDungonRewardOnce(id, userkey.trim(), Math.floor(dungonId), reward);
+        if (result === null) {
+            return res.status(404).json({ result: -1, error: 'PC not found' });
+        }
+        return res.json({
+            result: 1,
+            awarded: result.awarded,
+            sp: result.sp,
+            spLifetime: result.spLifetime,
+        });
+    }
+    catch (error) {
+        console.error('Error completing dungeon reward:', error);
+        return res.status(500).json({ result: -1, error: 'Failed to complete dungeon reward' });
+    }
+};
+exports.completeDungonReward = completeDungonReward;
 const updatePc = async (req, res) => {
     const id = Number.parseInt(req.params['id'], 10);
     const { userkey, pc } = req.body;

@@ -178,7 +178,7 @@ export class SampleGame implements OnInit {
   readonly hasError = signal(false);
 
   // ── Tavern tutorial ───────────────────────────────────────────
-  readonly showTutorial = signal(true);
+  readonly showTutorial = signal(false);
   readonly tutorialPageIndex = signal(0);
 
   readonly tutorialPages: TutorialPage[] = [
@@ -186,31 +186,31 @@ export class SampleGame implements OnInit {
       image: 'images/taren1.jpg',
       speaker: 'Cellen',
       title: 'Welcome, Adventurer!',
-      text: "Pull up a stool and rest your boots! I'm Cellen, keeper of the Rusty Flagon. Word is you're thinking of braving the dungeons beneath our town. Smart move coming to me first — I've sent many brave souls down there, and most of them came back. Let me walk you through what you're in for.",
+      text: "Welcome to the Rusty Flagon. I am Cellen. You are about to enter your first dungeon, so here is the quick version before you go.",
     },
     {
       image: 'images/taren1.jpg',
       speaker: 'Cellen',
       title: 'Finding Your Way',
-      text: "You'll explore from a first-person view — stone corridors stretching out ahead of you — with a mini-map below to keep your bearings. Use the Arrow Keys to turn and face a new direction. Press Space or F to step forward, and B to step back. The dungeon isn't huge, but every corridor looks the same in the dark.",
+      text: "You explore in first-person with a mini-map below. Arrow keys turn, Space or F moves forward, and B steps back. Use the map so you do not get turned around.",
     },
     {
       image: 'images/taren1.jpg',
       speaker: 'Cellen',
       title: 'Action Economy',
-      text: "Every round you have a pool of Action Economy — AE for short. Moving costs 1 AE. Attacking costs 1 AE. Drinking a potion costs 1 AE. Casting a spell also costs 1 AE — but spells additionally spend their Magic Cost from your MP pool, so keep an eye on both. When your AE hits zero, it's the monsters' turn. Spend your points wisely — getting caught flat-footed is how adventurers end up as wall decorations.",
+      text: "Each turn you spend AE. Moving, attacking, drinking potions, and casting each cost 1 AE. Spells also spend MP. When AE reaches 0, monsters take their turn.",
     },
     {
       image: 'images/taren2.jpg',
       speaker: 'Reanna',
       title: 'Combat',
-      text: "Tap a monster on the mini-map to target it, then click Attack. You'll roll a d12 and add your weapon bonus and Stamina — beat the monster's Armor Class and you land a hit. Damage is your weapon dice plus Strength. Monsters hit back on their turn, so keep moving and keep that armor on. Oh — and watch your flanks.",
+      text: "Click a monster on the mini-map, then Attack. You roll d12 plus weapon bonus and Stamina vs monster AC. Damage is weapon dice plus Strength. Keep distance and do not let enemies surround you.",
     },
     {
       image: 'images/taren2.jpg',
       speaker: 'Reanna',
       title: 'Loot & the Exit',
-      text: "Treshers — those containers scattered through the dungeon — hold weapons, armor, potions, spells, and coin. Hit the Take All button in the side panel to scoop up everything on your current square, or grab items one at a time. Your Inventory panel shows what you're carrying — equip weapons and armor from there. Your goal is the Exit square on the mini-map. Step onto it to finish the dungeon and earn your Skill Point reward. Now get in there — the first round's on the house when you return!",
+      text: "Loot treshers for gear, potions, spells, and coin. Use Take All or pick items one by one, then equip from Inventory. Reach the Exit square to complete the dungeon and claim your SP reward.",
     },
   ];
 
@@ -240,13 +240,12 @@ export class SampleGame implements OnInit {
 
   skipTutorial(): void {
     this.showTutorial.set(false);
+    this.navigateToSamplePlay();
   }
 
   playFromTutorial(): void {
     this.showTutorial.set(false);
-    if (this.selectedPc()) {
-      this.playNow();
-    }
+    this.navigateToSamplePlay();
   }
 
   ngOnInit(): void {
@@ -309,7 +308,8 @@ export class SampleGame implements OnInit {
       return;
     }
     this.selectPc(pc);
-    this.playNow();
+    this.tutorialPageIndex.set(0);
+    this.showTutorial.set(true);
   }
 
   changePc(): void {
@@ -317,6 +317,16 @@ export class SampleGame implements OnInit {
   }
 
   playNow(): void {
+    if (!this.showTutorial()) {
+      this.tutorialPageIndex.set(0);
+      this.showTutorial.set(true);
+      return;
+    }
+
+    this.navigateToSamplePlay();
+  }
+
+  private navigateToSamplePlay(): void {
     const pc = this.selectedPc();
     if (!pc) return;
     this.router.navigate(['/sample-play'], { queryParams: { pcId: pc.id } });

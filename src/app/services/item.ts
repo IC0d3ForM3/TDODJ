@@ -21,6 +21,8 @@ export interface UserItemListItem {
   effectOn: string | null;
   effectToPc: string | null;
   effectToPcValue: number;
+  note: string | null;
+  minMindToRead: number;
   weaponEffectType: string;
   weaponEffectColor: string;
   imageId: number | null;
@@ -46,6 +48,8 @@ export interface UserItemWritePayload {
   effectOn: string | null;
   effectToPc: string | null;
   effectToPcValue: number;
+  note: string | null;
+  minMindToRead: number;
   weaponEffectType: string;
   weaponEffectColor: string;
   imageId: number | null;

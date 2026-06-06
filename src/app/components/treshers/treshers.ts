@@ -196,6 +196,38 @@ export class Treshers implements OnInit {
     this.beginCreate();
   }
 
+  deleteTresher(item: UserTresherListItem): void {
+    if (!confirm(`Delete tresher "${item.name}"? This cannot be undone.`)) {
+      return;
+    }
+
+    const userkey = this.account.getKey();
+    if (!userkey) {
+      this.saveMessage.set('Please log in to delete treshers.');
+      return;
+    }
+
+    this.isSaving.set(true);
+    this.saveMessage.set(null);
+
+    this.tresherService.deleteTresher(item.id, userkey)
+      .pipe(finalize(() => this.isSaving.set(false)))
+      .subscribe({
+        next: (response) => {
+          if (response.result !== 1) {
+            this.saveMessage.set(response.error || 'Failed to delete tresher.');
+            return;
+          }
+          this.tresherService.loadTreshers(userkey);
+          this.saveMessage.set('Tresher deleted.');
+          this.beginCreate(false);
+        },
+        error: () => {
+          this.saveMessage.set('Failed to delete tresher.');
+        },
+      });
+  }
+
   save(): void {
     if (this.isSaving()) return;
 

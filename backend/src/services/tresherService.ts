@@ -1,3 +1,10 @@
+import { deleteTresherForUser as repoDeleteTresherForUser } from '../repositories/tresherRepository';
+export const deleteTresherForUser = async (
+  id: number,
+  userguid: string
+): Promise<boolean> => {
+  return await repoDeleteTresherForUser(id, userguid);
+};
 import {
   getTresherLibraryByUserGuid,
   getTreshersByIds,

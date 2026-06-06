@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tavernTurnInQuestItems = exports.updateTresherForUser = exports.insertTresherForUser = exports.isTresherAccessibleByIdForUser = exports.getTreshersByIds = exports.getAllTreshersWithUsername = exports.getTresherLibraryByUserGuid = exports.getTreshersByUserGuid = exports.isAdminUserByGuid = void 0;
+exports.tavernTurnInQuestItems = exports.updateTresherForUser = exports.insertTresherForUser = exports.isTresherAccessibleByIdForUser = exports.getTreshersByIds = exports.getAllTreshersWithUsername = exports.getTresherLibraryByUserGuid = exports.getTreshersByUserGuid = exports.isAdminUserByGuid = exports.deleteTresherForUser = void 0;
 const db_1 = __importDefault(require("../db"));
 const SELECT_TRESHER_FIELDS = `
   id,
@@ -36,6 +36,11 @@ const SELECT_TRESHER_FIELDS = `
   potion3id AS "potion3Id",
   COALESCE(isquest, FALSE) AS isquest
 `;
+const deleteTresherForUser = async (id, userguid) => {
+    const { rowCount } = await db_1.default.query(`DELETE FROM treshers WHERE id = $1 AND userguid = $2`, [id, userguid]);
+    return (rowCount ?? 0) > 0;
+};
+exports.deleteTresherForUser = deleteTresherForUser;
 const isAdminUserByGuid = async (userguid) => {
     const { rows } = await db_1.default.query('SELECT isadmin FROM users WHERE key = $1', [userguid]);
     if (!rows[0]) {

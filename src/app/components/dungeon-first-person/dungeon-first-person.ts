@@ -562,11 +562,16 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     const monsterImages = this.monsterImagesBySquare();
     const monsterImpactEffects = this.monsterImpactEffects();
     const detectedTraps = this.floorTrapPlacements();
-    const pitTrapSquareKeys = new Set(
-      detectedTraps
-        .filter(fp => !fp.isTriggered && !fp.isDisarmed && fp.trap.name.toLowerCase().includes('pit'))
-        .map(fp => this.getSquareKey(fp.row, fp.column))
-    );
+    const trapSquaresByType = new Map<string, Set<string>>();
+    for (const fp of detectedTraps) {
+      if (fp.isDisarmed) continue;
+      if (!(fp.isDetected || fp.isTriggered)) continue;
+      const trapType = (fp.trap.trapType ?? fp.trap.name ?? 'Pit').toLowerCase();
+      const squareKey = this.getSquareKey(fp.row, fp.column);
+      const set = trapSquaresByType.get(trapType) ?? new Set<string>();
+      set.add(squareKey);
+      trapSquaresByType.set(trapType, set);
+    }
 
     for (const segment of farToNearSegments) {
       const { depth, step, nearFrame, farFrame } = segment;
@@ -659,8 +664,27 @@ export class DungeonFirstPersonComponent implements OnDestroy {
         );
       }
 
-      if (pitTrapSquareKeys.has(squareKey)) {
+      const typeMatches = (needle: string) => [...trapSquaresByType.entries()].some(([type, keys]) => type.includes(needle) && keys.has(squareKey));
+      if (typeMatches('pit') && !typeMatches('spiked pit')) {
         this.drawFirstPersonPitTrap(context, nearFrame, farFrame);
+      }
+      if (typeMatches('spiked pit')) {
+        this.drawFirstPersonSpikedPitTrap(context, nearFrame, farFrame);
+      }
+      if (typeMatches('floor glue')) {
+        this.drawFirstPersonFloorGlueTrap(context, nearFrame, farFrame);
+      }
+      if (typeMatches('drop net')) {
+        this.drawFirstPersonDropNetTrap(context, nearFrame, farFrame);
+      }
+      if (typeMatches('dart')) {
+        this.drawFirstPersonDartTrap(context, nearFrame, farFrame);
+      }
+      if (typeMatches('gas cloud')) {
+        this.drawFirstPersonGasCloudTrap(context, nearFrame, farFrame);
+      }
+      if (typeMatches('wall spikes')) {
+        this.drawFirstPersonWallSpikesTrap(context, nearFrame, farFrame);
       }
 
       if (bagSquareKeys.has(squareKey) && !obstacleItemSquareKeys.has(squareKey)) {
@@ -1479,6 +1503,126 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     // faint dark‐brown rim
     context.strokeStyle = 'rgba(80,50,20,0.7)';
     context.lineWidth = 1.5;
+    context.stroke();
+    context.restore();
+  }
+
+  private drawFirstPersonSpikedPitTrap(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number }
+  ): void {
+    this.drawFirstPersonPitTrap(context, nearFrame, farFrame);
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midFloor = (nearFrame.bottom + farFrame.bottom) / 2;
+    const cx = (midLeft + midRight) / 2;
+    const cy = midFloor - 1;
+    context.save();
+    context.strokeStyle = '#c0392b';
+    context.lineWidth = 1.2;
+    context.beginPath();
+    context.moveTo(cx - 6, cy + 1);
+    context.lineTo(cx - 3, cy - 3);
+    context.lineTo(cx, cy + 1);
+    context.lineTo(cx + 3, cy - 3);
+    context.lineTo(cx + 6, cy + 1);
+    context.stroke();
+    context.restore();
+  }
+
+  private drawFirstPersonFloorGlueTrap(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number }
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midFloor = (nearFrame.bottom + farFrame.bottom) / 2;
+    context.save();
+    context.fillStyle = 'rgba(70, 180, 70, 0.75)';
+    context.beginPath();
+    context.ellipse((midLeft + midRight) / 2, midFloor - 1, (midRight - midLeft) * 0.24, 4, 0, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+
+  private drawFirstPersonDropNetTrap(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number }
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midTop = (nearFrame.top + farFrame.top) / 2;
+    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
+    context.save();
+    context.strokeStyle = '#c9b58a';
+    context.lineWidth = 1;
+    context.strokeRect(midLeft + 6, midTop + 2, (midRight - midLeft) - 12, (midBottom - midTop) - 4);
+    context.strokeRect(midLeft + 8, midTop + 4, (midRight - midLeft) - 16, (midBottom - midTop) - 8);
+    context.restore();
+  }
+
+  private drawFirstPersonDartTrap(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number }
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
+    const centerX = (midLeft + midRight) / 2;
+    context.save();
+    context.strokeStyle = '#d35400';
+    context.lineWidth = 1.1;
+    context.beginPath();
+    context.moveTo(centerX - 3, midBottom - 2);
+    context.lineTo(centerX, midBottom - 8);
+    context.lineTo(centerX + 3, midBottom - 2);
+    context.stroke();
+    context.restore();
+  }
+
+  private drawFirstPersonGasCloudTrap(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number }
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midTop = (nearFrame.top + farFrame.top) / 2;
+    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
+    const cx = (midLeft + midRight) / 2;
+    const cy = (midTop + midBottom) / 2 - 1;
+    context.save();
+    context.fillStyle = 'rgba(108, 75, 217, 0.35)';
+    context.beginPath();
+    context.arc(cx - 3, cy, 4, 0, Math.PI * 2);
+    context.arc(cx + 3, cy - 1, 5, 0, Math.PI * 2);
+    context.arc(cx + 1, cy + 2, 4, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+
+  private drawFirstPersonWallSpikesTrap(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number }
+  ): void {
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midTop = (nearFrame.top + farFrame.top) / 2;
+    context.save();
+    context.strokeStyle = '#6c3483';
+    context.lineWidth = 1;
+    const x = (midLeft + midRight) / 2;
+    context.beginPath();
+    context.moveTo(x - 5, midTop + 4);
+    context.lineTo(x - 2, midTop + 1);
+    context.lineTo(x + 1, midTop + 4);
+    context.lineTo(x + 4, midTop + 1);
+    context.lineTo(x + 7, midTop + 4);
     context.stroke();
     context.restore();
   }

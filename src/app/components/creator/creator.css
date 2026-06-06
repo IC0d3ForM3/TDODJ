@@ -475,6 +475,15 @@
 	transition: background-color 0.1s, border-color 0.1s, color 0.1s;
 }
 
+.open-block-btn--icon {
+	width: 2.1rem;
+	height: 2.1rem;
+	padding: 0;
+	font-size: 1.05rem;
+	line-height: 1;
+	flex: 0 0 auto;
+}
+
 .open-block-btn:hover {
 	background-color: #e0e4ea;
 	border-color: #8a96a3;
@@ -597,7 +606,8 @@
 
 .dungon-grid-top-labels {
 	display: grid;
-	grid-template-columns: repeat(45, 20px);
+	grid-auto-flow: column;
+	grid-auto-columns: 20px;
 	height: 16px;
 	background-color: #000;
 	color: #9aa0a6;
@@ -608,7 +618,7 @@
 
 .dungon-grid-left-labels {
 	display: grid;
-	grid-template-rows: repeat(50, 20px);
+	grid-auto-rows: 20px;
 	width: 24px;
 	background-color: #000;
 	color: #9aa0a6;
@@ -634,6 +644,34 @@
 	display: flex;
 	align-items: flex-start;
 	gap: 0.75rem;
+}
+
+.grid-overflow-controls {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	flex-wrap: wrap;
+	margin-top: 0.35rem;
+}
+
+.grid-size-badge {
+	display: inline-flex;
+	align-items: center;
+	margin-top: 0.35rem;
+	padding: 0.16rem 0.5rem;
+	border: 1px solid #32567a;
+	border-radius: 999px;
+	background: #102439;
+	color: #d8ebff;
+	font-size: 0.75rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.grid-size-badge-overflow {
+	border-color: #b87a1a;
+	background: #3d2700;
+	color: #ffe8b8;
 }
 
 .placement-inspector {

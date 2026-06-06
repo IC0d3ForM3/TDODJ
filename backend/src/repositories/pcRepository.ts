@@ -259,6 +259,90 @@ export const addSpToPc = async (
   return rows[0] ?? null;
 };
 
+export const completeDungonRewardOnce = async (
+  id: number,
+  userguid: string,
+  dungonId: number,
+  spReward: number
+): Promise<{ awarded: boolean; sp: number; spLifetime: number } | null> => {
+  const safeDungonId = Math.max(1, Math.floor(dungonId));
+  const safeReward = Math.max(0, Math.floor(spReward));
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const { rows: existingRows } = await client.query<{
+      completedDungonIds: number[];
+      sp: number;
+      spLifetime: number;
+    }>(
+      `SELECT
+         COALESCE(completed_dungon_ids, '[]'::jsonb) AS "completedDungonIds",
+         COALESCE(sp_bank, 0) AS sp,
+         COALESCE(sp_lifetime, 0) AS "spLifetime"
+       FROM pcs
+       WHERE id = $1 AND userguid = $2
+       FOR UPDATE`,
+      [id, userguid]
+    );
+
+    if (!existingRows[0]) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const completedDungonIds = Array.isArray(existingRows[0].completedDungonIds)
+      ? existingRows[0].completedDungonIds
+      : [];
+    const alreadyCompleted = completedDungonIds.includes(safeDungonId);
+
+    if (alreadyCompleted || safeReward <= 0) {
+      await client.query(
+        `UPDATE pcs
+         SET completed_dungon_ids = CASE
+           WHEN COALESCE(completed_dungon_ids, '[]'::jsonb) @> to_jsonb(ARRAY[$3]::int[])
+             THEN COALESCE(completed_dungon_ids, '[]'::jsonb)
+           ELSE COALESCE(completed_dungon_ids, '[]'::jsonb) || to_jsonb($3::int)
+         END,
+         updatedat = NOW()
+         WHERE id = $1 AND userguid = $2`,
+        [id, userguid, safeDungonId]
+      );
+
+      await client.query('COMMIT');
+      return {
+        awarded: false,
+        sp: existingRows[0].sp,
+        spLifetime: existingRows[0].spLifetime,
+      };
+    }
+
+    const { rows: updatedRows } = await client.query<{ sp: number; spLifetime: number }>(
+      `UPDATE pcs
+       SET completed_dungon_ids = COALESCE(completed_dungon_ids, '[]'::jsonb) || to_jsonb($3::int),
+           sp_bank = COALESCE(sp_bank, 0) + $4,
+           sp_lifetime = COALESCE(sp_lifetime, 0) + $4,
+           updatedat = NOW()
+       WHERE id = $1 AND userguid = $2
+       RETURNING COALESCE(sp_bank, 0) AS sp, COALESCE(sp_lifetime, 0) AS "spLifetime"`,
+      [id, userguid, safeDungonId, safeReward]
+    );
+
+    await client.query('COMMIT');
+    return {
+      awarded: true,
+      sp: updatedRows[0]?.sp ?? existingRows[0].sp,
+      spLifetime: updatedRows[0]?.spLifetime ?? existingRows[0].spLifetime,
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 /** Append a single tresher id to the PC's tresherids JSON array. */
 export const addTresherIdToPcInDb = async (pcId: number, tresherId: number): Promise<void> => {
   await pool.query(

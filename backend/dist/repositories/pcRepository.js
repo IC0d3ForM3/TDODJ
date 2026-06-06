@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllPcsForAdmin = exports.upgradeStat = exports.getPcByIdPublic = exports.setIsMainGamePcInDb = exports.setSamplePcInDb = exports.getSamplePcsFromDb = exports.upgradeNod = exports.upgradeNoa = exports.deletePcForUser = exports.updatePcForUser = exports.insertPcForUser = exports.addTresherIdToPcInDb = exports.addSpToPc = exports.getPcByIdForUser = exports.getAllPcsWithUsername = exports.getPcsByUserGuid = void 0;
+exports.getAllPcsForAdmin = exports.upgradeStat = exports.getPcByIdPublic = exports.setIsMainGamePcInDb = exports.setSamplePcInDb = exports.getSamplePcsFromDb = exports.upgradeNod = exports.upgradeNoa = exports.deletePcForUser = exports.updatePcForUser = exports.insertPcForUser = exports.addTresherIdToPcInDb = exports.completeDungonRewardOnce = exports.addSpToPc = exports.getPcByIdForUser = exports.getAllPcsWithUsername = exports.getPcsByUserGuid = void 0;
 const db_1 = __importDefault(require("../db"));
 const getPcsByUserGuid = async (userguid) => {
     const { rows } = await db_1.default.query(`SELECT
@@ -157,6 +157,66 @@ const addSpToPc = async (id, userguid, amount) => {
     return rows[0] ?? null;
 };
 exports.addSpToPc = addSpToPc;
+const completeDungonRewardOnce = async (id, userguid, dungonId, spReward) => {
+    const safeDungonId = Math.max(1, Math.floor(dungonId));
+    const safeReward = Math.max(0, Math.floor(spReward));
+    const client = await db_1.default.connect();
+    try {
+        await client.query('BEGIN');
+        const { rows: existingRows } = await client.query(`SELECT
+         COALESCE(completed_dungon_ids, '[]'::jsonb) AS "completedDungonIds",
+         COALESCE(sp_bank, 0) AS sp,
+         COALESCE(sp_lifetime, 0) AS "spLifetime"
+       FROM pcs
+       WHERE id = $1 AND userguid = $2
+       FOR UPDATE`, [id, userguid]);
+        if (!existingRows[0]) {
+            await client.query('ROLLBACK');
+            return null;
+        }
+        const completedDungonIds = Array.isArray(existingRows[0].completedDungonIds)
+            ? existingRows[0].completedDungonIds
+            : [];
+        const alreadyCompleted = completedDungonIds.includes(safeDungonId);
+        if (alreadyCompleted || safeReward <= 0) {
+            await client.query(`UPDATE pcs
+         SET completed_dungon_ids = CASE
+           WHEN COALESCE(completed_dungon_ids, '[]'::jsonb) @> to_jsonb(ARRAY[$3]::int[])
+             THEN COALESCE(completed_dungon_ids, '[]'::jsonb)
+           ELSE COALESCE(completed_dungon_ids, '[]'::jsonb) || to_jsonb($3::int)
+         END,
+         updatedat = NOW()
+         WHERE id = $1 AND userguid = $2`, [id, userguid, safeDungonId]);
+            await client.query('COMMIT');
+            return {
+                awarded: false,
+                sp: existingRows[0].sp,
+                spLifetime: existingRows[0].spLifetime,
+            };
+        }
+        const { rows: updatedRows } = await client.query(`UPDATE pcs
+       SET completed_dungon_ids = COALESCE(completed_dungon_ids, '[]'::jsonb) || to_jsonb($3::int),
+           sp_bank = COALESCE(sp_bank, 0) + $4,
+           sp_lifetime = COALESCE(sp_lifetime, 0) + $4,
+           updatedat = NOW()
+       WHERE id = $1 AND userguid = $2
+       RETURNING COALESCE(sp_bank, 0) AS sp, COALESCE(sp_lifetime, 0) AS "spLifetime"`, [id, userguid, safeDungonId, safeReward]);
+        await client.query('COMMIT');
+        return {
+            awarded: true,
+            sp: updatedRows[0]?.sp ?? existingRows[0].sp,
+            spLifetime: updatedRows[0]?.spLifetime ?? existingRows[0].spLifetime,
+        };
+    }
+    catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    }
+    finally {
+        client.release();
+    }
+};
+exports.completeDungonRewardOnce = completeDungonRewardOnce;
 /** Append a single tresher id to the PC's tresherids JSON array. */
 const addTresherIdToPcInDb = async (pcId, tresherId) => {
     await db_1.default.query(`UPDATE pcs

@@ -62,6 +62,12 @@ function normalizeNullableInt(value) {
     const n = typeof value === 'number' ? value : Number(value);
     return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
 }
+function normalizeOptionalNullableText(value) {
+    if (typeof value !== 'string')
+        return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+}
 function normalizeWeaponEffectType(value) {
     const raw = normalizeOptionalText(value).toLowerCase();
     if (raw === 'fire')
@@ -117,6 +123,8 @@ function buildItemPayload(input, isAdmin) {
     const rawEffectOn = normalizeOptionalText(input.effectOn ?? input.effecton);
     const effectToPc = normalizeEffectToPc(input.effectToPc ?? input.effecttopc);
     const effectToPcValue = normalizeNumber(input.effectToPcValue ?? input.effecttopcvalue, 0);
+    const note = normalizeOptionalNullableText(input.note);
+    const minMindToRead = Math.max(0, normalizeNumber(input.minMindToRead ?? input.minmindtoread, 0));
     const weaponEffectType = normalizeWeaponEffectType(input.weaponEffectType ?? input.weaponeffecttype);
     const weaponEffectColor = normalizeWeaponEffectColor(input.weaponEffectColor ?? input.weaponeffectcolor);
     const normalizedType = ITEM_TYPES.has(type) ? type : 'other';
@@ -136,6 +144,8 @@ function buildItemPayload(input, isAdmin) {
         effectOn: EFFECT_ON_OPTIONS.has(rawEffectOn) ? rawEffectOn : null,
         effectToPc: allowsPcEffect ? effectToPc : null,
         effectToPcValue: allowsPcEffect ? effectToPcValue : 0,
+        note,
+        minMindToRead: note ? minMindToRead : 0,
         weaponEffectType: canonicalType === 'weapon' ? weaponEffectType : 'Blood',
         weaponEffectColor: canonicalType === 'weapon' ? weaponEffectColor : '#cc0000',
         imageId: normalizeNullableInt(input.imageId ?? input.imageid),

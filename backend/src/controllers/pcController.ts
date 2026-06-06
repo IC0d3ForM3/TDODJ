@@ -197,6 +197,46 @@ export const awardSpToPc = async (req: Request, res: Response) => {
   }
 };
 
+export const completeDungonReward = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const { userkey, dungonId, spReward } = req.body as Partial<{
+    userkey: string;
+    dungonId: number;
+    spReward: number;
+  }>;
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid pc id is required' });
+  }
+
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
+  }
+
+  if (typeof dungonId !== 'number' || !Number.isFinite(dungonId) || dungonId <= 0) {
+    return res.status(400).json({ result: -1, error: 'Valid dungonId is required' });
+  }
+
+  const reward = typeof spReward === 'number' && Number.isFinite(spReward) ? Math.max(0, Math.floor(spReward)) : 0;
+
+  try {
+    const result = await pcService.completeDungonRewardOnce(id, userkey.trim(), Math.floor(dungonId), reward);
+    if (result === null) {
+      return res.status(404).json({ result: -1, error: 'PC not found' });
+    }
+
+    return res.json({
+      result: 1,
+      awarded: result.awarded,
+      sp: result.sp,
+      spLifetime: result.spLifetime,
+    });
+  } catch (error) {
+    console.error('Error completing dungeon reward:', error);
+    return res.status(500).json({ result: -1, error: 'Failed to complete dungeon reward' });
+  }
+};
+
 export const updatePc = async (req: Request, res: Response) => {
   const id = Number.parseInt(req.params['id'], 10);
   const { userkey, pc } = req.body as PcWriteRequestBody;

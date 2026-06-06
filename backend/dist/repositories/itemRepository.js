@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getPublicItemsByNames = exports.deleteItemForUser = exports.getItemsByIds = exports.updateItemForUser = exports.insertItemForUser = exports.getAllItemsWithUsername = exports.getItemsLibraryByUserGuid = exports.getItemsByUserGuid = exports.isAdminUserByGuid = void 0;
 const db_1 = __importDefault(require("../db"));
+const PG_UNDEFINED_COLUMN = '42703';
 const SELECT_ITEM_FIELDS = `
   id,
   userguid::text AS userguid,
@@ -21,6 +22,8 @@ const SELECT_ITEM_FIELDS = `
   effecton AS "effectOn",
   effecttopc AS "effectToPc",
   COALESCE(effecttopcvalue, 0) AS "effectToPcValue",
+  NULLIF(note, '') AS note,
+  COALESCE(minmindtoread, 0) AS "minMindToRead",
   COALESCE(weaponeffecttype, 'Blood') AS "weaponEffectType",
   COALESCE(weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
   imageid AS "imageId",
@@ -31,53 +34,134 @@ const SELECT_ITEM_FIELDS = `
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
+const SELECT_ITEM_FIELDS_LEGACY = `
+  id,
+  userguid::text AS userguid,
+  name,
+  description,
+  type,
+  COALESCE(NULLIF(range, '')::int, 0) AS range,
+  value,
+  weight,
+  curseid AS "curseId",
+  COALESCE(effectvalue, 0) AS "effectValue",
+  COALESCE(damage, 0) AS "damage",
+  armorslot AS "armorSlot",
+  effecton AS "effectOn",
+  effecttopc AS "effectToPc",
+  COALESCE(effecttopcvalue, 0) AS "effectToPcValue",
+  NULL::text AS note,
+  0 AS "minMindToRead",
+  COALESCE(weaponeffecttype, 'Blood') AS "weaponEffectType",
+  COALESCE(weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
+  imageid AS "imageId",
+  soundid AS "soundId",
+  ispublic AS "isPublic",
+  COALESCE(istwohanded, false) AS "isTwoHanded",
+  uses,
+  createdat::text AS "createdAt",
+  updatedat::text AS "updatedAt"
+`;
+function isUndefinedColumnError(err) {
+    return typeof err === 'object' && err !== null && err.code === PG_UNDEFINED_COLUMN;
+}
 const isAdminUserByGuid = async (userguid) => {
     const { rows } = await db_1.default.query('SELECT isadmin FROM users WHERE key = $1', [userguid]);
     return rows[0]?.isadmin === true;
 };
 exports.isAdminUserByGuid = isAdminUserByGuid;
 const getItemsByUserGuid = async (userguid) => {
-    const { rows } = await db_1.default.query(`SELECT ${SELECT_ITEM_FIELDS}
-     FROM items
-     WHERE userguid = $1
-     ORDER BY LOWER(name) ASC, id ASC`, [userguid]);
-    return rows;
+    try {
+        const { rows } = await db_1.default.query(`SELECT ${SELECT_ITEM_FIELDS}
+       FROM items
+       WHERE userguid = $1
+       ORDER BY LOWER(name) ASC, id ASC`, [userguid]);
+        return rows;
+    }
+    catch (err) {
+        if (!isUndefinedColumnError(err))
+            throw err;
+        const { rows } = await db_1.default.query(`SELECT ${SELECT_ITEM_FIELDS_LEGACY}
+       FROM items
+       WHERE userguid = $1
+       ORDER BY LOWER(name) ASC, id ASC`, [userguid]);
+        return rows;
+    }
 };
 exports.getItemsByUserGuid = getItemsByUserGuid;
 const getItemsLibraryByUserGuid = async (userguid) => {
-    const { rows } = await db_1.default.query(`SELECT ${SELECT_ITEM_FIELDS}
-     FROM items
-     WHERE userguid = $1 OR ispublic = true
-     ORDER BY LOWER(name) ASC, id ASC`, [userguid]);
-    return rows;
+    try {
+        const { rows } = await db_1.default.query(`SELECT ${SELECT_ITEM_FIELDS}
+       FROM items
+       WHERE userguid = $1 OR ispublic = true
+       ORDER BY LOWER(name) ASC, id ASC`, [userguid]);
+        return rows;
+    }
+    catch (err) {
+        if (!isUndefinedColumnError(err))
+            throw err;
+        const { rows } = await db_1.default.query(`SELECT ${SELECT_ITEM_FIELDS_LEGACY}
+       FROM items
+       WHERE userguid = $1 OR ispublic = true
+       ORDER BY LOWER(name) ASC, id ASC`, [userguid]);
+        return rows;
+    }
 };
 exports.getItemsLibraryByUserGuid = getItemsLibraryByUserGuid;
 const getAllItemsWithUsername = async () => {
-    const { rows } = await db_1.default.query(`SELECT i.id, i.userguid::text AS userguid, i.name, i.description, i.type,
-       COALESCE(NULLIF(i.range, '')::int, 0) AS range,
-       i.value, i.weight, i.curseid AS "curseId",
-       COALESCE(i.effectvalue, 0) AS "effectValue", COALESCE(i.damage, 0) AS "damage",
-       i.armorslot AS "armorSlot", i.effecton AS "effectOn",
-       i.effecttopc AS "effectToPc", COALESCE(i.effecttopcvalue, 0) AS "effectToPcValue",
-       COALESCE(i.weaponeffecttype, 'Blood') AS "weaponEffectType",
-       COALESCE(i.weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
-       i.imageid AS "imageId", i.soundid AS "soundId",
-       i.ispublic AS "isPublic",
-       COALESCE(i.istwohanded, false) AS "isTwoHanded",
-       i.uses,
-       i.createdat::text AS "createdAt", i.updatedat::text AS "updatedAt",
-       COALESCE(u.username, '') AS username
-     FROM items i
-     LEFT JOIN users u ON u.key::text = i.userguid::text
-     ORDER BY LOWER(i.name) ASC, i.id ASC`);
-    return rows;
+    try {
+        const { rows } = await db_1.default.query(`SELECT i.id, i.userguid::text AS userguid, i.name, i.description, i.type,
+         COALESCE(NULLIF(i.range, '')::int, 0) AS range,
+         i.value, i.weight, i.curseid AS "curseId",
+         COALESCE(i.effectvalue, 0) AS "effectValue", COALESCE(i.damage, 0) AS "damage",
+         i.armorslot AS "armorSlot", i.effecton AS "effectOn",
+         i.effecttopc AS "effectToPc", COALESCE(i.effecttopcvalue, 0) AS "effectToPcValue",
+         NULLIF(i.note, '') AS note,
+         COALESCE(i.minmindtoread, 0) AS "minMindToRead",
+         COALESCE(i.weaponeffecttype, 'Blood') AS "weaponEffectType",
+         COALESCE(i.weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
+         i.imageid AS "imageId", i.soundid AS "soundId",
+         i.ispublic AS "isPublic",
+         COALESCE(i.istwohanded, false) AS "isTwoHanded",
+         i.uses,
+         i.createdat::text AS "createdAt", i.updatedat::text AS "updatedAt",
+         COALESCE(u.username, '') AS username
+       FROM items i
+       LEFT JOIN users u ON u.key::text = i.userguid::text
+       ORDER BY LOWER(i.name) ASC, i.id ASC`);
+        return rows;
+    }
+    catch (err) {
+        if (!isUndefinedColumnError(err))
+            throw err;
+        const { rows } = await db_1.default.query(`SELECT i.id, i.userguid::text AS userguid, i.name, i.description, i.type,
+         COALESCE(NULLIF(i.range, '')::int, 0) AS range,
+         i.value, i.weight, i.curseid AS "curseId",
+         COALESCE(i.effectvalue, 0) AS "effectValue", COALESCE(i.damage, 0) AS "damage",
+         i.armorslot AS "armorSlot", i.effecton AS "effectOn",
+         i.effecttopc AS "effectToPc", COALESCE(i.effecttopcvalue, 0) AS "effectToPcValue",
+         NULL::text AS note,
+         0 AS "minMindToRead",
+         COALESCE(i.weaponeffecttype, 'Blood') AS "weaponEffectType",
+         COALESCE(i.weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
+         i.imageid AS "imageId", i.soundid AS "soundId",
+         i.ispublic AS "isPublic",
+         COALESCE(i.istwohanded, false) AS "isTwoHanded",
+         i.uses,
+         i.createdat::text AS "createdAt", i.updatedat::text AS "updatedAt",
+         COALESCE(u.username, '') AS username
+       FROM items i
+       LEFT JOIN users u ON u.key::text = i.userguid::text
+       ORDER BY LOWER(i.name) ASC, i.id ASC`);
+        return rows;
+    }
 };
 exports.getAllItemsWithUsername = getAllItemsWithUsername;
 const insertItemForUser = async (userguid, payload) => {
     const { rows } = await db_1.default.query(`INSERT INTO items
        (userguid, name, description, type, range, value, weight, curseid,
-        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded, uses)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, note, minmindtoread, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded, uses)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
      RETURNING ${SELECT_ITEM_FIELDS}`, [
         userguid,
         payload.name,
@@ -93,6 +177,8 @@ const insertItemForUser = async (userguid, payload) => {
         payload.effectOn,
         payload.effectToPc,
         payload.effectToPcValue,
+        payload.note,
+        payload.minMindToRead,
         payload.weaponEffectType,
         payload.weaponEffectColor,
         payload.imageId,
@@ -119,15 +205,17 @@ const updateItemForUser = async (id, userguid, payload) => {
          effecton = $11,
          effecttopc = $12,
          effecttopcvalue = $13,
-         weaponeffecttype = $14,
-         weaponeffectcolor = $15,
-         imageid = $16,
-         soundid = $17,
-         ispublic = $18,
-         istwohanded = $19,
-         uses = $20,
+         note = $14,
+         minmindtoread = $15,
+         weaponeffecttype = $16,
+         weaponeffectcolor = $17,
+         imageid = $18,
+         soundid = $19,
+         ispublic = $20,
+         istwohanded = $21,
+         uses = $22,
          updatedat = NOW()
-       WHERE id = $21 AND userguid = $22
+       WHERE id = $23 AND userguid = $24
      RETURNING ${SELECT_ITEM_FIELDS}`, [
         payload.name,
         payload.description,
@@ -142,6 +230,8 @@ const updateItemForUser = async (id, userguid, payload) => {
         payload.effectOn,
         payload.effectToPc,
         payload.effectToPcValue,
+        payload.note,
+        payload.minMindToRead,
         payload.weaponEffectType,
         payload.weaponEffectColor,
         payload.imageId,
@@ -160,10 +250,20 @@ const getItemsByIds = async (ids) => {
         return [];
     }
     const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
-    const { rows } = await db_1.default.query(`SELECT ${SELECT_ITEM_FIELDS}
-     FROM items
-     WHERE id IN (${placeholders})`, ids);
-    return rows;
+    try {
+        const { rows } = await db_1.default.query(`SELECT ${SELECT_ITEM_FIELDS}
+       FROM items
+       WHERE id IN (${placeholders})`, ids);
+        return rows;
+    }
+    catch (err) {
+        if (!isUndefinedColumnError(err))
+            throw err;
+        const { rows } = await db_1.default.query(`SELECT ${SELECT_ITEM_FIELDS_LEGACY}
+       FROM items
+       WHERE id IN (${placeholders})`, ids);
+        return rows;
+    }
 };
 exports.getItemsByIds = getItemsByIds;
 const deleteItemForUser = async (id, userguid) => {

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tavernTurnIn = exports.fetchSamplePcById = exports.fetchAllPcsForAdmin = exports.setMainGamePc = exports.setSamplePc = exports.fetchSamplePcs = exports.removePcForUser = exports.savePcForUser = exports.upgradeStat = exports.createPcForUser = exports.upgradeNod = exports.upgradeNoa = exports.awardSpToPc = exports.fetchPcByIdForUser = exports.fetchAllPcsWithUsername = exports.fetchPcsByUserGuid = void 0;
+exports.tavernTurnIn = exports.fetchSamplePcById = exports.fetchAllPcsForAdmin = exports.setMainGamePc = exports.setSamplePc = exports.fetchSamplePcs = exports.removePcForUser = exports.savePcForUser = exports.upgradeStat = exports.createPcForUser = exports.upgradeNod = exports.upgradeNoa = exports.completeDungonRewardOnce = exports.awardSpToPc = exports.fetchPcByIdForUser = exports.fetchAllPcsWithUsername = exports.fetchPcsByUserGuid = void 0;
 const pcRepository_1 = require("../repositories/pcRepository");
 const tresherRepository_1 = require("../repositories/tresherRepository");
 const tresherRepository_2 = require("../repositories/tresherRepository");
@@ -23,6 +23,10 @@ const awardSpToPc = async (id, userguid, amount) => {
     return await (0, pcRepository_1.addSpToPc)(id, userguid, amount);
 };
 exports.awardSpToPc = awardSpToPc;
+const completeDungonRewardOnce = async (id, userguid, dungonId, spReward) => {
+    return await (0, pcRepository_1.completeDungonRewardOnce)(id, userguid, dungonId, spReward);
+};
+exports.completeDungonRewardOnce = completeDungonRewardOnce;
 const upgradeNoa = async (id, userguid, spCost, goldCost, tresherId) => {
     return await (0, pcRepository_1.upgradeNoa)(id, userguid, spCost, goldCost, tresherId);
 };

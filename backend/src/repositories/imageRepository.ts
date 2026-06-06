@@ -1,5 +1,71 @@
 import pool from '../db';
 
+const PG_UNIQUE_VIOLATION = '23505';
+const IMAGES_PKEY_CONSTRAINT = 'images_pkey';
+
+interface PgErrorWithCodeAndConstraint {
+  code?: string;
+  constraint?: string;
+}
+
+function isImagesPrimaryKeyDuplicate(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    (err as PgErrorWithCodeAndConstraint).code === PG_UNIQUE_VIOLATION &&
+    (err as PgErrorWithCodeAndConstraint).constraint === IMAGES_PKEY_CONSTRAINT
+  );
+}
+
+async function syncImagesIdSequence(): Promise<void> {
+  await pool.query(`
+    SELECT setval(
+      pg_get_serial_sequence('images', 'id'),
+      COALESCE((SELECT MAX(id) FROM images), 1),
+      (SELECT COUNT(*) > 0 FROM images)
+    )
+  `);
+}
+
+async function insertImageRecord(
+  userguid: string,
+  payload: CreateImagePayload
+): Promise<ImageRecord> {
+  const { rows } = await pool.query<ImageRecord>(
+    `INSERT INTO images (
+       userguid,
+       path,
+       ispublic,
+       isactive,
+       name,
+       assettype,
+       updatedat
+     )
+     VALUES (
+       $1,
+       $2,
+       $3,
+       $4,
+       $5,
+       $6,
+       NOW()
+     )
+     RETURNING
+       id,
+       userguid::text AS userguid,
+       path,
+       ispublic AS "isPublic",
+       isactive AS "isActive",
+       name,
+       assettype::text AS assettype,
+       createdat::text AS "createdAt",
+       updatedat::text AS "updatedAt"`,
+    [userguid, payload.path, payload.isPublic, payload.isActive, payload.name, payload.assettype]
+  );
+
+  return rows[0];
+}
+
 export interface ImageRecord {
   id: number;
   userguid: string;
@@ -127,39 +193,17 @@ export const insertImageForUser = async (
   userguid: string,
   payload: CreateImagePayload
 ): Promise<ImageRecord> => {
-  const { rows } = await pool.query<ImageRecord>(
-    `INSERT INTO images (
-       userguid,
-       path,
-       ispublic,
-       isactive,
-       name,
-       assettype,
-       updatedat
-     )
-     VALUES (
-       $1,
-       $2,
-       $3,
-       $4,
-       $5,
-       $6,
-       NOW()
-     )
-     RETURNING
-       id,
-       userguid::text AS userguid,
-       path,
-       ispublic AS "isPublic",
-       isactive AS "isActive",
-       name,
-       assettype::text AS assettype,
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"`,
-    [userguid, payload.path, payload.isPublic, payload.isActive, payload.name, payload.assettype]
-  );
+  try {
+    return await insertImageRecord(userguid, payload);
+  } catch (err) {
+    if (!isImagesPrimaryKeyDuplicate(err)) {
+      throw err;
+    }
 
-  return rows[0];
+    // Local restores can leave identity/sequence behind max(id). Repair once and retry insert.
+    await syncImagesIdSequence();
+    return await insertImageRecord(userguid, payload);
+  }
 };
 
 export const updateImageForUser = async (

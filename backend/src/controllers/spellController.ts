@@ -27,8 +27,20 @@ interface SpellWriteInput {
   lastfor?: unknown;
   effectAmount?: unknown;
   effectAmount2?: unknown;
+  effectDiceCount?: unknown;
+  effectdicecount?: unknown;
+  effectDiceSides?: unknown;
+  effectdicesides?: unknown;
+  effectAmount2DiceCount?: unknown;
+  effectamount2dicecount?: unknown;
+  effectAmount2DiceSides?: unknown;
+  effectamount2dicesides?: unknown;
   value?: unknown;
   sp?: unknown;
+  minLtsp?: unknown;
+  minltsp?: unknown;
+  learnCostGp?: unknown;
+  learncostgp?: unknown;
   successTestValue?: unknown;
   successtestvalue?: unknown;
   magicCost?: unknown;
@@ -105,6 +117,12 @@ function buildSpellPayload(input: SpellWriteInput, isAdmin: boolean): UpsertSpel
   const lastFor2 = Math.max(0, normalizeNumber(input.lastFor2 ?? input.lastfor2 ?? input.lastFor ?? input.lastfor, 0));
   const effectOnPc1 = (input.effectOnPc1 === true || input.effectonpc1 === true) || range1 === 0;
   const effectOnPc2 = (input.effectOnPc2 === true || input.effectonpc2 === true) || range2 === 0;
+  const legacyAmount1 = Math.max(0, normalizeNumber(input.effectAmount, 0));
+  const legacyAmount2 = Math.max(0, normalizeNumber(input.effectAmount2, 0));
+  const effectDiceSides = Math.max(0, normalizeNumber(input.effectDiceSides ?? input.effectdicesides, legacyAmount1));
+  const effectAmount2DiceSides = Math.max(0, normalizeNumber(input.effectAmount2DiceSides ?? input.effectamount2dicesides, legacyAmount2));
+  const effectDiceCount = Math.max(0, normalizeNumber(input.effectDiceCount ?? input.effectdicecount, effectDiceSides > 0 ? 1 : 0));
+  const effectAmount2DiceCount = Math.max(0, normalizeNumber(input.effectAmount2DiceCount ?? input.effectamount2dicecount, effectAmount2DiceSides > 0 ? 1 : 0));
 
   return {
     name: normalizeText(input.name, 'Unnamed Spell'),
@@ -113,10 +131,16 @@ function buildSpellPayload(input: SpellWriteInput, isAdmin: boolean): UpsertSpel
     effectOn: EFFECT_TO_OPTIONS.has(effectOn) ? effectOn : '',
     effectOn2: EFFECT_TO_OPTIONS.has(effectOn2) ? effectOn2 : '',
     lastFor: lastFor1,
-    effectAmount: normalizeNumber(input.effectAmount, 0),
-    effectAmount2: normalizeNumber(input.effectAmount2, 0),
+    effectAmount: effectDiceSides,
+    effectAmount2: effectAmount2DiceSides,
+    effectDiceCount,
+    effectDiceSides,
+    effectAmount2DiceCount,
+    effectAmount2DiceSides,
     value: Math.max(0, normalizeNumber(input.value, 0)),
     sp: Math.max(0, normalizeNumber(input.sp, 0)),
+    minLtsp: Math.max(0, normalizeNumber(input.minLtsp ?? input.minltsp ?? input.sp, 0)),
+    learnCostGp: Math.max(0, normalizeNumber(input.learnCostGp ?? input.learncostgp, 0)),
     successTestValue: Math.max(0, normalizeNumber(input.successTestValue ?? input.successtestvalue, 0)),
     magicCost: Math.max(1, normalizeNumber(input.magicCost ?? input.magiccost, 1)),
     costToLearn: Math.max(0, normalizeNumber(input.costToLearn ?? input.costtolearn, 0)),

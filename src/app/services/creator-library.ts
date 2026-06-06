@@ -32,9 +32,12 @@ export interface LibSoundItem {
 export interface LibSpellItem {
   id: number; name: string; description: string; range: number; effectOn: string;
   effectOn2: string; lastFor: number; effectAmount: number; effectAmount2: number;
-  value: number; sp: number; successTestValue: number; magicCost: number;
+  effectDiceCount?: number; effectDiceSides?: number;
+  effectAmount2DiceCount?: number; effectAmount2DiceSides?: number;
+  value: number; sp: number; minLtsp?: number; learnCostGp?: number; successTestValue: number; magicCost: number;
   costToLearn: number; imageId: number | null; soundId: number | null;
   isPublic: boolean; numberOfTargets?: number; effectType?: string; effectColor?: string;
+  targetType?: 'auto' | 'monster' | 'trap' | 'pc';
   effectOnPc1?: boolean; effectOnPc2?: boolean;
   range1?: number; range2?: number;
   lastFor1?: number; lastFor2?: number;
@@ -97,6 +100,6 @@ export class CreatorLibraryService {
   readonly isLibSpellSectionVisible = signal(true);
 
   readonly libSpellEffectToOptions = [
-    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'ROS', 'AE', 'Action Economy', '# of Attacks', 'Remove Curse',
+    'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'ROS', 'AE', '# of Attacks', 'Remove Curse', 'Remove Trap',
   ] as const;
 }

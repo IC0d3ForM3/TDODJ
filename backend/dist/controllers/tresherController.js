@@ -33,7 +33,29 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateTresher = exports.createTresher = exports.getTreshers = void 0;
+exports.updateTresher = exports.createTresher = exports.getTreshers = exports.deleteTresher = void 0;
+const deleteTresher = async (req, res) => {
+    const id = Number.parseInt(req.params['id'], 10);
+    const userkey = req.query['userkey'];
+    if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ result: 0, error: 'Valid tresher id is required' });
+    }
+    if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+        return res.status(400).json({ result: 0, error: 'Valid userkey is required' });
+    }
+    try {
+        const deleted = await tresherService.deleteTresherForUser(id, userkey.trim());
+        if (!deleted) {
+            return res.status(404).json({ result: 0, error: 'Tresher not found or access denied' });
+        }
+        return res.json({ result: 1 });
+    }
+    catch (error) {
+        console.error('Error deleting tresher:', error);
+        return res.status(500).json({ result: 0, error: 'Failed to delete tresher' });
+    }
+};
+exports.deleteTresher = deleteTresher;
 const userRepository_1 = require("../repositories/userRepository");
 const tresherService = __importStar(require("../services/tresherService"));
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

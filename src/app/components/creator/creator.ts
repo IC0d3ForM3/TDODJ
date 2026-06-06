@@ -72,6 +72,10 @@ import {
   Tresher,
   TresherPlacement,
   Trap,
+  TrapCrossingRequirement,
+  TrapSourceObjectType,
+  TrapSourceSide,
+  TrapType,
   FloorTrapPlacement,
   PortalPlacement,
   PortalLook,
@@ -152,8 +156,13 @@ interface LibSpellWritePayload {
   effectOn: string;
   effectOn2: string;
   lastFor: number;
+  targetType: 'auto' | 'monster' | 'trap' | 'pc';
   effectAmount: number;
   effectAmount2: number;
+  effectDiceCount: number;
+  effectDiceSides: number;
+  effectAmount2DiceCount: number;
+  effectAmount2DiceSides: number;
   value: number;
   sp: number;
   successTestValue: number;
@@ -204,6 +213,28 @@ interface GenerateItemBatch {
   count: number;
 }
 
+const FLOOR_TRAP_TYPE_OPTIONS: TrapType[] = [
+  'Pit',
+  'Spiked Pit',
+  'Ceiling Spikes',
+  'Floor Glue',
+  'Drop Net',
+  'Dart',
+  'Gas Cloud',
+  'Wall Spikes',
+];
+
+const TRAP_SOURCE_OBJECT_OPTIONS: TrapSourceObjectType[] = [
+  'floor',
+  'wall',
+  'door',
+  'item',
+  'tresher',
+  'obstacle',
+];
+
+const TRAP_SOURCE_SIDE_OPTIONS: TrapSourceSide[] = ['north', 'east', 'south', 'west'];
+
 @Component({
   selector: 'app-creator',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -239,6 +270,7 @@ export class Creator implements OnInit {
   private nextSquareTextId = 0;
 
   private gridCanvasRef: ElementRef<HTMLCanvasElement> | null = null;
+  private gridCanvasWrapRef: ElementRef<HTMLDivElement> | null = null;
   private previewGridCanvasRef: ElementRef<HTMLCanvasElement> | null = null;
   private firstPersonCanvasRef: ElementRef<HTMLCanvasElement> | null = null;
 
@@ -246,6 +278,11 @@ export class Creator implements OnInit {
   set dungonGridCanvas(value: ElementRef<HTMLCanvasElement> | undefined) {
     this.gridCanvasRef = value ?? null;
     this.drawGridCanvas();
+  }
+
+  @ViewChild('gridCanvasWrap')
+  set gridCanvasWrap(value: ElementRef<HTMLDivElement> | undefined) {
+    this.gridCanvasWrapRef = value ?? null;
   }
 
   readonly isSidebarCollapsed = signal(false);
@@ -374,6 +411,11 @@ export class Creator implements OnInit {
   get isCopyFloorTrapMode() { return this.placementService.isCopyFloorTrapMode; }
   get copyFloorTrapSource() { return this.placementService.copyFloorTrapSource; }
   private nextFloorTrapId = 1;
+  readonly floorTrapTypeOptions = FLOOR_TRAP_TYPE_OPTIONS;
+  readonly trapSourceObjectOptions = TRAP_SOURCE_OBJECT_OPTIONS;
+  readonly trapSourceSideOptions = TRAP_SOURCE_SIDE_OPTIONS;
+  readonly floorTrapCrossingItemId = signal<number | null>(null);
+  readonly floorTrapCrossingRequirements = signal<TrapCrossingRequirement[]>([]);
   get obstaclePlacementsByDungon() { return this.dungeonState.obstaclePlacementsByDungon; }
   get isPlaceObstacleMode() { return this.placementService.isPlaceObstacleMode; }
   readonly isObstacleDialogVisible = signal(false);
@@ -581,6 +623,7 @@ export class Creator implements OnInit {
     description: new FormControl<string>('', { nonNullable: true }),
     range: new FormControl<number>(0, { nonNullable: true }),
     effectOn: new FormControl<string>('HP', { nonNullable: true }),
+    targetType: new FormControl<'auto' | 'monster' | 'trap' | 'pc'>('auto', { nonNullable: true }),
     effectOnPc1: new FormControl<boolean>(false, { nonNullable: true }),
     range1: new FormControl<number>(0, { nonNullable: true }),
     lastFor1: new FormControl<number>(0, { nonNullable: true }),
@@ -591,6 +634,10 @@ export class Creator implements OnInit {
     lastFor: new FormControl<number>(0, { nonNullable: true }),
     effectAmount: new FormControl<number>(0, { nonNullable: true }),
     effectAmount2: new FormControl<number>(0, { nonNullable: true }),
+    effectDiceCount: new FormControl<number>(0, { nonNullable: true }),
+    effectDiceSides: new FormControl<number>(0, { nonNullable: true }),
+    effectAmount2DiceCount: new FormControl<number>(0, { nonNullable: true }),
+    effectAmount2DiceSides: new FormControl<number>(0, { nonNullable: true }),
     value: new FormControl<number>(0, { nonNullable: true }),
     sp: new FormControl<number>(0, { nonNullable: true }),
     successTestValue: new FormControl<number>(0, { nonNullable: true }),
@@ -617,12 +664,20 @@ export class Creator implements OnInit {
     ...EMPTY_OPEN_BLOCK_SELECTIONS,
   });
   readonly gridCellSize = 20;
-  readonly gridColumnCount = 45;
-  readonly gridRowCount = 50;
-  readonly gridColumnNumbers = Array.from({ length: this.gridColumnCount }, (_, index) => index);
-  readonly gridRowNumbers = Array.from({ length: this.gridRowCount }, (_, index) => index);
-  readonly gridCanvasWidth = this.gridCellSize * this.gridColumnCount;
-  readonly gridCanvasHeight = this.gridCellSize * this.gridRowCount;
+  readonly defaultGridColumnCount = 45;
+  readonly defaultGridRowCount = 50;
+  private readonly gridColumnCountState = signal(this.defaultGridColumnCount);
+  private readonly gridRowCountState = signal(this.defaultGridRowCount);
+  get gridColumnCount(): number { return this.gridColumnCountState(); }
+  get gridRowCount(): number { return this.gridRowCountState(); }
+  get gridColumnNumbers(): number[] {
+    return Array.from({ length: this.gridColumnCount }, (_, index) => index);
+  }
+  get gridRowNumbers(): number[] {
+    return Array.from({ length: this.gridRowCount }, (_, index) => index);
+  }
+  get gridCanvasWidth(): number { return this.gridCellSize * this.gridColumnCount; }
+  get gridCanvasHeight(): number { return this.gridCellSize * this.gridRowCount; }
   readonly previewGridCellSize = 18;
   readonly previewGridDimension = 10;
   readonly previewGridCanvasWidth = this.previewGridCellSize * this.previewGridDimension;
@@ -808,13 +863,20 @@ export class Creator implements OnInit {
   });
 
   readonly floorTrapForm = new FormGroup({
+    trapType: new FormControl<TrapType>('Pit', { nonNullable: true }),
     trapName: new FormControl<string>('', { nonNullable: true }),
     trapDescription: new FormControl<string>('', { nonNullable: true }),
     trapDamage: new FormControl<number>(0, { nonNullable: true }),
     trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS'>('HP', { nonNullable: true }),
+    isHiddenUntilFoundOrTriggered: new FormControl<boolean>(true, { nonNullable: true }),
     trapCurseId: new FormControl<number | null>(null),
     trapToDetect: new FormControl<number>(10, { nonNullable: true }),
     trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
+    sourceObjectType: new FormControl<TrapSourceObjectType>('floor', { nonNullable: true }),
+    sourceSide: new FormControl<TrapSourceSide>('north', { nonNullable: true }),
+    secondaryEffectTo: new FormControl<'Stamina' | 'Mind' | 'AE' | 'ROS' | null>(null),
+    secondaryEffectAmount: new FormControl<number>(0, { nonNullable: true }),
+    secondaryEffectDuration: new FormControl<number>(0, { nonNullable: true }),
   });
 
   readonly obstacleForm = new FormGroup({
@@ -1411,17 +1473,77 @@ export class Creator implements OnInit {
     this.pendingFloorTrapPlacement.set(null);
   }
 
+  isFloorTrapCrossingConfigVisible(): boolean {
+    const type = this.floorTrapForm.controls.trapType.value;
+    return type === 'Pit' || type === 'Spiked Pit';
+  }
+
+  isFloorTrapSourceConfigVisible(): boolean {
+    const type = this.floorTrapForm.controls.trapType.value;
+    return type === 'Dart' || type === 'Gas Cloud' || type === 'Wall Spikes' || type === 'Drop Net';
+  }
+
+  isFloorTrapAlwaysHiddenType(): boolean {
+    const type = this.floorTrapForm.controls.trapType.value;
+    return type === 'Floor Glue' || type === 'Drop Net';
+  }
+
+  onFloorTrapTypeChange(event: Event): void {
+    const target = event.target as HTMLSelectElement | null;
+    if (!target) return;
+    const nextType = this.floorTrapTypeOptions.find((t) => t === target.value) ?? 'Pit';
+    this.floorTrapForm.controls.trapType.setValue(nextType);
+    if (this.isFloorTrapAlwaysHiddenType()) {
+      this.floorTrapForm.controls.isHiddenUntilFoundOrTriggered.setValue(true);
+    }
+    if (!this.isFloorTrapCrossingConfigVisible()) {
+      this.floorTrapCrossingRequirements.set([]);
+      this.floorTrapCrossingItemId.set(null);
+    }
+    if (!this.isFloorTrapSourceConfigVisible()) {
+      this.floorTrapForm.controls.sourceObjectType.setValue('floor');
+      this.floorTrapForm.controls.sourceSide.setValue('north');
+    }
+  }
+
+  addFloorTrapCrossingRequirement(itemIdRaw: number | string | null): void {
+    const itemId = itemIdRaw !== null ? Number(itemIdRaw) : NaN;
+    if (!Number.isFinite(itemId)) return;
+    const selected = this.libItems().find((item) => item.id === itemId);
+    if (!selected) return;
+    this.floorTrapCrossingRequirements.update((existing) => {
+      if (existing.some((entry) => entry.itemId === selected.id)) {
+        return existing;
+      }
+      return [...existing, { itemId: selected.id, itemName: selected.name || `Item ${selected.id}` }];
+    });
+    this.floorTrapCrossingItemId.set(null);
+  }
+
+  removeFloorTrapCrossingRequirementAt(index: number): void {
+    this.floorTrapCrossingRequirements.update((existing) => existing.filter((_, i) => i !== index));
+  }
+
   openFloorTrapDialog(dungonId: number, row: number, column: number): void {
     this.editingFloorTrapId.set(null);
     this.pendingFloorTrapPlacement.set({ dungonId, row, column });
+    this.floorTrapCrossingRequirements.set([]);
+    this.floorTrapCrossingItemId.set(null);
     this.floorTrapForm.reset({
+      trapType: 'Pit',
       trapName: '',
       trapDescription: '',
       trapDamage: 0,
       trapDamageTo: 'HP',
+      isHiddenUntilFoundOrTriggered: true,
       trapCurseId: null,
       trapToDetect: 10,
       trapToDisarm: 10,
+      sourceObjectType: 'floor',
+      sourceSide: 'north',
+      secondaryEffectTo: null,
+      secondaryEffectAmount: 0,
+      secondaryEffectDuration: 0,
     });
     this.isFloorTrapDialogVisible.set(true);
   }
@@ -1431,15 +1553,27 @@ export class Creator implements OnInit {
     if (!trap) return;
     this.editingFloorTrapId.set(trapId);
     this.pendingFloorTrapPlacement.set({ dungonId, row: trap.row, column: trap.column });
+    this.floorTrapCrossingRequirements.set([...(trap.trap.crossingRequirements ?? [])]);
+    this.floorTrapCrossingItemId.set(null);
     this.floorTrapForm.reset({
+      trapType: trap.trap.trapType ?? 'Pit',
       trapName: trap.trap.name,
       trapDescription: trap.trap.description,
       trapDamage: trap.trap.damage,
       trapDamageTo: trap.trap.damageTo,
+      isHiddenUntilFoundOrTriggered: trap.trap.isHiddenUntilFoundOrTriggered ?? true,
       trapCurseId: trap.trap.curseId,
       trapToDetect: trap.trap.toDetect,
       trapToDisarm: trap.trap.toDisarm,
+      sourceObjectType: trap.trap.sourceObjectType ?? 'floor',
+      sourceSide: trap.trap.sourceSide ?? 'north',
+      secondaryEffectTo: trap.trap.secondaryEffectTo ?? null,
+      secondaryEffectAmount: trap.trap.secondaryEffectAmount ?? 0,
+      secondaryEffectDuration: trap.trap.secondaryEffectDuration ?? 0,
     });
+    if (this.isFloorTrapAlwaysHiddenType()) {
+      this.floorTrapForm.controls.isHiddenUntilFoundOrTriggered.setValue(true);
+    }
     this.isFloorTrapDialogVisible.set(true);
   }
 
@@ -1448,14 +1582,33 @@ export class Creator implements OnInit {
     if (!pending) return;
 
     const controls = this.floorTrapForm.controls;
+    const trapType = controls.trapType.value;
+    const isAlwaysHidden = trapType === 'Floor Glue' || trapType === 'Drop Net';
+    const crossingRequirements = this.isFloorTrapCrossingConfigVisible()
+      ? this.floorTrapCrossingRequirements()
+      : [];
+    const sourceObjectType = this.isFloorTrapSourceConfigVisible()
+      ? controls.sourceObjectType.value
+      : 'floor';
+    const sourceSide = this.isFloorTrapSourceConfigVisible()
+      ? controls.sourceSide.value
+      : 'north';
     const trap: Trap = {
+      trapType,
       name: controls.trapName.value.trim(),
       description: controls.trapDescription.value.trim(),
       damage: Math.max(0, controls.trapDamage.value),
       damageTo: controls.trapDamageTo.value,
+      isHiddenUntilFoundOrTriggered: isAlwaysHidden ? true : controls.isHiddenUntilFoundOrTriggered.value,
+      crossingRequirements,
       curseId: controls.trapCurseId.value ?? null,
       toDetect: Math.max(0, controls.trapToDetect.value),
       toDisarm: Math.max(0, controls.trapToDisarm.value),
+      sourceObjectType,
+      sourceSide,
+      secondaryEffectTo: controls.secondaryEffectTo.value,
+      secondaryEffectAmount: Math.max(0, controls.secondaryEffectAmount.value),
+      secondaryEffectDuration: Math.max(0, controls.secondaryEffectDuration.value),
     };
 
     const editingId = this.editingFloorTrapId();
@@ -1475,7 +1628,7 @@ export class Creator implements OnInit {
         trap,
         isTriggered: false,
         isDisarmed: false,
-        isDetected: false,
+        isDetected: !trap.isHiddenUntilFoundOrTriggered,
       };
       this.nextFloorTrapId += 1;
       this.floorTrapPlacementsByDungon.update((all) => ({
@@ -1493,6 +1646,8 @@ export class Creator implements OnInit {
     this.isFloorTrapDialogVisible.set(false);
     this.pendingFloorTrapPlacement.set(null);
     this.editingFloorTrapId.set(null);
+    this.floorTrapCrossingRequirements.set([]);
+    this.floorTrapCrossingItemId.set(null);
   }
 
   copyFloorTrapFromSelection(): void {
@@ -2291,8 +2446,8 @@ export class Creator implements OnInit {
     if (!item) return;
 
     if (item.type === 'monster') {
-      this.openMonsterDialog();
-      this.editSelectedMonster(item.refId);
+      // Use the Configure Monster modal for both editing and placing
+      this.openPlaceMonsterDialogForEdit(item.refId);
     } else if (item.type === 'tresher') {
       this.openTresherDialog();
     } else if (item.type === 'obstacle') {
@@ -2311,6 +2466,51 @@ export class Creator implements OnInit {
       this.selectedPlacedItemKey.set(null);
       this.openDoorEditDialog(item.refId);
     }
+  }
+
+  /**
+   * Opens the Configure Monster modal for editing an existing placed monster.
+   * Pre-fills all drop/cash/item/potion/spell fields from the placement.
+   */
+  openPlaceMonsterDialogForEdit(monsterId: number): void {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) return;
+    // Find the placement by monsterId
+    const placement = (this.monsterPlacementsByDungon()[dungonId] ?? []).find((mp) => mp.monsterId === monsterId);
+    if (!placement) return;
+    // Find the grid position
+    const row = placement.row;
+    const column = placement.column;
+    // Set up modal state
+    this.editingMonsterPlacementPos.set({ dungonId, row, column });
+    this.pendingMonsterPlacement.set({ dungonId, row, column });
+    this.placeMonsterRoam.set(placement.roam ?? false);
+    this.placeMonsterDropTresherIds.set([...(placement.tresherIds ?? [])]);
+    this.placeMonsterDropKeyIds.set([...(placement.keyIds ?? [])]);
+    this.placeMonsterDropItemIds.set([...(placement.itemIds ?? [])]);
+    this.placeMonsterDropSpellIds.set([...(placement.spellIds ?? [])]);
+    this.placeMonsterDropPotionIds.set([...(placement.potionIds ?? [])]);
+    this.placeMonsterGold.set(placement.gold ?? 0);
+    this.placeMonsterSilver.set(placement.silver ?? 0);
+    this.placeMonsterCopper.set(placement.copper ?? 0);
+    this.placeMonsterZinc.set(placement.zinc ?? 0);
+    this.placeMonsterWeaponItemId.set(placement.weaponItemId ?? null);
+    this.placeMonsterIsDormant.set(placement.isDormant ?? false);
+    this.placeMonsterGuardRow.set(placement.guardRow ?? null);
+    this.placeMonsterGuardCol.set(placement.guardColumn ?? null);
+    this.isSelectingGuardSquare.set(false);
+    this.placeMonsterIsStationary.set(placement.isStationary ?? false);
+    this.placeMonsterStationaryTriggerRow.set(placement.stationaryTriggerRow ?? null);
+    this.placeMonsterStationaryTriggerCol.set(placement.stationaryTriggerCol ?? null);
+    this.isSelectingStationaryTriggerSquare.set(false);
+    this.placeMonsterNoAttackUnlessAttacked.set(placement.noAttackUnlessAttacked ?? false);
+    this.isKaysDialogVisible.set(false);
+    this.isTresherDialogVisible.set(false);
+    this.isMonsterDialogVisible.set(false);
+    this.isPlaceTresherDialogVisible.set(false);
+    this.loadMonsterLibrary();
+    this.itemService.loadItems(this.account.getKey()!);
+    this.isPlaceMonsterDialogVisible.set(true);
   }
 
   clearSelectedPlacement(): void {
@@ -3062,6 +3262,36 @@ export class Creator implements OnInit {
 
   cancelExitDialog(): void {
     this.closeExitDialog();
+  }
+
+  hasExistingExitAtPendingPlacement(): boolean {
+    const pending = this.pendingExitPlacement();
+    if (!pending) {
+      return false;
+    }
+
+    return (this.exitsByDungon()[pending.dungonId] ?? []).some(
+      (exit) => exit.row === pending.row && exit.column === pending.column
+    );
+  }
+
+  removeExitAtPendingPlacement(): void {
+    const pending = this.pendingExitPlacement();
+    if (!pending) {
+      return;
+    }
+
+    this.exitsByDungon.update((allExits) => ({
+      ...allExits,
+      [pending.dungonId]: (allExits[pending.dungonId] ?? []).filter(
+        (exit) => !(exit.row === pending.row && exit.column === pending.column)
+      ),
+    }));
+
+    this.closeExitDialog();
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
   }
 
   openTresherDialog(): void {
@@ -5369,47 +5599,13 @@ export class Creator implements OnInit {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const source = JSON.parse(reader.result as string) as {
-          rects?: Array<{ x: number; y: number; w: number; h: number }>;
-        };
-
-        if (!source.rects || !Array.isArray(source.rects)) {
-          this.mapImportError.set('Invalid map file: missing rects array.');
-          this.isImportingMap.set(false);
+        const parseResult = this.parseImportTilesFromMapJson(reader.result as string);
+        if ('error' in parseResult) {
+          this.mapImportError.set(parseResult.error);
           return;
         }
 
-        // Compute offset so all coords are >= 0 (normalize to top-left = 0,0)
-        let minX = Infinity, minY = Infinity;
-        for (const r of source.rects) {
-          minX = Math.min(minX, r.x);
-          minY = Math.min(minY, r.y);
-        }
-        const ox = -minX;
-        const oy = -minY;
-
-        // Build normalized tile list
-        const tiles: Array<{ row: number; col: number }> = [];
-        const seenKeys = new Set<string>();
-        for (const rect of source.rects) {
-          for (let dy = 0; dy < rect.h; dy++) {
-            for (let dx = 0; dx < rect.w; dx++) {
-              const row = rect.y + dy + oy;
-              const col = rect.x + dx + ox;
-              const k = `${row}:${col}`;
-              if (!seenKeys.has(k)) {
-                seenKeys.add(k);
-                tiles.push({ row, col });
-              }
-            }
-          }
-        }
-
-        if (tiles.length === 0) {
-          this.mapImportError.set('No tiles found in map file.');
-          this.isImportingMap.set(false);
-          return;
-        }
+        const { tiles } = parseResult;
 
         this.pendingImportTiles.set(tiles);
         this.isImportPlacementMode.set(true);
@@ -5424,6 +5620,90 @@ export class Creator implements OnInit {
       this.isImportingMap.set(false);
     };
     reader.readAsText(file);
+  }
+
+  importMapTopLeftFromFile(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) {
+      this.mapImportError.set('Select a dungeon first.');
+      return;
+    }
+
+    this.mapImportError.set(null);
+    this.isImportingMap.set(true);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parseResult = this.parseImportTilesFromMapJson(reader.result as string);
+        if ('error' in parseResult) {
+          this.mapImportError.set(parseResult.error);
+          return;
+        }
+
+        this.cancelImportPlacementMode();
+        this.applyImportedTilesWithOffset(dungonId, parseResult.tiles, 0, 0);
+        this.markDungonJsonChanged();
+        this.saveDungonJson();
+        this.drawGridCanvas();
+        this.drawPreviewGridCanvas();
+      } catch {
+        this.mapImportError.set('Failed to parse map file. Make sure it is valid JSON.');
+      } finally {
+        this.isImportingMap.set(false);
+      }
+    };
+    reader.onerror = () => {
+      this.mapImportError.set('Failed to read file.');
+      this.isImportingMap.set(false);
+    };
+    reader.readAsText(file);
+  }
+
+  private parseImportTilesFromMapJson(rawText: string): { tiles: Array<{ row: number; col: number }> } | { error: string } {
+    const source = JSON.parse(rawText) as {
+      rects?: Array<{ x: number; y: number; w: number; h: number }>;
+    };
+
+    if (!source.rects || !Array.isArray(source.rects)) {
+      return { error: 'Invalid map file: missing rects array.' };
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    for (const r of source.rects) {
+      minX = Math.min(minX, r.x);
+      minY = Math.min(minY, r.y);
+    }
+    const ox = -minX;
+    const oy = -minY;
+
+    const tiles: Array<{ row: number; col: number }> = [];
+    const seenKeys = new Set<string>();
+    for (const rect of source.rects) {
+      for (let dy = 0; dy < rect.h; dy++) {
+        for (let dx = 0; dx < rect.w; dx++) {
+          const row = rect.y + dy + oy;
+          const col = rect.x + dx + ox;
+          const key = `${row}:${col}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            tiles.push({ row, col });
+          }
+        }
+      }
+    }
+
+    if (tiles.length === 0) {
+      return { error: 'No tiles found in map file.' };
+    }
+
+    return { tiles };
   }
 
   cancelImportPlacementMode(): void {
@@ -5444,14 +5724,32 @@ export class Creator implements OnInit {
     const rowOffset = anchorRow - minRow;
     const colOffset = anchorCol - topRightCol;
 
+    this.applyImportedTilesWithOffset(dungonId, tiles, rowOffset, colOffset);
+
+    this.markDungonJsonChanged();
+    this.saveDungonJson();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+    this.isImportPlacementMode.set(false);
+    this.pendingImportTiles.set([]);
+  }
+
+  private applyImportedTilesWithOffset(
+    dungonId: number,
+    tiles: Array<{ row: number; col: number }>,
+    rowOffset: number,
+    colOffset: number
+  ): void {
     const newTileKeys = new Set<string>(
-      tiles.map(t => `${t.row + rowOffset}:${t.col + colOffset}`)
+      tiles.map((t) => `${t.row + rowOffset}:${t.col + colOffset}`)
     );
+
+    this.ensureGridCanFitTileKeys(newTileKeys);
 
     const existingFilled = this.filledSquaresByDungon()[dungonId] ?? {};
     const existingSquares = this.squaresByDungon()[dungonId] ?? {};
 
-    // Combined set so new tiles open walls toward each other AND toward existing tiles
+    // Combined set so new tiles open walls toward each other and existing tiles.
     const combinedFilled = new Set<string>([...Object.keys(existingFilled), ...newTileKeys]);
 
     let uid = Date.now();
@@ -5503,12 +5801,59 @@ export class Creator implements OnInit {
     this.filledSquaresByDungon.update((all) => ({ ...all, [dungonId]: mergedFilled }));
     this.squaresByDungon.update((all) => ({ ...all, [dungonId]: mergedSquares }));
 
-    this.markDungonJsonChanged();
-    this.saveDungonJson();
-    this.drawGridCanvas();
-    this.drawPreviewGridCanvas();
-    this.isImportPlacementMode.set(false);
-    this.pendingImportTiles.set([]);
+  }
+
+  private ensureGridCanFitTileKeys(tileKeys: Set<string>): void {
+    let maxRow = -1;
+    let maxCol = -1;
+    for (const key of tileKeys) {
+      const [rowText, colText] = key.split(':');
+      const row = Number.parseInt(rowText ?? '', 10);
+      const col = Number.parseInt(colText ?? '', 10);
+      if (Number.isNaN(row) || Number.isNaN(col)) continue;
+      if (row > maxRow) maxRow = row;
+      if (col > maxCol) maxCol = col;
+    }
+
+    if (maxRow + 1 > this.gridRowCount) {
+      this.gridRowCountState.set(maxRow + 1);
+    }
+    if (maxCol + 1 > this.gridColumnCount) {
+      this.gridColumnCountState.set(maxCol + 1);
+    }
+  }
+
+  hasGridOverflow(): boolean {
+    return this.gridRowCount > this.defaultGridRowCount || this.gridColumnCount > this.defaultGridColumnCount;
+  }
+
+  panGridViewport(direction: 'left' | 'right' | 'up' | 'down'): void {
+    const wrap = this.gridCanvasWrapRef?.nativeElement;
+    if (!wrap) return;
+
+    const stepX = Math.max(this.gridCellSize * 8, Math.floor(wrap.clientWidth * 0.75));
+    const stepY = Math.max(this.gridCellSize * 8, Math.floor(wrap.clientHeight * 0.75));
+
+    const dx = direction === 'left' ? -stepX : direction === 'right' ? stepX : 0;
+    const dy = direction === 'up' ? -stepY : direction === 'down' ? stepY : 0;
+
+    wrap.scrollBy({ left: dx, top: dy, behavior: 'smooth' });
+  }
+
+  showNormalGridView(): void {
+    const wrap = this.gridCanvasWrapRef?.nativeElement;
+    if (!wrap) return;
+    wrap.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
+  }
+
+  showOverflowGridView(): void {
+    const wrap = this.gridCanvasWrapRef?.nativeElement;
+    if (!wrap) return;
+    wrap.scrollTo({
+      left: Math.max(0, wrap.scrollWidth - wrap.clientWidth),
+      top: Math.max(0, wrap.scrollHeight - wrap.clientHeight),
+      behavior: 'smooth',
+    });
   }
 
   saveDungonJson(): void {
@@ -6349,6 +6694,14 @@ export class Creator implements OnInit {
     }
 
     if (isFilledSquare) {
+      const existingExit = (this.exitsByDungon()[dungonId] ?? []).find(
+        (exit) => exit.row === row && exit.column === column
+      );
+      if (existingExit) {
+        this.openExitDialog(dungonId, row, column);
+        return;
+      }
+
       const existingObstacle = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find(
         (obs) => obs.row === row && obs.column === column && !obs.isDestroyed
       );
@@ -8012,6 +8365,27 @@ export class Creator implements OnInit {
     return this.spellEffectTypeDefaultColor(effectType);
   }
 
+  private normalizeSpellEffectOn(value: unknown, fallback: string): string {
+    if (typeof value !== 'string') {
+      return fallback;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return fallback;
+    }
+
+    const normalized = trimmed.toLowerCase();
+    if (normalized === 'sight') {
+      return 'ROS';
+    }
+    if (normalized === 'action economy' || normalized === 'action econamey' || normalized === 'action econame') {
+      return 'AE';
+    }
+
+    return trimmed;
+  }
+
   private normalizeLibSpellItem(item: unknown): LibSpellItem | null {
     if (!item || typeof item !== 'object') {
       return null;
@@ -8030,15 +8404,15 @@ export class Creator implements OnInit {
       name: typeof source['name'] === 'string' && source['name'].trim() ? source['name'].trim() : 'Unnamed Spell',
       description: typeof source['description'] === 'string' ? source['description'] : '',
       range: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['range']), 0)),
-      effectOn: typeof source['effectOn'] === 'string'
-        ? source['effectOn']
-        : (typeof source['effecton'] === 'string' ? source['effecton'] : 'HP'),
-      effectOn2: typeof source['effectOn2'] === 'string'
-        ? source['effectOn2']
-        : (typeof source['effecton2'] === 'string' ? source['effecton2'] : ''),
+      effectOn: this.normalizeSpellEffectOn(source['effectOn'] ?? source['effecton'], 'HP'),
+      effectOn2: this.normalizeSpellEffectOn(source['effectOn2'] ?? source['effecton2'], ''),
       lastFor: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['lastFor'] ?? source['lastfor']), 0)),
       effectAmount: this.normalizeNumber(this.toFiniteNumber(source['effectAmount'] ?? source['damage']), 0),
       effectAmount2: this.normalizeNumber(this.toFiniteNumber(source['effectAmount2'] ?? source['effectamount2']), 0),
+      effectDiceCount: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['effectDiceCount'] ?? source['effectdicecount']), 1)),
+      effectDiceSides: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['effectDiceSides'] ?? source['effectdicesides'] ?? source['effectAmount'] ?? source['damage']), 0)),
+      effectAmount2DiceCount: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['effectAmount2DiceCount'] ?? source['effectamount2dicecount']), 0)),
+      effectAmount2DiceSides: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['effectAmount2DiceSides'] ?? source['effectamount2dicesides'] ?? source['effectAmount2'] ?? source['effectamount2']), 0)),
       value: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['value']), 0)),
       sp: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['sp']), 0)),
       successTestValue: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['successTestValue'] ?? source['successtestvalue']), 0)),
@@ -8050,6 +8424,11 @@ export class Creator implements OnInit {
       numberOfTargets: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['numberOfTargets'] ?? source['numberoftargets']), 1)),
       effectType,
       effectColor: this.normalizeSpellEffectColor(source['effectColor'] ?? source['effectcolor'], effectType),
+      targetType: source['targetType'] === 'monster' || source['targetType'] === 'trap' || source['targetType'] === 'pc' || source['targetType'] === 'auto'
+        ? source['targetType']
+        : source['targettype'] === 'monster' || source['targettype'] === 'trap' || source['targettype'] === 'pc' || source['targettype'] === 'auto'
+          ? source['targettype']
+          : 'auto',
       effectOnPc1: this.normalizeBoolean(source['effectOnPc1'] ?? source['effectonpc1']),
       effectOnPc2: this.normalizeBoolean(source['effectOnPc2'] ?? source['effectonpc2']),
       range1: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['range1']), 0)),
@@ -12332,14 +12711,21 @@ export class Creator implements OnInit {
     const lastFor2 = item.lastFor2 ?? item.lastFor ?? 0;
     this.libSpellForm.reset({
       name: item.name || '', description: item.description || '', range: item.range ?? 0,
+      targetType: item.targetType || 'auto',
       effectOnPc1: item.effectOnPc1 ?? range1 === 0,
       range1,
       lastFor1,
-      effectOn: item.effectOn || 'HP', effectOn2: item.effectOn2 || '',
+      effectOn: this.normalizeSpellEffectOn(item.effectOn, 'HP'), effectOn2: this.normalizeSpellEffectOn(item.effectOn2, ''),
       effectOnPc2: item.effectOnPc2 ?? range2 === 0,
       range2,
       lastFor2,
-      lastFor: item.lastFor ?? 0, effectAmount: item.effectAmount ?? 0, effectAmount2: item.effectAmount2 ?? 0,
+      lastFor: item.lastFor ?? 0,
+      effectAmount: item.effectAmount ?? 0,
+      effectAmount2: item.effectAmount2 ?? 0,
+      effectDiceCount: item.effectDiceCount ?? ((item.effectAmount ?? 0) > 0 ? 1 : 0),
+      effectDiceSides: item.effectDiceSides ?? Math.max(0, item.effectAmount ?? 0),
+      effectAmount2DiceCount: item.effectAmount2DiceCount ?? ((item.effectAmount2 ?? 0) > 0 ? 1 : 0),
+      effectAmount2DiceSides: item.effectAmount2DiceSides ?? Math.max(0, item.effectAmount2 ?? 0),
       value: item.value ?? 0, sp: item.sp ?? 0, successTestValue: item.successTestValue ?? 0,
       magicCost: item.magicCost ?? 1, costToLearn: item.costToLearn ?? 0, imageId: item.imageId ?? null, soundId: item.soundId ?? null, isPublic: item.isPublic,
       numberOfTargets: item.numberOfTargets ?? 1,
@@ -12540,16 +12926,24 @@ export class Creator implements OnInit {
     const range2 = Math.max(0, c.range2.value ?? 0);
     const effectOnPc1 = (c.effectOnPc1.value ?? false) || range1 === 0;
     const effectOnPc2 = (c.effectOnPc2.value ?? false) || range2 === 0;
+    const effectDiceCount = Math.max(0, c.effectDiceCount.value ?? 0);
+    const effectDiceSides = Math.max(0, c.effectDiceSides.value ?? 0);
+    const effectAmount2DiceCount = Math.max(0, c.effectAmount2DiceCount.value ?? 0);
+    const effectAmount2DiceSides = Math.max(0, c.effectAmount2DiceSides.value ?? 0);
     const payload: LibSpellWritePayload = {
       name: (c.name.value || '').trim() || 'Unnamed Spell',
       description: (c.description.value || '').trim(),
       // Backward compatibility: primary effect still populates legacy range/lastFor.
       range: effectOnPc1 ? 0 : range1,
-      effectOn: (c.effectOn.value || 'HP').trim(),
-      effectOn2: (c.effectOn2.value || '').trim(),
+      effectOn: this.normalizeSpellEffectOn(c.effectOn.value, 'HP'),
+      effectOn2: this.normalizeSpellEffectOn(c.effectOn2.value, ''),
       lastFor: Math.max(0, c.lastFor1.value ?? 0),
-      effectAmount: c.effectAmount.value ?? 0,
-      effectAmount2: c.effectAmount2.value ?? 0,
+      effectAmount: effectDiceSides,
+      effectAmount2: effectAmount2DiceSides,
+      effectDiceCount,
+      effectDiceSides,
+      effectAmount2DiceCount,
+      effectAmount2DiceSides,
       value: Math.max(0, c.value.value ?? 0),
       sp: Math.max(0, c.sp.value ?? 0),
       successTestValue: Math.max(0, c.successTestValue.value ?? 0),
@@ -12561,6 +12955,7 @@ export class Creator implements OnInit {
       numberOfTargets: Math.max(1, c.numberOfTargets.value ?? 1),
       effectType: c.effectType.value || 'Other',
       effectColor: c.effectColor.value || '#ffffff',
+      targetType: c.targetType.value || 'auto',
       effectOnPc1,
       effectOnPc2,
       range1,
@@ -12593,6 +12988,7 @@ export class Creator implements OnInit {
       description: '',
       range: 0,
       effectOn: 'HP',
+      targetType: 'auto',
       effectOnPc1: false,
       range1: 0,
       lastFor1: 0,
@@ -12603,6 +12999,10 @@ export class Creator implements OnInit {
       lastFor: 0,
       effectAmount: 0,
       effectAmount2: 0,
+      effectDiceCount: 0,
+      effectDiceSides: 0,
+      effectAmount2DiceCount: 0,
+      effectAmount2DiceSides: 0,
       value: 0,
       sp: 0,
       successTestValue: 0,

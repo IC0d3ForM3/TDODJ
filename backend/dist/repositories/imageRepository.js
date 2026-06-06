@@ -5,6 +5,54 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteImageForUser = exports.checkImageInUse = exports.getPublicImagesByIds = exports.getImagesByIds = exports.updateImageForUser = exports.insertImageForUser = exports.isImageAccessibleByIdForUser = exports.getAllImagesWithUsername = exports.getImageLibraryByUserGuid = exports.getImagesByUserGuid = exports.isAdminUserByGuid = void 0;
 const db_1 = __importDefault(require("../db"));
+const PG_UNIQUE_VIOLATION = '23505';
+const IMAGES_PKEY_CONSTRAINT = 'images_pkey';
+function isImagesPrimaryKeyDuplicate(err) {
+    return (typeof err === 'object' &&
+        err !== null &&
+        err.code === PG_UNIQUE_VIOLATION &&
+        err.constraint === IMAGES_PKEY_CONSTRAINT);
+}
+async function syncImagesIdSequence() {
+    await db_1.default.query(`
+    SELECT setval(
+      pg_get_serial_sequence('images', 'id'),
+      COALESCE((SELECT MAX(id) FROM images), 1),
+      (SELECT COUNT(*) > 0 FROM images)
+    )
+  `);
+}
+async function insertImageRecord(userguid, payload) {
+    const { rows } = await db_1.default.query(`INSERT INTO images (
+       userguid,
+       path,
+       ispublic,
+       isactive,
+       name,
+       assettype,
+       updatedat
+     )
+     VALUES (
+       $1,
+       $2,
+       $3,
+       $4,
+       $5,
+       $6,
+       NOW()
+     )
+     RETURNING
+       id,
+       userguid::text AS userguid,
+       path,
+       ispublic AS "isPublic",
+       isactive AS "isActive",
+       name,
+       assettype::text AS assettype,
+       createdat::text AS "createdAt",
+       updatedat::text AS "updatedAt"`, [userguid, payload.path, payload.isPublic, payload.isActive, payload.name, payload.assettype]);
+    return rows[0];
+}
 const isAdminUserByGuid = async (userguid) => {
     const { rows } = await db_1.default.query('SELECT isadmin FROM users WHERE key = $1', [userguid]);
     if (!rows[0]) {
@@ -78,35 +126,17 @@ const isImageAccessibleByIdForUser = async (imageId, userguid) => {
 };
 exports.isImageAccessibleByIdForUser = isImageAccessibleByIdForUser;
 const insertImageForUser = async (userguid, payload) => {
-    const { rows } = await db_1.default.query(`INSERT INTO images (
-       userguid,
-       path,
-       ispublic,
-       isactive,
-       name,
-       assettype,
-       updatedat
-     )
-     VALUES (
-       $1,
-       $2,
-       $3,
-       $4,
-       $5,
-       $6,
-       NOW()
-     )
-     RETURNING
-       id,
-       userguid::text AS userguid,
-       path,
-       ispublic AS "isPublic",
-       isactive AS "isActive",
-       name,
-       assettype::text AS assettype,
-       createdat::text AS "createdAt",
-       updatedat::text AS "updatedAt"`, [userguid, payload.path, payload.isPublic, payload.isActive, payload.name, payload.assettype]);
-    return rows[0];
+    try {
+        return await insertImageRecord(userguid, payload);
+    }
+    catch (err) {
+        if (!isImagesPrimaryKeyDuplicate(err)) {
+            throw err;
+        }
+        // Local restores can leave identity/sequence behind max(id). Repair once and retry insert.
+        await syncImagesIdSequence();
+        return await insertImageRecord(userguid, payload);
+    }
 };
 exports.insertImageForUser = insertImageForUser;
 const updateImageForUser = async (id, userguid, payload) => {

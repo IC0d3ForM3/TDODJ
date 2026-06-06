@@ -270,84 +270,116 @@
 								}
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
 									[class.open-block-btn--active]="isPlaceMonsterMode()"
 									[disabled]="!hasAnyWhiteSpace()"
+									title="Add Monster"
+									aria-label="Add Monster"
 									(click)="startPlaceMonsterMode()"
-								>+Monster</button>
+								>👹</button>
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
 									[class.open-block-btn--active]="isAddTextMode()"
 									[disabled]="!hasAnyWhiteSpace()"
+									title="Add Text"
+									aria-label="Add Text"
 									(click)="startAddTextMode()"
-								>+Text</button>
+								>📝</button>
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
 									[class.open-block-btn--active]="isPlaceItemMode()"
 									[disabled]="!hasAnyWhiteSpace()"
+									title="Add Item"
+									aria-label="Add Item"
 									(click)="startPlaceItemMode()"
-								>+Item</button>
+								>🗡️</button>
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
 									[class.open-block-btn--active]="isPlacePotionMode()"
 									[disabled]="!hasAnyWhiteSpace()"
+									title="Add Potion"
+									aria-label="Add Potion"
 									(click)="startPlacePotionMode()"
-								>+Potion</button>
+								>🧪</button>
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
 									[class.open-block-btn--active]="isPlaceSpellMode()"
 									[disabled]="!hasAnyWhiteSpace()"
+									title="Add Spell"
+									aria-label="Add Spell"
 									(click)="startPlaceSpellMode()"
-								>+Spell</button>
+								>✨</button>
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
+									title="Keys"
+									aria-label="Keys"
 									(click)="openKaysDialog()"
-								>+Keys</button>
+								>🔑</button>
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
 									[class.open-block-btn--active]="isPlaceTresherMode()"
 									[disabled]="!hasAnyWhiteSpace()"
+									title="Add Tresher"
+									aria-label="Add Tresher"
 									(click)="startPlaceTresherMode()"
-								>+Tresher</button>
+								>💰</button>
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
 									[class.open-block-btn--active]="isPlaceFloorTrapMode()"
 									[disabled]="!hasAnyWhiteSpace()"
+									title="Add Floor Trap"
+									aria-label="Add Floor Trap"
 									(click)="startPlaceFloorTrapMode()"
-								>+FTrap</button>
+								>🪤</button>
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
 									[class.open-block-btn--active]="isPlaceObstacleMode()"
 									[disabled]="!hasAnyWhiteSpace()"
+									title="Add Obstacle"
+									aria-label="Add Obstacle"
 									(click)="startPlaceObstacleMode()"
-								>+Obstacle</button>
+								>🧱</button>
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
 									[disabled]="!hasAnyWhiteSpace()"
+									title="Add Portal"
+									aria-label="Add Portal"
 									(click)="openPortalDialog(null)"
-								>+Portal</button>
+								>🌀</button>
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
 									[class.open-block-btn--active]="isImportPlacementMode()"
 									[disabled]="isImportingMap() || isSavingDungonJson()"
+									title="Import"
+									aria-label="Import"
 									(click)="gridMapFileInput.click()"
-								>+Import</button>
+								>📥</button>
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
+									[disabled]="isImportingMap() || isSavingDungonJson()"
+									title="Import Top-Left"
+									aria-label="Import Top-Left"
+									(click)="gridMapTopLeftFileInput.click()"
+								>↖️</button>
+								<button
+									type="button"
+									class="open-block-btn open-block-btn--icon"
 									[disabled]="generateButtonReason() !== null"
+									title="Generate"
+									aria-label="Generate"
 									(click)="openGenerateDungonDialog()"
-								>+Generate</button>
+								>⚙️</button>
 								<button
 									type="button"
 									class="open-block-btn open-block-btn--clear"
@@ -356,6 +388,8 @@
 								>Clear</button>
 								<input #gridMapFileInput type="file" accept=".json" style="display:none"
 									(change)="importMapFromFile($event)" />
+								<input #gridMapTopLeftFileInput type="file" accept=".json" style="display:none"
+									(change)="importMapTopLeftFromFile($event)" />
 							</div>
 							@if (isGenerateAnchorPickMode()) {
 								<div class="details-message" style="margin-top:0.45rem; color:#ffffff; display:flex; align-items:center; justify-content:space-between; gap:0.6rem; flex-wrap:wrap;">
@@ -550,6 +584,20 @@
 								<button type="button" class="cancel-button" (click)="cancelImportPlacementMode()">cancel</button>
 							</span>
 						}
+						@if (hasGridOverflow()) {
+							<div class="grid-overflow-controls">
+								<span class="details-message">Expanded grid view controls:</span>
+								<button type="button" class="cancel-button" (click)="showNormalGridView()">Normal View</button>
+								<button type="button" class="cancel-button" (click)="showOverflowGridView()">Overflow View</button>
+								<button type="button" class="cancel-button" (click)="panGridViewport('left')">◀</button>
+								<button type="button" class="cancel-button" (click)="panGridViewport('right')">▶</button>
+								<button type="button" class="cancel-button" (click)="panGridViewport('up')">▲</button>
+								<button type="button" class="cancel-button" (click)="panGridViewport('down')">▼</button>
+							</div>
+						}
+						<div class="grid-size-badge" [class.grid-size-badge-overflow]="hasGridOverflow()">
+							Grid: {{ gridColumnCount }} x {{ gridRowCount }}
+						</div>
 					</div>
 
 					@if (selectedPlacedItem(); as selItem) {
@@ -625,7 +673,7 @@
 					}
 
 					<div class="grid-canvas-row">
-						<div class="grid-canvas-wrap">
+						<div #gridCanvasWrap class="grid-canvas-wrap">
 							<div class="dungon-grid-shell">
 								<div class="dungon-grid-corner" aria-hidden="true"></div>
 								<div class="dungon-grid-top-labels" aria-hidden="true">
@@ -1136,15 +1184,18 @@
 						<label class="tresher-field"><span>Name</span><input type="text" formControlName="name" placeholder="Spell name" /></label>
 						<label class="tresher-field tresher-field-wide"><span>Description</span><input type="text" formControlName="description" /></label>
 						<label class="tresher-field"><span>Effect On 1</span><select formControlName="effectOn">@for (o of libSpellEffectToOptions; track o) { <option [value]="o">{{ o }}</option> }</select></label>
+						<label class="tresher-field"><span>Target Type</span><select formControlName="targetType"><option value="auto">Auto</option><option value="monster">Monster</option><option value="pc">PC</option><option value="trap">Trap</option></select></label>
 						<label class="tresher-field-checkbox"><input type="checkbox" formControlName="effectOnPc1" /><span>Effect On PC 1</span></label>
-						<label class="tresher-field"><span>Effect Value 1</span><input type="number" formControlName="effectAmount" /></label>
+						<label class="tresher-field"><span>Effect 1 Dice Count (X in XdY)</span><input type="number" min="0" formControlName="effectDiceCount" /></label>
+						<label class="tresher-field"><span>Effect 1 Dice Sides (Y in XdY)</span><input type="number" min="0" formControlName="effectDiceSides" /></label>
 						<label class="tresher-field"><span>Range 1</span><input type="number" formControlName="range1" min="0" /></label>
 						<label class="tresher-field"><span>Last For 1 (0 = Indefinite)</span><input type="number" formControlName="lastFor1" min="0" /></label>
 						<div class="spell-effect-divider" aria-hidden="true"></div>
 
 						<label class="tresher-field"><span>Effect On 2</span><select formControlName="effectOn2"><option [ngValue]="null">None</option>@for (o of libSpellEffectToOptions; track o) { <option [value]="o">{{ o }}</option> }</select></label>
 						<label class="tresher-field-checkbox"><input type="checkbox" formControlName="effectOnPc2" /><span>Effect On PC 2</span></label>
-						<label class="tresher-field"><span>Effect Value 2</span><input type="number" formControlName="effectAmount2" /></label>
+						<label class="tresher-field"><span>Effect 2 Dice Count (X in XdY)</span><input type="number" min="0" formControlName="effectAmount2DiceCount" /></label>
+						<label class="tresher-field"><span>Effect 2 Dice Sides (Y in XdY)</span><input type="number" min="0" formControlName="effectAmount2DiceSides" /></label>
 						<label class="tresher-field"><span>Range 2</span><input type="number" formControlName="range2" min="0" /></label>
 						<label class="tresher-field"><span>Last For 2 (0 = Indefinite)</span><input type="number" formControlName="lastFor2" min="0" /></label>
 						<div class="spell-effect-divider" aria-hidden="true"></div>
@@ -1770,6 +1821,11 @@
 
 				<div class="form-actions">
 					<button type="submit" class="save-button">Save</button>
+					@if (hasExistingExitAtPendingPlacement()) {
+						<button type="button" class="cancel-button" (click)="removeExitAtPendingPlacement()">
+							Delete Exit
+						</button>
+					}
 					<button type="button" class="cancel-button" (click)="cancelExitDialog()">
 						Cancel
 					</button>
@@ -2826,6 +2882,13 @@
 		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Floor trap settings">
 			<h4 class="door-dialog-title">{{ editingFloorTrapId() !== null ? 'Edit Trap' : 'Floor Trap' }}</h4>
 			<form class="door-settings-form" [formGroup]="floorTrapForm" (ngSubmit)="saveFloorTrap()">
+				<label class="form-label" for="floor-trap-type">Trap Type</label>
+				<select id="floor-trap-type" class="form-input" formControlName="trapType" (change)="onFloorTrapTypeChange($event)">
+					@for (type of floorTrapTypeOptions; track type) {
+						<option [value]="type">{{ type }}</option>
+					}
+				</select>
+
 				<label class="form-label" for="floor-trap-name">Trap Name</label>
 				<input id="floor-trap-name" class="form-input" type="text" formControlName="trapName" />
 
@@ -2844,6 +2907,63 @@
 					<option value="ROS">ROS (Range of Sight)</option>
 				</select>
 
+				<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
+					<input
+						type="checkbox"
+						formControlName="isHiddenUntilFoundOrTriggered"
+						[disabled]="isFloorTrapAlwaysHiddenType()"
+					/>
+					Hidden until found or triggered
+				</label>
+
+				@if (isFloorTrapCrossingConfigVisible()) {
+					<p class="details-message" style="margin: 0 0 0.35rem">Items Needed To Cross (any one item in list)</p>
+					<div style="display:flex; gap:0.4rem; align-items:center; margin-bottom:0.35rem;">
+						<select
+							class="form-input"
+							style="flex:1; min-width:0;"
+							[value]="floorTrapCrossingItemId() ?? ''"
+							(change)="floorTrapCrossingItemId.set(($any($event.target).value === '' ? null : +$any($event.target).value))"
+						>
+							<option value="">Select item...</option>
+							@for (item of libItems(); track item.id) {
+								<option [value]="item.id">{{ item.name || 'Unnamed Item' }} ({{ item.type }})</option>
+							}
+						</select>
+						<button
+							type="button"
+							class="save-button"
+							style="padding:0.25rem 0.55rem;"
+							[disabled]="floorTrapCrossingItemId() === null"
+							(click)="addFloorTrapCrossingRequirement(floorTrapCrossingItemId())"
+						>Add</button>
+					</div>
+					<ul class="dungons-list" style="margin-bottom: 0.6rem">
+						@for (req of floorTrapCrossingRequirements(); track req.itemId; let i = $index) {
+							<li class="dungons-list-item" style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.35rem 0.5rem;">
+								<span>{{ req.itemName }}</span>
+								<button type="button" class="cancel-button" style="padding:0.08rem 0.4rem; line-height:1" (click)="removeFloorTrapCrossingRequirementAt(i)">x</button>
+							</li>
+						}
+					</ul>
+				}
+
+				@if (isFloorTrapSourceConfigVisible()) {
+					<label class="form-label" for="floor-trap-source-side">Trap Source Side</label>
+					<select id="floor-trap-source-side" class="form-input" formControlName="sourceSide">
+						@for (side of trapSourceSideOptions; track side) {
+							<option [value]="side">{{ side }}</option>
+						}
+					</select>
+
+					<label class="form-label" for="floor-trap-source-object">Trap Source Object</label>
+					<select id="floor-trap-source-object" class="form-input" formControlName="sourceObjectType">
+						@for (objectType of trapSourceObjectOptions; track objectType) {
+							<option [value]="objectType">{{ objectType }}</option>
+						}
+					</select>
+				}
+
 				<label class="form-label" for="floor-trap-curse-id">Curse (optional)</label>
 				<select id="floor-trap-curse-id" class="form-input" formControlName="trapCurseId">
 					<option [ngValue]="null">— None —</option>
@@ -2857,6 +2977,21 @@
 
 				<label class="form-label" for="floor-trap-to-disarm">To Disarm DC (Mind + d4)</label>
 				<input id="floor-trap-to-disarm" class="form-input" type="number" min="0" formControlName="trapToDisarm" />
+
+				<label class="form-label" for="floor-trap-secondary-effect-to">Secondary Effect (optional)</label>
+				<select id="floor-trap-secondary-effect-to" class="form-input" formControlName="secondaryEffectTo">
+					<option [ngValue]="null">— None —</option>
+					<option value="Stamina">Stamina</option>
+					<option value="Mind">Mind</option>
+					<option value="AE">AE (Action Economy)</option>
+					<option value="ROS">ROS (Range of Sight)</option>
+				</select>
+
+				<label class="form-label" for="floor-trap-secondary-effect-amount">Secondary Effect Amount</label>
+				<input id="floor-trap-secondary-effect-amount" class="form-input" type="number" min="0" formControlName="secondaryEffectAmount" />
+
+				<label class="form-label" for="floor-trap-secondary-effect-duration">Secondary Effect Duration (turns)</label>
+				<input id="floor-trap-secondary-effect-duration" class="form-input" type="number" min="0" formControlName="secondaryEffectDuration" />
 
 				<div class="form-actions">
 					<button type="submit" class="save-button">Save</button>

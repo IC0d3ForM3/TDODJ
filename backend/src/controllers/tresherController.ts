@@ -1,3 +1,23 @@
+export const deleteTresher = async (req: Request, res: Response) => {
+  const id = Number.parseInt(req.params['id'], 10);
+  const userkey = req.query['userkey'];
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ result: 0, error: 'Valid tresher id is required' });
+  }
+  if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
+    return res.status(400).json({ result: 0, error: 'Valid userkey is required' });
+  }
+  try {
+    const deleted = await tresherService.deleteTresherForUser(id, userkey.trim());
+    if (!deleted) {
+      return res.status(404).json({ result: 0, error: 'Tresher not found or access denied' });
+    }
+    return res.json({ result: 1 });
+  } catch (error) {
+    console.error('Error deleting tresher:', error);
+    return res.status(500).json({ result: 0, error: 'Failed to delete tresher' });
+  }
+};
 import { Request, Response } from 'express';
 import {
   UpsertTresherPayload,

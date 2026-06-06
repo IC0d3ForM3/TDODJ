@@ -1,0 +1,238 @@
+Running questions for DnD sync
+
+- [Spell 1] Mend Wounds
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 2] Healing Word
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 3] Greater Heal
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 7] Cat's Grace
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 8] Arcane Surge
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 12] Fire Lance
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 13] Lightning Arc
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 14] Could not find DnD spell for "Mind Spike" (tried index: mind-spike).
+- [Spell 15] Dark Drain
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 16] Blind
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 19] Vampiric Touch
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 20] Could not find DnD spell for "Storm Bolt" (tried index: witch-bolt).
+- [Spell 657] Acid Arrow
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 659] Aid
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 663] Animal Messenger
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 665] Animate Dead
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 666] Animate Objects
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 671] Arcane Hand
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 678] Bane
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 679] Banishment
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 682] Bestow Curse
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 685] Bless
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 686] Blight
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 687] Blindness/Deafness
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 690] Branding Smite
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 691] Burning Hands
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 692] Call Lightning
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 694] Chain Lightning
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 695] Charm Person
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 697] Circle of Death
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 700] Cloudkill
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 701] Color Spray
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 702] Command
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 707] Cone of Cold
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 708] Confusion
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 709] Conjure Animals
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 710] Conjure Celestial
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 711] Conjure Elemental
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 712] Conjure Fey
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 713] Conjure Minor Elementals
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 714] Conjure Woodland Beings
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 721] Counterspell
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 723] Create or Destroy Water
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 724] Create Undead
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 725] Creation
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 726] Cure Wounds
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 732] Delayed Blast Fireball
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 740] Disintegrate
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 742] Dispel Magic
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 746] Dominate Beast
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 747] Dominate Monster
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 748] Dominate Person
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 753] Enhance Ability
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 757] Etherealness
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 763] False Life
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 775] Fireball
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 776] Flame Blade
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 777] Flame Strike
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 778] Flaming Sphere
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 781] Fly
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 782] Fog Cloud
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 787] Freezing Sphere
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 790] Geas
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 794] Globe of Invulnerability
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 795] Glyph of Warding
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 803] Guiding Bolt
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 808] Heal
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 809] Heat Metal
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 810] Hellish Rebuke
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 814] Hold Monster
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 815] Hold Person
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 817] Hunter's Mark
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 819] Ice Storm
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 824] Inflict Wounds
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 825] Insect Plague
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 827] Invisibility
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 835] Lightning Bolt
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 839] Longstrider
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 842] Magic Circle
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 844] Magic Missile
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 846] Magic Weapon
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 848] Major Image
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 849] Mass Cure Wounds
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 851] Mass Healing Word
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 852] Mass Suggestion
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 864] Modify Memory
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 865] Moonbeam
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 870] Phantasmal Killer
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 873] Planar Binding
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 880] Prayer of Healing
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 884] Private Sanctum
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 906] Scorching Ray
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 914] Shatter
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 921] Sleep
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 929] Spirit Guardians
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 930] Spiritual Weapon
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 944] Thunderwave
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 956] Wall of Fire
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 958] Wall of Ice
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 960] Wall of Thorns
+  - Damage scales by slot level. Should scaling stay in Effect 1 only, or map to Effect 2 as base+bonus?
+  - Spell has higher_level text. Confirm how to map this into Effect 2 fields.
+- [Spell 971] Could not find DnD spell for "Cures-Blinding Curse" (tried index: cures-blinding-curse).
+- [Spell 972] Could not find DnD spell for "Cures-Curse of Weakness" (tried index: cures-curse-of-weakness).
+- [Spell 973] Could not find DnD spell for "Cures-Double Bane" (tried index: cures-double-bane).
+- [Spell 974] Could not find DnD spell for "Cures-Mark of Ruin" (tried index: cures-mark-of-ruin).
+- [Spell 975] Could not find DnD spell for "Cures-Mind Fog" (tried index: cures-mind-fog).
+- [Spell 976] Could not find DnD spell for "Cures-Poison" (tried index: cures-poison).
+- [Spell 977] Could not find DnD spell for "Cures-Slow Hex" (tried index: cures-slow-hex).
+
+Summary: updated=332, missingDnDMatch=9, spellsWithQuestions=98
+- [System] GP learn-cost is now synced/displayed, but learning flow still spends SP only. Confirm whether to implement a real GP wallet spend source for learning (inventory currency/stash).

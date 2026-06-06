@@ -21,13 +21,20 @@ export interface PcTresherSpellData {
   effectOn2?: string;
   effectAmount: number;
   effectAmount2?: number;
+  effectDiceCount?: number;
+  effectDiceSides?: number;
+  effectAmount2DiceCount?: number;
+  effectAmount2DiceSides?: number;
   successTestValue: number;
   sp: number;
+  minLtsp?: number;
+  learnCostGp?: number;
   lastFor: number;
   numberOfTargets: number;
   magicCost?: number;
   effectType?: string;
   effectColor?: string;
+  targetType?: 'auto' | 'monster' | 'trap' | 'pc';
   effectOnPc1?: boolean;
   effectOnPc2?: boolean;
   range1?: number;
@@ -51,6 +58,8 @@ export type PcTresherItemData = {
   effectOn: string | null;
   effectToPc?: string | null;
   effectToPcValue?: number;
+  note?: string | null;
+  minMindToRead?: number;
   weaponEffectType?: string;
   weaponEffectColor?: string;
   isTwoHanded: boolean;
@@ -72,6 +81,8 @@ export type FloorItemData = {
   effectOn: string | null;
   effectToPc?: string | null;
   effectToPcValue?: number;
+  note?: string | null;
+  minMindToRead?: number;
   weaponEffectType?: string;
   weaponEffectColor?: string;
   isTwoHanded: boolean;
@@ -83,7 +94,15 @@ type PcTresherPotionData = {
   name: string;
   description: string;
   effectTo: string;
+  effectTo2?: string | null;
   effectAmount: number;
+  effectAmount2?: number;
+  effectAmountMin?: number;
+  effectAmountDiceCount?: number;
+  effectAmountDiceSides?: number;
+  effectAmount2Min?: number;
+  effectAmount2DiceCount?: number;
+  effectAmount2DiceSides?: number;
   lastFor: number;
 };
 

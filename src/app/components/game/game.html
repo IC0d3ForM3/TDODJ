@@ -174,6 +174,19 @@
 					}
 				}
 
+				<div class="npc-dialog-response">
+					<label class="npc-dialog-response-label" for="npcResponseInput">Your response</label>
+					<textarea
+						id="npcResponseInput"
+						class="npc-dialog-response-input"
+						rows="2"
+						placeholder="Type your response..."
+						[value]="npcResponseDraft()"
+						(input)="onNpcResponseInput($any($event.target).value)"
+					></textarea>
+					<button class="npc-dialog-btn" (click)="sendNpcResponse()" [disabled]="!npcResponseDraft().trim()">Send Response</button>
+				</div>
+
 				<div class="npc-dialog-actions">
 					@if (!dialog.instance.hasSharedInfo && (dialog.template.npcInfo1 || dialog.template.npcInfo2 || dialog.template.npcInfo3)) {
 						<button class="npc-dialog-btn" (click)="npcShareInfo()">Ask for Information</button>
@@ -182,6 +195,7 @@
 						<button class="npc-dialog-btn npc-dialog-btn-spare" (click)="spareNpc()">Spare</button>
 					}
 					<button class="npc-dialog-btn npc-dialog-btn-close" (click)="dismissNpcDialog()">Close</button>
+					<button class="npc-dialog-btn npc-dialog-btn-attack" (click)="closeNpcDialogAndAttack()">Close + Attack</button>
 				</div>
 
 				@if (dialog.template.npcCanTrade && !dialog.instance.npcIsHostile) {
@@ -213,6 +227,193 @@
 						}
 					</div>
 				}
+			</div>
+		</div>
+	}
+
+	@if (itemNoteModal(); as noteModal) {
+		<div class="item-note-overlay" (click)="dismissItemNoteModal()">
+			<div class="item-note-modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Item note">
+				<button class="item-note-close" (click)="dismissItemNoteModal()" title="Dismiss">✕</button>
+				<p class="item-note-title">{{ noteModal.itemName }}</p>
+				@if (noteModal.canRead) {
+					<p class="item-note-text">{{ noteModal.note }}</p>
+				} @else {
+					<p class="item-note-locked">Your Mind is too low to read this note (requires {{ noteModal.minMindToRead }}).</p>
+				}
+				<div class="item-note-actions">
+					<button class="item-note-btn" (click)="dismissItemNoteModal()">Close</button>
+				</div>
+			</div>
+		</div>
+	}
+
+	@if (showBackpackInventoryModal()) {
+		<div class="inventory-modal-overlay" (click)="closeBackpackInventoryModal()">
+			<div class="inventory-modal-box" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Backpack inventory">
+				<div class="inventory-modal-header">
+					<h3 class="inventory-modal-title">Backpack Inventory</h3>
+					<button type="button" class="inventory-modal-close" (click)="closeBackpackInventoryModal()">✕</button>
+				</div>
+				<div class="inventory-modal-scroll">
+					<p class="inventory-section-title">Items</p>
+					@for (group of allTresherItemsGrouped(); track group.type) {
+						<p class="inventory-section-label">{{ group.type }}</p>
+						<ul class="tresher-items-list">
+							@for (item of group.items; track item.id) {
+								<li class="tresher-inner-item">
+									<span class="tresher-item-name">{{ item.name }}@if (item.description) {{{ ': ' + item.description }}}</span>
+									@if (isItemEquipable(item.type, item.name)) {
+										<div class="inventory-item-actions">
+											<button
+												type="button"
+												class="action-button"
+												[class.action-button-strong]="isItemEquippedById(item.id)"
+												(click)="toggleItemEquipped(item.id)"
+											>
+												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
+											</button>
+										</div>
+									}
+								</li>
+							}
+						</ul>
+					}
+
+					@if (allTresherSpellsFlat().length > 0) {
+						<p class="inventory-section-title">Spells</p>
+						<p class="tresher-item-desc">Spell Loadout: {{ equippedSpellMagicCostForPreview() }} / {{ playerMindForView() }} Mind</p>
+						<ul class="tresher-items-list">
+							@for (spell of allTresherSpellsFlat(); track spell.id) {
+								<li class="tresher-inner-item">
+									<div class="spell-header-row">
+										<span class="tresher-item-name">{{ spell.name }}</span>
+										<label class="spell-default-radio">
+											<input
+												type="radio"
+												name="defaultSpellBackpack"
+												[checked]="isDefaultSpell(spell.id)"
+												[disabled]="!isSpellEquippedById(spell.id)"
+												(change)="setDefaultSpell(spell.id)"
+											/>
+											Default
+										</label>
+									</div>
+									@if (spell.description) {
+										<span class="tresher-item-desc">{{ spell.description }}</span>
+									}
+									<div class="inventory-item-actions">
+										<button
+											type="button"
+											class="action-button"
+											[class.action-button-strong]="isSpellEquippedById(spell.id)"
+											(click)="toggleSpellEquipped(spell.id)"
+										>
+											{{ isSpellEquippedById(spell.id) ? 'Unequip' : 'Equip' }}
+										</button>
+									</div>
+								</li>
+							}
+						</ul>
+					}
+				</div>
+			</div>
+		</div>
+	}
+
+	@if (showDrinkPotionModal()) {
+		<div class="inventory-modal-overlay" (click)="closeDrinkPotionModal()">
+			<div class="inventory-modal-box" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Drink potion">
+				<div class="inventory-modal-header">
+					<h3 class="inventory-modal-title">Drink Potion</h3>
+					<button type="button" class="inventory-modal-close" (click)="closeDrinkPotionModal()">✕</button>
+				</div>
+				<div class="inventory-modal-scroll">
+					@if (allPotionsUnified().length > 0) {
+						<ul class="tresher-items-list">
+							@for (potion of allPotionsUnified(); track potion.id) {
+								<li class="tresher-inner-item">
+									<span class="tresher-item-name">{{ potion.name }}@if (potion.description) {{{ ': ' + potion.description }}}</span>
+									<div class="inventory-item-actions">
+										@if (potion.source === 'tresher' && isInnerPotionDrinkable(potion) && potion.tresherIdx !== undefined) {
+											<button
+												type="button"
+												class="action-button action-button-strong"
+												[disabled]="!canDrinkInnerPotion()"
+												(click)="drinkTresherInnerPotion(potion.tresherIdx, potion.id)"
+											>
+												Drink
+											</button>
+										} @else if (potion.source === 'collected') {
+											<button
+												type="button"
+												class="action-button action-button-strong"
+												[disabled]="turnPhase() !== 'player' || playerHp() <= 0"
+												(click)="drinkCollectedFloorPotion(potion.id)"
+											>
+												Drink
+											</button>
+										}
+									</div>
+								</li>
+							}
+						</ul>
+					} @else {
+						<p class="shop-empty">No potions available.</p>
+					}
+				</div>
+			</div>
+		</div>
+	}
+
+	@if (showControlsHelpModal()) {
+		<div class="inventory-modal-overlay" (click)="closeControlsHelpModal()">
+			<div class="inventory-modal-box controls-help-modal-box" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Controls help">
+				<div class="inventory-modal-header">
+					<h3 class="inventory-modal-title">Controls Help</h3>
+					<button type="button" class="inventory-modal-close" (click)="closeControlsHelpModal()">✕</button>
+				</div>
+				<div class="inventory-modal-scroll controls-help-scroll">
+					<p class="inventory-section-title">Action Icons (6 Rows)</p>
+					<ul class="controls-help-list">
+						<li><strong>Row 1:</strong> 👁 Search | 🧪 Drink Potion | ⌐¬ Pick Lock</li>
+						<li><strong>Row 2:</strong> 💰 Take Tresher | 🤷 Sneek | 💬 Talk</li>
+						<li><strong>Row 3:</strong> 🔑 Key | 🚪 Open Door | 🎒 Backpack</li>
+						<li><strong>Row 4:</strong> 🔙 Move Back | ↑ Face Up | 💥 Boost / ✨ Cast</li>
+						<li><strong>Row 5:</strong> ← Face Left | ⚔ Attack | → Face Right</li>
+						<li><strong>Row 6:</strong> ⏭️ End Turn | ↓ Face Down | 🛡 Defend</li>
+					</ul>
+
+					<p class="inventory-section-title">Icon Details</p>
+					<ul class="controls-help-list">
+						<li><strong>👁 Search:</strong> Search around your square (costs AE).</li>
+						<li><strong>🧪 Drink Potion:</strong> Open potion-drink modal and consume potions.</li>
+						<li><strong>⌐¬ Pick:</strong> Pick lock / disarm trap when available.</li>
+						<li><strong>💰 Take Tresher:</strong> Take all items from your current square.</li>
+						<li><strong>🤷 Sneek:</strong> Thieph/Shorties get stronger sneek behavior.</li>
+						<li><strong>💬 Talk:</strong> Talk to adjacent NPCs/monsters that can interact.</li>
+						<li><strong>🔑 Key:</strong> Unlock an adjacent locked door when you have a matching key.</li>
+						<li><strong>🚪 Open Door:</strong> Open an adjacent door.</li>
+						<li><strong>🎒 Backpack:</strong> Open item and spell inventory (equip/unequip, set default spell).</li>
+						<li><strong>🔙 Move Back:</strong> Move backward one square (or turn to face back if already facing back).</li>
+						<li><strong>↑↓←→ Directions:</strong> Face a direction, or move forward if already facing that way.</li>
+						<li><strong>💥 Boost:</strong> Fighter-only quick combat boost icon.</li>
+						<li><strong>✨ Cast:</strong> Non-fighter quick cast of your default equipped spell.</li>
+						<li><strong>⚔ Attack:</strong> Weapon attack (or unarmed attack if no weapon equipped).</li>
+						<li><strong>🛡 Defend:</strong> Defensive stance for incoming attacks.</li>
+						<li><strong>⏭️ End Turn:</strong> End your turn early.</li>
+					</ul>
+
+					<p class="inventory-section-title">Top Bar Buttons</p>
+					<ul class="controls-help-list">
+						<li><strong>Attack (A):</strong> Attack using your current weapon/unarmed setup.</li>
+						<li><strong>Defend (D):</strong> Spend AE to increase defense against the next hit.</li>
+						<li><strong>End Turn (E):</strong> End your turn immediately.</li>
+						<li><strong>ADE:</strong> Combined action (Attack + Defend + End Turn), requires enough AE.</li>
+						<li><strong>Boost:</strong> Fighter-only top-button version of boost.</li>
+						<li><strong>Rest ✨:</strong> Mage-capable rest action to recover MP (class/conditions apply).</li>
+					</ul>
+				</div>
 			</div>
 		</div>
 	}
@@ -259,7 +460,12 @@
 				<div class="canvas-panel">
 					<h3 class="panel-title">First Person</h3>
 					@if (playerName() || playerSpecies() || playerType()) {
-						<p class="pc-identity-bar">{{ playerName() }}@if (playerSpecies()) { &mdash; {{ playerSpecies() }}}@if (playerType()) { &mdash; {{ playerType() }}}</p>
+						<div class="pc-identity-row">
+							<p class="pc-identity-bar">{{ playerName() }}@if (playerSpecies()) { &mdash; {{ playerSpecies() }}}@if (playerType()) { &mdash; {{ playerType() }}}</p>
+							@if (facingWallNoteForPreview(); as wallNote) {
+								<button type="button" class="pc-wall-note-read-btn" (click)="readWallNote(wallNote)">Read Wall Note</button>
+							}
+						</div>
 					}
 					<div class="fpv-with-controls">
 						<div class="fpv-canvas-wrap">
@@ -310,98 +516,16 @@
 								}
 								@if (playerYellowHitFlash()) {
 									<div class="fpv-yellow-hit-flash"></div>
-								}									@if (spellHitFlash(); as kind) {
-										<div [class]="'fpv-spell-hit-' + kind"></div>
-									}							</div>
-							<div class="fpv-move-row">
-							<button type="button" class="fpv-move-btn fpv-move-btn-turn" title="Turn Left" (click)="turnFacingLeft()">↺</button>
-							<button type="button" class="fpv-move-btn fpv-move-btn-forward" title="Move Forward" (click)="moveForward()">👟</button>
-							<button type="button" class="fpv-move-btn fpv-move-btn-back" title="Move Backward" (click)="moveBackward()">🔙</button>
-							<button type="button" class="fpv-move-btn fpv-move-btn-turn" title="Turn Right" (click)="turnFacingRight()">↻</button>
+								}
+								@if (spellHitFlash(); as kind) {
+									<div [class]="'fpv-spell-hit-' + kind"></div>
+								}
 							</div>
-						</div>
-						<div class="fpv-icon-bar">
-							<button
-								type="button"
-								class="fpv-icon-btn fpv-icon-btn-eye"
-							title="Search (costs 1 AE)"
-							[class.fpv-icon-btn-active]="canSearch()"
-							[class.fpv-icon-btn-blink]="isThiephTrapSenseActive()"
-							[disabled]="!canSearch()"
-								(click)="searchForTraps()"
-							>👁</button>
-							<button
-								type="button"
-								class="fpv-icon-btn"
-								[class.fpv-icon-btn-active]="canPlayerAttack() || canAttackUnarmed()"
-								title="{{ hasWeaponEquipped() ? 'Attack' : 'Unarmed Attack' }}"
-								[disabled]="!canPlayerAttack()"
-								(click)="tryPlayerAttack()"
-								>{{ hasWeaponEquipped() ? '⚔' : '✊' }}</button>							<button
-							type="button"
-							class="fpv-icon-btn"
-							[class.fpv-icon-btn-active]="canPlayerDefend()"
-							[attr.data-stacks]="playerDefendStacks() > 0 ? playerDefendStacks() : null"
-							title="Defend (D) — costs 1 AE, +2 AC vs next attack"
-							(click)="tryPlayerDefend()"
-						>🛡</button>							<button
-								type="button"
-								class="fpv-icon-btn"
-								[class.fpv-icon-btn-active]="hasCurrentSquarePickupItems()"
-								title="Take All"
-								(click)="takeAllFromCurrentSquare()"
-							>&#x1F4B0;</button>
-							<button
-								type="button"
-								class="fpv-icon-btn"
-								[class.fpv-icon-btn-active]="canOpenAnyDoor()"
-								title="Open Door"
-								(click)="openAdjacentDoor(nearbyDoorsForPreview()[0])"
-							>🚪</button>
-							<button
-								type="button"
-								class="fpv-icon-btn"
-								[class.fpv-icon-btn-active]="canUnlockAnyDoor()"
-								title="Use Key"
-								(click)="unlockAdjacentDoor(nearbyDoorsForPreview()[0])"
-							>🔑</button>
-							<button
-								type="button"
-								class="fpv-icon-btn"
-								[class.fpv-icon-btn-active]="canPickAny()"
-								title="Pick Lock / Disarm Trap"
-								(click)="canPickAny() && foundTrap() ? tryDisarmTrap() : pickLockDoor(nearbyDoorsForPreview()[0])"
-							><span class="pick-icon">&#x2310;&#xAC;</span></button>
-							<button
-								type="button"
-								class="fpv-icon-btn"
-								[class.fpv-icon-btn-active]="canTalkToNpc()"
-								title="Talk to NPC"
-								(click)="talkToNpc()"
-							>💬</button>
-							<button
-								type="button"
-								class="fpv-icon-btn"
-								[class.fpv-icon-btn-active]="canUseSneek()"
-								[class.fpv-icon-btn-sneek-active]="playerSneekRoundsRemaining() > 0"
-								[disabled]="!canUseSneek() && playerSneekRoundsRemaining() === 0"
-								title="Sneek (Thieph/Shorties: free, lasts round | Others: 1 AE, re-check each action)"
-								(click)="trySneek()"
-							>🤷</button>
-							@if (isHealerClass()) {
-							<button
-								type="button"
-								class="fpv-icon-btn"
-								[class.fpv-icon-btn-active]="canUseHealerLesserHeal()"
-								[disabled]="!canUseHealerLesserHeal()"
-								title="Free Lesser Heal (once per round, no cost)"
-								(click)="useHealerLesserHeal()"
-							>💊</button>
-							}
 						</div>
 					<!-- Bottom row: 2D minimap LEFT + body outfit panel RIGHT -->
 					<div class="fpv-below-row">
-						<div class="map-canvas-wrap">
+						<div class="fpv-map-equipment-col">
+							<div class="map-canvas-wrap">
 							<app-dungeon-preview-grid
 								[preview]="preview"
 								[cheater]="previewCheaterForView()"
@@ -425,9 +549,9 @@
 								[portalPlacements]="previewPortalPlacementsForView()"
 								(cellClicked)="onMapCellClicked($event)"
 							></app-dungeon-preview-grid>
-						</div>
-						@let slots = equippedBodySlotsForView();
-						<div class="fpv-body-panel" [style.background-color]="bodyPanelBgColor()">
+							</div>
+							@let slots = equippedBodySlotsForView();
+							<div class="fpv-body-panel" [style.background-color]="bodyPanelBgColor()">
 							<p class="body-panel-title">Equipment</p>
 							<svg class="body-outline-svg" viewBox="-12 0 104 165" xmlns="http://www.w3.org/2000/svg">
 							<rect x="-12" y="0" width="104" height="165" fill="white"/>
@@ -510,6 +634,42 @@
 									<circle cx="73" cy="96" r="1.5" fill="#886600"/>
 								}
 							</svg>
+							</div>
+						</div>
+						<div class="fpv-actions-block">
+							<div class="fpv-action-grid" aria-label="Action icons">
+								<div class="fpv-action-grid-row">
+									<button type="button" class="fpv-icon-btn fpv-icon-btn-eye" title="Search (costs 1 AE)" [class.fpv-icon-btn-active]="canSearch()" [class.fpv-icon-btn-blink]="isThiephTrapSenseActive()" [disabled]="!canSearch()" (click)="searchForTraps()">👁</button>
+									<button type="button" class="fpv-icon-btn" title="Drink Potion" (click)="openDrinkPotionModal()">🧪</button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canPickAny()" title="Pick Lock / Disarm Trap" (click)="canPickAny() && foundTrap() ? tryDisarmTrap() : pickLockDoor(nearbyDoorsForPreview()[0])"><span class="pick-icon">&#x2310;&#xAC;</span></button>
+								</div>
+								<div class="fpv-action-grid-row">
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="hasCurrentSquarePickupItems()" title="Take Tresher" (click)="takeAllFromCurrentSquare()">&#x1F4B0;</button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canUseSneek()" [class.fpv-icon-btn-sneek-active]="playerSneekRoundsRemaining() > 0" [disabled]="!canUseSneek() && playerSneekRoundsRemaining() === 0" title="Sneek (Thieph/Shorties: free, lasts round | Others: 1 AE, re-check each action)" (click)="trySneek()">🤷</button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canTalkToNpc()" title="Talk to NPC" (click)="talkToNpc()">💬</button>
+								</div>
+								<div class="fpv-action-grid-row">
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canUnlockAnyDoor()" title="Use Key" (click)="unlockAdjacentDoor(nearbyDoorsForPreview()[0])">🔑</button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canOpenAnyDoor()" title="Open Door" (click)="openAdjacentDoor(nearbyDoorsForPreview()[0])">🚪</button>
+									<button type="button" class="fpv-icon-btn" title="Backpack Inventory" (click)="openBackpackInventoryModal()">🎒</button>
+								</div>
+								<div class="fpv-action-grid-row">
+									<button type="button" class="fpv-icon-btn" title="Move Backward" (click)="moveBackward()">🔙</button>
+									<button type="button" class="fpv-icon-btn" title="Face Up" (click)="setFacingDirectionFromPad('up')">↑</button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canUseQuickCastIcon() || canBoostAttack()" [disabled]="!(canUseQuickCastIcon() || canBoostAttack())" title="{{ isFighterClass() ? 'Boost Attack' : 'Cast Default Spell' }}" (click)="quickCastFromIcon()">{{ isFighterClass() ? '💥' : '✨' }}</button>
+								</div>
+								<div class="fpv-action-grid-row">
+									<button type="button" class="fpv-icon-btn" title="Face Left" (click)="setFacingDirectionFromPad('left')">←</button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canPlayerAttack() || canAttackUnarmed()" title="{{ hasWeaponEquipped() ? 'Attack' : 'Unarmed Attack' }}" [disabled]="!canPlayerAttack()" (click)="tryPlayerAttack()">{{ hasWeaponEquipped() ? '⚔' : '✊' }}</button>
+									<button type="button" class="fpv-icon-btn" title="Face Right" (click)="setFacingDirectionFromPad('right')">→</button>
+								</div>
+								<div class="fpv-action-grid-row">
+									<button type="button" class="fpv-icon-btn" title="End Turn" (click)="endPlayerTurnEarly()">⏭️</button>
+									<button type="button" class="fpv-icon-btn" title="Face Down" (click)="setFacingDirectionFromPad('down')">↓</button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canPlayerDefend()" [attr.data-stacks]="playerDefendStacks() > 0 ? playerDefendStacks() : null" title="Defend (D) - costs 1 AE, +2 AC vs next attack" (click)="tryPlayerDefend()">🛡</button>
+								</div>
+							</div>
+							<button type="button" class="fpv-help-btn" (click)="openControlsHelpModal()">? HELP ?</button>
 						</div>
 					</div>
 					</div>
@@ -562,7 +722,6 @@
 							<button type="button" class="action-button action-button-ade" [disabled]="!canAde()" (click)="tryAde()" title="Attack + Defend + End Turn (requires 2 AE)">
 								ADE
 							</button>
-							<span class="stat-badge stat-phase turn-phase-inline">Your Turn</span>
 						@if (isFighterClass()) {
 							<button type="button" class="action-button action-button-boost" [class.action-button-disabled]="!canBoostAttack()" [disabled]="!canBoostAttack()" (click)="tryBoostAttack()" title="Boost Attack — +1d3/d4/d6 to hit, -4 AC until your next turn. Must be first action of your turn.">
 								Boost
@@ -573,14 +732,20 @@
 								Rest ✨
 							</button>
 						}
-							@if (hasCurrencyInInventory()) {
-								<span class="currency-badge" title="Coins in inventory">
-									@if (totalInventoryCurrency().gold > 0) {<span class="currency-coin currency-gold">G:{{ totalInventoryCurrency().gold }}</span>}
-									@if (totalInventoryCurrency().silver > 0) {<span class="currency-coin currency-silver">S:{{ totalInventoryCurrency().silver }}</span>}
-									@if (totalInventoryCurrency().copper > 0) {<span class="currency-coin currency-copper">C:{{ totalInventoryCurrency().copper }}</span>}
-									@if (totalInventoryCurrency().zinc > 0) {<span class="currency-coin currency-zinc">Z:{{ totalInventoryCurrency().zinc }}</span>}
-								</span>
-							}
+						<div class="combat-currency-row combat-currency-row-inline" title="Coins in inventory">
+							<span class="currency-coin currency-gold">G:{{ totalInventoryCurrency().gold }}</span>
+							<span class="currency-coin currency-silver">S:{{ totalInventoryCurrency().silver }}</span>
+							<span class="currency-coin currency-copper">C:{{ totalInventoryCurrency().copper }}</span>
+							<span class="currency-coin currency-zinc">Z:{{ totalInventoryCurrency().zinc }}</span>
+						</div>
+						</div>
+					}
+					@if (turnPhase() !== 'player') {
+						<div class="combat-currency-row combat-currency-row-inline" title="Coins in inventory">
+							<span class="currency-coin currency-gold">G:{{ totalInventoryCurrency().gold }}</span>
+							<span class="currency-coin currency-silver">S:{{ totalInventoryCurrency().silver }}</span>
+							<span class="currency-coin currency-copper">C:{{ totalInventoryCurrency().copper }}</span>
+							<span class="currency-coin currency-zinc">Z:{{ totalInventoryCurrency().zinc }}</span>
 						</div>
 					}
 					@if (turnPhase() === 'gameover') {
@@ -594,7 +759,10 @@
 							<h4 class="combat-log-title">Log</h4>
 							<ul class="combat-log-list">
 								@for (entry of combatLog(); track $index) {
-									<li class="combat-log-entry">{{ entry.text }}</li>
+									<li class="combat-log-entry"
+										[class.combat-log-entry-pc]="entry.type === 'pc'"
+										[class.combat-log-entry-monster]="entry.type === 'monster'"
+									>{{ entry.text }}</li>
 								}
 							</ul>
 						</div>
@@ -738,7 +906,7 @@
 					@if (otherNearbyItemsForPreview().length > 0) {
 						<ul class="discovery-list">
 							@for (item of otherNearbyItemsForPreview(); track item.kind + ':' + item.row + ':' + item.column + ':' + item.name) {
-							<li class="discovery-item" [class.discovery-item-wall-note]="item.kind === 'Text'">
+							<li class="discovery-item" [class.discovery-item-wall-note]="item.kind === 'Text' && item.name === 'Wall Note'">
 									<span class="discovery-kind">{{ item.kind }}</span>
 									<p class="discovery-name">{{ item.name }}</p>
 									<p class="discovery-description">{{ item.description }}</p>
@@ -810,6 +978,12 @@
 					<div class="info-col inventory-col">
 						<h3 class="panel-title panel-title-light">Inventory</h3>
 						<div class="inventory-scroll">
+						<div class="inventory-coin-row" title="Coins in inventory">
+							<span class="currency-coin currency-gold">G:{{ totalInventoryCurrency().gold }}</span>
+							<span class="currency-coin currency-silver">S:{{ totalInventoryCurrency().silver }}</span>
+							<span class="currency-coin currency-copper">C:{{ totalInventoryCurrency().copper }}</span>
+							<span class="currency-coin currency-zinc">Z:{{ totalInventoryCurrency().zinc }}</span>
+						</div>
 						<div class="inventory-summary">
 							<p class="inventory-summary-line">
 								Hands Equipped: {{ inventoryHandsUsedForPreview() }} / {{ maxEquippableHands }}
@@ -841,7 +1015,7 @@
 								<ul class="tresher-items-list">
 									@for (item of group.items; track item.id) {
 										<li class="tresher-inner-item">
-											<span class="tresher-item-name">{{ item.name }}</span>
+											<span class="tresher-item-name">{{ item.name }}@if (item.description) {{{ ': ' + item.description }}}</span>
 											@if (item.type === 'weapon' && item.damage > 0) {
 												<span class="tresher-item-stat">Dmg: 1–{{ item.damage }} | Range: {{ item.range }}</span>
 											}
@@ -872,23 +1046,31 @@
 								</ul>
 							}
 
-							@if (allTresherPotionsFlat().length > 0) {
+							@if (allPotionsUnified().length > 0) {
 								<p class="inventory-section-label">Potions</p>
 								<p class="tresher-item-desc">Hint: "Magic"/"MP" potions apply Arcane Infusion: +MP and +spell effect while active.</p>
 								<ul class="tresher-items-list">
-									@for (potion of allTresherPotionsFlat(); track potion.id) {
+									@for (potion of allPotionsUnified(); track potion.id) {
 										<li class="tresher-inner-item">
-											<span class="tresher-item-name">{{ potion.name }}</span>
-											@if (potion.description) {
-												<span class="tresher-item-desc">{{ potion.description }}</span>
-											}
-											@if (isInnerPotionDrinkable(potion)) {
+											<span class="tresher-item-name">{{ potion.name }}@if (potion.description) {{{ ': ' + potion.description }}}</span>
+											@if (potion.source === 'tresher' && isInnerPotionDrinkable(potion) && potion.tresherIdx !== undefined) {
 												<div class="inventory-item-actions">
 													<button
 														type="button"
 														class="action-button action-button-strong"
 														[disabled]="!canDrinkInnerPotion()"
 														(click)="drinkTresherInnerPotion(potion.tresherIdx, potion.id)"
+													>
+														Drink
+													</button>
+												</div>
+											} @else if (potion.source === 'collected') {
+												<div class="inventory-item-actions">
+													<button
+														type="button"
+														class="action-button action-button-strong"
+														[disabled]="turnPhase() !== 'player' || playerHp() <= 0"
+														(click)="drinkCollectedFloorPotion(potion.id)"
 													>
 														Drink
 													</button>
@@ -922,12 +1104,24 @@
 								<ul class="tresher-items-list">
 									@for (spell of allTresherSpellsFlat(); track spell.id) {
 										<li class="tresher-inner-item">
-											<span class="tresher-item-name">{{ spell.name }}</span>
+											<div class="spell-header-row">
+												<span class="tresher-item-name">{{ spell.name }}</span>
+												<label class="spell-default-radio">
+													<input
+														type="radio"
+														name="defaultSpell"
+														[checked]="isDefaultSpell(spell.id)"
+														[disabled]="!isSpellEquippedById(spell.id)"
+														(change)="setDefaultSpell(spell.id)"
+													/>
+													Default
+												</label>
+											</div>
 											@if (spell.description) {
 												<span class="tresher-item-desc">{{ spell.description }}</span>
 											}
 											<span class="tresher-item-desc">
-												AE: {{ spell.sp }} | Magic Cost: {{ spell.magicCost ?? 1 }} | Range: {{ spell.range }} | Effect: {{ spell.effectOn }}@if (spell.numberOfTargets > 1) { | Targets: {{ spell.numberOfTargets }}}
+												Min LTSP: {{ spell.minLtsp ?? spell.sp }} | Magic Cost: {{ spell.magicCost ?? 1 }} | Range: {{ spell.range }} | Effect: {{ spell.effectOn }}@if (spell.numberOfTargets > 1) { | Targets: {{ spell.numberOfTargets }}}
 											</span>
 											<div class="inventory-item-actions">
 												<button
@@ -961,7 +1155,7 @@
 											@if (spell.description) {
 												<span class="tresher-item-desc">{{ spell.description }}</span>
 											}
-											<span class="tresher-item-desc">Learn Cost: {{ spell.sp }} SP | Learn TN: {{ spell.successTestValue }}</span>
+											<span class="tresher-item-desc">Learn Cost: {{ spell.sp }} SP @if ((spell.learnCostGp ?? 0) > 0) { | {{ spell.learnCostGp }} GP } | Min LTSP: {{ spell.minLtsp ?? spell.sp }} | Learn TN: {{ spell.successTestValue }}</span>
 											<div class="inventory-item-actions">
 												<button
 													type="button"
@@ -1096,30 +1290,7 @@
 						</ul>
 					}
 
-					@if (collectedFloorPotionsForPreview().length > 0) {
-						<p class="inventory-section-title">Potions</p>
-						<p class="tresher-item-desc">Hint: "Magic"/"MP" potions apply Arcane Infusion: +MP and +spell effect while active.</p>
-						<ul class="tresher-items-list">
-							@for (potion of collectedFloorPotionsForPreview(); track potion.id + ':' + $index) {
-								<li class="tresher-inner-item">
-									<span class="tresher-item-name">{{ potion.name || 'Unnamed Potion' }}</span>
-									@if (potion.description) {
-										<span class="tresher-item-desc">{{ potion.description }}</span>
-									}
-									<div class="inventory-item-actions">
-										<button
-											type="button"
-											class="action-button action-button-strong"
-											[disabled]="turnPhase() !== 'player' || playerHp() <= 0"
-											(click)="drinkCollectedFloorPotion(potion.id)"
-										>
-											Drink
-										</button>
-									</div>
-								</li>
-							}
-						</ul>
-					}
+					<!-- Collected floor potions are now unified above -->
 					</div>
 					<div class="inventory-pc-card">
 						@if (playerPortraitUrl(); as portraitUrl) {
@@ -1149,8 +1320,14 @@
 				@if (pendingExitTransitionType()) {
 					<div class="exit-confirm-overlay" aria-live="assertive">
 						<p class="exit-confirm-title">You found an exit!</p>
-						@if (dungonSpReward() > 0) {
+						@if (dungonSpReward() > 0 && pendingExitAwardsInnReward()) {
 							<p class="exit-confirm-sp">Reward: +{{ dungonSpReward() }} SP</p>
+						}
+						@if (!pendingExitAwardsInnReward()) {
+							<p class="exit-confirm-warning">
+								You need <strong>{{ pendingExitMissingItemName() || 'the required item' }}</strong> to claim the Inn Keeper reward.
+								You can still leave now, but no reward will be given.
+							</p>
 						}
 						<p class="exit-confirm-prompt">Do you want to leave the dungeon?</p>
 						<div class="exit-confirm-actions">
@@ -1170,8 +1347,10 @@
 						}
 						<h2 class="win-title">You Won!</h2>
 						<p class="win-subtitle">You've reached the end of the dungeon!</p>
-						@if (dungonSpReward() > 0) {
+						@if (dungonSpReward() > 0 && lastExitGrantedInnReward()) {
 							<p class="win-sp">+{{ dungonSpReward() }} SP awarded!</p>
+						} @else if (dungonSpReward() > 0) {
+							<p class="win-sp win-sp-muted">No Inn Keeper reward awarded.</p>
 						}
 					</div>
 				}
@@ -1183,7 +1362,7 @@
 	@if (turnPhase() === 'gameover' && playerDeadName()) {
 		<div class="death-overlay">
 			<div class="death-card">
-				<p class="death-cross">✝</p>
+				<p class="death-cross">☠</p>
 				<h2 class="death-name">{{ playerDeadName() }}</h2>
 				<p class="death-subtitle">{{ playerDeathCause() }}</p>
 				<button type="button" class="death-home-btn" (click)="goHome()">Return Home</button>

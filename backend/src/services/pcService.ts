@@ -12,6 +12,7 @@ import {
   updatePcForUser,
   deletePcForUser,
   addSpToPc,
+  completeDungonRewardOnce as completeDungonRewardOnceInDb,
   addTresherIdToPcInDb,
   upgradeNoa as upgradeNoaInDb,
   upgradeNod as upgradeNodInDb,
@@ -48,6 +49,15 @@ export const awardSpToPc = async (
   amount: number
 ): Promise<{ sp: number; spLifetime: number } | null> => {
   return await addSpToPc(id, userguid, amount);
+};
+
+export const completeDungonRewardOnce = async (
+  id: number,
+  userguid: string,
+  dungonId: number,
+  spReward: number
+): Promise<{ awarded: boolean; sp: number; spLifetime: number } | null> => {
+  return await completeDungonRewardOnceInDb(id, userguid, dungonId, spReward);
 };
 
 export const upgradeNoa = async (

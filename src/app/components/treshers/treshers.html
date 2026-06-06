@@ -37,7 +37,10 @@
                     <small class="tr-item-desc">{{ item.description }}</small>
                   }
                 </div>
-                <button type="button" class="tr-edit-btn" (click)="editTresher(item)">Edit</button>
+                <div class="tr-item-actions">
+                  <button type="button" class="tr-edit-btn" (click)="editTresher(item)">Edit</button>
+                  <button type="button" class="tr-delete-btn" (click)="deleteTresher(item)" [disabled]="isSaving()">Delete</button>
+                </div>
               </li>
             }
           </ul>

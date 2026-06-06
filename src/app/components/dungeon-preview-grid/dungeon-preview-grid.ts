@@ -458,20 +458,65 @@ export class DungeonPreviewGridComponent {
       }
     }
 
-    // Draw lowercase 't' markers for detected, active floor traps
+    // Draw type-aware markers for detected or triggered floor traps
     for (const fp of this.floorTrapPlacements()) {
-      if (fp.isTriggered || fp.isDisarmed) continue;
+      if (fp.isDisarmed) continue;
+      if (!(fp.isDetected || fp.isTriggered)) continue;
       if (!visibleSquareKeys.has(this.getSquareKey(fp.row, fp.column))) continue;
       const previewRow = fp.row - preview.startRow;
       const previewColumn = fp.column - preview.startColumn;
       if (previewRow >= 0 && previewColumn >= 0 && previewRow < this.dimension && previewColumn < this.dimension) {
         const centerX = previewColumn * this.cellSize + this.cellSize / 2;
         const centerY = previewRow * this.cellSize + this.cellSize / 2;
-        context.fillStyle = '#ffcc00';
-        context.font = 'bold 8px sans-serif';
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText('t', centerX + 4, centerY + 4);
+        const trapType = (fp.trap.trapType ?? fp.trap.name ?? '').toLowerCase();
+        context.save();
+        if (trapType.includes('pit') && !trapType.includes('spiked')) {
+          context.fillStyle = fp.isTriggered ? '#111' : '#222';
+          context.beginPath();
+          context.ellipse(centerX, centerY, 4, 3, 0, 0, Math.PI * 2);
+          context.fill();
+          context.strokeStyle = '#000';
+          context.stroke();
+        } else if (trapType.includes('spiked pit')) {
+          context.fillStyle = fp.isTriggered ? '#1a1a1a' : '#2a1e1e';
+          context.beginPath();
+          context.ellipse(centerX, centerY, 4, 3, 0, 0, Math.PI * 2);
+          context.fill();
+          context.strokeStyle = '#c0392b';
+          context.beginPath();
+          context.moveTo(centerX - 4, centerY - 1);
+          context.lineTo(centerX - 1, centerY - 4);
+          context.lineTo(centerX + 1, centerY - 4);
+          context.lineTo(centerX + 4, centerY - 1);
+          context.stroke();
+        } else if (trapType.includes('glue')) {
+          context.fillStyle = '#4caf50';
+          context.fillRect(centerX - 4, centerY - 3, 8, 6);
+        } else if (trapType.includes('net')) {
+          context.strokeStyle = '#d9c7a0';
+          context.lineWidth = 1;
+          context.strokeRect(centerX - 4, centerY - 3, 8, 6);
+          context.beginPath();
+          context.moveTo(centerX - 4, centerY - 3);
+          context.lineTo(centerX + 4, centerY + 3);
+          context.moveTo(centerX + 4, centerY - 3);
+          context.lineTo(centerX - 4, centerY + 3);
+          context.stroke();
+        } else if (trapType.includes('dart') || trapType.includes('gas') || trapType.includes('wall spikes')) {
+          context.fillStyle = trapType.includes('gas') ? '#6c4bd9' : '#f5f5f5';
+          context.beginPath();
+          context.arc(centerX, centerY, 3, 0, Math.PI * 2);
+          context.fill();
+          context.strokeStyle = trapType.includes('wall spikes') ? '#7a3db8' : '#7f8c8d';
+          context.stroke();
+        } else {
+          context.fillStyle = '#ffcc00';
+          context.font = 'bold 8px sans-serif';
+          context.textAlign = 'center';
+          context.textBaseline = 'middle';
+          context.fillText('t', centerX + 4, centerY + 4);
+        }
+        context.restore();
       }
     }
 

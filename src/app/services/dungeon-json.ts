@@ -47,6 +47,52 @@ export class DungeonJsonService {
   parseTrapObject(raw: unknown): Trap | null {
     if (!raw || typeof raw !== 'object') return null;
     const src = raw as Partial<Record<string, unknown>>;
+    const trapType =
+      src['trapType'] === 'Pit' ? 'Pit'
+      : src['trapType'] === 'Spiked Pit' ? 'Spiked Pit'
+      : src['trapType'] === 'Ceiling Spikes' ? 'Ceiling Spikes'
+      : src['trapType'] === 'Floor Glue' ? 'Floor Glue'
+      : src['trapType'] === 'Drop Net' ? 'Drop Net'
+      : src['trapType'] === 'Dart' ? 'Dart'
+      : src['trapType'] === 'Gas Cloud' ? 'Gas Cloud'
+      : src['trapType'] === 'Wall Spikes' ? 'Wall Spikes'
+      : 'Pit';
+    const sourceObjectType =
+      src['sourceObjectType'] === 'floor' ? 'floor'
+      : src['sourceObjectType'] === 'wall' ? 'wall'
+      : src['sourceObjectType'] === 'door' ? 'door'
+      : src['sourceObjectType'] === 'item' ? 'item'
+      : src['sourceObjectType'] === 'tresher' ? 'tresher'
+      : src['sourceObjectType'] === 'obstacle' ? 'obstacle'
+      : 'floor';
+    const sourceSide =
+      src['sourceSide'] === 'north' ? 'north'
+      : src['sourceSide'] === 'east' ? 'east'
+      : src['sourceSide'] === 'south' ? 'south'
+      : src['sourceSide'] === 'west' ? 'west'
+      : 'north';
+    const secondaryEffectTo =
+      src['secondaryEffectTo'] === 'Stamina' ? 'Stamina'
+      : src['secondaryEffectTo'] === 'Mind' ? 'Mind'
+      : src['secondaryEffectTo'] === 'AE' ? 'AE'
+      : src['secondaryEffectTo'] === 'ROS' ? 'ROS'
+      : null;
+    const crossingRequirements = Array.isArray(src['crossingRequirements'])
+      ? (src['crossingRequirements'] as unknown[])
+          .filter((entry) => !!entry && typeof entry === 'object')
+          .map((entry) => {
+            const req = entry as Partial<Record<string, unknown>>;
+            const id = typeof req['itemId'] === 'number' ? Math.floor(req['itemId']) : NaN;
+            if (!Number.isFinite(id) || id < 0) {
+              return null;
+            }
+            return {
+              itemId: id,
+              itemName: typeof req['itemName'] === 'string' ? req['itemName'] : `Item ${id}`,
+            };
+          })
+          .filter((entry): entry is { itemId: number; itemName: string } => entry !== null)
+      : [];
     const damageTo = src['damageTo'] === 'Stamina' ? 'Stamina'
       : src['damageTo'] === 'Mind' ? 'Mind'
       : src['damageTo'] === 'AE' ? 'AE'
@@ -60,6 +106,14 @@ export class DungeonJsonService {
       curseId: typeof src['curseId'] === 'number' ? src['curseId'] : null,
       toDetect: typeof src['toDetect'] === 'number' ? Math.max(0, src['toDetect']) : 10,
       toDisarm: typeof src['toDisarm'] === 'number' ? Math.max(0, src['toDisarm']) : 10,
+      trapType,
+      isHiddenUntilFoundOrTriggered: src['isHiddenUntilFoundOrTriggered'] === true,
+      crossingRequirements,
+      sourceObjectType,
+      sourceSide,
+      secondaryEffectTo,
+      secondaryEffectAmount: typeof src['secondaryEffectAmount'] === 'number' ? Math.max(0, src['secondaryEffectAmount']) : 0,
+      secondaryEffectDuration: typeof src['secondaryEffectDuration'] === 'number' ? Math.max(0, src['secondaryEffectDuration']) : 0,
     };
   }
 

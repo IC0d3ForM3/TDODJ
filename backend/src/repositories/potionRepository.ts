@@ -10,6 +10,12 @@ export interface PotionRecord {
   lastFor: number;
   effectAmount: number;
   effectAmount2: number;
+  effectAmountMin: number;
+  effectAmountDiceCount: number;
+  effectAmountDiceSides: number;
+  effectAmount2Min: number;
+  effectAmount2DiceCount: number;
+  effectAmount2DiceSides: number;
   value: number;
   imageId: number | null;
   soundId: number | null;
@@ -27,6 +33,12 @@ export interface UpsertPotionPayload {
   lastFor: number;
   effectAmount: number;
   effectAmount2: number;
+  effectAmountMin: number;
+  effectAmountDiceCount: number;
+  effectAmountDiceSides: number;
+  effectAmount2Min: number;
+  effectAmount2DiceCount: number;
+  effectAmount2DiceSides: number;
   value: number;
   imageId: number | null;
   soundId: number | null;
@@ -43,6 +55,12 @@ const SELECT_POTION_FIELDS = `
   effecttime AS "lastFor",
   effectnumber AS "effectAmount",
   COALESCE(effectamount2, 0) AS "effectAmount2",
+  COALESCE(effectnumbermin, 0) AS "effectAmountMin",
+  COALESCE(effectnumberdicecount, CASE WHEN COALESCE(effectnumber, 0) > 0 THEN 1 ELSE 0 END) AS "effectAmountDiceCount",
+  COALESCE(effectnumberdicesides, GREATEST(0, COALESCE(effectnumber, 0))) AS "effectAmountDiceSides",
+  COALESCE(effectamount2min, 0) AS "effectAmount2Min",
+  COALESCE(effectamount2dicecount, CASE WHEN COALESCE(effectamount2, 0) > 0 THEN 1 ELSE 0 END) AS "effectAmount2DiceCount",
+  COALESCE(effectamount2dicesides, GREATEST(0, COALESCE(effectamount2, 0))) AS "effectAmount2DiceSides",
   value,
   imageid AS "imageId",
   soundid AS "soundId",
@@ -76,6 +94,12 @@ export const getAllPotionsWithUsername = async (): Promise<PotionRecord[]> => {
        p.effectto AS "effectTo", p.effectto2 AS "effectTo2",
        p.effecttime AS "lastFor", p.effectnumber AS "effectAmount",
        COALESCE(p.effectamount2, 0) AS "effectAmount2",
+      COALESCE(p.effectnumbermin, 0) AS "effectAmountMin",
+      COALESCE(p.effectnumberdicecount, CASE WHEN COALESCE(p.effectnumber, 0) > 0 THEN 1 ELSE 0 END) AS "effectAmountDiceCount",
+      COALESCE(p.effectnumberdicesides, GREATEST(0, COALESCE(p.effectnumber, 0))) AS "effectAmountDiceSides",
+      COALESCE(p.effectamount2min, 0) AS "effectAmount2Min",
+      COALESCE(p.effectamount2dicecount, CASE WHEN COALESCE(p.effectamount2, 0) > 0 THEN 1 ELSE 0 END) AS "effectAmount2DiceCount",
+      COALESCE(p.effectamount2dicesides, GREATEST(0, COALESCE(p.effectamount2, 0))) AS "effectAmount2DiceSides",
        p.value, p.imageid AS "imageId", p.soundid AS "soundId",
        p.ispublic AS "isPublic",
        p.createdat::text AS "createdAt", p.updatedat::text AS "updatedAt",
@@ -117,8 +141,8 @@ export const insertPotionForUser = async (
   const { rows } = await pool.query<PotionRecord>(
     `INSERT INTO potions
        (userguid, name, description, effectto, effectto2, effecttime, effectnumber,
-        effectamount2, value, imageid, soundid, ispublic)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        effectamount2, effectnumbermin, effectnumberdicecount, effectnumberdicesides, effectamount2min, effectamount2dicecount, effectamount2dicesides, value, imageid, soundid, ispublic)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      RETURNING ${SELECT_POTION_FIELDS}`,
     [
       userguid,
@@ -129,6 +153,12 @@ export const insertPotionForUser = async (
       payload.lastFor,
       payload.effectAmount,
       payload.effectAmount2,
+      payload.effectAmountMin,
+      payload.effectAmountDiceCount,
+      payload.effectAmountDiceSides,
+      payload.effectAmount2Min,
+      payload.effectAmount2DiceCount,
+      payload.effectAmount2DiceSides,
       payload.value,
       payload.imageId,
       payload.soundId,
@@ -153,10 +183,16 @@ export const updatePotionForUser = async (
        effecttime = $7,
        effectnumber = $8,
        effectamount2 = $9,
-       value = $10,
-       imageid = $11,
-       soundid = $12,
-       ispublic = $13,
+       effectnumbermin = $10,
+       effectnumberdicecount = $11,
+       effectnumberdicesides = $12,
+       effectamount2min = $13,
+       effectamount2dicecount = $14,
+       effectamount2dicesides = $15,
+       value = $16,
+       imageid = $17,
+       soundid = $18,
+       ispublic = $19,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING ${SELECT_POTION_FIELDS}`,
@@ -170,6 +206,12 @@ export const updatePotionForUser = async (
       payload.lastFor,
       payload.effectAmount,
       payload.effectAmount2,
+      payload.effectAmountMin,
+      payload.effectAmountDiceCount,
+      payload.effectAmountDiceSides,
+      payload.effectAmount2Min,
+      payload.effectAmount2DiceCount,
+      payload.effectAmount2DiceSides,
       payload.value,
       payload.imageId,
       payload.soundId,

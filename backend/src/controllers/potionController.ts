@@ -28,6 +28,18 @@ interface PotionWriteInput {
   effectamount?: unknown;
   effectAmount2?: unknown;
   effectamount2?: unknown;
+  effectAmountMin?: unknown;
+  effectamountmin?: unknown;
+  effectAmountDiceCount?: unknown;
+  effectamountdicecount?: unknown;
+  effectAmountDiceSides?: unknown;
+  effectamountdicesides?: unknown;
+  effectAmount2Min?: unknown;
+  effectamount2min?: unknown;
+  effectAmount2DiceCount?: unknown;
+  effectamount2dicecount?: unknown;
+  effectAmount2DiceSides?: unknown;
+  effectamount2dicesides?: unknown;
   value?: unknown;
   imageId?: unknown;
   imageid?: unknown;
@@ -60,14 +72,29 @@ function buildPotionPayload(input: PotionWriteInput, isAdmin: boolean): UpsertPo
     : null;
   const effectTo2 = effectTo2Raw && EFFECT_TO_OPTIONS.has(effectTo2Raw) ? effectTo2Raw : null;
 
+  const legacyAmount1 = Math.max(0, normalizeNumber(input.effectAmount ?? input.effectamount, 0));
+  const legacyAmount2 = Math.max(0, normalizeNumber(input.effectAmount2 ?? input.effectamount2, 0));
+  const effectAmountMin = normalizeNumber(input.effectAmountMin ?? input.effectamountmin, 0);
+  const effectAmount2Min = normalizeNumber(input.effectAmount2Min ?? input.effectamount2min, 0);
+  const effectAmountDiceSides = Math.max(0, normalizeNumber(input.effectAmountDiceSides ?? input.effectamountdicesides, legacyAmount1));
+  const effectAmount2DiceSides = Math.max(0, normalizeNumber(input.effectAmount2DiceSides ?? input.effectamount2dicesides, legacyAmount2));
+  const effectAmountDiceCount = Math.max(0, normalizeNumber(input.effectAmountDiceCount ?? input.effectamountdicecount, effectAmountDiceSides > 0 ? 1 : 0));
+  const effectAmount2DiceCount = Math.max(0, normalizeNumber(input.effectAmount2DiceCount ?? input.effectamount2dicecount, effectAmount2DiceSides > 0 ? 1 : 0));
+
   return {
     name: normalizeText(input.name, 'Unnamed Potion'),
     description: normalizeText(input.description, ''),
     effectTo: EFFECT_TO_OPTIONS.has(effectTo) ? effectTo : 'HP',
     effectTo2,
     lastFor: Math.max(0, normalizeNumber(input.lastFor ?? input.lastfor, 0)),
-    effectAmount: normalizeNumber(input.effectAmount ?? input.effectamount, 0),
-    effectAmount2: normalizeNumber(input.effectAmount2 ?? input.effectamount2, 0),
+    effectAmount: effectAmountDiceSides,
+    effectAmount2: effectAmount2DiceSides,
+    effectAmountMin,
+    effectAmountDiceCount,
+    effectAmountDiceSides,
+    effectAmount2Min,
+    effectAmount2DiceCount,
+    effectAmount2DiceSides,
     value: Math.max(0, normalizeNumber(input.value, 0)),
     imageId: normalizeNullableInt(input.imageId ?? input.imageid),
     soundId: normalizeNullableInt(input.soundId ?? input.soundid),

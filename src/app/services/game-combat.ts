@@ -28,6 +28,10 @@ export interface GameMonsterInstance {
   dropItemIds: number[];
   dropSpellIds: number[];
   dropPotionIds: number[];
+  dropGold: number;
+  dropSilver: number;
+  dropCopper: number;
+  dropZinc: number;
   activeEffects: ActiveEffect[];
   isDormant: boolean;
   guardRow: number | null;
@@ -46,6 +50,7 @@ export interface GameMonsterInstance {
 
 export interface CombatLogEntry {
   text: string;
+  type?: 'pc' | 'monster'; // 'pc' for player actions, 'monster' for monster actions
 }
 
 @Injectable({ providedIn: 'root' })
@@ -102,6 +107,6 @@ export class GameCombatService {
   readonly spellHitFlash = signal<'blood' | 'arcane' | 'fire' | 'ice' | 'lightning' | 'mind' | null>(null);
   readonly spellBeamEffects = signal<{ fromRow: number; fromCol: number; toRow: number; toCol: number; isHP: boolean }[]>([]);
   readonly monsterGlowKeys = signal<Set<string>>(new Set());
-  readonly spellTargetMode = signal<{ spellId: number; maxTargets: number; targets: { row: number; column: number }[] } | null>(null);
+  readonly spellTargetMode = signal<{ spellId: number; maxTargets: number; targets: { row: number; column: number }[]; targetType?: 'monster' | 'trap' } | null>(null);
   readonly playerDeathCause = signal<string | null>(null);
 }

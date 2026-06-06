@@ -88,9 +88,14 @@
 .tr-item-meta { color: #555; font-size: 0.75rem; }
 .tr-item-desc { color: #777; font-size: 0.72rem; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.tr-edit-btn {
-  align-self: flex-start;
+.tr-item-actions {
+  display: flex;
+  gap: 0.5rem;
   margin-top: 0.35rem;
+  align-items: center;
+}
+
+.tr-edit-btn {
   padding: 0.2rem 0.65rem;
   font-size: 0.78rem;
   font-weight: 600;
@@ -102,6 +107,20 @@
   transition: background 0.15s, color 0.15s;
 }
 .tr-edit-btn:hover { background: #c8860a; color: #fff; }
+
+.tr-delete-btn {
+  padding: 0.2rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid #d32f2f;
+  color: #d32f2f;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.tr-delete-btn:hover:not(:disabled) { background: #d32f2f; color: #fff; }
+.tr-delete-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ── Right form panel ─────────────────────── */
 .tr-form {

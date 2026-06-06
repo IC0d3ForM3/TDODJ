@@ -1,0 +1,123 @@
+Spell review update log
+
+[2026-06-03T23:24:47.277Z] Spell ID 1 — Mend Wounds
+
+[2026-06-03T23:27:25.509Z] Spell ID 2 — Healing Word
+- effecton2:  -> HP
+- effectonpc2: false -> true
+- effectdicesides: 5 -> 4
+- effectamount2dicecount: 0 -> 1
+- effectamount2dicesides: 0 -> 4
+- range1: 2 -> 3
+- range2: 2 -> 0
+- numberoftargets: 1 -> 100
+- magiccost: 2 -> 3
+
+[2026-06-03T23:28:57.493Z] Spell ID 3 — Greater Heal
+- effectdicecount: 1 -> 2
+- effectdicesides: 10 -> 6
+
+[2026-06-03T23:31:44.211Z] Spell ID 4 — Restore Stamina
+- effectdicecount: 0 -> 1
+- effectdicesides: 0 -> 4
+- range1: 0 -> 3
+
+[2026-06-03T23:33:59.039Z] Spell ID 5 — Clear Mind
+
+[2026-06-04T01:25:39.295Z] Spell ID 6 — Shield of Faith
+- effectdicecount: 1 -> 2
+- effectdicesides: 4 -> 3
+- lastfor1: 3 -> 4
+- magiccost: 2 -> 3
+- soundid: null -> 14
+- ispublic: false -> true
+
+[2026-06-04T01:28:45.872Z] Spell ID 7 — Cat's Grace
+- effecton: Defense -> # of Attacks
+- effecton2:  -> Sight
+- effectonpc1: false -> true
+- effectonpc2: false -> true
+- effectdicecount: 1 -> 2
+- effectamount2dicecount: 0 -> 2
+- effectamount2dicesides: 0 -> 2
+- range1: 1 -> 0
+- range2: 1 -> 0
+- lastfor1: 3 -> 5
+- lastfor2: 3 -> 5
+- magiccost: 2 -> 3
+
+[2026-06-04T01:32:09.864Z] Spell ID 8 — Arcane Surge
+- successtestvalue: 0 -> 5
+- soundid: null -> 14
+
+[2026-06-04T01:34:58.626Z] Spell ID 9 — Eagle Eye
+- effecton: Sight -> ROS
+- effectdicecount: 0 -> 1
+- effectdicesides: 0 -> 4
+- range1: 0 -> 3
+- magiccost: 2 -> 3
+- successtestvalue: 0 -> 5
+
+[2026-06-04T01:38:05.551Z] Spell ID 10 — Haste
+- effecton: Action Economy -> AE
+- effectonpc1: false -> true
+- effectdicesides: 1 -> 4
+- range1: 1 -> 0
+- lastfor1: 2 -> 3
+- magiccost: 3 -> 5
+- sp: 3 -> 4
+
+[2026-06-04T01:42:39.934Z] Spell ID 11 — Frost Bolt
+- effectdicecount: 0 -> 2
+- effectdicesides: 0 -> 4
+- magiccost: 2 -> 3
+
+[2026-06-04T01:46:00.449Z] Spell ID 12 — Fire Lance
+- ispublic: false -> true
+
+[2026-06-04T01:48:33.031Z] Spell ID 13 — Lightning Arc
+- effectdicecount: 0 -> 2
+- effectdicesides: 0 -> 6
+- range1: 3 -> 4
+
+[2026-06-04T01:54:35.407Z] Spell ID 14 — Mind Spike
+- effectdicecount: 0 -> 2
+- effectdicesides: 0 -> 3
+
+[2026-06-04T01:56:31.669Z] Spell ID 15 — Dark Drain
+- effecton2:  -> Mind
+- effectdicecount: 0 -> 2
+- effectdicesides: 0 -> 2
+- effectamount2dicecount: 0 -> 2
+- effectamount2dicesides: 0 -> 2
+- range1: 2 -> 4
+- range2: 2 -> 4
+
+[2026-06-04T01:59:13.429Z] Spell ID 16 — Blind
+- effectdicesides: 2 -> 10
+- range1: 3 -> 5
+- lastfor1: 2 -> 4
+- magiccost: 3 -> 5
+- successtestvalue: 9 -> 10
+- sp: 3 -> 5
+
+[2026-06-04T02:09:04.926Z] Spell ID 17 — Slow
+- effectdicecount: 0 -> 2
+- effectdicesides: 0 -> 4
+
+[2026-06-05T12:22:34.881Z] Spell ID 18 — Weaken
+- effecton2:  -> Defense
+- effectdicesides: 5 -> 6
+- effectamount2dicecount: 0 -> 2
+- effectamount2dicesides: 0 -> 4
+- range1: 1 -> 4
+- lastfor1: 3 -> 5
+- lastfor2: 3 -> 5
+- numberoftargets: 1 -> 3
+- magiccost: 2 -> 5
+- successtestvalue: 9 -> 12
+- costtolearn: 10 -> 20
+- value: 12 -> 30
+- sp: 2 -> 5
+- soundid: null -> 14
+

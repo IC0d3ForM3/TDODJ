@@ -1,0 +1,5316 @@
+Spell sync updates
+
+[2026-06-05T13:27:12.039Z] Spell 1 Mend Wounds
+  dndIndex: cure-wounds
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 1d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 38 -> 38
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:12.205Z] Spell 2 Healing Word
+  dndIndex: healing-word
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 1d4
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 38 -> 38
+  soundId: 1 -> 1
+
+[2026-06-05T13:27:12.300Z] Spell 3 Greater Heal
+  dndIndex: mass-healing-word
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 1d4
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 39 -> 39
+  soundId: 17 -> 17
+
+[2026-06-05T13:27:12.450Z] Spell 4 Restore Stamina
+  dndIndex: heroism
+  range1: 1 -> 1
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 47 -> 47
+  soundId: 16 -> 16
+
+[2026-06-05T13:27:12.587Z] Spell 5 Clear Mind
+  dndIndex: calm-emotions
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 47 -> 47
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:12.711Z] Spell 6 Shield of Faith
+  dndIndex: shield-of-faith
+  range1: 6 -> 6
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:12.818Z] Spell 7 Cat's Grace
+  dndIndex: enhance-ability
+  range1: 0 -> 1
+  effectOnPc1: true -> true
+  lastFor1: 5 -> 600
+  effectDice: 2d2 -> 0d0
+  targets: 1 -> 1
+  magicCost: 3 -> 2
+  sp(learn SP): 2 -> 14
+  minLtsp: 2 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 8 -> 14
+  value: 10 -> 100
+  imageId: 46 -> 46
+  soundId: 10 -> 10
+
+[2026-06-05T13:27:13.026Z] Spell 8 Arcane Surge
+  dndIndex: arcane-hand
+  range1: 0 -> 12
+  effectOnPc1: true -> true
+  lastFor1: 3 -> 10
+  effectDice: 1d4 -> 0d0
+  targets: 1 -> 1
+  magicCost: 3 -> 2
+  sp(learn SP): 3 -> 20
+  minLtsp: 3 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 10 -> 20
+  value: 12 -> 400
+  imageId: 46 -> 46
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:13.182Z] Spell 9 Eagle Eye
+  dndIndex: clairvoyance
+  range1: 3 -> 528
+  effectOnPc1: true -> true
+  lastFor1: 4 -> 100
+  effectDice: 1d4 -> 0d0
+  targets: 1 -> 1
+  magicCost: 3 -> 2
+  sp(learn SP): 2 -> 16
+  minLtsp: 2 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 8 -> 16
+  value: 10 -> 200
+  imageId: 46 -> 46
+  soundId: 1 -> 1
+
+[2026-06-05T13:27:13.309Z] Spell 10 Haste
+  dndIndex: haste
+  range1: 3 -> 3
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 47 -> 47
+  soundId: 8 -> 8
+
+[2026-06-05T13:27:13.438Z] Spell 11 Frost Bolt
+  dndIndex: ray-of-frost
+  range1: 4 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 2d4 -> 1d8
+  targets: 1 -> 1
+  magicCost: 3 -> 2
+  sp(learn SP): 2 -> 0
+  minLtsp: 2 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 8 -> 0
+  value: 8 -> 10
+  imageId: 66 -> 66
+  soundId: 8 -> 8
+
+[2026-06-05T13:27:13.568Z] Spell 12 Fire Lance
+  dndIndex: scorching-ray
+  range1: 3 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 1d6 -> 2d6
+  targets: 1 -> 1
+  magicCost: 3 -> 2
+  sp(learn SP): 3 -> 14
+  minLtsp: 3 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 12 -> 14
+  value: 15 -> 100
+  imageId: 65 -> 65
+  soundId: 15 -> 15
+
+[2026-06-05T13:27:13.704Z] Spell 13 Lightning Arc
+  dndIndex: lightning-bolt
+  range1: 4 -> 0
+  effectOnPc1: false -> true
+  lastFor1: 0 -> 0
+  effectDice: 2d6 -> 8d6
+  targets: 1 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 2 -> 16
+  minLtsp: 2 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 10 -> 16
+  value: 12 -> 200
+  imageId: 67 -> 67
+  soundId: 8 -> 8
+
+[2026-06-05T13:27:14.059Z] Spell 15 Dark Drain
+  dndIndex: blight
+  range1: 4 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 2d2 -> 8d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2 -> 18
+  minLtsp: 2 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 10 -> 18
+  value: 10 -> 300
+  imageId: 45 -> 45
+  soundId: 10 -> 10
+
+[2026-06-05T13:27:14.183Z] Spell 16 Blind
+  dndIndex: blindness-deafness
+  range1: 5 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 4 -> 10
+  effectDice: 1d10 -> 0d0
+  targets: 1 -> 1
+  magicCost: 5 -> 2
+  sp(learn SP): 5 -> 14
+  minLtsp: 5 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 12 -> 14
+  value: 15 -> 100
+  imageId: 46 -> 46
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:14.317Z] Spell 17 Slow
+  dndIndex: slow
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 47 -> 47
+  soundId: 17 -> 17
+
+[2026-06-05T13:27:14.450Z] Spell 18 Weaken
+  dndIndex: ray-of-enfeeblement
+  range1: 4 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 5 -> 10
+  effectDice: 1d6 -> 0d0
+  targets: 3 -> 1
+  magicCost: 5 -> 2
+  sp(learn SP): 5 -> 14
+  minLtsp: 5 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 20 -> 14
+  value: 30 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:14.585Z] Spell 19 Vampiric Touch
+  dndIndex: vampiric-touch
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 3d6 -> 3d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 47 -> 47
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:14.770Z] Spell 657 Acid Arrow
+  dndIndex: acid-arrow
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 4d4 -> 4d4
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 956 -> 956
+  soundId: 43 -> 43
+
+[2026-06-05T13:27:14.904Z] Spell 658 Acid Splash
+  dndIndex: acid-splash
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 1d6 -> 1d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:15.038Z] Spell 659 Aid
+  dndIndex: aid
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:15.168Z] Spell 660 Alarm
+  dndIndex: alarm
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:15.336Z] Spell 661 Alter Self
+  dndIndex: alter-self
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:15.470Z] Spell 662 Animal Friendship
+  dndIndex: animal-friendship
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:15.609Z] Spell 663 Animal Messenger
+  dndIndex: animal-messenger
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:15.743Z] Spell 664 Animal Shapes
+  dndIndex: animal-shapes
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:15.908Z] Spell 665 Animate Dead
+  dndIndex: animate-dead
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:16.090Z] Spell 666 Animate Objects
+  dndIndex: animate-objects
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:16.232Z] Spell 667 Antilife Shell
+  dndIndex: antilife-shell
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:16.421Z] Spell 668 Antimagic Field
+  dndIndex: antimagic-field
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:16.603Z] Spell 669 Antipathy/Sympathy
+  dndIndex: antipathy-sympathy
+  range1: 12 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 144000
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 3
+  magicCost: 8 -> 2
+  sp(learn SP): 8 -> 26
+  minLtsp: 8 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 14000 -> 26
+  value: 8 -> 700
+  imageId: null -> 45
+  soundId: null -> 14
+
+[2026-06-05T13:27:16.738Z] Spell 670 Arcane Eye
+  dndIndex: arcane-eye
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:16.920Z] Spell 671 Arcane Hand
+  dndIndex: arcane-hand
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:17.052Z] Spell 672 Arcane Lock
+  dndIndex: arcane-lock
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:17.193Z] Spell 673 Arcane Sword
+  dndIndex: arcane-sword
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 3d10 -> 3d10
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:17.333Z] Spell 674 Arcanist's Magic Aura
+  dndIndex: arcanists-magic-aura
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:17.512Z] Spell 675 Astral Projection
+  dndIndex: astral-projection
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:17.648Z] Spell 676 Augury
+  dndIndex: augury
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:17.777Z] Spell 677 Awaken
+  dndIndex: awaken
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:17.907Z] Spell 678 Bane
+  dndIndex: bane
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:18.037Z] Spell 679 Banishment
+  dndIndex: banishment
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:18.143Z] Spell 680 Barkskin
+  dndIndex: barkskin
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:18.244Z] Spell 681 Beacon of Hope
+  dndIndex: beacon-of-hope
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:18.402Z] Spell 682 Bestow Curse
+  dndIndex: bestow-curse
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:18.532Z] Spell 683 Black Tentacles
+  dndIndex: black-tentacles
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 3d6 -> 3d6
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:18.662Z] Spell 684 Blade Barrier
+  dndIndex: blade-barrier
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 6d10 -> 6d10
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:18.793Z] Spell 685 Bless
+  dndIndex: bless
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:18.932Z] Spell 686 Blight
+  dndIndex: blight
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 8d8 -> 8d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:19.067Z] Spell 687 Blindness/Deafness
+  dndIndex: blindness-deafness
+  range1: 6 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2 -> 14
+  minLtsp: 2 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 2000 -> 14
+  value: 2 -> 100
+  imageId: null -> 45
+  soundId: null -> 14
+
+[2026-06-05T13:27:19.199Z] Spell 688 Blink
+  dndIndex: blink
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:19.297Z] Spell 689 Blur
+  dndIndex: blur
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:19.429Z] Spell 690 Branding Smite
+  dndIndex: branding-smite
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 2d6 -> 2d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:19.560Z] Spell 691 Burning Hands
+  dndIndex: burning-hands
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 3d6 -> 3d6
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:19.715Z] Spell 692 Call Lightning
+  dndIndex: call-lightning
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 3d10 -> 3d10
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:19.849Z] Spell 693 Calm Emotions
+  dndIndex: calm-emotions
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:19.982Z] Spell 694 Chain Lightning
+  dndIndex: chain-lightning
+  range1: 15 -> 15
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 10d8 -> 10d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:20.117Z] Spell 695 Charm Person
+  dndIndex: charm-person
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:20.247Z] Spell 696 Chill Touch
+  dndIndex: chill-touch
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 1 -> 1
+  effectDice: 1d8 -> 1d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:20.383Z] Spell 697 Circle of Death
+  dndIndex: circle-of-death
+  range1: 15 -> 15
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 8d6 -> 8d6
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:20.518Z] Spell 698 Clairvoyance
+  dndIndex: clairvoyance
+  range1: 528 -> 528
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:20.646Z] Spell 699 Clone
+  dndIndex: clone
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:20.773Z] Spell 700 Cloudkill
+  dndIndex: cloudkill
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 5d8 -> 5d8
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:20.904Z] Spell 701 Color Spray
+  dndIndex: color-spray
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 1 -> 1
+  effectDice: 0d0 -> 0d0
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:21.057Z] Spell 702 Command
+  dndIndex: command
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 1 -> 1
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:21.195Z] Spell 703 Commune
+  dndIndex: commune
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:21.333Z] Spell 704 Commune With Nature
+  dndIndex: commune-with-nature
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:21.463Z] Spell 705 Comprehend Languages
+  dndIndex: comprehend-languages
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:21.598Z] Spell 706 Compulsion
+  dndIndex: compulsion
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:21.732Z] Spell 707 Cone of Cold
+  dndIndex: cone-of-cold
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 8d8 -> 8d8
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:21.892Z] Spell 708 Confusion
+  dndIndex: confusion
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:22.028Z] Spell 709 Conjure Animals
+  dndIndex: conjure-animals
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:22.163Z] Spell 710 Conjure Celestial
+  dndIndex: conjure-celestial
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:22.336Z] Spell 711 Conjure Elemental
+  dndIndex: conjure-elemental
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:22.467Z] Spell 712 Conjure Fey
+  dndIndex: conjure-fey
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:22.597Z] Spell 713 Conjure Minor Elementals
+  dndIndex: conjure-minor-elementals
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:22.734Z] Spell 714 Conjure Woodland Beings
+  dndIndex: conjure-woodland-beings
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:22.872Z] Spell 715 Contact Other Plane
+  dndIndex: contact-other-plane
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:23.043Z] Spell 716 Contagion
+  dndIndex: contagion
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 100800 -> 100800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:23.173Z] Spell 717 Contingency
+  dndIndex: contingency
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 144000 -> 144000
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:23.289Z] Spell 718 Continual Flame
+  dndIndex: continual-flame
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:23.507Z] Spell 719 Control Water
+  dndIndex: control-water
+  range1: 30 -> 30
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 2d8 -> 2d8
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:23.673Z] Spell 720 Control Weather
+  dndIndex: control-weather
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:23.813Z] Spell 721 Counterspell
+  dndIndex: counterspell
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:23.992Z] Spell 722 Create Food and Water
+  dndIndex: create-food-and-water
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:24.128Z] Spell 723 Create or Destroy Water
+  dndIndex: create-or-destroy-water
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:24.294Z] Spell 724 Create Undead
+  dndIndex: create-undead
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:24.429Z] Spell 725 Creation
+  dndIndex: creation
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:24.563Z] Spell 726 Cure Wounds
+  dndIndex: cure-wounds
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 1d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:24.691Z] Spell 727 Dancing Lights
+  dndIndex: dancing-lights
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:24.839Z] Spell 728 Darkness
+  dndIndex: darkness
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:24.944Z] Spell 729 Darkvision
+  dndIndex: darkvision
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:25.074Z] Spell 730 Daylight
+  dndIndex: daylight
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:25.211Z] Spell 731 Death Ward
+  dndIndex: death-ward
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:25.378Z] Spell 732 Delayed Blast Fireball
+  dndIndex: delayed-blast-fireball
+  range1: 15 -> 15
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 12d6 -> 12d6
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:25.518Z] Spell 733 Demiplane
+  dndIndex: demiplane
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:25.656Z] Spell 734 Detect Evil and Good
+  dndIndex: detect-evil-and-good
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:25.833Z] Spell 735 Detect Magic
+  dndIndex: detect-magic
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:25.968Z] Spell 736 Detect Poison and Disease
+  dndIndex: detect-poison-and-disease
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:26.152Z] Spell 737 Detect Thoughts
+  dndIndex: detect-thoughts
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:26.304Z] Spell 738 Dimension Door
+  dndIndex: dimension-door
+  range1: 50 -> 50
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 4d6 -> 4d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:26.437Z] Spell 739 Disguise Self
+  dndIndex: disguise-self
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:26.575Z] Spell 740 Disintegrate
+  dndIndex: disintegrate
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 10d6 -> 10d6
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:26.716Z] Spell 741 Dispel Evil and Good
+  dndIndex: dispel-evil-and-good
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:26.851Z] Spell 742 Dispel Magic
+  dndIndex: dispel-magic
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:26.985Z] Spell 743 Divination
+  dndIndex: divination
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:27.091Z] Spell 744 Divine Favor
+  dndIndex: divine-favor
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 1d4 -> 1d4
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:27.231Z] Spell 745 Divine Word
+  dndIndex: divine-word
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:27.401Z] Spell 746 Dominate Beast
+  dndIndex: dominate-beast
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:27.574Z] Spell 747 Dominate Monster
+  dndIndex: dominate-monster
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:27.742Z] Spell 748 Dominate Person
+  dndIndex: dominate-person
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:27.908Z] Spell 749 Dream
+  dndIndex: dream
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 3d6 -> 3d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:28.039Z] Spell 750 Druidcraft
+  dndIndex: druidcraft
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:28.201Z] Spell 751 Earthquake
+  dndIndex: earthquake
+  range1: 50 -> 50
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:28.342Z] Spell 752 Eldritch Blast
+  dndIndex: eldritch-blast
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 1d10 -> 1d10
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:28.478Z] Spell 753 Enhance Ability
+  dndIndex: enhance-ability
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:28.643Z] Spell 754 Enlarge/Reduce
+  dndIndex: enlarge-reduce
+  range1: 6 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 4 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2 -> 14
+  minLtsp: 2 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 2000 -> 14
+  value: 2 -> 100
+  imageId: null -> 45
+  soundId: null -> 14
+
+[2026-06-05T13:27:28.780Z] Spell 755 Entangle
+  dndIndex: entangle
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:28.917Z] Spell 756 Enthrall
+  dndIndex: enthrall
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:29.083Z] Spell 757 Etherealness
+  dndIndex: etherealness
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:29.185Z] Spell 758 Expeditious Retreat
+  dndIndex: expeditious-retreat
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:29.345Z] Spell 759 Eyebite
+  dndIndex: eyebite
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:29.477Z] Spell 760 Fabricate
+  dndIndex: fabricate
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:29.611Z] Spell 761 Faerie Fire
+  dndIndex: faerie-fire
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:29.743Z] Spell 762 Faithful Hound
+  dndIndex: faithful-hound
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 4d8 -> 4d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:29.900Z] Spell 763 False Life
+  dndIndex: false-life
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 1d4
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:30.029Z] Spell 764 Fear
+  dndIndex: fear
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:30.176Z] Spell 765 Feather Fall
+  dndIndex: feather-fall
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:30.316Z] Spell 766 Feeblemind
+  dndIndex: feeblemind
+  range1: 15 -> 15
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 4d6 -> 4d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:30.477Z] Spell 767 Find Familiar
+  dndIndex: find-familiar
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:30.638Z] Spell 768 Find Steed
+  dndIndex: find-steed
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:30.766Z] Spell 769 Find the Path
+  dndIndex: find-the-path
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:30.897Z] Spell 770 Find Traps
+  dndIndex: find-traps
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:31.026Z] Spell 771 Finger of Death
+  dndIndex: finger-of-death
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 7d8 -> 7d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:31.157Z] Spell 772 Fire Bolt
+  dndIndex: fire-bolt
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 1d10 -> 1d10
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:31.286Z] Spell 773 Fire Shield
+  dndIndex: fire-shield
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 2d8 -> 2d8
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:31.417Z] Spell 774 Fire Storm
+  dndIndex: fire-storm
+  range1: 15 -> 15
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 7d10 -> 7d10
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:31.553Z] Spell 775 Fireball
+  dndIndex: fireball
+  range1: 15 -> 15
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 8d6 -> 8d6
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:31.689Z] Spell 776 Flame Blade
+  dndIndex: flame-blade
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 3d6 -> 3d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:31.817Z] Spell 777 Flame Strike
+  dndIndex: flame-strike
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 4d6 -> 4d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:31.953Z] Spell 778 Flaming Sphere
+  dndIndex: flaming-sphere
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 2d6 -> 2d6
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:32.087Z] Spell 779 Flesh to Stone
+  dndIndex: flesh-to-stone
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:32.216Z] Spell 780 Floating Disk
+  dndIndex: floating-disk
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:32.343Z] Spell 781 Fly
+  dndIndex: fly
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:32.470Z] Spell 782 Fog Cloud
+  dndIndex: fog-cloud
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:32.618Z] Spell 783 Forbiddance
+  dndIndex: forbiddance
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:32.759Z] Spell 784 Forcecage
+  dndIndex: forcecage
+  range1: 10 -> 10
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:32.900Z] Spell 785 Foresight
+  dndIndex: foresight
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:33.075Z] Spell 786 Freedom of Movement
+  dndIndex: freedom-of-movement
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:33.238Z] Spell 787 Freezing Sphere
+  dndIndex: freezing-sphere
+  range1: 30 -> 30
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 10d6 -> 10d6
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:33.369Z] Spell 788 Gaseous Form
+  dndIndex: gaseous-form
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:33.497Z] Spell 789 Gate
+  dndIndex: gate
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:33.634Z] Spell 790 Geas
+  dndIndex: geas
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 432000 -> 432000
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:33.768Z] Spell 791 Gentle Repose
+  dndIndex: gentle-repose
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 144000 -> 144000
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:33.896Z] Spell 792 Giant Insect
+  dndIndex: giant-insect
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:34.002Z] Spell 793 Glibness
+  dndIndex: glibness
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:34.131Z] Spell 794 Globe of Invulnerability
+  dndIndex: globe-of-invulnerability
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:34.314Z] Spell 795 Glyph of Warding
+  dndIndex: glyph-of-warding
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:34.417Z] Spell 796 Goodberry
+  dndIndex: goodberry
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:34.551Z] Spell 797 Grease
+  dndIndex: grease
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:34.651Z] Spell 798 Greater Invisibility
+  dndIndex: greater-invisibility
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:34.783Z] Spell 799 Greater Restoration
+  dndIndex: greater-restoration
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:34.911Z] Spell 800 Guardian of Faith
+  dndIndex: guardian-of-faith
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:35.098Z] Spell 801 Guards and Wards
+  dndIndex: guards-and-wards
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:35.205Z] Spell 802 Guidance
+  dndIndex: guidance
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:35.337Z] Spell 803 Guiding Bolt
+  dndIndex: guiding-bolt
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 1 -> 1
+  effectDice: 4d6 -> 4d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:35.462Z] Spell 804 Gust of Wind
+  dndIndex: gust-of-wind
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:35.643Z] Spell 805 Hallow
+  dndIndex: hallow
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:35.772Z] Spell 806 Hallucinatory Terrain
+  dndIndex: hallucinatory-terrain
+  range1: 30 -> 30
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:35.903Z] Spell 807 Harm
+  dndIndex: harm
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 14d6 -> 14d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:36.009Z] Spell 808 Heal
+  dndIndex: heal
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:36.139Z] Spell 809 Heat Metal
+  dndIndex: heat-metal
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 2d8 -> 2d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:36.274Z] Spell 810 Hellish Rebuke
+  dndIndex: hellish-rebuke
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 2d10 -> 2d10
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:36.407Z] Spell 811 Heroes' Feast
+  dndIndex: heroes-feast
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:36.526Z] Spell 812 Heroism
+  dndIndex: heroism
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:36.671Z] Spell 813 Hideous Laughter
+  dndIndex: hideous-laughter
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:37.051Z] Spell 814 Hold Monster
+  dndIndex: hold-monster
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:37.184Z] Spell 815 Hold Person
+  dndIndex: hold-person
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:37.311Z] Spell 816 Holy Aura
+  dndIndex: holy-aura
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:37.453Z] Spell 817 Hunter's Mark
+  dndIndex: hunters-mark
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:37.592Z] Spell 818 Hypnotic Pattern
+  dndIndex: hypnotic-pattern
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:37.725Z] Spell 819 Ice Storm
+  dndIndex: ice-storm
+  range1: 30 -> 30
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 2d8 -> 2d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:37.857Z] Spell 820 Identify
+  dndIndex: identify
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:37.989Z] Spell 821 Illusory Script
+  dndIndex: illusory-script
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 144000 -> 144000
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:38.194Z] Spell 822 Imprisonment
+  dndIndex: imprisonment
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:38.369Z] Spell 823 Incendiary Cloud
+  dndIndex: incendiary-cloud
+  range1: 15 -> 15
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 10d8 -> 10d8
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:38.503Z] Spell 824 Inflict Wounds
+  dndIndex: inflict-wounds
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 3d10 -> 3d10
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:38.630Z] Spell 825 Insect Plague
+  dndIndex: insect-plague
+  range1: 30 -> 30
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 4d10 -> 4d10
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:38.766Z] Spell 826 Instant Summons
+  dndIndex: instant-summons
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:38.894Z] Spell 827 Invisibility
+  dndIndex: invisibility
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:39.023Z] Spell 828 Irresistible Dance
+  dndIndex: irresistible-dance
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:39.126Z] Spell 829 Jump
+  dndIndex: jump
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:39.256Z] Spell 830 Knock
+  dndIndex: knock
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:39.387Z] Spell 831 Legend Lore
+  dndIndex: legend-lore
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:39.519Z] Spell 832 Lesser Restoration
+  dndIndex: lesser-restoration
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:39.646Z] Spell 833 Levitate
+  dndIndex: levitate
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:39.778Z] Spell 834 Light
+  dndIndex: light
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:39.906Z] Spell 835 Lightning Bolt
+  dndIndex: lightning-bolt
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 8d6 -> 8d6
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:40.017Z] Spell 836 Locate Animals or Plants
+  dndIndex: locate-animals-or-plants
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:40.143Z] Spell 837 Locate Creature
+  dndIndex: locate-creature
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:40.268Z] Spell 838 Locate Object
+  dndIndex: locate-object
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:40.372Z] Spell 839 Longstrider
+  dndIndex: longstrider
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:40.475Z] Spell 840 Mage Armor
+  dndIndex: mage-armor
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:40.605Z] Spell 841 Mage Hand
+  dndIndex: mage-hand
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:40.755Z] Spell 842 Magic Circle
+  dndIndex: magic-circle
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:40.946Z] Spell 843 Magic Jar
+  dndIndex: magic-jar
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:41.082Z] Spell 844 Magic Missile
+  dndIndex: magic-missile
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 3d4 -> 3d4
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:41.212Z] Spell 845 Magic Mouth
+  dndIndex: magic-mouth
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:41.318Z] Spell 846 Magic Weapon
+  dndIndex: magic-weapon
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:41.470Z] Spell 847 Magnificent Mansion
+  dndIndex: magnificent-mansion
+  range1: 30 -> 30
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:41.635Z] Spell 848 Major Image
+  dndIndex: major-image
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:41.763Z] Spell 849 Mass Cure Wounds
+  dndIndex: mass-cure-wounds
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 3d8
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:41.862Z] Spell 850 Mass Heal
+  dndIndex: mass-heal
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:41.993Z] Spell 851 Mass Healing Word
+  dndIndex: mass-healing-word
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 1d4
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:42.152Z] Spell 852 Mass Suggestion
+  dndIndex: mass-suggestion
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:42.257Z] Spell 853 Maze
+  dndIndex: maze
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:42.388Z] Spell 854 Meld Into Stone
+  dndIndex: meld-into-stone
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:42.522Z] Spell 855 Mending
+  dndIndex: mending
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:42.690Z] Spell 856 Message
+  dndIndex: message
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 1 -> 1
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:42.811Z] Spell 857 Meteor Swarm
+  dndIndex: meteor-swarm
+  range1: 528 -> 528
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 20d6 -> 20d6
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:42.946Z] Spell 858 Mind Blank
+  dndIndex: mind-blank
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:43.090Z] Spell 859 Minor Illusion
+  dndIndex: minor-illusion
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:43.229Z] Spell 860 Mirage Arcane
+  dndIndex: mirage-arcane
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 144000 -> 144000
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:43.371Z] Spell 861 Mirror Image
+  dndIndex: mirror-image
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:43.511Z] Spell 862 Mislead
+  dndIndex: mislead
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:43.614Z] Spell 863 Misty Step
+  dndIndex: misty-step
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:43.774Z] Spell 864 Modify Memory
+  dndIndex: modify-memory
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:44.031Z] Spell 865 Moonbeam
+  dndIndex: moonbeam
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 2d10 -> 2d10
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:44.156Z] Spell 866 Move Earth
+  dndIndex: move-earth
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 1200 -> 1200
+  effectDice: 0d0 -> 0d0
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:44.282Z] Spell 867 Nondetection
+  dndIndex: nondetection
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:44.407Z] Spell 868 Pass Without Trace
+  dndIndex: pass-without-trace
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:44.537Z] Spell 869 Passwall
+  dndIndex: passwall
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:44.668Z] Spell 870 Phantasmal Killer
+  dndIndex: phantasmal-killer
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 4d10 -> 4d10
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:44.798Z] Spell 871 Phantom Steed
+  dndIndex: phantom-steed
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:44.947Z] Spell 872 Planar Ally
+  dndIndex: planar-ally
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:45.103Z] Spell 873 Planar Binding
+  dndIndex: planar-binding
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:45.259Z] Spell 874 Plane Shift
+  dndIndex: plane-shift
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:45.387Z] Spell 875 Plant Growth
+  dndIndex: plant-growth
+  range1: 15 -> 15
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:45.522Z] Spell 876 Poison Spray
+  dndIndex: poison-spray
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 1d12 -> 1d12
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:45.677Z] Spell 877 Polymorph
+  dndIndex: polymorph
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:45.777Z] Spell 878 Power Word Kill
+  dndIndex: power-word-kill
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:45.905Z] Spell 879 Power Word Stun
+  dndIndex: power-word-stun
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:46.032Z] Spell 880 Prayer of Healing
+  dndIndex: prayer-of-healing
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 2d8
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:46.158Z] Spell 881 Prestidigitation
+  dndIndex: prestidigitation
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:46.307Z] Spell 882 Prismatic Spray
+  dndIndex: prismatic-spray
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 10d6 -> 10d6
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:46.505Z] Spell 883 Prismatic Wall
+  dndIndex: prismatic-wall
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:46.639Z] Spell 884 Private Sanctum
+  dndIndex: private-sanctum
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:46.767Z] Spell 885 Produce Flame
+  dndIndex: produce-flame
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 1d8 -> 1d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:46.915Z] Spell 886 Programmed Illusion
+  dndIndex: programmed-illusion
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:47.036Z] Spell 887 Project Image
+  dndIndex: project-image
+  range1: 264000 -> 264000
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:47.163Z] Spell 888 Protection From Energy
+  dndIndex: protection-from-energy
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:47.288Z] Spell 889 Protection from Evil and Good
+  dndIndex: protection-from-evil-and-good
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:47.413Z] Spell 890 Protection from Poison
+  dndIndex: protection-from-poison
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:47.510Z] Spell 891 Purify Food and Drink
+  dndIndex: purify-food-and-drink
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:47.635Z] Spell 892 Raise Dead
+  dndIndex: raise-dead
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:47.755Z] Spell 893 Ray of Enfeeblement
+  dndIndex: ray-of-enfeeblement
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:47.879Z] Spell 894 Ray of Frost
+  dndIndex: ray-of-frost
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 1d8 -> 1d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:48.005Z] Spell 895 Regenerate
+  dndIndex: regenerate
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 4d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:48.132Z] Spell 896 Reincarnate
+  dndIndex: reincarnate
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:48.230Z] Spell 897 Remove Curse
+  dndIndex: remove-curse
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:48.359Z] Spell 898 Resilient Sphere
+  dndIndex: resilient-sphere
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:48.456Z] Spell 899 Resistance
+  dndIndex: resistance
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:48.582Z] Spell 900 Resurrection
+  dndIndex: resurrection
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:48.719Z] Spell 901 Reverse Gravity
+  dndIndex: reverse-gravity
+  range1: 10 -> 10
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:48.816Z] Spell 902 Revivify
+  dndIndex: revivify
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:48.952Z] Spell 903 Rope Trick
+  dndIndex: rope-trick
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:49.075Z] Spell 904 Sacred Flame
+  dndIndex: sacred-flame
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 1d8 -> 1d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:49.221Z] Spell 905 Sanctuary
+  dndIndex: sanctuary
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:49.339Z] Spell 906 Scorching Ray
+  dndIndex: scorching-ray
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 2d6 -> 2d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:49.490Z] Spell 907 Scrying
+  dndIndex: scrying
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:49.616Z] Spell 908 Secret Chest
+  dndIndex: secret-chest
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:49.722Z] Spell 909 See Invisibility
+  dndIndex: see-invisibility
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:49.852Z] Spell 910 Seeming
+  dndIndex: seeming
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:49.977Z] Spell 911 Sending
+  dndIndex: sending
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 1 -> 1
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:50.101Z] Spell 912 Sequester
+  dndIndex: sequester
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:50.273Z] Spell 913 Shapechange
+  dndIndex: shapechange
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:50.397Z] Spell 914 Shatter
+  dndIndex: shatter
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 3d8 -> 3d8
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:50.498Z] Spell 915 Shield
+  dndIndex: shield
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 1 -> 1
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:50.623Z] Spell 916 Shillelagh
+  dndIndex: shillelagh
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:50.751Z] Spell 917 Shocking Grasp
+  dndIndex: shocking-grasp
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 1d8 -> 1d8
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:50.876Z] Spell 918 Silence
+  dndIndex: silence
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:51.012Z] Spell 919 Silent Image
+  dndIndex: silent-image
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:51.140Z] Spell 920 Simulacrum
+  dndIndex: simulacrum
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:51.268Z] Spell 921 Sleep
+  dndIndex: sleep
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 5d8 -> 5d8
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:51.391Z] Spell 922 Sleet Storm
+  dndIndex: sleet-storm
+  range1: 15 -> 15
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:51.492Z] Spell 923 Spare the Dying
+  dndIndex: spare-the-dying
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:51.633Z] Spell 924 Speak with Animals
+  dndIndex: speak-with-animals
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:51.756Z] Spell 925 Speak with Dead
+  dndIndex: speak-with-dead
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:51.881Z] Spell 926 Speak with Plants
+  dndIndex: speak-with-plants
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:52.016Z] Spell 927 Spider Climb
+  dndIndex: spider-climb
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:52.146Z] Spell 928 Spike Growth
+  dndIndex: spike-growth
+  range1: 15 -> 15
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:52.283Z] Spell 929 Spirit Guardians
+  dndIndex: spirit-guardians
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:52.410Z] Spell 930 Spiritual Weapon
+  dndIndex: spiritual-weapon
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 1d8 -> 1d8
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:52.531Z] Spell 931 Stinking Cloud
+  dndIndex: stinking-cloud
+  range1: 9 -> 9
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:52.650Z] Spell 932 Stone Shape
+  dndIndex: stone-shape
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:52.751Z] Spell 933 Stoneskin
+  dndIndex: stoneskin
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:52.910Z] Spell 934 Storm of Vengeance
+  dndIndex: storm-of-vengeance
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 2d6 -> 2d6
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:53.086Z] Spell 935 Suggestion
+  dndIndex: suggestion
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:53.222Z] Spell 936 Sunbeam
+  dndIndex: sunbeam
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 6d8 -> 6d8
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:53.360Z] Spell 937 Sunburst
+  dndIndex: sunburst
+  range1: 15 -> 15
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 12d6 -> 12d6
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 8000 -> 26
+  minLtsp: 8000 -> 8000
+  learnCostGp: 0 -> 80
+  costToLearn(SP): 26 -> 26
+  value: 700 -> 700
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:53.581Z] Spell 938 Symbol
+  dndIndex: symbol
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 9999 -> 9999
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:53.751Z] Spell 939 Telekinesis
+  dndIndex: telekinesis
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:53.895Z] Spell 940 Telepathic Bond
+  dndIndex: telepathic-bond
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:54.126Z] Spell 941 Teleport
+  dndIndex: teleport
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 7000 -> 24
+  minLtsp: 7000 -> 7000
+  learnCostGp: 0 -> 70
+  costToLearn(SP): 24 -> 24
+  value: 600 -> 600
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:54.281Z] Spell 942 Teleportation Circle
+  dndIndex: teleportation-circle
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 1 -> 1
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:54.416Z] Spell 943 Thaumaturgy
+  dndIndex: thaumaturgy
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:54.777Z] Spell 944 Thunderwave
+  dndIndex: thunderwave
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 2d8 -> 2d8
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:54.909Z] Spell 945 Time Stop
+  dndIndex: time-stop
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:55.040Z] Spell 946 Tiny Hut
+  dndIndex: tiny-hut
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:55.170Z] Spell 947 Tongues
+  dndIndex: tongues
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:55.266Z] Spell 948 Transport via Plants
+  dndIndex: transport-via-plants
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 1 -> 1
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:55.391Z] Spell 949 Tree Stride
+  dndIndex: tree-stride
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:55.564Z] Spell 950 True Polymorph
+  dndIndex: true-polymorph
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:55.694Z] Spell 951 True Resurrection
+  dndIndex: true-resurrection
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:55.817Z] Spell 952 True Seeing
+  dndIndex: true-seeing
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:55.922Z] Spell 953 True Strike
+  dndIndex: true-strike
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 1 -> 1
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:56.123Z] Spell 954 Unseen Servant
+  dndIndex: unseen-servant
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 10
+  costToLearn(SP): 0 -> 0
+  value: 50 -> 50
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:56.253Z] Spell 955 Vicious Mockery
+  dndIndex: vicious-mockery
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 1d4 -> 1d4
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 0 -> 0
+  minLtsp: 0 -> 0
+  learnCostGp: 0 -> 5
+  costToLearn(SP): 0 -> 0
+  value: 10 -> 10
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:56.376Z] Spell 956 Wall of Fire
+  dndIndex: wall-of-fire
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 5d8 -> 5d8
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 4000 -> 18
+  minLtsp: 4000 -> 4000
+  learnCostGp: 0 -> 40
+  costToLearn(SP): 18 -> 18
+  value: 300 -> 300
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:56.505Z] Spell 957 Wall of Force
+  dndIndex: wall-of-force
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:56.676Z] Spell 958 Wall of Ice
+  dndIndex: wall-of-ice
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 10d6 -> 10d6
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:56.837Z] Spell 959 Wall of Stone
+  dndIndex: wall-of-stone
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 5000 -> 20
+  minLtsp: 5000 -> 5000
+  learnCostGp: 0 -> 50
+  costToLearn(SP): 20 -> 20
+  value: 400 -> 400
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:56.972Z] Spell 960 Wall of Thorns
+  dndIndex: wall-of-thorns
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 7d8 -> 7d8
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:57.122Z] Spell 961 Warding Bond
+  dndIndex: warding-bond
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:57.276Z] Spell 962 Water Breathing
+  dndIndex: water-breathing
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 14400 -> 14400
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:57.402Z] Spell 963 Water Walk
+  dndIndex: water-walk
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:57.533Z] Spell 964 Web
+  dndIndex: web
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 600 -> 600
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:57.677Z] Spell 965 Weird
+  dndIndex: weird
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:57.812Z] Spell 966 Wind Walk
+  dndIndex: wind-walk
+  range1: 3 -> 3
+  effectOnPc1: false -> false
+  lastFor1: 4800 -> 4800
+  effectDice: 0d0 -> 0d0
+  targets: 1 -> 1
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:57.956Z] Spell 967 Wind Wall
+  dndIndex: wind-wall
+  range1: 12 -> 12
+  effectOnPc1: false -> false
+  lastFor1: 10 -> 10
+  effectDice: 3d8 -> 3d8
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 3000 -> 16
+  minLtsp: 3000 -> 3000
+  learnCostGp: 0 -> 30
+  costToLearn(SP): 16 -> 16
+  value: 200 -> 200
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:58.152Z] Spell 968 Wish
+  dndIndex: wish
+  range1: 0 -> 0
+  effectOnPc1: true -> true
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 2 -> 2
+  magicCost: 2 -> 2
+  sp(learn SP): 9000 -> 28
+  minLtsp: 9000 -> 9000
+  learnCostGp: 0 -> 90
+  costToLearn(SP): 28 -> 28
+  value: 800 -> 800
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:58.277Z] Spell 969 Word of Recall
+  dndIndex: word-of-recall
+  range1: 1 -> 1
+  effectOnPc1: false -> false
+  lastFor1: 0 -> 0
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 6000 -> 22
+  minLtsp: 6000 -> 6000
+  learnCostGp: 0 -> 60
+  costToLearn(SP): 22 -> 22
+  value: 500 -> 500
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+[2026-06-05T13:27:58.405Z] Spell 970 Zone of Truth
+  dndIndex: zone-of-truth
+  range1: 6 -> 6
+  effectOnPc1: false -> false
+  lastFor1: 100 -> 100
+  effectDice: 0d0 -> 0d0
+  targets: 3 -> 3
+  magicCost: 2 -> 2
+  sp(learn SP): 2000 -> 14
+  minLtsp: 2000 -> 2000
+  learnCostGp: 0 -> 20
+  costToLearn(SP): 14 -> 14
+  value: 100 -> 100
+  imageId: 45 -> 45
+  soundId: 14 -> 14
+
+
+Summary: updated=332, missingDnDMatch=9, spellsWithQuestions=98

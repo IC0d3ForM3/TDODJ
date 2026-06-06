@@ -1,3 +1,14 @@
+/* Combat log PC and monster entry styles */
+.combat-log-entry-pc {
+  color: #c00;
+  font-weight: bold;
+}
+.combat-log-entry-monster {
+  background: #14234b;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
 /* You can add global styles to this file, and also import other style files */
 
 /* Library filter input — used across all library list panels */

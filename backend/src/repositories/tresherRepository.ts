@@ -61,6 +61,7 @@ export interface UpsertTresherPayload {
   potion3Id: number | null;
 }
 
+
 const SELECT_TRESHER_FIELDS = `
   id,
   userguid::text AS userguid,
@@ -92,6 +93,17 @@ const SELECT_TRESHER_FIELDS = `
   potion3id AS "potion3Id",
   COALESCE(isquest, FALSE) AS isquest
 `;
+
+export const deleteTresherForUser = async (
+  id: number,
+  userguid: string
+): Promise<boolean> => {
+  const { rowCount } = await pool.query(
+    `DELETE FROM treshers WHERE id = $1 AND userguid = $2`,
+    [id, userguid]
+  );
+  return (rowCount ?? 0) > 0;
+};
 
 export const isAdminUserByGuid = async (userguid: string): Promise<boolean> => {
   const { rows } = await pool.query<{ isadmin: boolean }>(

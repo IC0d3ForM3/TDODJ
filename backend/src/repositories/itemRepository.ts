@@ -1,5 +1,7 @@
 import pool from '../db';
 
+const PG_UNDEFINED_COLUMN = '42703';
+
 export interface ItemRecord {
   id: number;
   userguid: string;
@@ -16,6 +18,8 @@ export interface ItemRecord {
   effectOn: string | null;
   effectToPc: string | null;
   effectToPcValue: number;
+  note: string | null;
+  minMindToRead: number;
   weaponEffectType: string;
   weaponEffectColor: string;
   imageId: number | null;
@@ -42,6 +46,8 @@ export interface UpsertItemPayload {
   effectOn: string | null;
   effectToPc: string | null;
   effectToPcValue: number;
+  note: string | null;
+  minMindToRead: number;
   weaponEffectType: string;
   weaponEffectColor: string;
   imageId: number | null;
@@ -67,6 +73,8 @@ const SELECT_ITEM_FIELDS = `
   effecton AS "effectOn",
   effecttopc AS "effectToPc",
   COALESCE(effecttopcvalue, 0) AS "effectToPcValue",
+  NULLIF(note, '') AS note,
+  COALESCE(minmindtoread, 0) AS "minMindToRead",
   COALESCE(weaponeffecttype, 'Blood') AS "weaponEffectType",
   COALESCE(weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
   imageid AS "imageId",
@@ -78,6 +86,43 @@ const SELECT_ITEM_FIELDS = `
   updatedat::text AS "updatedAt"
 `;
 
+const SELECT_ITEM_FIELDS_LEGACY = `
+  id,
+  userguid::text AS userguid,
+  name,
+  description,
+  type,
+  COALESCE(NULLIF(range, '')::int, 0) AS range,
+  value,
+  weight,
+  curseid AS "curseId",
+  COALESCE(effectvalue, 0) AS "effectValue",
+  COALESCE(damage, 0) AS "damage",
+  armorslot AS "armorSlot",
+  effecton AS "effectOn",
+  effecttopc AS "effectToPc",
+  COALESCE(effecttopcvalue, 0) AS "effectToPcValue",
+  NULL::text AS note,
+  0 AS "minMindToRead",
+  COALESCE(weaponeffecttype, 'Blood') AS "weaponEffectType",
+  COALESCE(weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
+  imageid AS "imageId",
+  soundid AS "soundId",
+  ispublic AS "isPublic",
+  COALESCE(istwohanded, false) AS "isTwoHanded",
+  uses,
+  createdat::text AS "createdAt",
+  updatedat::text AS "updatedAt"
+`;
+
+interface PgErrorWithCode {
+  code?: string;
+}
+
+function isUndefinedColumnError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as PgErrorWithCode).code === PG_UNDEFINED_COLUMN;
+}
+
 export const isAdminUserByGuid = async (userguid: string): Promise<boolean> => {
   const { rows } = await pool.query<{ isadmin: boolean }>(
     'SELECT isadmin FROM users WHERE key = $1',
@@ -87,48 +132,100 @@ export const isAdminUserByGuid = async (userguid: string): Promise<boolean> => {
 };
 
 export const getItemsByUserGuid = async (userguid: string): Promise<ItemRecord[]> => {
-  const { rows } = await pool.query<ItemRecord>(
-    `SELECT ${SELECT_ITEM_FIELDS}
-     FROM items
-     WHERE userguid = $1
-     ORDER BY LOWER(name) ASC, id ASC`,
-    [userguid]
-  );
-  return rows;
+  try {
+    const { rows } = await pool.query<ItemRecord>(
+      `SELECT ${SELECT_ITEM_FIELDS}
+       FROM items
+       WHERE userguid = $1
+       ORDER BY LOWER(name) ASC, id ASC`,
+      [userguid]
+    );
+    return rows;
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const { rows } = await pool.query<ItemRecord>(
+      `SELECT ${SELECT_ITEM_FIELDS_LEGACY}
+       FROM items
+       WHERE userguid = $1
+       ORDER BY LOWER(name) ASC, id ASC`,
+      [userguid]
+    );
+    return rows;
+  }
 };
 
 export const getItemsLibraryByUserGuid = async (userguid: string): Promise<ItemRecord[]> => {
-  const { rows } = await pool.query<ItemRecord>(
-    `SELECT ${SELECT_ITEM_FIELDS}
-     FROM items
-     WHERE userguid = $1 OR ispublic = true
-     ORDER BY LOWER(name) ASC, id ASC`,
-    [userguid]
-  );
-  return rows;
+  try {
+    const { rows } = await pool.query<ItemRecord>(
+      `SELECT ${SELECT_ITEM_FIELDS}
+       FROM items
+       WHERE userguid = $1 OR ispublic = true
+       ORDER BY LOWER(name) ASC, id ASC`,
+      [userguid]
+    );
+    return rows;
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const { rows } = await pool.query<ItemRecord>(
+      `SELECT ${SELECT_ITEM_FIELDS_LEGACY}
+       FROM items
+       WHERE userguid = $1 OR ispublic = true
+       ORDER BY LOWER(name) ASC, id ASC`,
+      [userguid]
+    );
+    return rows;
+  }
 };
 
 export const getAllItemsWithUsername = async (): Promise<ItemRecord[]> => {
-  const { rows } = await pool.query<ItemRecord>(
-    `SELECT i.id, i.userguid::text AS userguid, i.name, i.description, i.type,
-       COALESCE(NULLIF(i.range, '')::int, 0) AS range,
-       i.value, i.weight, i.curseid AS "curseId",
-       COALESCE(i.effectvalue, 0) AS "effectValue", COALESCE(i.damage, 0) AS "damage",
-       i.armorslot AS "armorSlot", i.effecton AS "effectOn",
-       i.effecttopc AS "effectToPc", COALESCE(i.effecttopcvalue, 0) AS "effectToPcValue",
-       COALESCE(i.weaponeffecttype, 'Blood') AS "weaponEffectType",
-       COALESCE(i.weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
-       i.imageid AS "imageId", i.soundid AS "soundId",
-       i.ispublic AS "isPublic",
-       COALESCE(i.istwohanded, false) AS "isTwoHanded",
-       i.uses,
-       i.createdat::text AS "createdAt", i.updatedat::text AS "updatedAt",
-       COALESCE(u.username, '') AS username
-     FROM items i
-     LEFT JOIN users u ON u.key::text = i.userguid::text
-     ORDER BY LOWER(i.name) ASC, i.id ASC`
-  );
-  return rows;
+  try {
+    const { rows } = await pool.query<ItemRecord>(
+      `SELECT i.id, i.userguid::text AS userguid, i.name, i.description, i.type,
+         COALESCE(NULLIF(i.range, '')::int, 0) AS range,
+         i.value, i.weight, i.curseid AS "curseId",
+         COALESCE(i.effectvalue, 0) AS "effectValue", COALESCE(i.damage, 0) AS "damage",
+         i.armorslot AS "armorSlot", i.effecton AS "effectOn",
+         i.effecttopc AS "effectToPc", COALESCE(i.effecttopcvalue, 0) AS "effectToPcValue",
+         NULLIF(i.note, '') AS note,
+         COALESCE(i.minmindtoread, 0) AS "minMindToRead",
+         COALESCE(i.weaponeffecttype, 'Blood') AS "weaponEffectType",
+         COALESCE(i.weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
+         i.imageid AS "imageId", i.soundid AS "soundId",
+         i.ispublic AS "isPublic",
+         COALESCE(i.istwohanded, false) AS "isTwoHanded",
+         i.uses,
+         i.createdat::text AS "createdAt", i.updatedat::text AS "updatedAt",
+         COALESCE(u.username, '') AS username
+       FROM items i
+       LEFT JOIN users u ON u.key::text = i.userguid::text
+       ORDER BY LOWER(i.name) ASC, i.id ASC`
+    );
+    return rows;
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const { rows } = await pool.query<ItemRecord>(
+      `SELECT i.id, i.userguid::text AS userguid, i.name, i.description, i.type,
+         COALESCE(NULLIF(i.range, '')::int, 0) AS range,
+         i.value, i.weight, i.curseid AS "curseId",
+         COALESCE(i.effectvalue, 0) AS "effectValue", COALESCE(i.damage, 0) AS "damage",
+         i.armorslot AS "armorSlot", i.effecton AS "effectOn",
+         i.effecttopc AS "effectToPc", COALESCE(i.effecttopcvalue, 0) AS "effectToPcValue",
+         NULL::text AS note,
+         0 AS "minMindToRead",
+         COALESCE(i.weaponeffecttype, 'Blood') AS "weaponEffectType",
+         COALESCE(i.weaponeffectcolor, '#cc0000') AS "weaponEffectColor",
+         i.imageid AS "imageId", i.soundid AS "soundId",
+         i.ispublic AS "isPublic",
+         COALESCE(i.istwohanded, false) AS "isTwoHanded",
+         i.uses,
+         i.createdat::text AS "createdAt", i.updatedat::text AS "updatedAt",
+         COALESCE(u.username, '') AS username
+       FROM items i
+       LEFT JOIN users u ON u.key::text = i.userguid::text
+       ORDER BY LOWER(i.name) ASC, i.id ASC`
+    );
+    return rows;
+  }
 };
 
 export const insertItemForUser = async (
@@ -138,8 +235,8 @@ export const insertItemForUser = async (
   const { rows } = await pool.query<ItemRecord>(
     `INSERT INTO items
        (userguid, name, description, type, range, value, weight, curseid,
-        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded, uses)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, note, minmindtoread, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded, uses)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
      RETURNING ${SELECT_ITEM_FIELDS}`,
     [
       userguid,
@@ -156,6 +253,8 @@ export const insertItemForUser = async (
       payload.effectOn,
       payload.effectToPc,
       payload.effectToPcValue,
+      payload.note,
+      payload.minMindToRead,
       payload.weaponEffectType,
       payload.weaponEffectColor,
       payload.imageId,
@@ -188,15 +287,17 @@ export const updateItemForUser = async (
          effecton = $11,
          effecttopc = $12,
          effecttopcvalue = $13,
-         weaponeffecttype = $14,
-         weaponeffectcolor = $15,
-         imageid = $16,
-         soundid = $17,
-         ispublic = $18,
-         istwohanded = $19,
-         uses = $20,
+         note = $14,
+         minmindtoread = $15,
+         weaponeffecttype = $16,
+         weaponeffectcolor = $17,
+         imageid = $18,
+         soundid = $19,
+         ispublic = $20,
+         istwohanded = $21,
+         uses = $22,
          updatedat = NOW()
-       WHERE id = $21 AND userguid = $22
+       WHERE id = $23 AND userguid = $24
      RETURNING ${SELECT_ITEM_FIELDS}`,
     [
       payload.name,
@@ -212,6 +313,8 @@ export const updateItemForUser = async (
       payload.effectOn,
       payload.effectToPc,
       payload.effectToPcValue,
+      payload.note,
+      payload.minMindToRead,
       payload.weaponEffectType,
       payload.weaponEffectColor,
       payload.imageId,
@@ -232,14 +335,24 @@ export const getItemsByIds = async (ids: number[]): Promise<ItemRecord[]> => {
   }
 
   const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
-  const { rows } = await pool.query<ItemRecord>(
-    `SELECT ${SELECT_ITEM_FIELDS}
-     FROM items
-     WHERE id IN (${placeholders})`,
-    ids
-  );
-
-  return rows;
+  try {
+    const { rows } = await pool.query<ItemRecord>(
+      `SELECT ${SELECT_ITEM_FIELDS}
+       FROM items
+       WHERE id IN (${placeholders})`,
+      ids
+    );
+    return rows;
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const { rows } = await pool.query<ItemRecord>(
+      `SELECT ${SELECT_ITEM_FIELDS_LEGACY}
+       FROM items
+       WHERE id IN (${placeholders})`,
+      ids
+    );
+    return rows;
+  }
 };
 
 export const deleteItemForUser = async (id: number, userguid: string): Promise<boolean> => {

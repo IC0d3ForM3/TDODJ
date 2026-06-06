@@ -166,4 +166,8 @@ export class TresherService {
   updateTresher(id: number, userkey: string, tresher: UserTresherWritePayload): Observable<TresherResponse> {
     return this.http.put<TresherResponse>(`${API_BASE_URL}/treshers/${id}`, { userkey, tresher });
   }
+
+  deleteTresher(id: number, userkey: string): Observable<{ result: number; error?: string }> {
+    return this.http.delete<{ result: number; error?: string }>(`${API_BASE_URL}/treshers/${id}`, { params: { userkey } });
+  }
 }

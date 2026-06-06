@@ -13,6 +13,12 @@ export interface UserPotionListItem {
   lastFor: number;
   effectAmount: number;
   effectAmount2: number;
+  effectAmountMin?: number;
+  effectAmountDiceCount?: number;
+  effectAmountDiceSides?: number;
+  effectAmount2Min?: number;
+  effectAmount2DiceCount?: number;
+  effectAmount2DiceSides?: number;
   value: number;
   imageId: number | null;
   soundId: number | null;
@@ -29,6 +35,12 @@ export interface UserPotionWritePayload {
   lastFor: number;
   effectAmount: number;
   effectAmount2: number;
+  effectAmountMin: number;
+  effectAmountDiceCount: number;
+  effectAmountDiceSides: number;
+  effectAmount2Min: number;
+  effectAmount2DiceCount: number;
+  effectAmount2DiceSides: number;
   value: number;
   imageId: number | null;
   soundId: number | null;
