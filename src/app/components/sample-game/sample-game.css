@@ -73,6 +73,79 @@
   text-decoration: underline;
 }
 
+/* Sample dungeon picker */
+.sg-dungeon-picker {
+  background: rgba(17, 25, 40, 0.7);
+  border: 1px solid rgba(110, 170, 255, 0.28);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.sg-dungeon-picker-header h3 {
+  margin: 0 0 0.25rem;
+  color: #d2e3ff;
+}
+
+.sg-dungeon-picker-header p {
+  margin: 0;
+  color: #a8c4e8;
+  font-size: 0.9rem;
+}
+
+.sg-dungeon-grid {
+  margin-top: 0.85rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.7rem;
+}
+
+.sg-dungeon-card {
+  border: 1px solid rgba(160, 184, 220, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #dbe8ff;
+  padding: 0.65rem 0.6rem 0.75rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+.sg-dungeon-card:hover {
+  border-color: rgba(120, 180, 255, 0.55);
+  background: rgba(80, 130, 200, 0.12);
+}
+
+.sg-dungeon-card-active {
+  border-color: #3f93ff;
+  background: rgba(31, 103, 201, 0.32);
+  box-shadow: 0 0 0 2px rgba(90, 165, 255, 0.5);
+}
+
+.sg-dungeon-card-name {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.45rem;
+  color: #e8f3ff;
+}
+
+.sg-dungeon-card-image {
+  display: block;
+  width: 100%;
+  max-width: 100px;
+  margin: 0 auto;
+  border-radius: 6px;
+  border: 1px solid rgba(160, 184, 220, 0.35);
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.sg-dungeon-card-no-image {
+  display: block;
+  font-size: 0.78rem;
+  color: #88a4cb;
+}
+
 /* Cards */
 .sg-cards {
   display: grid;

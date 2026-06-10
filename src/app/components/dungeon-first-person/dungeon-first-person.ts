@@ -228,7 +228,7 @@ export class DungeonFirstPersonComponent implements OnDestroy {
       const key = this.getSquareKey(obs.row, obs.column);
       obstacleImageBySquare.set(key, obstacleImagesBySquare.get(key) ?? null);
       obstacleBySquare.set(key, obs);
-      if (obs.containsItemId !== null && !obs.itemTaken) {
+      if (this.obstacleContainedItemIsVisible(obs)) {
         bagSquareKeys.add(key);
       }
     }
@@ -2460,6 +2460,14 @@ export class DungeonFirstPersonComponent implements OnDestroy {
 
   private isYeOldMagiceShop(obs: ObstaclePlacement | undefined): boolean {
     return (obs?.name ?? '').trim().toLowerCase() === 'ye old magice shop';
+  }
+
+  private obstacleContainedItemIsVisible(obs: ObstaclePlacement): boolean {
+    return (
+      obs.containsItemId !== null &&
+      !obs.itemTaken &&
+      ((obs.itemPlacement ?? 'in') === 'on' || obs.isDestroyed || obs.isOpened === true)
+    );
   }
 
   private drawFirstPersonShopObstacle(

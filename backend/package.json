@@ -18,7 +18,9 @@
     "migrate:monsters:treshers": "node scripts/run-sql-migration.cjs sql/008_add_monsters_tresherids.sql",
     "migrate:pcs": "node scripts/run-sql-migration.cjs sql/009_create_pcs_table.sql",
     "migrate:friends": "node scripts/run-sql-migration.cjs sql/014_create_friends_table.sql",
-    "migrate:dungons:all": "npm run migrate:dungons && npm run migrate:dungons:json && npm run migrate:games && npm run migrate:treshers && npm run migrate:monsters && npm run migrate:images && npm run migrate:monsters:image && npm run migrate:monsters:treshers && npm run migrate:pcs && npm run migrate:friends"
+    "migrate:dungons:all": "npm run migrate:dungons && npm run migrate:dungons:json && npm run migrate:games && npm run migrate:treshers && npm run migrate:monsters && npm run migrate:images && npm run migrate:monsters:image && npm run migrate:monsters:treshers && npm run migrate:pcs && npm run migrate:friends",
+    "push:dungon:prod": "node scripts/push-dungon-to-prod.cjs",
+    "push:dungeon:prod": "node scripts/push-dungon-to-prod.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1046.0",

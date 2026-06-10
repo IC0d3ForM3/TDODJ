@@ -37,6 +37,15 @@ export interface PublishedDungonListItemRecord {
   imagePath: string | null;
 }
 
+export interface SampleDungonRecord {
+  id: number;
+  name: string;
+  description: string;
+  intro: string;
+  imagePath: string | null;
+  spreward: number;
+}
+
 export interface GameRecord {
   id: number;
   dungonid: number;
@@ -538,30 +547,47 @@ export const getDungonImageIdById = async (id: number): Promise<number | null> =
   return rows[0]?.imageid ?? null;
 };
 
-export const getSampleDungonFromDb = async (): Promise<{ id: number; name: string; description: string; intro: string } | null> => {
-  const { rows } = await pool.query<{ id: number; name: string; description: string; intro: string }>(
-    `SELECT id, name, description, intro
-     FROM dungons
-     WHERE issample = TRUE AND status = 'published'
-     LIMIT 1`
+export const getSampleDungonsFromDb = async (): Promise<SampleDungonRecord[]> => {
+  const { rows } = await pool.query<SampleDungonRecord>(
+    `SELECT d.id, d.name, d.description, d.intro, COALESCE(d.spreward, 0) AS spreward, i.path AS "imagePath"
+     FROM dungons d
+     LEFT JOIN images i ON i.id = d.imageid
+     WHERE d.issample = TRUE AND d.status = 'published'
+     ORDER BY LOWER(d.name) ASC, d.id ASC`
   );
-  return rows[0] ?? null;
+  return rows;
 };
 
-export const getSampleDungonFullFromDb = async (): Promise<{ id: number; name: string; description: string; intro: string; dungenJson: unknown; spreward: number; imageid: number | null } | null> => {
+export const getSampleDungonFromDb = async (): Promise<{ id: number; name: string; description: string; intro: string } | null> => {
+  const rows = await getSampleDungonsFromDb();
+  const first = rows[0] ?? null;
+  return first ? { id: first.id, name: first.name, description: first.description, intro: first.intro } : null;
+};
+
+export const getSampleDungonFullFromDb = async (id?: number): Promise<{ id: number; name: string; description: string; intro: string; dungenJson: unknown; spreward: number; imageid: number | null } | null> => {
+  const query = id && Number.isInteger(id) && id > 0
+    ? `SELECT id, name, description, intro, "dungenJson" AS "dungenJson", COALESCE(spreward, 0) AS spreward, imageid
+       FROM dungons
+       WHERE id = $1 AND issample = TRUE AND status = 'published'
+       LIMIT 1`
+    : `SELECT id, name, description, intro, "dungenJson" AS "dungenJson", COALESCE(spreward, 0) AS spreward, imageid
+       FROM dungons
+       WHERE issample = TRUE AND status = 'published'
+       ORDER BY LOWER(name) ASC, id ASC
+       LIMIT 1`;
+
   const { rows } = await pool.query<{ id: number; name: string; description: string; intro: string; dungenJson: unknown; spreward: number; imageid: number | null }>(
-    `SELECT id, name, description, intro, "dungenJson" AS "dungenJson", COALESCE(spreward, 0) AS spreward, imageid
-     FROM dungons
-     WHERE issample = TRUE AND status = 'published'
-     LIMIT 1`
+    query,
+    id && Number.isInteger(id) && id > 0 ? [id] : []
   );
   return rows[0] ?? null;
 };
 
 export const setSampleDungonInDb = async (id: number): Promise<boolean> => {
-  await pool.query(`UPDATE dungons SET issample = FALSE WHERE issample = TRUE`);
   const { rowCount } = await pool.query(
-    `UPDATE dungons SET issample = TRUE WHERE id = $1 AND status = 'published'`,
+    `UPDATE dungons
+     SET issample = NOT issample
+     WHERE id = $1 AND status = 'published'`,
     [id]
   );
   return (rowCount ?? 0) > 0;

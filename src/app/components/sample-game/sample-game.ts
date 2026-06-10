@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { RouterLinkWithHref } from '@angular/router';
@@ -10,6 +10,7 @@ interface SampleDungon {
   name: string;
   description: string;
   intro: string;
+  imagePath?: string | null;
 }
 
 interface SamplePc {
@@ -171,6 +172,7 @@ export class SampleGame implements OnInit {
   private readonly router = inject(Router);
 
   readonly dungon = signal<SampleDungon | null>(null);
+  readonly sampleDungons = signal<SampleDungon[]>([]);
   readonly samplePcs = signal<SamplePc[]>([]);
   readonly selectedPc = signal<SamplePc | null>(null);
   readonly pickerIndex = signal(0);
@@ -181,12 +183,12 @@ export class SampleGame implements OnInit {
   readonly showTutorial = signal(false);
   readonly tutorialPageIndex = signal(0);
 
-  readonly tutorialPages: TutorialPage[] = [
+  readonly tutorialPages = computed<TutorialPage[]>(() => [
     {
       image: 'images/taren1.jpg',
       speaker: 'Cellen',
       title: 'Welcome, Adventurer!',
-      text: "Welcome to the Rusty Flagon. I am Cellen. You are about to enter your first dungeon, so here is the quick version before you go.",
+      text: this.buildKeeperIntro(this.dungon()),
     },
     {
       image: 'images/taren1.jpg',
@@ -212,18 +214,18 @@ export class SampleGame implements OnInit {
       title: 'Loot & the Exit',
       text: "Loot treshers for gear, potions, spells, and coin. Use Take All or pick items one by one, then equip from Inventory. Reach the Exit square to complete the dungeon and claim your SP reward.",
     },
-  ];
+  ]);
 
   get currentTutorialPage(): TutorialPage {
-    return this.tutorialPages[this.tutorialPageIndex()];
+    return this.tutorialPages()[this.tutorialPageIndex()];
   }
 
   get isLastTutorialPage(): boolean {
-    return this.tutorialPageIndex() === this.tutorialPages.length - 1;
+    return this.tutorialPageIndex() === this.tutorialPages().length - 1;
   }
 
   get tutorialProgress(): string {
-    return `${this.tutorialPageIndex() + 1} / ${this.tutorialPages.length}`;
+    return `${this.tutorialPageIndex() + 1} / ${this.tutorialPages().length}`;
   }
 
   nextTutorialPage(): void {
@@ -250,16 +252,15 @@ export class SampleGame implements OnInit {
 
   ngOnInit(): void {
     forkJoin({
-      dungon: this.http.get<SampleDungon>(`${API_BASE_URL}/dungons/sample`),
+      dungons: this.http.get<SampleDungon[]>(`${API_BASE_URL}/dungons/sample-list`),
       pcs: this.http.get<SamplePc[]>(`${API_BASE_URL}/pcs/sample`),
     }).subscribe({
-      next: ({ dungon, pcs }) => {
-        this.dungon.set(dungon);
+      next: ({ dungons, pcs }) => {
+        this.sampleDungons.set(dungons);
+        this.dungon.set(dungons[0] ?? null);
         this.samplePcs.set(pcs);
         this.pickerIndex.set(0);
-        if (pcs.length === 1) {
-          this.selectedPc.set(pcs[0]);
-        }
+        this.selectedPc.set(null);
         this.isLoading.set(false);
       },
       error: () => {
@@ -271,6 +272,12 @@ export class SampleGame implements OnInit {
 
   selectPc(pc: SamplePc): void {
     this.selectedPc.set(pc);
+  }
+
+  selectDungon(dungon: SampleDungon): void {
+    this.dungon.set(dungon);
+    this.selectedPc.set(null);
+    this.pickerIndex.set(0);
   }
 
   pickerPc(): SamplePc | null {
@@ -304,7 +311,7 @@ export class SampleGame implements OnInit {
 
   startWithPickerPc(): void {
     const pc = this.pickerPc();
-    if (!pc) {
+    if (!pc || !this.dungon()) {
       return;
     }
     this.selectPc(pc);
@@ -328,8 +335,24 @@ export class SampleGame implements OnInit {
 
   private navigateToSamplePlay(): void {
     const pc = this.selectedPc();
-    if (!pc) return;
-    this.router.navigate(['/sample-play'], { queryParams: { pcId: pc.id } });
+    const dungon = this.dungon();
+    if (!pc || !dungon) return;
+    this.router.navigate(['/sample-play'], { queryParams: { pcId: pc.id, dungonId: dungon.id } });
+  }
+
+  buildKeeperIntro(dungon: SampleDungon | null): string {
+    if (!dungon) {
+      return 'Cellen watches the door and says you should pick a sample dungeon before you go.';
+    }
+
+    const source = (dungon.description || dungon.intro || '').trim();
+    if (!source) {
+      return `Cellen says ${dungon.name} is ready for a fresh run.`;
+    }
+
+    const firstSentence = source.split(/(?<=[.!?])\s+/)[0].trim();
+    const clipped = firstSentence.length > 160 ? `${firstSentence.slice(0, 157).trimEnd()}...` : firstSentence;
+    return `Cellen studies the parchment and says: “${clipped}”`;
   }
 
   resolveImageUrl(imagePath: string | null | undefined): string {

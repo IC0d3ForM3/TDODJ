@@ -2,6 +2,105 @@
 	display: block;
 }
 
+/* ─── Sound Preference Modal ─────────────────────────────────────────────── */
+.sound-pref-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.72);
+	backdrop-filter: blur(1px);
+	z-index: 9100;
+}
+
+.sound-pref-modal {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: min(92vw, 460px);
+	background: linear-gradient(180deg, #1b1a24 0%, #12131a 100%);
+	border: 1px solid rgba(158, 197, 248, 0.45);
+	border-radius: 14px;
+	box-shadow: 0 16px 54px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+	padding: 1.15rem 1.25rem 1.2rem;
+	z-index: 9101;
+	color: #e6edf7;
+	font-family: inherit;
+}
+
+.sound-pref-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.8rem;
+}
+
+.sound-pref-title {
+	margin: 0;
+	font-size: 1.12rem;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	color: #9ec5f8;
+}
+
+.sound-pref-close {
+	background: none;
+	border: none;
+	color: #93a4b8;
+	cursor: pointer;
+	font-size: 1.05rem;
+	line-height: 1;
+	padding: 0.1rem 0.25rem;
+}
+.sound-pref-close:hover { color: #fff; }
+
+.sound-pref-text {
+	margin: 0.85rem 0 1rem;
+	color: #c9d6e6;
+	font-size: 0.92rem;
+	line-height: 1.45;
+}
+
+.sound-pref-actions {
+	display: flex;
+	gap: 0.7rem;
+	justify-content: flex-end;
+	flex-wrap: wrap;
+}
+
+.sound-pref-btn {
+	border-radius: 8px;
+	border: 1px solid transparent;
+	padding: 0.55rem 1rem;
+	font-size: 0.92rem;
+	font-weight: 700;
+	cursor: pointer;
+	transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.sound-pref-btn:hover {
+	transform: translateY(-1px);
+}
+
+.sound-pref-btn-on {
+	background: linear-gradient(180deg, rgba(74, 127, 193, 0.28) 0%, rgba(45, 89, 148, 0.34) 100%);
+	border-color: rgba(158, 197, 248, 0.5);
+	color: #eff6ff;
+}
+
+.sound-pref-btn-on:hover {
+	background: linear-gradient(180deg, rgba(74, 127, 193, 0.4) 0%, rgba(45, 89, 148, 0.46) 100%);
+}
+
+.sound-pref-btn-off {
+	background: linear-gradient(180deg, rgba(57, 57, 78, 0.28) 0%, rgba(35, 35, 46, 0.4) 100%);
+	border-color: rgba(173, 173, 173, 0.26);
+	color: #d8dee9;
+}
+
+.sound-pref-btn-off:hover {
+	background: linear-gradient(180deg, rgba(57, 57, 78, 0.42) 0%, rgba(35, 35, 46, 0.54) 100%);
+}
+
 /* ─── NPC Dialog Overlay ─────────────────────────────────────────────────── */
 .npc-dialog-overlay {
 	position: fixed;

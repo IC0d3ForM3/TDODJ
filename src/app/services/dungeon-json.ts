@@ -348,6 +348,7 @@ export class DungeonJsonService {
               : typeof src['containsitemid'] === 'string' && src['containsitemid']
                 ? (parseInt(src['containsitemid'], 10) || null)
                 : null,
+        itemPlacement: src['itemPlacement'] === 'on' ? 'on' : 'in',
         requiredKeyId: typeof src['requiredKeyId'] === 'number'
           ? src['requiredKeyId']
           : typeof src['requiredkeyid'] === 'number'
@@ -365,6 +366,11 @@ export class DungeonJsonService {
         widthAnchor,
         color,
         currentHp,
+        isUnlocked:
+          src['isUnlocked'] === true ||
+          src['isunlocked'] === true ||
+          src['isOpened'] === true ||
+          src['isDestroyed'] === true,
         isDestroyed: src['isDestroyed'] === true,
         isOpened: src['isOpened'] === true,
         itemTaken: src['itemTaken'] === true,

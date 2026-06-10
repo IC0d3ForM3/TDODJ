@@ -204,6 +204,107 @@ describe('Game', () => {
     expect(component.canSearch()).toBe(true); // thieph can search twice per round
   });
 
+  it('lets a fighter attack a monster in range', () => {
+    const dungonId = 1;
+    component.gridPreviewContext.set({ dungonId, centerRow: 5, centerColumn: 5 } as never);
+    component.turnPhase.set('player');
+    component.playerType.set('fighter');
+    component.playerHp.set(20);
+    component.playerAE.set(3);
+    component.playerNOA.set(1);
+    component.playerAttacksThisTurn.set(0);
+    component.playerStrength.set(4);
+    component.playerStamina.set(10);
+
+    component.squaresByDungon.set({
+      [dungonId]: {
+        '5,5': {} as never,
+        '5,6': {} as never,
+      },
+    });
+
+    component.cheaterByDungon.set({
+      [dungonId]: {
+        facingDir: 'right',
+        inventory: { keys: [], treshers: [] },
+      },
+    } as never);
+
+    component.monsterInstances.set([
+      {
+        placementIndex: 0,
+        monsterId: 101,
+        row: 5,
+        column: 6,
+        roam: false,
+        currentHp: 8,
+        currentMagic: 0,
+        permanentStatModifiers: {},
+        isDead: false,
+        remainingAE: 0,
+        attacksUsedThisTurn: 0,
+        hasCastSpellThisTurn: false,
+        dropTresherIds: [],
+        dropKeyIds: [],
+        dropItemIds: [],
+        dropSpellIds: [],
+        dropPotionIds: [],
+        dropGold: 0,
+        dropSilver: 0,
+        dropCopper: 0,
+        dropZinc: 0,
+        activeEffects: [],
+        isDormant: false,
+        guardRow: null,
+        guardColumn: null,
+        isStationary: false,
+        stationaryTriggerRow: null,
+        stationaryTriggerCol: null,
+        noAttackUnlessAttacked: false,
+        hasCalledReinforcements: false,
+        hasGreeted: false,
+        hasSharedInfo: false,
+        isSpared: false,
+        npcIsHostile: false,
+      },
+    ] as never);
+
+    component.monsterListByDungon.set({
+      [dungonId]: [
+        {
+          id: 101,
+          name: 'Training Goblin',
+          ac: 1,
+          hp: 8,
+          spReward: 0,
+          toHitPlusNeeded: 0,
+        },
+      ],
+    } as never);
+
+    const startMonstersSpy = vi.spyOn(component as any, 'startMonsterTurns').mockImplementation(() => {});
+    const hitSoundSpy = vi.spyOn(component as any, 'playWeaponHitSound').mockImplementation(() => {});
+    const impactSpy = vi.spyOn(component as any, 'triggerWeaponMonsterImpact').mockImplementation(() => {});
+    const rollSpy = vi.spyOn(component as any, 'rollD12').mockReturnValue(20);
+    const damageSpy = vi.spyOn(component as any, 'randomInt').mockReturnValue(4);
+
+    expect(component.canPlayerAttack()).toBe(true);
+    component.tryPlayerAttack();
+
+    const monster = component.monsterInstances()[0];
+    expect(component.playerAE()).toBe(2);
+    expect(component.playerAttacksThisTurn()).toBe(1);
+    expect(monster.currentHp).toBeLessThan(8);
+    expect(hitSoundSpy).toHaveBeenCalled();
+    expect(impactSpy).toHaveBeenCalled();
+
+    startMonstersSpy.mockRestore();
+    hitSoundSpy.mockRestore();
+    impactSpy.mockRestore();
+    rollSpy.mockRestore();
+    damageSpy.mockRestore();
+  });
+
   it('weapon hit and spell cast both trigger sound paths', () => {
     const dungonId = 1;
     const spellId = 7001;

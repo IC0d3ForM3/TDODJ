@@ -476,10 +476,10 @@
 }
 
 .open-block-btn--icon {
-	width: 2.1rem;
+	width: 2.45rem;
 	height: 2.1rem;
 	padding: 0;
-	font-size: 1.05rem;
+	font-size: 1rem;
 	line-height: 1;
 	flex: 0 0 auto;
 }
@@ -848,6 +848,43 @@
 .door-dialog .form-label,
 .door-dialog .door-locked-toggle {
 	color: #0f172a;
+}
+
+.square-actions-add-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.45rem;
+}
+
+.square-actions-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+}
+
+.square-actions-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	padding: 0.35rem 0.45rem;
+	border: 1px solid #d7dbe1;
+	border-radius: 6px;
+	background: #f8fafc;
+}
+
+.square-actions-label {
+	font-size: 0.9rem;
+	color: #1f2937;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.square-actions-buttons {
+	display: inline-flex;
+	gap: 0.35rem;
 }
 
 /* Placement dialog list buttons with thumbnail */

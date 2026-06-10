@@ -43,6 +43,30 @@ node scripts/run-sql-migration.cjs sql/clean_schema.sql
 
 ## Deploying
 
+### Push One Local Dungon To Live (Prod DB)
+```powershell
+cd backend
+npm run push:dungon:prod -- --id 123
+```
+
+Optional flags:
+- `--publish` : force publish/public fields on prod during push.
+- `--prod-userkey <uuid>` : remap owner key fields to a production user key.
+- `--dry-run` : preview columns/operation without writing.
+
+Examples:
+```powershell
+cd backend
+npm run push:dungon:prod -- --id 123 --dry-run
+npm run push:dungon:prod -- --id 123 --publish
+npm run push:dungon:prod -- --id 123 --prod-userkey bbd61968-4aba-4200-bb4f-53eb8eb91247
+```
+
+Notes:
+- Uses `backend/.env` as source (local DB) and `backend/.prod.env` as target (prod DB).
+- Upserts by dungon `id` in production.
+- If the referenced `imageid` does not exist in prod, it is automatically set to `NULL` to avoid FK errors.
+
 ### Deploy Frontend (Angular → S3 + CloudFront)
 ```powershell
 .\deploy-frontend.ps1

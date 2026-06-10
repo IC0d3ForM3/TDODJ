@@ -103,6 +103,8 @@ function buildSpellPayload(input, isAdmin) {
         effectAmount2DiceSides,
         value: Math.max(0, normalizeNumber(input.value, 0)),
         sp: Math.max(0, normalizeNumber(input.sp, 0)),
+        minLtsp: Math.max(0, normalizeNumber(input.minLtsp ?? input.minltsp ?? input.sp, 0)),
+        learnCostGp: Math.max(0, normalizeNumber(input.learnCostGp ?? input.learncostgp, 0)),
         successTestValue: Math.max(0, normalizeNumber(input.successTestValue ?? input.successtestvalue, 0)),
         magicCost: Math.max(1, normalizeNumber(input.magicCost ?? input.magiccost, 1)),
         costToLearn: Math.max(0, normalizeNumber(input.costToLearn ?? input.costtolearn, 0)),

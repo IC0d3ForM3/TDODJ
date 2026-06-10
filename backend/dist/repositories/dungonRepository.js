@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllPublishedDungonsForAdmin = exports.setSampleDungonInDb = exports.getSampleDungonFullFromDb = exports.getSampleDungonFromDb = exports.getDungonImageIdById = exports.getDungonSpRewardById = exports.approveDungon = exports.updateDungonMetadataForUser = exports.insertDungon = exports.deleteDungonForUser = exports.deleteGameForUser = exports.updateGameDungenJson = exports.getGameByIdForUser = exports.getGamesForUser = exports.startGameFromPublishedDungon = exports.publishDungonForUser = exports.updateDungonJsonForUser = exports.getDungonByIdForUser = exports.getDungonIsMainGameStatusById = exports.getPublishedDungons = exports.getDungonsByUserKey = void 0;
+exports.getAllPublishedDungonsForAdmin = exports.setSampleDungonInDb = exports.getSampleDungonFullFromDb = exports.getSampleDungonFromDb = exports.getSampleDungonsFromDb = exports.getDungonImageIdById = exports.getDungonSpRewardById = exports.approveDungon = exports.updateDungonMetadataForUser = exports.insertDungon = exports.deleteDungonForUser = exports.deleteGameForUser = exports.updateGameDungenJson = exports.getGameByIdForUser = exports.getGamesForUser = exports.startGameFromPublishedDungon = exports.publishDungonForUser = exports.updateDungonJsonForUser = exports.getDungonByIdForUser = exports.getDungonIsMainGameStatusById = exports.getPublishedDungons = exports.getDungonsByUserKey = void 0;
 const db_1 = __importDefault(require("../db"));
 const getDungonsByUserKey = async (userkey) => {
     const { rows } = await db_1.default.query(`SELECT id, key, userkey, name, description, intro, ispublic, status, approvedby, approveddate, minsplifetime, maxsplifetime, ismaingame, issample, resettable_per_pc, imageid
@@ -329,25 +329,40 @@ const getDungonImageIdById = async (id) => {
     return rows[0]?.imageid ?? null;
 };
 exports.getDungonImageIdById = getDungonImageIdById;
+const getSampleDungonsFromDb = async () => {
+    const { rows } = await db_1.default.query(`SELECT d.id, d.name, d.description, d.intro, COALESCE(d.spreward, 0) AS spreward, i.path AS "imagePath"
+     FROM dungons d
+     LEFT JOIN images i ON i.id = d.imageid
+     WHERE d.issample = TRUE AND d.status = 'published'
+     ORDER BY LOWER(d.name) ASC, d.id ASC`);
+    return rows;
+};
+exports.getSampleDungonsFromDb = getSampleDungonsFromDb;
 const getSampleDungonFromDb = async () => {
-    const { rows } = await db_1.default.query(`SELECT id, name, description, intro
-     FROM dungons
-     WHERE issample = TRUE AND status = 'published'
-     LIMIT 1`);
-    return rows[0] ?? null;
+    const rows = await (0, exports.getSampleDungonsFromDb)();
+    const first = rows[0] ?? null;
+    return first ? { id: first.id, name: first.name, description: first.description, intro: first.intro } : null;
 };
 exports.getSampleDungonFromDb = getSampleDungonFromDb;
-const getSampleDungonFullFromDb = async () => {
-    const { rows } = await db_1.default.query(`SELECT id, name, description, intro, "dungenJson" AS "dungenJson", COALESCE(spreward, 0) AS spreward, imageid
-     FROM dungons
-     WHERE issample = TRUE AND status = 'published'
-     LIMIT 1`);
+const getSampleDungonFullFromDb = async (id) => {
+    const query = id && Number.isInteger(id) && id > 0
+        ? `SELECT id, name, description, intro, "dungenJson" AS "dungenJson", COALESCE(spreward, 0) AS spreward, imageid
+       FROM dungons
+       WHERE id = $1 AND issample = TRUE AND status = 'published'
+       LIMIT 1`
+        : `SELECT id, name, description, intro, "dungenJson" AS "dungenJson", COALESCE(spreward, 0) AS spreward, imageid
+       FROM dungons
+       WHERE issample = TRUE AND status = 'published'
+       ORDER BY LOWER(name) ASC, id ASC
+       LIMIT 1`;
+    const { rows } = await db_1.default.query(query, id && Number.isInteger(id) && id > 0 ? [id] : []);
     return rows[0] ?? null;
 };
 exports.getSampleDungonFullFromDb = getSampleDungonFullFromDb;
 const setSampleDungonInDb = async (id) => {
-    await db_1.default.query(`UPDATE dungons SET issample = FALSE WHERE issample = TRUE`);
-    const { rowCount } = await db_1.default.query(`UPDATE dungons SET issample = TRUE WHERE id = $1 AND status = 'published'`, [id]);
+    const { rowCount } = await db_1.default.query(`UPDATE dungons
+     SET issample = NOT issample
+     WHERE id = $1 AND status = 'published'`, [id]);
     return (rowCount ?? 0) > 0;
 };
 exports.setSampleDungonInDb = setSampleDungonInDb;

@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.fetchDungonImageId = exports.fetchDungonSpReward = exports.fetchAllPublishedDungonsForAdmin = exports.setSampleGame = exports.fetchSampleDungonFull = exports.fetchSampleDungon = exports.approvePendingDungon = exports.removeDungonForUser = exports.removeGameForUser = exports.saveGameDungenJson = exports.fetchGameByIdForUser = exports.fetchGamesForUser = exports.startGameForUserFromPublishedDungon = exports.publishDungonForUserKey = exports.updateDungonMetadata = exports.saveDungonJsonForUser = exports.createDungon = exports.fetchDungonByIdForUser = exports.fetchDungonsByUserKey = exports.fetchPublishedDungons = exports.fetchDungonIsMainGameStatus = exports.fetchMainGameDungons = void 0;
+exports.fetchDungonImageId = exports.fetchDungonSpReward = exports.fetchAllPublishedDungonsForAdmin = exports.setSampleGame = exports.fetchSampleDungonFull = exports.fetchSampleDungons = exports.fetchSampleDungon = exports.approvePendingDungon = exports.removeDungonForUser = exports.removeGameForUser = exports.saveGameDungenJson = exports.fetchGameByIdForUser = exports.fetchGamesForUser = exports.startGameForUserFromPublishedDungon = exports.publishDungonForUserKey = exports.updateDungonMetadata = exports.saveDungonJsonForUser = exports.createDungon = exports.fetchDungonByIdForUser = exports.fetchDungonsByUserKey = exports.fetchPublishedDungons = exports.fetchDungonIsMainGameStatus = exports.fetchMainGameDungons = void 0;
 const dungonRepository_1 = require("../repositories/dungonRepository");
 const fetchMainGameDungons = async () => {
     const { rows } = await (await Promise.resolve().then(() => __importStar(require('../db')))).default.query('SELECT id, name, description, intro FROM dungons WHERE ismaingame = TRUE AND status = $1 ORDER BY id ASC', ['published']);
@@ -104,8 +104,12 @@ const fetchSampleDungon = async () => {
     return await (0, dungonRepository_1.getSampleDungonFromDb)();
 };
 exports.fetchSampleDungon = fetchSampleDungon;
-const fetchSampleDungonFull = async () => {
-    return await (0, dungonRepository_1.getSampleDungonFullFromDb)();
+const fetchSampleDungons = async () => {
+    return await (0, dungonRepository_1.getSampleDungonsFromDb)();
+};
+exports.fetchSampleDungons = fetchSampleDungons;
+const fetchSampleDungonFull = async (id) => {
+    return await (0, dungonRepository_1.getSampleDungonFullFromDb)(id);
 };
 exports.fetchSampleDungonFull = fetchSampleDungonFull;
 const setSampleGame = async (id) => {

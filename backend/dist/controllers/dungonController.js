@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateDungonContent = exports.getSampleGameSession = exports.getAdminPublishedDungons = exports.setSampleDungon = exports.getSampleDungon = exports.approveDungon = exports.deleteGame = exports.deleteDungon = exports.saveGame = exports.getGameById = exports.getGamesForUser = exports.startGameFromPublishedDungon = exports.publishDungon = exports.updateDungonMetadata = exports.updateDungonJson = exports.createDungon = exports.getDungonById = exports.getDungons = exports.getPublishedDungons = void 0;
+exports.generateDungonContent = exports.getSampleGameSession = exports.getAdminPublishedDungons = exports.setSampleDungon = exports.getSampleDungons = exports.getSampleDungon = exports.approveDungon = exports.deleteGame = exports.deleteDungon = exports.saveGame = exports.getGameById = exports.getGamesForUser = exports.startGameFromPublishedDungon = exports.publishDungon = exports.updateDungonMetadata = exports.updateDungonJson = exports.createDungon = exports.getDungonById = exports.getDungons = exports.getPublishedDungons = void 0;
 const dungonService = __importStar(require("../services/dungonService"));
 const dungon_generator_1 = require("../services/dungon-generator");
 const pcService = __importStar(require("../services/pcService"));
@@ -573,6 +573,8 @@ const getGameById = async (req, res) => {
                             effectAmount2DiceSides: s.effectAmount2DiceSides,
                             successTestValue: s.successTestValue,
                             sp: s.sp,
+                            minLtsp: s.minLtsp,
+                            learnCostGp: s.learnCostGp,
                             lastFor: s.lastFor,
                             numberOfTargets: s.numberOfTargets,
                             magicCost: s.magicCost,
@@ -831,6 +833,17 @@ const getSampleDungon = async (req, res) => {
     }
 };
 exports.getSampleDungon = getSampleDungon;
+const getSampleDungons = async (_req, res) => {
+    try {
+        const dungons = await dungonService.fetchSampleDungons();
+        return res.json(dungons);
+    }
+    catch (error) {
+        console.error('Error fetching sample dungons:', error);
+        return res.status(500).json({ error: 'Failed to fetch sample dungons' });
+    }
+};
+exports.getSampleDungons = getSampleDungons;
 const setSampleDungon = async (req, res) => {
     const id = Number.parseInt(req.params['id'], 10);
     const { userkey } = req.body;
@@ -881,12 +894,15 @@ exports.getAdminPublishedDungons = getAdminPublishedDungons;
 const getSampleGameSession = async (req, res) => {
     const pcIdRaw = req.query['pcId'];
     const pcId = typeof pcIdRaw === 'string' ? Number.parseInt(pcIdRaw, 10) : NaN;
+    const dungonIdRaw = req.query['dungonId'];
+    const dungonId = typeof dungonIdRaw === 'string' ? Number.parseInt(dungonIdRaw, 10) : NaN;
+    const requestedDungonId = Number.isInteger(dungonId) && dungonId > 0 ? dungonId : undefined;
     if (!Number.isInteger(pcId) || pcId <= 0) {
         return res.status(400).json({ error: 'Valid pcId query parameter is required' });
     }
     try {
         const [dungon, pc] = await Promise.all([
-            dungonService.fetchSampleDungonFull(),
+            dungonService.fetchSampleDungonFull(requestedDungonId),
             pcService.fetchSamplePcById(pcId),
         ]);
         if (!dungon) {
@@ -1017,6 +1033,8 @@ const getSampleGameSession = async (req, res) => {
                         effectAmount2DiceSides: s.effectAmount2DiceSides,
                         successTestValue: s.successTestValue,
                         sp: s.sp,
+                        minLtsp: s.minLtsp,
+                        learnCostGp: s.learnCostGp,
                         lastFor: s.lastFor,
                         numberOfTargets: s.numberOfTargets,
                         magicCost: s.magicCost,

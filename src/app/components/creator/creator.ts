@@ -213,6 +213,13 @@ interface GenerateItemBatch {
   count: number;
 }
 
+interface SquareActionEntry {
+  key: string;
+  type: 'start' | 'exit' | 'portal' | 'monster' | 'tresher' | 'door' | 'trap' | 'obstacle' | 'item' | 'potion' | 'spell';
+  label: string;
+  refId: number | null;
+}
+
 const FLOOR_TRAP_TYPE_OPTIONS: TrapType[] = [
   'Pit',
   'Spiked Pit',
@@ -234,6 +241,7 @@ const TRAP_SOURCE_OBJECT_OPTIONS: TrapSourceObjectType[] = [
 ];
 
 const TRAP_SOURCE_SIDE_OPTIONS: TrapSourceSide[] = ['north', 'east', 'south', 'west'];
+const DOOR_OBSTACLE_TRAP_TYPE_OPTIONS: TrapType[] = ['Dart', 'Gas Cloud'];
 
 @Component({
   selector: 'app-creator',
@@ -316,6 +324,8 @@ export class Creator implements OnInit {
   get publishFriendsError() { return this.publishService.publishFriendsError; }
   get publishFriends() { return this.publishService.publishFriends; }
   readonly isDoorDialogVisible = signal(false);
+  readonly isSquareActionsDialogVisible = signal(false);
+  readonly squareActionsContext = signal<{ dungonId: number; row: number; column: number } | null>(null);
   readonly isKaysDialogVisible = signal(false);
   get isWhiteSpacePreviewPickMode() { return this.placementService.isWhiteSpacePreviewPickMode; }
   readonly isGridPreviewModalVisible = signal(false);
@@ -412,6 +422,7 @@ export class Creator implements OnInit {
   get copyFloorTrapSource() { return this.placementService.copyFloorTrapSource; }
   private nextFloorTrapId = 1;
   readonly floorTrapTypeOptions = FLOOR_TRAP_TYPE_OPTIONS;
+  readonly doorObstacleTrapTypeOptions = DOOR_OBSTACLE_TRAP_TYPE_OPTIONS;
   readonly trapSourceObjectOptions = TRAP_SOURCE_OBJECT_OPTIONS;
   readonly trapSourceSideOptions = TRAP_SOURCE_SIDE_OPTIONS;
   readonly floorTrapCrossingItemId = signal<number | null>(null);
@@ -651,14 +662,14 @@ export class Creator implements OnInit {
     effectColor: new FormControl<string>('#ffffff', { nonNullable: true }),
   });
   readonly openBlockOptions: OpenBlockOption[] = [
-     { key: 'wallTop', label: 'WT' },
-     { key: 'wallBottom', label: 'WB' },
-     { key: 'wallLeft', label: 'WL' },
-     { key: 'wallRight', label: 'WR' },
-     { key: 'doorTop', label: 'DT' },
-     { key: 'doorBottom', label: 'DB' },
-     { key: 'doorLeft', label: 'DL' },
-     { key: 'doorRight', label: 'DR' },
+      { key: 'wallTop', label: 'Top Wall', icon: '🧱⬆️' },
+      { key: 'wallBottom', label: 'Bottom Wall', icon: '🧱⬇️' },
+      { key: 'wallLeft', label: 'Left Wall', icon: '🧱⬅️' },
+      { key: 'wallRight', label: 'Right Wall', icon: '🧱➡️' },
+      { key: 'doorTop', label: 'Top Door', icon: '🚪⬆️' },
+      { key: 'doorBottom', label: 'Bottom Door', icon: '🚪⬇️' },
+      { key: 'doorLeft', label: 'Left Door', icon: '🚪⬅️' },
+      { key: 'doorRight', label: 'Right Door', icon: '🚪➡️' },
   ];
   readonly openBlockSelections = signal<Record<OpenBlockOptionKey, boolean>>({
     ...EMPTY_OPEN_BLOCK_SELECTIONS,
@@ -774,9 +785,16 @@ export class Creator implements OnInit {
     trapDescription: new FormControl<string>('', { nonNullable: true }),
     trapDamage: new FormControl<number>(0, { nonNullable: true }),
     trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS'>('HP', { nonNullable: true }),
+    trapType: new FormControl<TrapType>('Dart', { nonNullable: true }),
+    trapHiddenUntilFoundOrTriggered: new FormControl<boolean>(true, { nonNullable: true }),
+    trapSourceObjectType: new FormControl<TrapSourceObjectType>('door', { nonNullable: true }),
+    trapSourceSide: new FormControl<TrapSourceSide>('north', { nonNullable: true }),
     trapCurseId: new FormControl<number | null>(null),
     trapToDetect: new FormControl<number>(10, { nonNullable: true }),
     trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
+    trapSecondaryEffectTo: new FormControl<'Stamina' | 'Mind' | 'AE' | 'ROS' | null>(null),
+    trapSecondaryEffectAmount: new FormControl<number>(0, { nonNullable: true }),
+    trapSecondaryEffectDuration: new FormControl<number>(0, { nonNullable: true }),
     itemRequirementItemId: new FormControl<number | null>(null),
     itemRequirementConsume: new FormControl<boolean>(false, { nonNullable: true }),
     oneWay: new FormControl<boolean>(false, { nonNullable: true }),
@@ -893,9 +911,17 @@ export class Creator implements OnInit {
     trapDescription: new FormControl<string>('', { nonNullable: true }),
     trapDamage: new FormControl<number>(0, { nonNullable: true }),
     trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS'>('HP', { nonNullable: true }),
+    trapType: new FormControl<TrapType>('Dart', { nonNullable: true }),
+    trapHiddenUntilFoundOrTriggered: new FormControl<boolean>(true, { nonNullable: true }),
+    trapSourceObjectType: new FormControl<TrapSourceObjectType>('obstacle', { nonNullable: true }),
+    trapSourceSide: new FormControl<TrapSourceSide>('north', { nonNullable: true }),
     trapCurseId: new FormControl<number | null>(null),
     trapToDetect: new FormControl<number>(10, { nonNullable: true }),
     trapToDisarm: new FormControl<number>(10, { nonNullable: true }),
+    trapSecondaryEffectTo: new FormControl<'Stamina' | 'Mind' | 'AE' | 'ROS' | null>(null),
+    trapSecondaryEffectAmount: new FormControl<number>(0, { nonNullable: true }),
+    trapSecondaryEffectDuration: new FormControl<number>(0, { nonNullable: true }),
+    itemPlacement: new FormControl<'in' | 'on'>('in', { nonNullable: true }),
     shape: new FormControl<'circle' | 'square'>('circle', { nonNullable: true }),
     heightPercent: new FormControl<number>(100, { nonNullable: true }),
     heightAnchor: new FormControl<'floor' | 'ceiling'>('floor', { nonNullable: true }),
@@ -1244,13 +1270,20 @@ export class Creator implements OnInit {
     const hasTrap = this.doorForm.controls.hasTrap.value;
     const trap: Trap | null = hasTrap
       ? {
+          trapType: this.doorForm.controls.trapType.value,
           name: this.doorForm.controls.trapName.value.trim(),
           description: this.doorForm.controls.trapDescription.value.trim(),
           damage: Math.max(0, this.doorForm.controls.trapDamage.value),
           damageTo: this.doorForm.controls.trapDamageTo.value,
+          isHiddenUntilFoundOrTriggered: this.doorForm.controls.trapHiddenUntilFoundOrTriggered.value,
+          sourceObjectType: 'door',
+          sourceSide: this.doorForm.controls.trapSourceSide.value,
           curseId: this.doorForm.controls.trapCurseId.value ?? null,
           toDetect: Math.max(0, this.doorForm.controls.trapToDetect.value),
           toDisarm: Math.max(0, this.doorForm.controls.trapToDisarm.value),
+          secondaryEffectTo: this.doorForm.controls.trapSecondaryEffectTo.value,
+          secondaryEffectAmount: Math.max(0, this.doorForm.controls.trapSecondaryEffectAmount.value),
+          secondaryEffectDuration: Math.max(0, this.doorForm.controls.trapSecondaryEffectDuration.value),
         }
       : null;
     const itemReqId = this.doorForm.controls.itemRequirementItemId.value;
@@ -1386,9 +1419,16 @@ export class Creator implements OnInit {
       trapDescription: door.trap?.description ?? '',
       trapDamage: door.trap?.damage ?? 0,
       trapDamageTo: door.trap?.damageTo ?? 'HP',
+      trapType: door.trap?.trapType === 'Gas Cloud' ? 'Gas Cloud' : 'Dart',
+      trapHiddenUntilFoundOrTriggered: door.trap?.isHiddenUntilFoundOrTriggered ?? true,
+      trapSourceObjectType: 'door',
+      trapSourceSide: door.trap?.sourceSide ?? 'north',
       trapCurseId: door.trap?.curseId ?? null,
       trapToDetect: door.trap?.toDetect ?? 10,
       trapToDisarm: door.trap?.toDisarm ?? 10,
+      trapSecondaryEffectTo: door.trap?.secondaryEffectTo ?? null,
+      trapSecondaryEffectAmount: door.trap?.secondaryEffectAmount ?? 0,
+      trapSecondaryEffectDuration: door.trap?.secondaryEffectDuration ?? 0,
       itemRequirementItemId: door.itemRequirement?.itemId ?? null,
       itemRequirementConsume: door.itemRequirement?.consume ?? false,
       oneWay: door.oneWay ?? false,
@@ -1434,6 +1474,10 @@ export class Creator implements OnInit {
       this.startSetStartPointMode();
     } else if (action === 'setExit') {
       this.startSetExitMode();
+    } else if (action === 'clearStart') {
+      this.clearStartPoint();
+    } else if (action === 'clearExit') {
+      this.clearExits();
     } else if (action === 'createMonseter') {
       this.openMonsterDialog();
     } else if (action === 'addCellWallText') {
@@ -1584,7 +1628,7 @@ export class Creator implements OnInit {
     const controls = this.floorTrapForm.controls;
     const trapType = controls.trapType.value;
     const isAlwaysHidden = trapType === 'Floor Glue' || trapType === 'Drop Net';
-    const crossingRequirements = this.isFloorTrapCrossingConfigVisible()
+    const crossingRequirements = this.isFloorTrapSourceConfigVisible()
       ? this.floorTrapCrossingRequirements()
       : [];
     const sourceObjectType = this.isFloorTrapSourceConfigVisible()
@@ -1762,9 +1806,17 @@ export class Creator implements OnInit {
         trapDescription: '',
         trapDamage: 0,
         trapDamageTo: 'HP',
+        trapType: 'Dart',
+        trapHiddenUntilFoundOrTriggered: true,
+        trapSourceObjectType: 'obstacle',
+        trapSourceSide: 'north',
         trapCurseId: null,
         trapToDetect: 10,
         trapToDisarm: 10,
+        trapSecondaryEffectTo: null,
+        trapSecondaryEffectAmount: 0,
+        trapSecondaryEffectDuration: 0,
+        itemPlacement: 'in',
         shape: 'square',
         heightPercent: 100,
         heightAnchor: 'floor',
@@ -1789,9 +1841,17 @@ export class Creator implements OnInit {
       trapDescription: '',
       trapDamage: 0,
       trapDamageTo: 'HP',
+      trapType: 'Dart',
+      trapHiddenUntilFoundOrTriggered: true,
+      trapSourceObjectType: 'obstacle',
+      trapSourceSide: 'north',
       trapCurseId: null,
       trapToDetect: 10,
       trapToDisarm: 10,
+      trapSecondaryEffectTo: null,
+      trapSecondaryEffectAmount: 0,
+      trapSecondaryEffectDuration: 0,
+      itemPlacement: 'in',
       shape: 'circle',
       heightPercent: 100,
       heightAnchor: 'floor',
@@ -1811,18 +1871,30 @@ export class Creator implements OnInit {
     const rawTextImageId = controls.textImageId.value;
     const rawContainsItemId = controls.containsItemId.value;
     const rawRequiredKeyId = controls.requiredKeyId.value;
+    const rawItemPlacement = controls.itemPlacement.value;
     const hasTrap = controls.hasTrap.value;
     const normalizedContainsItemId = rawContainsItemId !== null ? (Number(rawContainsItemId) || null) : null;
-    const normalizedRequiredKeyId = rawRequiredKeyId !== null ? (Number(rawRequiredKeyId) || null) : null;
+    const normalizedRequiredKeyId = rawRequiredKeyId !== null ? Number(rawRequiredKeyId) : null;
+    const normalizedItemPlacement: 'in' | 'on' =
+      normalizedContainsItemId !== null && controls.heightPercent.value <= 50 && rawItemPlacement === 'on'
+        ? 'on'
+        : 'in';
     const trap: Trap | null = hasTrap
       ? {
+          trapType: controls.trapType.value,
           name: controls.trapName.value.trim(),
           description: controls.trapDescription.value.trim(),
           damage: Math.max(0, controls.trapDamage.value),
           damageTo: controls.trapDamageTo.value,
+          isHiddenUntilFoundOrTriggered: controls.trapHiddenUntilFoundOrTriggered.value,
+          sourceObjectType: 'obstacle',
+          sourceSide: controls.trapSourceSide.value,
           curseId: controls.trapCurseId.value ?? null,
           toDetect: Math.max(0, controls.trapToDetect.value),
           toDisarm: Math.max(0, controls.trapToDisarm.value),
+          secondaryEffectTo: controls.trapSecondaryEffectTo.value,
+          secondaryEffectAmount: Math.max(0, controls.trapSecondaryEffectAmount.value),
+          secondaryEffectDuration: Math.max(0, controls.trapSecondaryEffectDuration.value),
         }
       : null;
     const obstacleName = controls.name.value.trim() || 'Obstacle';
@@ -1863,6 +1935,7 @@ export class Creator implements OnInit {
                 isIndestructible: controls.isIndestructible.value,
                 containsItemId: normalizedContainsItemId,
                 requiredKeyId: normalizedRequiredKeyId,
+                itemPlacement: normalizedItemPlacement,
                 trap,
                 heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
                 heightAnchor: controls.heightAnchor.value,
@@ -1870,6 +1943,12 @@ export class Creator implements OnInit {
                 widthAnchor: controls.widthAnchor.value,
                 color: controls.color.value || null,
                 shape: controls.shape.value,
+                isUnlocked:
+                  normalizedRequiredKeyId === null || obs.isDestroyed || obs.isOpened
+                    ? true
+                    : obs.requiredKeyId === normalizedRequiredKeyId
+                      ? (obs.isUnlocked ?? false)
+                      : false,
                 isTrapDetected: trap ? obs.isTrapDetected : false,
                 isTrapDisarmed: trap ? obs.isTrapDisarmed : false,
               }
@@ -1890,6 +1969,7 @@ export class Creator implements OnInit {
         isIndestructible: controls.isIndestructible.value,
         containsItemId: normalizedContainsItemId,
         requiredKeyId: normalizedRequiredKeyId,
+        itemPlacement: normalizedItemPlacement,
         trap,
         heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
         heightAnchor: controls.heightAnchor.value,
@@ -1898,6 +1978,7 @@ export class Creator implements OnInit {
         color: controls.color.value || null,
         shape: controls.shape.value,
         currentHp: Math.max(1, controls.hp.value),
+        isUnlocked: normalizedRequiredKeyId === null,
         isDestroyed: false,
         isOpened: false,
         itemTaken: false,
@@ -1968,9 +2049,17 @@ export class Creator implements OnInit {
         trapDescription: obstacle.trap?.description ?? '',
         trapDamage: obstacle.trap?.damage ?? 0,
         trapDamageTo: obstacle.trap?.damageTo ?? 'HP',
+        trapType: obstacle.trap?.trapType === 'Gas Cloud' ? 'Gas Cloud' : 'Dart',
+        trapHiddenUntilFoundOrTriggered: obstacle.trap?.isHiddenUntilFoundOrTriggered ?? true,
+        trapSourceObjectType: 'obstacle',
+        trapSourceSide: obstacle.trap?.sourceSide ?? 'north',
         trapCurseId: obstacle.trap?.curseId ?? null,
         trapToDetect: obstacle.trap?.toDetect ?? 10,
         trapToDisarm: obstacle.trap?.toDisarm ?? 10,
+        trapSecondaryEffectTo: obstacle.trap?.secondaryEffectTo ?? null,
+        trapSecondaryEffectAmount: obstacle.trap?.secondaryEffectAmount ?? 0,
+        trapSecondaryEffectDuration: obstacle.trap?.secondaryEffectDuration ?? 0,
+        itemPlacement: obstacle.itemPlacement ?? 'in',
         shape: obstacle.shape ?? 'circle',
         heightPercent: obstacle.heightPercent ?? 100,
         heightAnchor: obstacle.heightAnchor ?? 'floor',
@@ -2011,9 +2100,16 @@ export class Creator implements OnInit {
       trapDescription: obstacle.trap?.description ?? '',
       trapDamage: obstacle.trap?.damage ?? 0,
       trapDamageTo: obstacle.trap?.damageTo ?? 'HP',
+      trapType: obstacle.trap?.trapType === 'Gas Cloud' ? 'Gas Cloud' : 'Dart',
+      trapHiddenUntilFoundOrTriggered: obstacle.trap?.isHiddenUntilFoundOrTriggered ?? true,
+      trapSourceObjectType: 'obstacle',
+      trapSourceSide: obstacle.trap?.sourceSide ?? 'north',
       trapCurseId: obstacle.trap?.curseId ?? null,
       trapToDetect: obstacle.trap?.toDetect ?? 10,
       trapToDisarm: obstacle.trap?.toDisarm ?? 10,
+      trapSecondaryEffectTo: obstacle.trap?.secondaryEffectTo ?? null,
+      trapSecondaryEffectAmount: obstacle.trap?.secondaryEffectAmount ?? 0,
+      trapSecondaryEffectDuration: obstacle.trap?.secondaryEffectDuration ?? 0,
       shape: obstacle.shape ?? 'circle',
       heightPercent: obstacle.heightPercent ?? 100,
       heightAnchor: obstacle.heightAnchor ?? 'floor',
@@ -2034,7 +2130,11 @@ export class Creator implements OnInit {
     const rawRequiredKeyId = controls.requiredKeyId.value;
     const hasTrap = controls.hasTrap.value;
     const normalizedContainsItemId = rawContainsItemId !== null ? (Number(rawContainsItemId) || null) : null;
-    const normalizedRequiredKeyId = rawRequiredKeyId !== null ? (Number(rawRequiredKeyId) || null) : null;
+    const normalizedRequiredKeyId = rawRequiredKeyId !== null ? Number(rawRequiredKeyId) : null;
+    const normalizedItemPlacement: 'in' | 'on' =
+      normalizedContainsItemId !== null && controls.heightPercent.value <= 50 && controls.itemPlacement.value === 'on'
+        ? 'on'
+        : 'in';
     const trap: Trap | null = hasTrap
       ? {
           name: controls.trapName.value.trim(),
@@ -2058,6 +2158,7 @@ export class Creator implements OnInit {
       isIndestructible: controls.isIndestructible.value,
       containsItemId: normalizedContainsItemId,
       requiredKeyId: normalizedRequiredKeyId,
+      itemPlacement: normalizedItemPlacement,
       trap,
       heightPercent: Math.max(1, Math.min(100, controls.heightPercent.value)),
       heightAnchor: controls.heightAnchor.value,
@@ -2066,6 +2167,7 @@ export class Creator implements OnInit {
       color: controls.color.value || null,
       shape: controls.shape.value,
       currentHp: Math.max(1, controls.hp.value),
+      isUnlocked: normalizedRequiredKeyId === null,
       isDestroyed: false,
       isOpened: false,
       itemTaken: false,
@@ -2123,10 +2225,17 @@ export class Creator implements OnInit {
   }
 
   removeObstacle(dungonId: number, obstacleId: number): void {
+    const obstacle = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find((p) => p.id === obstacleId) ?? null;
     this.obstaclePlacementsByDungon.update((all) => ({
       ...all,
       [dungonId]: (all[dungonId] ?? []).filter((p) => p.id !== obstacleId),
     }));
+
+    const requiredKeyId = obstacle?.requiredKeyId ?? null;
+    if (requiredKeyId !== null) {
+      this.keyList = this.keyList.filter((key) => key.id !== requiredKeyId);
+    }
+
     this.markDungonJsonChanged();
   }
 
@@ -2402,6 +2511,309 @@ export class Creator implements OnInit {
     const value = (event.target as HTMLSelectElement).value;
     this.selectedPlacedItemKey.set(value || null);
     this.drawGridCanvas();
+  }
+
+  openSquareActionsDialog(dungonId: number, row: number, column: number): void {
+    this.squareActionsContext.set({ dungonId, row, column });
+    this.isSquareActionsDialogVisible.set(true);
+  }
+
+  closeSquareActionsDialog(): void {
+    this.isSquareActionsDialogVisible.set(false);
+    this.squareActionsContext.set(null);
+  }
+
+  squareActionEntries(): SquareActionEntry[] {
+    const context = this.squareActionsContext();
+    if (!context) return [];
+
+    const { dungonId, row, column } = context;
+    const entries: SquareActionEntry[] = [];
+    const start = this.startPointByDungon()[dungonId] ?? null;
+    if (start && start.row === row && start.col === column) {
+      entries.push({
+        key: `start-${row}-${column}`,
+        type: 'start',
+        label: 'Start Point',
+        refId: null,
+      });
+    }
+
+    for (const exit of this.exitsByDungon()[dungonId] ?? []) {
+      if (exit.row !== row || exit.column !== column) continue;
+      entries.push({
+        key: `exit-${exit.id}`,
+        type: 'exit',
+        label: `Exit (${exit.destinationType})`,
+        refId: exit.id,
+      });
+    }
+
+    for (const portal of this.portalPlacementsByDungon()[dungonId] ?? []) {
+      const touchesStart = portal.startRow === row && portal.startColumn === column;
+      const touchesEnd = portal.endRow === row && portal.endColumn === column;
+      if (!touchesStart && !touchesEnd) continue;
+      const endpoint = touchesStart ? 'start' : 'end';
+      entries.push({
+        key: `portal-${portal.id}-${endpoint}`,
+        type: 'portal',
+        label: `Portal: ${portal.name} (${endpoint})`,
+        refId: portal.id,
+      });
+    }
+
+    for (const placement of this.monsterPlacementsByDungon()[dungonId] ?? []) {
+      if (placement.row !== row || placement.column !== column) continue;
+      const name = (this.monsterListByDungon()[dungonId] ?? []).find((m) => m.id === placement.monsterId)?.name ?? `Monster #${placement.monsterId}`;
+      entries.push({
+        key: `monster-${placement.monsterId}-${row}-${column}`,
+        type: 'monster',
+        label: `Monster: ${name}`,
+        refId: placement.monsterId,
+      });
+    }
+
+    for (const placement of this.tresherPlacementsByDungon()[dungonId] ?? []) {
+      if (placement.row !== row || placement.column !== column) continue;
+      const name = (this.tresherListByDungon()[dungonId] ?? []).find((t) => t.id === placement.tresherId)?.name ?? `Tresher #${placement.tresherId}`;
+      entries.push({
+        key: `tresher-${placement.tresherId}-${row}-${column}`,
+        type: 'tresher',
+        label: `Tresher: ${name}`,
+        refId: placement.tresherId,
+      });
+    }
+
+    const square = (this.squaresByDungon()[dungonId] ?? {})[this.getSquareKey(row, column)];
+    if (square) {
+      const seenDoorIds = new Set<number>();
+      for (const [sideLabel, conn] of [
+        ['Top', square.toTop],
+        ['Right', square.toRight],
+        ['Bottom', square.toBottom],
+        ['Left', square.toLeft],
+      ] as const) {
+        if (!conn || !this.isDoorConnection(conn) || seenDoorIds.has(conn.id)) continue;
+        seenDoorIds.add(conn.id);
+        entries.push({
+          key: `door-${conn.id}-${sideLabel}`,
+          type: 'door',
+          label: `Door (${sideLabel}): ${conn.name || 'Unnamed'}`,
+          refId: conn.id,
+        });
+      }
+    }
+
+    for (const trap of this.floorTrapPlacementsByDungon()[dungonId] ?? []) {
+      if (trap.row !== row || trap.column !== column) continue;
+      entries.push({
+        key: `trap-${trap.id}`,
+        type: 'trap',
+        label: `Trap: ${trap.trap.name || 'Unnamed'}`,
+        refId: trap.id,
+      });
+    }
+
+    for (const obstacle of this.obstaclePlacementsByDungon()[dungonId] ?? []) {
+      if (obstacle.row !== row || obstacle.column !== column || obstacle.isDestroyed) continue;
+      entries.push({
+        key: `obstacle-${obstacle.id}`,
+        type: 'obstacle',
+        label: `Obstacle: ${obstacle.name || 'Unnamed'}`,
+        refId: obstacle.id,
+      });
+    }
+
+    for (const item of this.itemPlacementsByDungon()[dungonId] ?? []) {
+      if (item.row !== row || item.column !== column) continue;
+      const name = this.libItems().find((i) => i.id === item.itemId)?.name ?? `Item #${item.itemId}`;
+      entries.push({
+        key: `item-${item.itemId}-${row}-${column}`,
+        type: 'item',
+        label: `Item: ${name}`,
+        refId: item.itemId,
+      });
+    }
+
+    for (const potion of this.potionPlacementsByDungon()[dungonId] ?? []) {
+      if (potion.row !== row || potion.column !== column) continue;
+      const name = this.libPotions().find((p) => p.id === potion.potionId)?.name ?? `Potion #${potion.potionId}`;
+      entries.push({
+        key: `potion-${potion.potionId}-${row}-${column}`,
+        type: 'potion',
+        label: `Potion: ${name}`,
+        refId: potion.potionId,
+      });
+    }
+
+    for (const spell of this.spellPlacementsByDungon()[dungonId] ?? []) {
+      if (spell.row !== row || spell.column !== column) continue;
+      const name = this.libUserSpells().find((s) => s.id === spell.spellId)?.name ?? `Spell #${spell.spellId}`;
+      entries.push({
+        key: `spell-${spell.spellId}-${row}-${column}`,
+        type: 'spell',
+        label: `Spell: ${name}`,
+        refId: spell.spellId,
+      });
+    }
+
+    return entries;
+  }
+
+  onSquareActionEdit(entry: SquareActionEntry): void {
+    const context = this.squareActionsContext();
+    if (!context) return;
+
+    const { dungonId, row, column } = context;
+    this.closeSquareActionsDialog();
+
+    if (entry.type === 'start') {
+      this.openStartPointDialog(dungonId, row, column);
+      return;
+    }
+    if (entry.type === 'exit') {
+      this.openExitDialog(dungonId, row, column);
+      return;
+    }
+    if (entry.type === 'portal' && entry.refId !== null) {
+      this.openPortalDialog(entry.refId);
+      return;
+    }
+    if (entry.type === 'monster') {
+      this.openMonsterPlacementEditDialog(dungonId, row, column);
+      return;
+    }
+    if (entry.type === 'tresher') {
+      this.openPlaceTresherDialog(dungonId, row, column);
+      return;
+    }
+    if (entry.type === 'door' && entry.refId !== null) {
+      this.openDoorEditDialog(entry.refId);
+      return;
+    }
+    if (entry.type === 'trap' && entry.refId !== null) {
+      this.openFloorTrapEditDialog(dungonId, entry.refId);
+      return;
+    }
+    if (entry.type === 'obstacle' && entry.refId !== null) {
+      this.openObstacleEditDialog(dungonId, entry.refId);
+      return;
+    }
+    if (entry.type === 'item') {
+      this.removeItemPlacementsAtSquare(dungonId, row, column);
+      this.markDungonJsonChanged();
+      this.openPlaceItemDialog(dungonId, row, column);
+      return;
+    }
+    if (entry.type === 'potion') {
+      this.removePotionPlacementsAtSquare(dungonId, row, column);
+      this.markDungonJsonChanged();
+      this.openPlacePotionDialog(dungonId, row, column);
+      return;
+    }
+    if (entry.type === 'spell') {
+      this.removeSpellPlacementsAtSquare(dungonId, row, column);
+      this.markDungonJsonChanged();
+      this.openPlaceSpellDialog(dungonId, row, column);
+    }
+  }
+
+  onSquareActionRemove(entry: SquareActionEntry): void {
+    const context = this.squareActionsContext();
+    if (!context) return;
+
+    const { dungonId, row, column } = context;
+
+    if (entry.type === 'start') {
+      const start = this.startPointByDungon()[dungonId] ?? null;
+      if (start && start.row === row && start.col === column) {
+        this.startPointByDungon.update((all) => ({ ...all, [dungonId]: null }));
+      }
+    } else if (entry.type === 'exit') {
+      this.removeExitsAtSquare(dungonId, row, column);
+    } else if (entry.type === 'portal' && entry.refId !== null) {
+      this.removePortal(dungonId, entry.refId);
+      return;
+    } else if (entry.type === 'monster') {
+      this.removeMonsterPlacementsAtSquare(dungonId, row, column);
+    } else if (entry.type === 'tresher') {
+      this.removeTresherPlacementsAtSquare(dungonId, row, column);
+    } else if (entry.type === 'door' && entry.refId !== null) {
+      this.removeDoorById(dungonId, entry.refId);
+    } else if (entry.type === 'trap' && entry.refId !== null) {
+      this.removeFloorTrap(dungonId, entry.refId);
+      this.drawGridCanvas();
+      this.drawPreviewGridCanvas();
+      return;
+    } else if (entry.type === 'obstacle' && entry.refId !== null) {
+      this.removeObstacle(dungonId, entry.refId);
+    } else if (entry.type === 'item') {
+      this.removeItemPlacementsAtSquare(dungonId, row, column);
+    } else if (entry.type === 'potion') {
+      this.removePotionPlacementsAtSquare(dungonId, row, column);
+    } else if (entry.type === 'spell') {
+      this.removeSpellPlacementsAtSquare(dungonId, row, column);
+    }
+
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+  }
+
+  onSquareActionAdd(kind: 'start' | 'exit' | 'monster' | 'tresher' | 'doorTop' | 'doorRight' | 'doorBottom' | 'doorLeft' | 'trap' | 'obstacle' | 'item' | 'potion' | 'spell'): void {
+    const context = this.squareActionsContext();
+    if (!context) return;
+
+    const { dungonId, row, column } = context;
+    this.closeSquareActionsDialog();
+
+    if (kind === 'start') {
+      this.openStartPointDialog(dungonId, row, column);
+      return;
+    }
+    if (kind === 'exit') {
+      this.openExitDialog(dungonId, row, column);
+      return;
+    }
+    if (kind === 'monster') {
+      this.openPlaceMonsterDialog(dungonId, row, column);
+      return;
+    }
+    if (kind === 'tresher') {
+      this.openPlaceTresherDialog(dungonId, row, column);
+      return;
+    }
+    if (kind === 'trap') {
+      this.openFloorTrapDialog(dungonId, row, column);
+      return;
+    }
+    if (kind === 'obstacle') {
+      this.openObstacleDialog(dungonId, row, column);
+      return;
+    }
+    if (kind === 'item') {
+      this.openPlaceItemDialog(dungonId, row, column);
+      return;
+    }
+    if (kind === 'potion') {
+      this.openPlacePotionDialog(dungonId, row, column);
+      return;
+    }
+    if (kind === 'spell') {
+      this.openPlaceSpellDialog(dungonId, row, column);
+      return;
+    }
+
+    const selections: Record<OpenBlockOptionKey, boolean> = {
+      ...EMPTY_OPEN_BLOCK_SELECTIONS,
+      doorTop: kind === 'doorTop',
+      doorRight: kind === 'doorRight',
+      doorBottom: kind === 'doorBottom',
+      doorLeft: kind === 'doorLeft',
+    };
+    const squareKey = this.getSquareKey(row, column);
+    const isNewSquare = !(this.filledSquaresByDungon()[dungonId] ?? {})[squareKey];
+    this.openDoorPlacementDialog(dungonId, row, column, isNewSquare, selections, squareKey);
   }
 
   moveSelectedPlacement(): void {
@@ -2705,6 +3117,13 @@ export class Creator implements OnInit {
 
     this.selectedKeyIdForPlacement.set(keyId);
     this.isKaysDialogVisible.set(false);
+  }
+
+  syncObstacleItemPlacement(): void {
+    const controls = this.obstacleForm.controls;
+    if (controls.containsItemId.value === null || controls.heightPercent.value > 50) {
+      controls.itemPlacement.setValue('in');
+    }
   }
 
   createObstacleRequiredKey(): void {
@@ -3055,6 +3474,21 @@ export class Creator implements OnInit {
     this.isStartPointMode.set(false);
   }
 
+  clearStartPoint(): void {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) {
+      return;
+    }
+
+    this.startPointByDungon.update((all) => ({ ...all, [dungonId]: null }));
+    this.isStartPointMode.set(false);
+    this.isStartPointDialogVisible.set(false);
+    this.pendingStartPointPlacement.set(null);
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
+  }
+
   startSetExitMode(): void {
     if (!this.hasAnyWhiteSpace()) {
       return;
@@ -3076,6 +3510,22 @@ export class Creator implements OnInit {
 
   cancelSetExitMode(): void {
     this.isExitMode.set(false);
+  }
+
+  clearExits(): void {
+    const dungonId = this.selectedDungonId();
+    if (dungonId === null) {
+      return;
+    }
+
+    this.exitsByDungon.update((all) => ({ ...all, [dungonId]: [] }));
+    this.isExitMode.set(false);
+    this.isExitDialogVisible.set(false);
+    this.pendingExitPlacement.set(null);
+    this.exitDialogError.set(null);
+    this.markDungonJsonChanged();
+    this.drawGridCanvas();
+    this.drawPreviewGridCanvas();
   }
 
   availableDestinationDungonsForExit(): DungonListItem[] {
@@ -6694,30 +7144,7 @@ export class Creator implements OnInit {
     }
 
     if (isFilledSquare) {
-      const existingExit = (this.exitsByDungon()[dungonId] ?? []).find(
-        (exit) => exit.row === row && exit.column === column
-      );
-      if (existingExit) {
-        this.openExitDialog(dungonId, row, column);
-        return;
-      }
-
-      const existingObstacle = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find(
-        (obs) => obs.row === row && obs.column === column && !obs.isDestroyed
-      );
-      if (existingObstacle) {
-        this.openObstacleEditDialog(dungonId, existingObstacle.id);
-        return;
-      }
-
-      const existingMonsterPlacement = (this.monsterPlacementsByDungon()[dungonId] ?? []).find(
-        (mp) => mp.row === row && mp.column === column
-      );
-      if (existingMonsterPlacement) {
-        this.openMonsterPlacementEditDialog(dungonId, row, column);
-        return;
-      }
-
+      this.openSquareActionsDialog(dungonId, row, column);
       return;
     }
 
@@ -7365,9 +7792,16 @@ export class Creator implements OnInit {
       trapDescription: '',
       trapDamage: 0,
       trapDamageTo: 'HP',
+      trapType: 'Dart',
+      trapHiddenUntilFoundOrTriggered: true,
+      trapSourceObjectType: 'door',
+      trapSourceSide: 'north',
       trapCurseId: null,
       trapToDetect: 10,
       trapToDisarm: 10,
+      trapSecondaryEffectTo: null,
+      trapSecondaryEffectAmount: 0,
+      trapSecondaryEffectDuration: 0,
       itemRequirementItemId: null,
       itemRequirementConsume: false,
     });

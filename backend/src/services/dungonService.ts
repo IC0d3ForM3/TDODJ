@@ -22,6 +22,7 @@ import {
   approveDungon as approveDungonInRepo,
   getSampleDungonFromDb,
   getSampleDungonFullFromDb,
+  getSampleDungonsFromDb,
   setSampleDungonInDb,
   getAllPublishedDungonsForAdmin,
 } from '../repositories/dungonRepository';
@@ -134,8 +135,12 @@ export const fetchSampleDungon = async () => {
   return await getSampleDungonFromDb();
 };
 
-export const fetchSampleDungonFull = async () => {
-  return await getSampleDungonFullFromDb();
+export const fetchSampleDungons = async () => {
+  return await getSampleDungonsFromDb();
+};
+
+export const fetchSampleDungonFull = async (id?: number) => {
+  return await getSampleDungonFullFromDb(id);
 };
 
 export const setSampleGame = async (id: number) => {

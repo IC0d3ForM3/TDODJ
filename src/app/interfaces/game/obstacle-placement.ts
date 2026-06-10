@@ -10,6 +10,7 @@ export interface ObstaclePlacement extends BasePlacement {
   hp: number;
   isIndestructible: boolean;
   containsItemId: number | null;
+  itemPlacement?: 'in' | 'on';
   requiredKeyId?: number | null;
   trap: Trap | null;
   shape: 'circle' | 'square';               // circle = pillar/cylinder; square = filled box
@@ -20,6 +21,7 @@ export interface ObstaclePlacement extends BasePlacement {
   color: string | null;                         // CSS color for fallback; null = white stone
   // runtime game state (mutable during play, persisted with save):
   currentHp?: number;
+  isUnlocked?: boolean;
   isDestroyed?: boolean;
   isOpened?: boolean;
   itemTaken?: boolean;

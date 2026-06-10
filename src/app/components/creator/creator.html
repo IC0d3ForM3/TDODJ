@@ -215,10 +215,12 @@
 							@for (option of openBlockOptions; track option.key) {
 								<button
 									type="button"
-									class="open-block-btn"
+									class="open-block-btn open-block-btn--icon"
 									[class.open-block-btn--active]="openBlockSelections()[option.key]"
+									[attr.title]="'Place ' + option.label"
+									[attr.aria-label]="'Place ' + option.label"
 									(click)="selectOpenBlockOption(option.key)"
-								>{{ option.label }}</button>
+								>{{ option.icon }}</button>
 							}
 							<button
 								type="button"
@@ -234,6 +236,8 @@
 								<option value="">Tools</option>
 								<option value="setStart" [disabled]="!hasAnyWhiteSpace()">Set Start</option>
 								<option value="setExit" [disabled]="!hasAnyWhiteSpace()">Set Exit</option>
+								<option value="clearStart" [disabled]="!selectedDungonId()">Clear Start</option>
+								<option value="clearExit" [disabled]="!selectedDungonId()">Clear Exit</option>
 								<option value="createThresher">Create Thresher</option>
 								<option value="createMonseter">Create Monseter</option>
 								<option value="placeShop" [disabled]="!hasAnyWhiteSpace()">Place Shop</option>
@@ -1470,6 +1474,52 @@
 	</div>
 }
 
+@if (isSquareActionsDialogVisible() && squareActionsContext(); as ctx) {
+	<div class="door-dialog-backdrop">
+		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Square actions">
+			<h4 class="door-dialog-title">Square Actions (row {{ ctx.row }}, col {{ ctx.column }})</h4>
+
+			<p class="details-message" style="margin-bottom: 0.55rem">Add to this square:</p>
+			<div class="square-actions-add-grid">
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('monster')">Add Monster</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('tresher')">Add Tresher</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('item')">Add Item</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('potion')">Add Potion</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('spell')">Add Spell</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('trap')">Add Trap</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('obstacle')">Add Obstacle</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('exit')">Set Exit</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('start')">Set Start</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('doorTop')">Add Door Top</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('doorRight')">Add Door Right</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('doorBottom')">Add Door Bottom</button>
+				<button type="button" class="cancel-button" (click)="onSquareActionAdd('doorLeft')">Add Door Left</button>
+			</div>
+
+			<p class="details-message" style="margin: 0.9rem 0 0.45rem">Current square contents:</p>
+			@if (squareActionEntries().length === 0) {
+				<p class="details-message">Nothing placed here yet.</p>
+			} @else {
+				<div class="square-actions-list">
+					@for (entry of squareActionEntries(); track entry.key) {
+						<div class="square-actions-item">
+							<span class="square-actions-label">{{ entry.label }}</span>
+							<div class="square-actions-buttons">
+								<button type="button" class="cancel-button" (click)="onSquareActionEdit(entry)">Edit</button>
+								<button type="button" class="cancel-button remove-button" (click)="onSquareActionRemove(entry)">Remove</button>
+							</div>
+						</div>
+					}
+				</div>
+			}
+
+			<div class="door-dialog-actions">
+				<button type="button" class="cancel-button" (click)="closeSquareActionsDialog()">Close</button>
+			</div>
+		</section>
+	</div>
+}
+
 @if (isDoorDialogVisible()) {
 	<div class="door-dialog-backdrop">
 		<section class="door-dialog" role="dialog" aria-modal="true" aria-label="Door settings">
@@ -1528,6 +1578,13 @@
 					Has Trap
 				</label>
 				@if (doorForm.controls.hasTrap.value) {
+					<label class="form-label" for="door-trap-type">Trap Type</label>
+					<select id="door-trap-type" class="form-input" formControlName="trapType">
+						@for (type of doorObstacleTrapTypeOptions; track type) {
+							<option [value]="type">{{ type }}</option>
+						}
+					</select>
+
 					<label class="form-label" for="door-trap-name">Trap Name</label>
 					<input id="door-trap-name" class="form-input" type="text" formControlName="trapName" />
 					<label class="form-label" for="door-trap-description">Trap Description</label>
@@ -1542,6 +1599,22 @@
 						<option value="AE">AE (Action Economy)</option>
 						<option value="ROS">ROS (Range of Sight)</option>
 					</select>
+					<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
+						<input type="checkbox" formControlName="trapHiddenUntilFoundOrTriggered" />
+						Hidden until found or triggered
+					</label>
+					<label class="form-label" for="door-trap-source-side">Trap Source Side</label>
+					<select id="door-trap-source-side" class="form-input" formControlName="trapSourceSide">
+						@for (side of trapSourceSideOptions; track side) {
+							<option [value]="side">{{ side }}</option>
+						}
+					</select>
+					<label class="form-label" for="door-trap-source-object">Trap Source Object</label>
+					<select id="door-trap-source-object" class="form-input" formControlName="trapSourceObjectType" [disabled]="true">
+						@for (objectType of trapSourceObjectOptions; track objectType) {
+							<option [value]="objectType">{{ objectType }}</option>
+						}
+					</select>
 					<label class="form-label" for="door-trap-curse-id">Curse (optional)</label>
 					<select id="door-trap-curse-id" class="form-input" formControlName="trapCurseId">
 						<option [ngValue]="null">— None —</option>
@@ -1553,6 +1626,18 @@
 					<input id="door-trap-to-detect" class="form-input" type="number" min="0" formControlName="trapToDetect" />
 					<label class="form-label" for="door-trap-to-disarm">To Disarm DC (Mind + d4)</label>
 					<input id="door-trap-to-disarm" class="form-input" type="number" min="0" formControlName="trapToDisarm" />
+					<label class="form-label" for="door-trap-secondary-effect-to">Secondary Effect (optional)</label>
+					<select id="door-trap-secondary-effect-to" class="form-input" formControlName="trapSecondaryEffectTo">
+						<option [ngValue]="null">— None —</option>
+						<option value="Stamina">Stamina</option>
+						<option value="Mind">Mind</option>
+						<option value="AE">AE (Action Economy)</option>
+						<option value="ROS">ROS (Range of Sight)</option>
+					</select>
+					<label class="form-label" for="door-trap-secondary-effect-amount">Secondary Effect Amount</label>
+					<input id="door-trap-secondary-effect-amount" class="form-input" type="number" min="0" formControlName="trapSecondaryEffectAmount" />
+					<label class="form-label" for="door-trap-secondary-effect-duration">Secondary Effect Duration (turns)</label>
+					<input id="door-trap-secondary-effect-duration" class="form-input" type="number" min="0" formControlName="trapSecondaryEffectDuration" />
 				}
 
 				@if (doorDialogError()) {
@@ -3122,7 +3207,7 @@
 				</div>
 
 				<label class="form-label" for="obstacle-height">Height % (100 = floor to ceiling)</label>
-				<input id="obstacle-height" class="form-input" type="number" min="1" max="100" formControlName="heightPercent" />
+				<input id="obstacle-height" class="form-input" type="number" min="1" max="100" formControlName="heightPercent" (input)="syncObstacleItemPlacement()" />
 
 				@if (obstacleForm.controls.heightPercent.value < 100) {
 					<label class="form-label" for="obstacle-height-anchor">Anchored from</label>
@@ -3158,12 +3243,28 @@
 				}
 
 				<label class="form-label" for="obstacle-item">Contains Item (optional)</label>
-				<select id="obstacle-item" class="form-input" formControlName="containsItemId">
+				<select id="obstacle-item" class="form-input" formControlName="containsItemId" (change)="syncObstacleItemPlacement()">
 					<option [ngValue]="null">— None —</option>
 					@for (item of libItems(); track item.id) {
 						<option [ngValue]="item.id">{{ item.name }}</option>
 					}
 				</select>
+
+				@if (obstacleForm.controls.containsItemId.value !== null) {
+					@if (obstacleForm.controls.heightPercent.value <= 50) {
+						<label class="form-label">Item Placement</label>
+						<div class="form-radio-group">
+							<label class="form-radio-label">
+								<input type="radio" formControlName="itemPlacement" value="in" /> In the obstacle
+							</label>
+							<label class="form-radio-label">
+								<input type="radio" formControlName="itemPlacement" value="on" /> On top of the obstacle
+							</label>
+						</div>
+					} @else {
+						<p class="form-hint">Tall obstacles can only contain items inside them.</p>
+					}
+				}
 
 				<label class="form-label" for="obstacle-required-key">Required Key To Open (optional)</label>
 				<select id="obstacle-required-key" class="form-input" formControlName="requiredKeyId">
@@ -3182,6 +3283,13 @@
 				</label>
 
 				@if (obstacleForm.controls.hasTrap.value) {
+					<label class="form-label" for="obstacle-trap-type">Trap Type</label>
+					<select id="obstacle-trap-type" class="form-input" formControlName="trapType">
+						@for (type of doorObstacleTrapTypeOptions; track type) {
+							<option [value]="type">{{ type }}</option>
+						}
+					</select>
+
 					<label class="form-label" for="obstacle-trap-name">Trap Name</label>
 					<input id="obstacle-trap-name" class="form-input" type="text" formControlName="trapName" />
 
@@ -3200,6 +3308,25 @@
 						<option value="ROS">ROS</option>
 					</select>
 
+					<label class="door-locked-toggle" style="margin-bottom: 0.6rem">
+						<input type="checkbox" formControlName="trapHiddenUntilFoundOrTriggered" />
+						Hidden until found or triggered
+					</label>
+
+					<label class="form-label" for="obstacle-trap-source-side">Trap Source Side</label>
+					<select id="obstacle-trap-source-side" class="form-input" formControlName="trapSourceSide">
+						@for (side of trapSourceSideOptions; track side) {
+							<option [value]="side">{{ side }}</option>
+						}
+					</select>
+
+					<label class="form-label" for="obstacle-trap-source-object">Trap Source Object</label>
+					<select id="obstacle-trap-source-object" class="form-input" formControlName="trapSourceObjectType" [disabled]="true">
+						@for (objectType of trapSourceObjectOptions; track objectType) {
+							<option [value]="objectType">{{ objectType }}</option>
+						}
+					</select>
+
 					<label class="form-label" for="obstacle-trap-curse-id">Curse (optional)</label>
 					<select id="obstacle-trap-curse-id" class="form-input" formControlName="trapCurseId">
 						<option [ngValue]="null">— None —</option>
@@ -3213,6 +3340,21 @@
 
 					<label class="form-label" for="obstacle-trap-to-disarm">To Disarm DC (Mind + d12)</label>
 					<input id="obstacle-trap-to-disarm" class="form-input" type="number" min="0" formControlName="trapToDisarm" />
+
+					<label class="form-label" for="obstacle-trap-secondary-effect-to">Secondary Effect (optional)</label>
+					<select id="obstacle-trap-secondary-effect-to" class="form-input" formControlName="trapSecondaryEffectTo">
+						<option [ngValue]="null">— None —</option>
+						<option value="Stamina">Stamina</option>
+						<option value="Mind">Mind</option>
+						<option value="AE">AE (Action Economy)</option>
+						<option value="ROS">ROS (Range of Sight)</option>
+					</select>
+
+					<label class="form-label" for="obstacle-trap-secondary-effect-amount">Secondary Effect Amount</label>
+					<input id="obstacle-trap-secondary-effect-amount" class="form-input" type="number" min="0" formControlName="trapSecondaryEffectAmount" />
+
+					<label class="form-label" for="obstacle-trap-secondary-effect-duration">Secondary Effect Duration (turns)</label>
+					<input id="obstacle-trap-secondary-effect-duration" class="form-input" type="number" min="0" formControlName="trapSecondaryEffectDuration" />
 				}
 
 				<div class="form-actions">

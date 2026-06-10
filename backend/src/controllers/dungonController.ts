@@ -955,6 +955,16 @@ export const getSampleDungon = async (req: Request, res: Response) => {
   }
 };
 
+export const getSampleDungons = async (_req: Request, res: Response) => {
+  try {
+    const dungons = await dungonService.fetchSampleDungons();
+    return res.json(dungons);
+  } catch (error) {
+    console.error('Error fetching sample dungons:', error);
+    return res.status(500).json({ error: 'Failed to fetch sample dungons' });
+  }
+};
+
 export const setSampleDungon = async (req: Request, res: Response) => {
   const id = Number.parseInt(req.params['id'], 10);
   const { userkey } = req.body as Partial<{ userkey: string }>;
@@ -1010,6 +1020,9 @@ export const getAdminPublishedDungons = async (req: Request, res: Response) => {
 export const getSampleGameSession = async (req: Request, res: Response) => {
   const pcIdRaw = req.query['pcId'];
   const pcId = typeof pcIdRaw === 'string' ? Number.parseInt(pcIdRaw, 10) : NaN;
+  const dungonIdRaw = req.query['dungonId'];
+  const dungonId = typeof dungonIdRaw === 'string' ? Number.parseInt(dungonIdRaw, 10) : NaN;
+  const requestedDungonId = Number.isInteger(dungonId) && dungonId > 0 ? dungonId : undefined;
 
   if (!Number.isInteger(pcId) || pcId <= 0) {
     return res.status(400).json({ error: 'Valid pcId query parameter is required' });
@@ -1017,7 +1030,7 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
 
   try {
     const [dungon, pc] = await Promise.all([
-      dungonService.fetchSampleDungonFull(),
+      dungonService.fetchSampleDungonFull(requestedDungonId),
       pcService.fetchSamplePcById(pcId),
     ]);
 

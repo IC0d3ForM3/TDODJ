@@ -1,4 +1,24 @@
 <section class="game-page">
+	@if (showSoundPreferenceModal()) {
+		<div class="sound-pref-overlay" (click)="closeSoundPreferenceModal()"></div>
+		<div class="sound-pref-modal" role="dialog" aria-modal="true" aria-labelledby="sound-pref-title" aria-describedby="sound-pref-desc" (click)="$event.stopPropagation()">
+			<div class="sound-pref-header">
+				<p id="sound-pref-title" class="sound-pref-title">Listen for the dungeon?</p>
+				<button type="button" class="sound-pref-close" (click)="closeSoundPreferenceModal()" aria-label="Close">✕</button>
+			</div>
+			<p id="sound-pref-desc" class="sound-pref-text">
+				Choose whether the tavern music, spell crackle, and dungeon sounds should play.
+			</p>
+			<div class="sound-pref-actions">
+				<button type="button" class="sound-pref-btn sound-pref-btn-on" (click)="chooseSoundPreference(true)">
+					Sound On
+				</button>
+				<button type="button" class="sound-pref-btn sound-pref-btn-off" (click)="chooseSoundPreference(false)">
+					Sound Off
+				</button>
+			</div>
+		</div>
+	}
 
 	@if (showTavernModal()) {
 		<button type="button" class="sound-toggle-btn tavern-mute-overlay" (click)="toggleMute()"
@@ -252,19 +272,44 @@
 		<div class="inventory-modal-overlay" (click)="closeBackpackInventoryModal()">
 			<div class="inventory-modal-box" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Backpack inventory">
 				<div class="inventory-modal-header">
-					<h3 class="inventory-modal-title">Backpack Inventory</h3>
+					<h3 class="inventory-modal-title">Backpack Inventory ({{ backpackTotalItemCount() }})</h3>
 					<button type="button" class="inventory-modal-close" (click)="closeBackpackInventoryModal()">✕</button>
 				</div>
 				<div class="inventory-modal-scroll">
-					<p class="inventory-section-title">Items</p>
-					@for (group of allTresherItemsGrouped(); track group.type) {
-						<p class="inventory-section-label">{{ group.type }}</p>
+					@if (allTresherItemsGrouped().length > 0) {
+						<p class="inventory-section-title">Items ({{ backpackTresherItemCount() }})</p>
+						@for (group of allTresherItemsGrouped(); track group.type) {
+							<p class="inventory-section-label">{{ group.type }}</p>
+							<ul class="tresher-items-list">
+								@for (item of group.items; track item.id) {
+									<li class="tresher-inner-item">
+										<span class="tresher-item-name">{{ item.name }}@if (item.description) {{{ ': ' + item.description }}}</span>
+										@if (isItemEquipable(item.type, item.name)) {
+											<div class="inventory-item-actions">
+												<button
+													type="button"
+													class="action-button"
+													[class.action-button-strong]="isItemEquippedById(item.id)"
+													(click)="toggleItemEquipped(item.id)"
+												>
+													{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
+												</button>
+											</div>
+										}
+									</li>
+								}
+							</ul>
+						}
+					}
+
+					@if (collectedWeaponItemsForPreview().length > 0) {
+						<p class="inventory-section-title">Weapons ({{ collectedWeaponItemsForPreview().length }})</p>
 						<ul class="tresher-items-list">
-							@for (item of group.items; track item.id) {
+							@for (item of collectedWeaponItemsForPreview(); track item.id) {
 								<li class="tresher-inner-item">
-									<span class="tresher-item-name">{{ item.name }}@if (item.description) {{{ ': ' + item.description }}}</span>
-									@if (isItemEquipable(item.type, item.name)) {
-										<div class="inventory-item-actions">
+									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+									<div class="inventory-item-actions">
+										@if (isItemEquipable(item.type, item.name)) {
 											<button
 												type="button"
 												class="action-button"
@@ -273,7 +318,77 @@
 											>
 												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
 											</button>
-										</div>
+										}
+									</div>
+								</li>
+							}
+						</ul>
+					}
+
+					@if (collectedArmorItemsForPreview().length > 0) {
+						<p class="inventory-section-title">Armor ({{ collectedArmorItemsForPreview().length }})</p>
+						<ul class="tresher-items-list">
+							@for (item of collectedArmorItemsForPreview(); track item.id) {
+								<li class="tresher-inner-item">
+									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+									<div class="inventory-item-actions">
+										@if (isItemEquipable(item.type, item.name)) {
+											<button
+												type="button"
+												class="action-button"
+												[class.action-button-strong]="isItemEquippedById(item.id)"
+												(click)="toggleItemEquipped(item.id)"
+											>
+												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
+											</button>
+										}
+									</div>
+								</li>
+							}
+						</ul>
+					}
+
+					@if (collectedOtherItemsForPreview().length > 0) {
+						<p class="inventory-section-title">Other Items ({{ collectedOtherItemsForPreview().length }})</p>
+						<ul class="tresher-items-list">
+							@for (item of collectedOtherItemsForPreview(); track item.id) {
+								<li class="tresher-inner-item">
+									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+									<div class="inventory-item-actions">
+										@if (isOtherItemUsable(item)) {
+											<button
+												type="button"
+												class="action-button action-button-strong"
+												[disabled]="turnPhase() !== 'player' || playerHp() <= 0 || playerAE() < 1"
+												(click)="useCollectedOtherItem(item.id)"
+											>
+												Use ({{ item.uses }})
+											</button>
+										}
+										@if (isItemEquipable(item.type, item.name)) {
+											<button
+												type="button"
+												class="action-button"
+												[class.action-button-strong]="isItemEquippedById(item.id)"
+												(click)="toggleItemEquipped(item.id)"
+											>
+												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
+											</button>
+										}
+									</div>
+								</li>
+							}
+						</ul>
+					}
+
+					@if (allPotionsUnified().length > 0) {
+						<p class="inventory-section-title">Potions ({{ allPotionsUnified().length }})</p>
+						<ul class="tresher-items-list">
+							@for (potion of allPotionsUnified(); track potion.id + ':' + potion.source) {
+								<li class="tresher-inner-item">
+									<span class="tresher-item-name">{{ potion.name }}</span>
+									@if (potion.description) {
+										<span class="tresher-item-desc">{{ potion.description }}</span>
 									}
 								</li>
 							}
@@ -281,7 +396,7 @@
 					}
 
 					@if (allTresherSpellsFlat().length > 0) {
-						<p class="inventory-section-title">Spells</p>
+						<p class="inventory-section-title">Spells ({{ allTresherSpellsFlat().length }})</p>
 						<p class="tresher-item-desc">Spell Loadout: {{ equippedSpellMagicCostForPreview() }} / {{ playerMindForView() }} Mind</p>
 						<ul class="tresher-items-list">
 							@for (spell of allTresherSpellsFlat(); track spell.id) {
@@ -311,6 +426,33 @@
 										>
 											{{ isSpellEquippedById(spell.id) ? 'Unequip' : 'Equip' }}
 										</button>
+									</div>
+								</li>
+							}
+						</ul>
+					}
+
+					@if (collectedFloorSpellsForPreview().length > 0) {
+						<p class="inventory-section-title">Learnable Spells ({{ collectedFloorSpellsForPreview().length }})</p>
+						<ul class="tresher-items-list">
+							@for (spell of collectedFloorSpellsForPreview(); track spell.id + ':' + $index) {
+								<li class="tresher-inner-item">
+									<span class="tresher-item-name">{{ spell.name }}</span>
+									@if (spell.description) {
+										<span class="tresher-item-desc">{{ spell.description }}</span>
+									}
+									<div class="inventory-item-actions">
+										<button
+											type="button"
+											class="action-button action-button-strong"
+											[disabled]="!canLearnCollectedSpell(spell)"
+											(click)="learnCollectedFloorSpell(spell.id)"
+										>
+											Learn
+										</button>
+										@if (isSpellLearned(spell.id)) {
+											<span class="inventory-equipped-status">Learned</span>
+										}
 									</div>
 								</li>
 							}
@@ -641,7 +783,7 @@
 								<div class="fpv-action-grid-row">
 									<button type="button" class="fpv-icon-btn fpv-icon-btn-eye" title="Search (costs 1 AE)" [class.fpv-icon-btn-active]="canSearch()" [class.fpv-icon-btn-blink]="isThiephTrapSenseActive()" [disabled]="!canSearch()" (click)="searchForTraps()">👁</button>
 									<button type="button" class="fpv-icon-btn" title="Drink Potion" (click)="openDrinkPotionModal()">🧪</button>
-									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canPickAny()" title="Pick Lock / Disarm Trap" (click)="canPickAny() && foundTrap() ? tryDisarmTrap() : pickLockDoor(nearbyDoorsForPreview()[0])"><span class="pick-icon">&#x2310;&#xAC;</span></button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canPickAny()" title="Pick Lock / Disarm Trap" (click)="handlePickActionIcon()"><span class="pick-icon">&#x2310;&#xAC;</span></button>
 								</div>
 								<div class="fpv-action-grid-row">
 									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="hasCurrentSquarePickupItems()" title="Take Tresher" (click)="takeAllFromCurrentSquare()">&#x1F4B0;</button>
@@ -649,8 +791,8 @@
 									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canTalkToNpc()" title="Talk to NPC" (click)="talkToNpc()">💬</button>
 								</div>
 								<div class="fpv-action-grid-row">
-									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canUnlockAnyDoor()" title="Use Key" (click)="unlockAdjacentDoor(nearbyDoorsForPreview()[0])">🔑</button>
-									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canOpenAnyDoor()" title="Open Door" (click)="openAdjacentDoor(nearbyDoorsForPreview()[0])">🚪</button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canUnlockAnyDoor()" title="Use Key" (click)="handleUnlockActionIcon()">🔑</button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canOpenAnyDoor()" title="Open Door" (click)="handleOpenActionIcon()">🚪</button>
 									<button type="button" class="fpv-icon-btn" title="Backpack Inventory" (click)="openBackpackInventoryModal()">🎒</button>
 								</div>
 								<div class="fpv-action-grid-row">
@@ -728,7 +870,7 @@
 							</button>
 						}
 						@if (canMageRest()) {
-							<button type="button" class="action-button action-button-mage-rest" (click)="mageRest()" title="Rest — roll 1d12 per AE. Each non-Dox roll restores 1 MP. No Dox: AE restored to max. Dox: turn ends immediately.">
+							<button type="button" class="action-button action-button-mage-rest" (click)="mageRest()" title="Rest — recover 1 MP per current AE (up to max), then restore AE to max. Mage Dox checks: 1d20 per MP gained; on spell cast: 1d20 per MP spent. End Turn Early restores 1 MP per AE left.">
 								Rest ✨
 							</button>
 						}
@@ -874,19 +1016,38 @@
 												Destroyed.
 											} @else if (obstacleInfo.obstacle.isOpened) {
 												Opened.
+											} @else if (obstacleInfo.obstacle.requiredKeyId !== null && obstacleInfo.obstacle.isUnlocked !== true) {
+												Locked.
+											} @else if (obstacleInfo.obstacle.isOpened) {
+												Opened.
 											} @else {
 												Closed.
 											}
 											@if (obstacleRequiresKeyLabel(obstacleInfo.obstacle); as keyLabel) {
 												Requires key: {{ keyLabel }}.
-												@if (obstacleInfo.hasMatchingKey) {
+												@if (obstacleInfo.obstacle.isUnlocked) {
+													Already unlocked.
+												} @else if (obstacleInfo.hasMatchingKey) {
 													You can unlock it now.
 												} @else {
 													You need the right key.
 												}
 											}
 										</p>
+												@if ((obstacleInfo.obstacle.note || '').trim()) {
+													<button type="button" class="pc-wall-note-read-btn" (click)="readObstacleText(obstacleInfo.obstacle.name || 'Text', obstacleInfo.obstacle.note)">Read Text</button>
+												}
 										<div class="door-actions">
+											@if (obstacleInfo.canUseKey) {
+												<button type="button" class="action-button action-button-key" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="unlockObstacle(obstacleInfo.obstacle.id)">
+													Use Key
+												</button>
+											}
+											@if (obstacleInfo.canPick) {
+												<button type="button" class="action-button" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="pickObstacleLock(obstacleInfo.obstacle.id)">
+													Pick Lock
+												</button>
+											}
 											@if (obstacleInfo.canOpen) {
 												<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="openObstacle(obstacleInfo.obstacle.id)">
 													{{ obstacleOpenButtonLabel(obstacleInfo.obstacle) }}
@@ -910,6 +1071,33 @@
 									<span class="discovery-kind">{{ item.kind }}</span>
 									<p class="discovery-name">{{ item.name }}</p>
 									<p class="discovery-description">{{ item.description }}</p>
+									@if (item.kind === 'Obstacle' && obstacleActionInfoForNearbyItem(item); as obstacleInfo) {
+										<div class="door-actions">
+											@if (obstacleInfo.canUseKey) {
+												<button type="button" class="action-button action-button-key" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="unlockObstacle(obstacleInfo.obstacle.id)">
+													Use Key
+												</button>
+											}
+											@if (obstacleInfo.canPick) {
+												<button type="button" class="action-button" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="pickObstacleLock(obstacleInfo.obstacle.id)">
+													Pick Lock
+												</button>
+											}
+											@if (obstacleInfo.canOpen) {
+												<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="openObstacle(obstacleInfo.obstacle.id)">
+													Open Obstacle
+												</button>
+											}
+											@if (obstacleInfo.canTakeItem) {
+												<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="takeItemFromObstacle(obstacleInfo.obstacle.id)">
+													Take Item
+												</button>
+											}
+										</div>
+									}
+												@if (item.kind === 'Text') {
+													<button type="button" class="pc-wall-note-read-btn" (click)="readObstacleText(item.name, item.description)">Read Text</button>
+												}
 								@if (item.imageSrc) {
 									<img [src]="item.imageSrc" alt="discovery image" style="display:block;max-width:100%;max-height:140px;border:1px solid rgba(255,255,255,0.25);border-radius:4px;margin-top:0.35rem" />
 								}
@@ -949,11 +1137,29 @@
 							@for (obs of currentSquareObstacles(); track obs.id) {
 								<div class="obstacle-action-row">
 									<span class="obstacle-action-name">{{ obs.name }}</span>
-									@if (obs.containsItemId !== null && !obs.itemTaken && !obs.isDestroyed) {
+											@if ((obs.note || '').trim()) {
+												<button type="button" class="pc-wall-note-read-btn" (click)="readObstacleText(obs.name || 'Text', obs.note)">Read Text</button>
+											}
+											@if (!obs.isDestroyed && !obs.isOpened && obstacleIsLocked(obs) && obstacleHasMatchingKey(obs)) {
+												<button type="button" class="action-button action-button-key" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="unlockObstacle(obs.id)">
+													Use Key
+												</button>
+											}
+											@if (!obs.isDestroyed && !obs.isOpened && obstacleIsLocked(obs)) {
+												<button type="button" class="action-button" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="pickObstacleLock(obs.id)">
+													Pick Lock
+												</button>
+											}
+											@if (!obs.isDestroyed && !obs.isOpened && !obstacleIsLocked(obs) && ((obs.itemPlacement ?? 'in') !== 'on' || obs.containsItemId === null || obs.itemTaken)) {
 										<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="openObstacle(obs.id)">
 											{{ obstacleOpenButtonLabel(obs) }}
 										</button>
 									}
+											@if (obs.containsItemId !== null && !obs.itemTaken && ((obs.itemPlacement ?? 'in') === 'on' || obs.isDestroyed || obs.isOpened)) {
+												<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="takeItemFromObstacle(obs.id)">
+													Take Item
+												</button>
+											}
 									@if (!obs.isIndestructible && !(obs.isDestroyed)) {
 										<button type="button" class="action-button" (click)="smashObstacle(obs.id)">
 											Smash

@@ -276,7 +276,7 @@ export class Admin implements OnInit {
     this.http.put<{ result: number }>(`${API_BASE_URL}/dungons/${id}/set-sample`, { userkey: key }).subscribe({
       next: () => {
         this.dungons.update((list) =>
-          list.map((d) => ({ ...d, issample: d.id === id }))
+          list.map((d) => d.id === id ? { ...d, issample: !d.issample } : d)
         );
         this.dungonSaving.set(null);
         this.dungonSaveSuccess.set('Sample dungon updated.');
@@ -330,7 +330,7 @@ export class Admin implements OnInit {
   private loadDailyHits(): void {
     this.isDailyHitsLoading.set(true);
     this.dailyHitsError.set(null);
-    this.http.get<DailyHitsRecord[]>(`${API_BASE_URL}/stats/daily-hits?limit=30`).subscribe({
+    this.http.get<DailyHitsRecord[]>(`${API_BASE_URL}/stats/daily-hits?limit=5`).subscribe({
       next: (hits) => {
         this.dailyHits.set(hits);
         this.isDailyHitsLoading.set(false);

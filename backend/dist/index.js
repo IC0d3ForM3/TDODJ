@@ -77,6 +77,7 @@ app.put('/users/:id', userController.updateUserFlags);
 app.get('/dungons', dungonController.getDungons);
 app.get('/dungons/published', dungonController.getPublishedDungons);
 app.get('/dungons/sample', dungonController.getSampleDungon);
+app.get('/dungons/sample-list', dungonController.getSampleDungons);
 app.get('/dungons/admin-published', dungonController.getAdminPublishedDungons);
 app.get('/dungons/:id', dungonController.getDungonById);
 app.post('/dungons', dungonController.createDungon);
