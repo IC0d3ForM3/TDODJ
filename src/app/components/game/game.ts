@@ -14,8 +14,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Account } from '../../services/account';
 import { GameDrawingAssetsService } from '../../services/game-drawing-assets';
-import { DungeonJsonService } from '../../services/dungeon-json';
 import { DungeonStateService } from '../../services/dungeon-state';
+import { GameJsonParserService, ParsedPcTresherCurseData as PcTresherCurseData } from '../../services/game-json-parser';
 import { GameInventoryService, PcTresherSpellData } from '../../services/game-inventory';
 import { GameCombatService, TurnPhase, GameMonsterInstance, CombatLogEntry, ActiveEffect } from '../../services/game-combat';
 import { GameMovementService } from '../../services/game-movement';
@@ -107,17 +107,6 @@ interface SoundRecordPayload {
   path: string;
 }
 
-interface PcTresherCurseData {
-  id: number;
-  name: string;
-  description: string;
-  effectTo: string;
-  effectTo2: string | null;
-  damage: number;
-  damage2: number;
-  lastFor: number;
-}
-
 type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind' | 'rangedTarget';
 type MonsterImpactProjectile = 'arrow' | 'knife';
 type MonsterImpactState = { kind: MonsterImpactKind; color?: string | null; projectile?: MonsterImpactProjectile | null; startedAt: number; expiresAt: number };
@@ -177,8 +166,8 @@ export class Game implements OnInit {
   private readonly router = inject(Router);
   private readonly account = inject(Account);
   private readonly drawingAssets = inject(GameDrawingAssetsService);
-  private readonly dungeonJsonService = inject(DungeonJsonService);
   private readonly dungeonState = inject(DungeonStateService);
+  private readonly gameJsonParserService = inject(GameJsonParserService);
   readonly inventoryService = inject(GameInventoryService);
   readonly combatService = inject(GameCombatService);
   readonly movementService = inject(GameMovementService);
@@ -5218,9 +5207,9 @@ const targetKind = this.getSpellTargetKind(spell);
         .pipe(finalize(() => this.isLoadingGame.set(false)))
         .subscribe({
           next: (game) => {
-            const playerMaxHp = this.resolvePlayerMaxHp(game.pcMaxHP);
+            const playerMaxHp = this.gameJsonParserService.resolvePlayerMaxHp(game.pcMaxHP);
             this.playerMaxHp.set(playerMaxHp);
-            this.playerStartingHp = this.resolvePlayerCurrentHp(game.pcCurrentHP, playerMaxHp);
+            this.playerStartingHp = this.gameJsonParserService.resolvePlayerCurrentHp(game.pcCurrentHP, playerMaxHp);
             this.currentGameId.set(null);
             this.gameName.set(game.name || 'Sample Game');
             this.gameLastUpdated.set(null);
@@ -5240,34 +5229,13 @@ const targetKind = this.getSpellTargetKind(spell);
             this.setPcInventoryInitialized(game.dungonid, false);
             this.seedPcTreshersIntoInventory(game.dungonid, game.pcTreshers);
             if (Array.isArray(game.pcTresherItems)) {
-              const itemMap = new Map<number, { id: number; name: string; description: string; type: string; soundId?: number | null; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>();
-              for (const raw of game.pcTresherItems) {
-                const it = raw as { id: number; name: string; description: string; type: string; soundId?: number | null; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean };
-                const itemRaw = raw as Record<string, unknown>;
-                if (typeof it.id === 'number') {
-                  itemMap.set(it.id, { ...it, soundId: typeof it.soundId === 'number' ? it.soundId : (typeof itemRaw['soundid'] === 'number' ? itemRaw['soundid'] as number : null), damage: typeof it.damage === 'number' ? it.damage : 6, range: typeof it.range === 'number' ? Math.max(1, it.range) : 1, effectToPc: typeof it.effectToPc === 'string' ? it.effectToPc : null, effectToPcValue: typeof it.effectToPcValue === 'number' ? it.effectToPcValue : 0, weaponEffectType: typeof it.weaponEffectType === 'string' ? it.weaponEffectType : 'Blood', weaponEffectColor: typeof it.weaponEffectColor === 'string' ? it.weaponEffectColor : '#cc0000', isTwoHanded: it.isTwoHanded === true });
-                }
-              }
-              this.pcTresherItemsById.set(itemMap);
+              this.pcTresherItemsById.set(this.gameJsonParserService.parsePcTresherItemMap(game.pcTresherItems));
             }
             if (Array.isArray(game.pcTresherPotions)) {
-              const potionMap = new Map<number, { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>();
-              for (const raw of game.pcTresherPotions) {
-                const p = raw as { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number };
-                if (typeof p.id === 'number') {
-                  potionMap.set(p.id, p);
-                }
-              }
-              this.pcTresherPotionsById.set(potionMap);
+              this.pcTresherPotionsById.set(this.gameJsonParserService.parsePcTresherPotionMap(game.pcTresherPotions));
             }
             if (Array.isArray(game.pcTresherSpells)) {
-              const spellMap = new Map<number, PcTresherSpellData>();
-              for (const raw of game.pcTresherSpells) {
-                const spell = this.normalizeSpellRecord(raw);
-                if (spell !== null) {
-                  spellMap.set(spell.id, spell);
-                }
-              }
+              const spellMap = this.gameJsonParserService.parsePcTresherSpellMap(game.pcTresherSpells);
               this.pcTresherSpellsById.update((existingMap) => {
                 const merged = new Map(existingMap);
                 for (const [id, spell] of spellMap) {
@@ -5277,14 +5245,7 @@ const targetKind = this.getSpellTargetKind(spell);
               });
             }
             if (Array.isArray(game.pcTresherCurses)) {
-              const curseMap = new Map<number, PcTresherCurseData>();
-              for (const raw of game.pcTresherCurses) {
-                const curse = this.normalizeCurseRecord(raw);
-                if (curse !== null) {
-                  curseMap.set(curse.id, curse);
-                }
-              }
-              this.pcTresherCursesById.set(curseMap);
+              this.pcTresherCursesById.set(this.gameJsonParserService.parsePcTresherCurseMap(game.pcTresherCurses));
             } else {
               this.pcTresherCursesById.set(new Map());
             }
@@ -5334,9 +5295,9 @@ const targetKind = this.getSpellTargetKind(spell);
       .pipe(finalize(() => this.isLoadingGame.set(false)))
       .subscribe({
         next: (game) => {
-          const playerMaxHp = this.resolvePlayerMaxHp(game.pcMaxHP);
+          const playerMaxHp = this.gameJsonParserService.resolvePlayerMaxHp(game.pcMaxHP);
           this.playerMaxHp.set(playerMaxHp);
-          this.playerStartingHp = this.resolvePlayerCurrentHp(game.pcCurrentHP, playerMaxHp);
+          this.playerStartingHp = this.gameJsonParserService.resolvePlayerCurrentHp(game.pcCurrentHP, playerMaxHp);
 
           this.currentGameId.set(gameId);
           this.gameName.set(game.name || 'Game');
@@ -5364,51 +5325,13 @@ const targetKind = this.getSpellTargetKind(spell);
           this.loadDungonJsonState(game.dungonid, game.dungenJson);
           this.seedPcTreshersIntoInventory(game.dungonid, game.pcTreshers);
           if (Array.isArray(game.pcTresherItems)) {
-            const itemMap = new Map<number, { id: number; name: string; description: string; type: string; soundId?: number | null; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean }>();
-            for (const raw of game.pcTresherItems) {
-              const it = raw as { id: number; name: string; description: string; type: string; soundId?: number | null; effectValue: number | null; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean };
-              const itemRaw = raw as Record<string, unknown>;
-              if (typeof it.id === 'number') {
-                itemMap.set(it.id, { ...it, soundId: typeof it.soundId === 'number' ? it.soundId : (typeof itemRaw['soundid'] === 'number' ? itemRaw['soundid'] as number : null), damage: typeof it.damage === 'number' ? it.damage : 6, range: typeof it.range === 'number' ? Math.max(1, it.range) : 1, effectToPc: typeof it.effectToPc === 'string' ? it.effectToPc : null, effectToPcValue: typeof it.effectToPcValue === 'number' ? it.effectToPcValue : 0, weaponEffectType: typeof it.weaponEffectType === 'string' ? it.weaponEffectType : 'Blood', weaponEffectColor: typeof it.weaponEffectColor === 'string' ? it.weaponEffectColor : '#cc0000', isTwoHanded: it.isTwoHanded === true });
-              }
-            }
-            this.pcTresherItemsById.set(itemMap);
+            this.pcTresherItemsById.set(this.gameJsonParserService.parsePcTresherItemMap(game.pcTresherItems));
           }
           if (Array.isArray(game.pcTresherPotions)) {
-            const potionMap = new Map<number, { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>();
-            for (const raw of game.pcTresherPotions) {
-              const p = raw as { id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number };
-              if (typeof p.id === 'number') {
-                potionMap.set(p.id, p);
-              }
-            }
-            this.pcTresherPotionsById.set(potionMap);
+            this.pcTresherPotionsById.set(this.gameJsonParserService.parsePcTresherPotionMap(game.pcTresherPotions));
           }
           if (Array.isArray(game.pcTresherSpells)) {
-            const spellMap = new Map<number, PcTresherSpellData>();
-            for (const raw of game.pcTresherSpells) {
-              const s = raw as PcTresherSpellData;
-              const sRaw = raw as Record<string, unknown>;
-              if (typeof s.id === 'number') {
-                spellMap.set(s.id, {
-                  id: s.id,
-                  name: typeof s.name === 'string' && s.name ? s.name : 'Unnamed Spell',
-                  description: typeof s.description === 'string' ? s.description : '',
-                    soundId: typeof s.soundId === 'number' ? s.soundId : (typeof sRaw['soundid'] === 'number' ? sRaw['soundid'] as number : null),
-                    soundPath: typeof sRaw['soundPath'] === 'string'
-                      ? (sRaw['soundPath'] as string)
-                      : (typeof sRaw['path'] === 'string' ? (sRaw['path'] as string) : null),
-                  range: typeof s.range === 'number' ? Math.max(1, s.range) : 1,
-                  effectOn: typeof s.effectOn === 'string' ? s.effectOn : 'HP',
-                  effectAmount: typeof s.effectAmount === 'number' ? s.effectAmount : 0,
-                  successTestValue: typeof s.successTestValue === 'number' ? s.successTestValue : 10,
-                  sp: typeof s.sp === 'number' ? Math.max(1, s.sp) : 1,
-                  lastFor: typeof s.lastFor === 'number' ? Math.max(0, s.lastFor) : 0,
-                  numberOfTargets: typeof s.numberOfTargets === 'number' ? Math.max(1, s.numberOfTargets) : 1,
-                  magicCost: typeof s.magicCost === 'number' ? Math.max(1, s.magicCost) : 1,
-                });
-              }
-            }
+            const spellMap = this.gameJsonParserService.parsePcTresherSpellMap(game.pcTresherSpells);
             this.pcTresherSpellsById.update((existingMap) => {
               const merged = new Map(existingMap);
               for (const [id, spell] of spellMap) {
@@ -5418,14 +5341,7 @@ const targetKind = this.getSpellTargetKind(spell);
             });
           }
           if (Array.isArray(game.pcTresherCurses)) {
-            const curseMap = new Map<number, PcTresherCurseData>();
-            for (const raw of game.pcTresherCurses) {
-              const curse = this.normalizeCurseRecord(raw);
-              if (curse !== null) {
-                curseMap.set(curse.id, curse);
-              }
-            }
-            this.pcTresherCursesById.set(curseMap);
+            this.pcTresherCursesById.set(this.gameJsonParserService.parsePcTresherCurseMap(game.pcTresherCurses));
           } else {
             this.pcTresherCursesById.set(new Map());
           }
@@ -5523,7 +5439,7 @@ const targetKind = this.getSpellTargetKind(spell);
 
           const catalog = new Map<number, PcTresherSpellData>();
           for (const raw of items) {
-            const spell = this.normalizeSpellRecord(raw);
+            const spell = this.gameJsonParserService.normalizeSpellRecord(raw);
             if (spell !== null) {
               catalog.set(spell.id, spell);
             }
@@ -9897,12 +9813,6 @@ const targetKind = this.getSpellTargetKind(spell);
     return order[(order.indexOf(current) + delta + 4) % 4];
   }
 
-  private normalizeFacingDirection(direction: unknown): FacingDirection {
-    return direction === 'up' || direction === 'right' || direction === 'down' || direction === 'left'
-      ? direction
-      : DEFAULT_CHEATER.facingDir;
-  }
-
   private drawFacingArrow(
     context: CanvasRenderingContext2D,
     left: number,
@@ -9995,67 +9905,6 @@ const targetKind = this.getSpellTargetKind(spell);
     return direction.toUpperCase();
   }
 
-  private synchronizeDoorConnections(
-    squares: Record<string, Square>
-  ): Record<string, Square> {
-    const synchronizedSquares = Object.entries(squares).reduce<Record<string, Square>>(
-      (accumulator, [squareKey, square]) => {
-        accumulator[squareKey] = { ...square };
-        return accumulator;
-      },
-      {}
-    );
-
-    for (const squareKey of Object.keys(synchronizedSquares)) {
-      const square = synchronizedSquares[squareKey];
-
-      for (const sideRule of SIDE_RULES) {
-        if (sideRule.side === 'toTop' || sideRule.side === 'toLeft') {
-          continue;
-        }
-
-        const neighborRow = square.row + sideRule.neighborRowOffset;
-        const neighborColumn = square.column + sideRule.neighborColumnOffset;
-        const neighborKey = this.getSquareKey(neighborRow, neighborColumn);
-        const neighborSquare = synchronizedSquares[neighborKey];
-        if (!neighborSquare) {
-          continue;
-        }
-
-        const currentConnection = synchronizedSquares[squareKey][sideRule.side];
-        const neighborConnection = neighborSquare[sideRule.oppositeSide];
-        const currentDoor = this.isDoorConnection(currentConnection) ? currentConnection : null;
-        const neighborDoor = this.isDoorConnection(neighborConnection) ? neighborConnection : null;
-        if (!currentDoor && !neighborDoor) {
-          continue;
-        }
-
-        const sharedDoor = currentDoor ?? neighborDoor;
-        if (!sharedDoor) {
-          continue;
-        }
-
-        if (synchronizedSquares[squareKey][sideRule.side] !== sharedDoor) {
-          synchronizedSquares[squareKey] = this.withSquareSide(
-            synchronizedSquares[squareKey],
-            sideRule.side,
-            sharedDoor
-          );
-        }
-
-        if (synchronizedSquares[neighborKey][sideRule.oppositeSide] !== sharedDoor) {
-          synchronizedSquares[neighborKey] = this.withSquareSide(
-            synchronizedSquares[neighborKey],
-            sideRule.oppositeSide,
-            sharedDoor
-          );
-        }
-      }
-    }
-
-    return synchronizedSquares;
-  }
-
   private withSquareSide(
     square: Square,
     side: SquareSide,
@@ -10080,7 +9929,7 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private loadDungonJsonState(dungonId: number, rawDungonJson: unknown): void {
-    const parsed = this.parseDungonJsonPayload(rawDungonJson);
+    const parsed = this.gameJsonParserService.parseDungonJsonPayload(rawDungonJson);
 
     this.filledSquaresByDungon.update((allSquares) => ({
       ...allSquares,
@@ -10282,889 +10131,6 @@ const targetKind = this.getSpellTargetKind(spell);
     };
   }
 
-  private parseDungonJsonPayload(rawDungonJson: unknown): {
-    filledSquares: Record<string, true>;
-    squares: Record<string, Square>;
-    keyList: Key[];
-    cheater: Cheater;
-    startpoint: StartPoint | null;
-    tresherList: Tresher[];
-    tresherPlacements: TresherPlacement[];
-    monsterList: Monster[];
-    monsterPlacements: MonsterPlacement[];
-    squareTexts: SquareText[];
-    exits: DungonExit[];
-    portalPlacements: PortalPlacement[];
-    floorTrapPlacements: FloorTrapPlacement[];
-    obstaclePlacements: ObstaclePlacement[];
-    itemPlacements: ItemPlacement[];
-    potionPlacements: PotionPlacement[];
-    spellPlacements: SpellPlacement[];
-    floorItemList: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean; uses?: number | null }>;
-    floorPotionList: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>;
-    floorSpellList: PcTresherSpellData[];
-    collectedFloorItems: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean; uses?: number | null }>;
-    collectedFloorPotions: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }>;
-    collectedFloorSpells: PcTresherSpellData[];
-    learnedFloorSpellIds: number[];
-    equippedSpellIds: number[];
-    rangerRangedHitBonus: number;
-    rangerFavoredTypeDamageBonuses: RangerFavoredTypeBonuses;
-    pcInventoryInitialized: boolean;
-    savedPlayerHp: number | null;
-    savedPlayerAE: number | null;
-    savedTurnPhase: TurnPhase | null;
-    savedPlayerRow: number | null;
-    savedPlayerColumn: number | null;
-    npcTradesPurchased: number[];
-    cheaterByPcId: Record<number, Cheater>;
-  } {
-    if (!rawDungonJson || typeof rawDungonJson !== 'object') {
-      return {
-        filledSquares: {},
-        squares: {},
-        keyList: [],
-        cheater: { ...DEFAULT_CHEATER },
-        startpoint: null,
-        tresherList: [],
-        tresherPlacements: [],
-        monsterList: [],
-        monsterPlacements: [],
-        squareTexts: [],
-        exits: [],
-        portalPlacements: [],
-        floorTrapPlacements: [],
-        obstaclePlacements: [],
-        itemPlacements: [],
-        potionPlacements: [],
-        spellPlacements: [],
-        floorItemList: [],
-        floorPotionList: [],
-        floorSpellList: [],
-        collectedFloorItems: [],
-        collectedFloorPotions: [],
-        collectedFloorSpells: [],
-        learnedFloorSpellIds: [],
-        equippedSpellIds: [],
-        rangerRangedHitBonus: 2,
-        rangerFavoredTypeDamageBonuses: { Beast: 2 },
-        pcInventoryInitialized: false,
-        savedPlayerHp: null,
-        savedPlayerAE: null,
-        savedTurnPhase: null,
-        savedPlayerRow: null,
-        savedPlayerColumn: null,
-        npcTradesPurchased: [],
-        cheaterByPcId: {},
-      };
-    }
-
-    const source = rawDungonJson as {
-      filledSquares?: unknown;
-      squares?: unknown;
-      keyList?: unknown[];
-      cheater?: unknown;
-      startpoint?: unknown;
-      startPoint?: unknown;
-      tresherList?: unknown[];
-      trasherList?: unknown[];
-      tresher?: unknown[];
-      tresherPlacements?: unknown[];
-      tresherPlacementList?: unknown[];
-      trasherPlacements?: unknown[];
-      monsterList?: unknown[];
-      monsters?: unknown[];
-      monsterPlacements?: unknown[];
-      monsterPlacementList?: unknown[];
-      squareTexts?: unknown[];
-      pcInventoryInitialized?: unknown;
-      playerHp?: unknown;
-      playerAE?: unknown;
-      turnPhase?: unknown;
-      playerRow?: unknown;
-      playerColumn?: unknown;
-      exits?: unknown[];
-      exitList?: unknown[];
-      portalPlacements?: unknown[];
-      floorTrapPlacements?: unknown[];
-      obstaclePlacements?: unknown[];
-      itemPlacements?: unknown[];
-      potionPlacements?: unknown[];
-      spellPlacements?: unknown[];
-      floorItemList?: unknown[];
-      floorPotionList?: unknown[];
-      floorSpellList?: unknown[];
-      spellList?: unknown[];
-      collectedFloorItems?: unknown[];
-      collectedFloorPotions?: unknown[];
-      collectedFloorSpells?: unknown[];
-      learnedFloorSpellIds?: unknown[];
-      equippedSpellIds?: unknown[];
-      rangerRangedHitBonus?: unknown;
-      rangerFavoredTypeDamageBonuses?: unknown;
-      npcTradesPurchased?: unknown[];
-      cheaterByPcId?: unknown;
-    };
-
-    const filledSquaresSource =
-      source.filledSquares && typeof source.filledSquares === 'object'
-        ? (source.filledSquares as Record<string, unknown>)
-        : {};
-    const filledSquares = Object.keys(filledSquaresSource).reduce<Record<string, true>>(
-      (accumulator, key) => {
-        if (Boolean(filledSquaresSource[key])) {
-          accumulator[key] = true;
-        }
-
-        return accumulator;
-      },
-      {}
-    );
-
-    const rawSquares =
-      source.squares && typeof source.squares === 'object'
-        ? (source.squares as Record<string, Square>)
-        : {};
-    const squares = this.synchronizeDoorConnections(rawSquares);
-
-    const keyList = Array.isArray(source.keyList)
-      ? source.keyList
-          .map((item) => {
-            if (!item || typeof item !== 'object') {
-              return null;
-            }
-
-            const sourceKey = item as Partial<Key>;
-            if (typeof sourceKey.id !== 'number') {
-              return null;
-            }
-
-            return {
-              id: sourceKey.id,
-              name: typeof sourceKey.name === 'string' ? sourceKey.name : '',
-              description:
-                typeof sourceKey.description === 'string' ? sourceKey.description : '',
-              doorId: typeof sourceKey.doorId === 'number' ? sourceKey.doorId : null,
-              rownId: typeof sourceKey.rownId === 'number' ? sourceKey.rownId : null,
-              columnId: typeof sourceKey.columnId === 'number' ? sourceKey.columnId : null,
-            } as Key;
-          })
-          .filter((item): item is Key => item !== null)
-      : [];
-
-    const sourceCheater =
-      source.cheater && typeof source.cheater === 'object'
-        ? (source.cheater as Partial<Cheater> & {
-            inventory?: unknown;
-            inventoryKeys?: unknown[];
-            inventoryTreshers?: unknown[];
-          })
-        : {};
-
-    const inventory = this.dungeonJsonService.parseCheaterInventory(sourceCheater);
-    const cheater: Cheater = {
-      name:
-        typeof sourceCheater.name === 'string' && sourceCheater.name.trim()
-          ? sourceCheater.name
-          : DEFAULT_CHEATER.name,
-      rangeOfSight:
-        typeof sourceCheater.rangeOfSight === 'number' && Number.isFinite(sourceCheater.rangeOfSight)
-          ? sourceCheater.rangeOfSight
-          : DEFAULT_CHEATER.rangeOfSight,
-      facingDir: this.normalizeFacingDirection(sourceCheater.facingDir),
-      inventory,
-    };
-
-    const sourceStartPointRaw =
-      source.startpoint && typeof source.startpoint === 'object'
-        ? source.startpoint
-        : source.startPoint && typeof source.startPoint === 'object'
-          ? source.startPoint
-          : null;
-
-    let startpoint: StartPoint | null = null;
-    if (sourceStartPointRaw) {
-      const sourceStartPoint = sourceStartPointRaw as Partial<StartPoint>;
-      const parsedRow =
-        typeof sourceStartPoint.row === 'number' && Number.isFinite(sourceStartPoint.row)
-          ? Math.floor(sourceStartPoint.row)
-          : null;
-      const parsedCol =
-        typeof sourceStartPoint.col === 'number' && Number.isFinite(sourceStartPoint.col)
-          ? Math.floor(sourceStartPoint.col)
-          : null;
-
-      if (parsedRow !== null && parsedCol !== null) {
-        startpoint = {
-          row: parsedRow,
-          col: parsedCol,
-          description:
-            typeof sourceStartPoint.description === 'string'
-              ? sourceStartPoint.description
-              : '',
-          playerSees:
-            typeof sourceStartPoint.playerSees === 'string'
-              ? sourceStartPoint.playerSees
-              : '',
-        };
-      }
-    }
-
-    const sourceTresherList =
-      Array.isArray(source.tresherList)
-        ? source.tresherList
-        : Array.isArray(source.trasherList)
-          ? source.trasherList
-          : Array.isArray(source.tresher)
-            ? source.tresher
-            : [];
-
-    const tresherList = sourceTresherList
-      .map((item) => this.dungeonJsonService.parseTresherItem(item))
-      .filter((item): item is Tresher => item !== null);
-
-    const sourceTresherPlacements = Array.isArray(source.tresherPlacements)
-      ? source.tresherPlacements
-      : Array.isArray(source.tresherPlacementList)
-        ? source.tresherPlacementList
-        : Array.isArray(source.trasherPlacements)
-          ? source.trasherPlacements
-          : [];
-
-    const validTresherIds = new Set(tresherList.map((tresher) => tresher.id));
-    const tresherPlacements = sourceTresherPlacements
-      .map((item) => this.dungeonJsonService.parseTresherPlacementItem(item))
-      .filter(
-        (item): item is TresherPlacement => item !== null && validTresherIds.has(item.tresherId)
-      );
-
-    const sourceMonsterList = Array.isArray(source.monsterList)
-      ? source.monsterList
-      : Array.isArray(source.monsters)
-        ? source.monsters
-        : [];
-
-    const monsterList = sourceMonsterList
-      .map((item) => this.parseMonsterItem(item))
-      .filter((item): item is Monster => item !== null);
-
-    const sourceMonsterPlacements = Array.isArray(source.monsterPlacements)
-      ? source.monsterPlacements
-      : Array.isArray(source.monsterPlacementList)
-        ? source.monsterPlacementList
-        : [];
-
-    const validMonsterIds = new Set(monsterList.map((monster) => monster.id));
-    const monsterPlacements = sourceMonsterPlacements
-      .map((item) => this.parseMonsterPlacementItem(item))
-      .filter(
-        (item): item is MonsterPlacement => item !== null && validMonsterIds.has(item.monsterId)
-      );
-
-    const savedPlayerHpRaw = this.toFiniteNumber(source.playerHp);
-    const savedPlayerAERaw = this.toFiniteNumber(source.playerAE);
-    const savedTurnPhaseRaw = source.turnPhase;
-    const savedTurnPhase: TurnPhase | null =
-      savedTurnPhaseRaw === 'player' || savedTurnPhaseRaw === 'monsters' || savedTurnPhaseRaw === 'gameover'
-        ? savedTurnPhaseRaw
-        : null;
-
-    const savedPlayerRow = this.toFiniteNumber(source.playerRow);
-    const savedPlayerColumn = this.toFiniteNumber(source.playerColumn);
-    const pcInventoryInitialized =
-      source.pcInventoryInitialized === true ||
-      savedPlayerHpRaw !== null ||
-      savedPlayerAERaw !== null ||
-      savedTurnPhase !== null ||
-      savedPlayerRow !== null ||
-      savedPlayerColumn !== null;
-
-    const squareTexts: SquareText[] = Array.isArray(source.squareTexts)
-      ? source.squareTexts
-          .filter(
-            (item): item is Record<string, unknown> =>
-              !!item && typeof item === 'object'
-          )
-          .map((item) => ({
-            id: Math.max(0, Math.floor(Number(item['id']) || 0)),
-            row: Math.max(0, Math.floor(Number(item['row']) || 0)),
-            column: Math.max(0, Math.floor(Number(item['column']) || 0)),
-            text: typeof item['text'] === 'string' ? item['text'] : '',
-            wallSide: normalizeSquareTextWallSide(item['wallSide']),
-          }))
-          .filter((st) => st.text.trim().length > 0)
-      : [];
-
-    const sourceExits = Array.isArray(source.exits)
-      ? source.exits
-      : Array.isArray(source.exitList)
-        ? source.exitList
-        : [];
-    const exits: DungonExit[] = sourceExits
-      .map((item) => this.parseExitItem(item))
-      .filter((item): item is DungonExit => item !== null);
-
-    const floorTrapPlacements = this.dungeonJsonService.parseFloorTrapPlacements(source.floorTrapPlacements);
-    const obstaclePlacements = this.dungeonJsonService.parseObstaclePlacements(source.obstaclePlacements);
-
-    const itemPlacements: ItemPlacement[] = Array.isArray(source.itemPlacements)
-      ? source.itemPlacements
-          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-          .map((x) => {
-            const itemId = typeof x['itemId'] === 'number' ? x['itemId'] : null;
-            const row = typeof x['row'] === 'number' ? Math.floor(x['row']) : null;
-            const column = typeof x['column'] === 'number' ? Math.floor(x['column']) : null;
-            if (itemId === null || row === null || column === null) return null;
-            return { itemId, row, column } as ItemPlacement;
-          })
-          .filter((x): x is ItemPlacement => x !== null)
-      : [];
-
-    const potionPlacements: PotionPlacement[] = Array.isArray(source.potionPlacements)
-      ? source.potionPlacements
-          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-          .map((x) => {
-            const potionId = typeof x['potionId'] === 'number' ? x['potionId'] : null;
-            const row = typeof x['row'] === 'number' ? Math.floor(x['row']) : null;
-            const column = typeof x['column'] === 'number' ? Math.floor(x['column']) : null;
-            if (potionId === null || row === null || column === null) return null;
-            return { potionId, row, column } as PotionPlacement;
-          })
-          .filter((x): x is PotionPlacement => x !== null)
-      : [];
-
-    const spellPlacements: SpellPlacement[] = Array.isArray(source.spellPlacements)
-      ? source.spellPlacements
-          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-          .map((x) => {
-            const spellId = typeof x['spellId'] === 'number' ? x['spellId'] : null;
-            const row = typeof x['row'] === 'number' ? Math.floor(x['row']) : null;
-            const column = typeof x['column'] === 'number' ? Math.floor(x['column']) : null;
-            if (spellId === null || row === null || column === null) return null;
-            return { spellId, row, column } as SpellPlacement;
-          })
-          .filter((x): x is SpellPlacement => x !== null)
-      : [];
-
-    const floorItemList: Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean; uses?: number | null }> =
-      Array.isArray(source.floorItemList)
-        ? source.floorItemList
-            .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-            .map((x) => {
-              const id = typeof x['id'] === 'number' ? x['id'] : null;
-              if (id === null) return null;
-              return {
-                id,
-                name: typeof x['name'] === 'string' ? x['name'] : '',
-                description: typeof x['description'] === 'string' ? x['description'] : '',
-                type: typeof x['type'] === 'string' ? x['type'] : 'other',
-                imageId: typeof x['imageId'] === 'number' ? x['imageId'] : (typeof x['imageid'] === 'number' ? x['imageid'] : null),
-                soundId: typeof x['soundId'] === 'number' ? x['soundId'] : (typeof x['soundid'] === 'number' ? x['soundid'] : null),
-                effectValue:
-                  typeof x['effectValue'] === 'number'
-                    ? x['effectValue']
-                    : (typeof x['effectvalue'] === 'number' ? x['effectvalue'] : 0),
-                damage: typeof x['damage'] === 'number' ? x['damage'] : 6,
-                range: typeof x['range'] === 'number' ? Math.max(1, x['range']) : 1,
-                armorSlot:
-                  typeof x['armorSlot'] === 'string'
-                    ? x['armorSlot']
-                    : (typeof x['armorslot'] === 'string' ? x['armorslot'] : null),
-                effectOn:
-                  typeof x['effectOn'] === 'string'
-                    ? x['effectOn']
-                    : (typeof x['effecton'] === 'string' ? x['effecton'] : null),
-                effectToPc:
-                  typeof x['effectToPc'] === 'string'
-                    ? x['effectToPc']
-                    : (typeof x['effecttopc'] === 'string' ? x['effecttopc'] : null),
-                effectToPcValue:
-                  typeof x['effectToPcValue'] === 'number'
-                    ? x['effectToPcValue']
-                    : (typeof x['effecttopcvalue'] === 'number' ? x['effecttopcvalue'] : 0),
-                weaponEffectType: typeof x['weaponEffectType'] === 'string' ? x['weaponEffectType'] : 'Blood',
-                weaponEffectColor: typeof x['weaponEffectColor'] === 'string' ? x['weaponEffectColor'] : '#cc0000',
-                isTwoHanded: x['isTwoHanded'] === true || x['istwohanded'] === true,
-                uses: typeof x['uses'] === 'number' ? x['uses'] : null,
-              };
-            })
-            .filter((x): x is NonNullable<typeof x> => x !== null)
-        : [];
-
-    const floorPotionList: Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }> =
-      Array.isArray(source.floorPotionList)
-        ? source.floorPotionList
-            .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-            .map((x) => {
-              const id = typeof x['id'] === 'number' ? x['id'] : null;
-              if (id === null) return null;
-              return {
-                id,
-                name: typeof x['name'] === 'string' ? x['name'] : '',
-                description: typeof x['description'] === 'string' ? x['description'] : '',
-                effectTo: typeof x['effectTo'] === 'string' ? x['effectTo'] : 'HP',
-                effectAmount: typeof x['effectAmount'] === 'number' ? x['effectAmount'] : 0,
-                lastFor: typeof x['lastFor'] === 'number' ? Math.max(0, x['lastFor']) : 0,
-              };
-            })
-            .filter((x): x is NonNullable<typeof x> => x !== null)
-        : [];
-
-    const npcTradesPurchased: number[] = Array.isArray(source.npcTradesPurchased)
-      ? source.npcTradesPurchased.filter((x): x is number => typeof x === 'number')
-      : [];
-
-    const parseItemArray = (raw: unknown[]): Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; soundId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; weaponEffectType?: string; weaponEffectColor?: string; isTwoHanded: boolean; uses?: number | null }> =>
-      raw
-        .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-        .map((x) => {
-          const id = typeof x['id'] === 'number' ? x['id'] : null;
-          if (id === null) return null;
-          return {
-            id,
-            name: typeof x['name'] === 'string' ? x['name'] : '',
-            description: typeof x['description'] === 'string' ? x['description'] : '',
-            type: typeof x['type'] === 'string' ? x['type'] : 'other',
-            imageId: typeof x['imageId'] === 'number' ? x['imageId'] : (typeof x['imageid'] === 'number' ? x['imageid'] : null),
-            soundId: typeof x['soundId'] === 'number' ? x['soundId'] : (typeof x['soundid'] === 'number' ? x['soundid'] : null),
-            effectValue:
-              typeof x['effectValue'] === 'number'
-                ? x['effectValue']
-                : (typeof x['effectvalue'] === 'number' ? x['effectvalue'] : 0),
-            damage: typeof x['damage'] === 'number' ? x['damage'] : 6,
-            range: typeof x['range'] === 'number' ? Math.max(1, x['range']) : 1,
-            armorSlot:
-              typeof x['armorSlot'] === 'string'
-                ? x['armorSlot']
-                : (typeof x['armorslot'] === 'string' ? x['armorslot'] : null),
-            effectOn:
-              typeof x['effectOn'] === 'string'
-                ? x['effectOn']
-                : (typeof x['effecton'] === 'string' ? x['effecton'] : null),
-            effectToPc:
-              typeof x['effectToPc'] === 'string'
-                ? x['effectToPc']
-                : (typeof x['effecttopc'] === 'string' ? x['effecttopc'] : null),
-            effectToPcValue:
-              typeof x['effectToPcValue'] === 'number'
-                ? x['effectToPcValue']
-                : (typeof x['effecttopcvalue'] === 'number' ? x['effecttopcvalue'] : 0),
-            weaponEffectType: typeof x['weaponEffectType'] === 'string' ? x['weaponEffectType'] : 'Blood',
-            weaponEffectColor: typeof x['weaponEffectColor'] === 'string' ? x['weaponEffectColor'] : '#cc0000',
-            isTwoHanded: x['isTwoHanded'] === true || x['istwohanded'] === true,
-            uses: typeof x['uses'] === 'number' ? x['uses'] : null,
-          };
-        })
-        .filter((x): x is NonNullable<typeof x> => x !== null);
-
-    const parsePotionArray = (raw: unknown[]): Array<{ id: number; name: string; description: string; effectTo: string; effectAmount: number; lastFor: number }> =>
-      raw
-        .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-        .map((x) => {
-          const id = typeof x['id'] === 'number' ? x['id'] : null;
-          if (id === null) return null;
-          return {
-            id,
-            name: typeof x['name'] === 'string' ? x['name'] : '',
-            description: typeof x['description'] === 'string' ? x['description'] : '',
-            effectTo: typeof x['effectTo'] === 'string' ? x['effectTo'] : 'HP',
-            effectAmount: typeof x['effectAmount'] === 'number' ? x['effectAmount'] : 0,
-            lastFor: typeof x['lastFor'] === 'number' ? Math.max(0, x['lastFor']) : 0,
-          };
-        })
-        .filter((x): x is NonNullable<typeof x> => x !== null);
-
-    const parseSpellArray = (raw: unknown[]): PcTresherSpellData[] =>
-      raw
-        .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-        .map((x) => {
-          const id = typeof x['id'] === 'number' ? x['id'] : null;
-          if (id === null) return null;
-          return {
-            id,
-            name: typeof x['name'] === 'string' ? x['name'] : '',
-            description: typeof x['description'] === 'string' ? x['description'] : '',
-            soundId: typeof x['soundId'] === 'number' ? x['soundId'] : null,
-            range: typeof x['range'] === 'number' ? x['range'] : 1,
-            effectOn: typeof x['effectOn'] === 'string' ? x['effectOn'] : 'HP',
-            effectAmount: typeof x['effectAmount'] === 'number' ? x['effectAmount'] : 0,
-            successTestValue: typeof x['successTestValue'] === 'number' ? x['successTestValue'] : 0,
-            sp: typeof x['sp'] === 'number' ? x['sp'] : 0,
-            lastFor: typeof x['lastFor'] === 'number' ? x['lastFor'] : 0,
-            numberOfTargets: typeof x['numberOfTargets'] === 'number' ? Math.max(1, x['numberOfTargets']) : 1,
-            magicCost: typeof x['magicCost'] === 'number' ? Math.max(1, x['magicCost']) : 1,
-          } as PcTresherSpellData;
-        })
-        .filter((x): x is NonNullable<typeof x> => x !== null);
-
-    const floorSpellList: PcTresherSpellData[] = Array.isArray(source.floorSpellList)
-      ? parseSpellArray(source.floorSpellList)
-      : Array.isArray(source.spellList)
-        ? parseSpellArray(source.spellList)
-        : [];
-
-    const collectedFloorItems = Array.isArray(source.collectedFloorItems) ? parseItemArray(source.collectedFloorItems) : [];
-    const collectedFloorPotions = Array.isArray(source.collectedFloorPotions) ? parsePotionArray(source.collectedFloorPotions) : [];
-    const collectedFloorSpells = Array.isArray(source.collectedFloorSpells) ? parseSpellArray(source.collectedFloorSpells) : [];
-    const learnedFloorSpellIds = Array.isArray(source.learnedFloorSpellIds)
-      ? source.learnedFloorSpellIds
-          .map((x) => this.toFiniteNumber(x))
-          .filter((x): x is number => x !== null)
-          .map((x) => Math.max(0, Math.floor(x)))
-      : [];
-    const equippedSpellIds = Array.isArray(source.equippedSpellIds)
-      ? source.equippedSpellIds
-          .map((x) => this.toFiniteNumber(x))
-          .filter((x): x is number => x !== null)
-          .map((x) => Math.max(0, Math.floor(x)))
-      : [];
-
-    const rangerRangedHitBonus =
-      typeof source.rangerRangedHitBonus === 'number' && Number.isFinite(source.rangerRangedHitBonus)
-        ? Math.max(2, Math.floor(source.rangerRangedHitBonus))
-        : 2;
-    const rangerFavoredTypeDamageBonuses: RangerFavoredTypeBonuses = { Beast: 2 };
-    if (source.rangerFavoredTypeDamageBonuses && typeof source.rangerFavoredTypeDamageBonuses === 'object') {
-      for (const [rawType, rawBonus] of Object.entries(source.rangerFavoredTypeDamageBonuses as Record<string, unknown>)) {
-        const type = this.normalizeMonsterTypeLabel(rawType);
-        if (!type || typeof rawBonus !== 'number' || !Number.isFinite(rawBonus)) {
-          continue;
-        }
-        rangerFavoredTypeDamageBonuses[type] = Math.max(2, Math.floor(rawBonus));
-      }
-    }
-
-    const cheaterByPcId: Record<number, Cheater> = {};
-    if (source.cheaterByPcId && typeof source.cheaterByPcId === 'object') {
-      for (const [key, val] of Object.entries(source.cheaterByPcId as Record<string, unknown>)) {
-        const pcId = Number(key);
-        if (!Number.isInteger(pcId) || pcId <= 0 || !val || typeof val !== 'object') continue;
-        const raw = val as Partial<Cheater> & { inventory?: unknown };
-        cheaterByPcId[pcId] = {
-          name: typeof raw.name === 'string' && raw.name.trim() ? raw.name : DEFAULT_CHEATER.name,
-          rangeOfSight: typeof raw.rangeOfSight === 'number' && Number.isFinite(raw.rangeOfSight) ? raw.rangeOfSight : DEFAULT_CHEATER.rangeOfSight,
-          facingDir: this.normalizeFacingDirection(raw.facingDir),
-          inventory: this.dungeonJsonService.parseCheaterInventory(raw),
-        };
-      }
-    }
-
-    const portalPlacements: PortalPlacement[] = Array.isArray(source.portalPlacements)
-      ? source.portalPlacements
-          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-          .map((x): PortalPlacement | null => {
-            const id = typeof x['id'] === 'number' ? Math.floor(x['id']) : 0;
-            const toNullableInt = (v: unknown): number | null =>
-              typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : null;
-            const look = x['look'] === 'starDown' ? 'starDown' : x['look'] === 'magicDoor' ? 'magicDoor' : 'starUp';
-            return {
-              id,
-              name: typeof x['name'] === 'string' ? x['name'] : '',
-              description: typeof x['description'] === 'string' ? x['description'] : '',
-              look,
-              isTwoWay: x['isTwoWay'] !== false,
-              startRow: toNullableInt(x['startRow']),
-              startColumn: toNullableInt(x['startColumn']),
-              endRow: toNullableInt(x['endRow']),
-              endColumn: toNullableInt(x['endColumn']),
-            };
-          })
-          .filter((x): x is PortalPlacement => x !== null)
-      : [];
-
-    return {
-      filledSquares,
-      squares,
-      keyList,
-      cheater,
-      startpoint,
-      tresherList,
-      tresherPlacements,
-      monsterList,
-      monsterPlacements,
-      squareTexts,
-      exits,
-      portalPlacements,
-      floorTrapPlacements,
-      obstaclePlacements,
-      itemPlacements,
-      potionPlacements,
-      spellPlacements,
-      floorItemList,
-      floorPotionList,
-      floorSpellList,
-      collectedFloorItems,
-      collectedFloorPotions,
-      collectedFloorSpells,
-      learnedFloorSpellIds,
-      equippedSpellIds,
-      rangerRangedHitBonus,
-      rangerFavoredTypeDamageBonuses,
-      pcInventoryInitialized,
-      savedPlayerHp: savedPlayerHpRaw,
-      savedPlayerAE: savedPlayerAERaw,
-      savedTurnPhase: savedTurnPhase,
-      savedPlayerRow: savedPlayerRow !== null ? Math.floor(savedPlayerRow) : null,
-      savedPlayerColumn: savedPlayerColumn !== null ? Math.floor(savedPlayerColumn) : null,
-      npcTradesPurchased,
-      cheaterByPcId,
-    };
-  }
-
-  private parseMonsterItem(item: unknown): Monster | null {
-    if (!item || typeof item !== 'object') {
-      return null;
-    }
-
-    const source = item as Partial<Monster> & {
-      movement_economy?: unknown;
-      run_at?: unknown;
-      number_of_attacks?: unknown;
-    };
-
-    const parsedId = this.toFiniteNumber(source.id);
-    if (parsedId === null) {
-      return null;
-    }
-
-    return {
-      id: Math.max(0, Math.floor(parsedId)),
-      imageId: typeof source.imageId === 'number' ? source.imageId : null,
-      tresherIds: Array.isArray(source.tresherIds)
-        ? source.tresherIds
-            .map((val) => this.toFiniteNumber(val))
-            .filter((val): val is number => val !== null)
-        : [],
-      keyIds: Array.isArray(source.keyIds)
-        ? source.keyIds
-            .map((val) => this.toFiniteNumber(val))
-            .filter((val): val is number => val !== null)
-        : [],
-      name: typeof source.name === 'string' && source.name.trim() ? source.name : 'Unnamed Monster',
-      type: typeof source.type === 'string' ? source.type : 'Unknown',
-      description: typeof source.description === 'string' ? source.description : '',
-      hp: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source.hp), 1)),
-      movementEconomy: Math.max(
-        0,
-        this.normalizeNumber(
-          this.toFiniteNumber(source.movementEconomy ?? source.movement_economy),
-          0
-        )
-      ),
-      ac: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.ac), 10)),
-      runAt: Math.max(
-        0,
-        this.normalizeNumber(this.toFiniteNumber(source.runAt ?? source.run_at), 0)
-      ),
-      numberOfAttacks: Math.max(
-        0,
-        this.normalizeNumber(
-          this.toFiniteNumber(source.numberOfAttacks ?? source.number_of_attacks),
-          1
-        )
-      ),
-      attacks: this.normalizeMonsterAttacks(source.attacks),
-      spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.spReward), 0)),
-      soundId: typeof source.soundId === 'number' ? source.soundId : null,
-      magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magic), 0)),
-      magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magicResistance), 0)),
-      callsReinforcements: (source as Record<string, unknown>)['callsReinforcements'] === true,
-      reinforcementCount: Math.max(0, this.normalizeNumber(this.toFiniteNumber((source as Record<string, unknown>)['reinforcementCount']), 0)),
-      reinforcementMonsterName:
-        typeof (source as Record<string, unknown>)['reinforcementMonsterName'] === 'string' &&
-        String((source as Record<string, unknown>)['reinforcementMonsterName']).trim()
-          ? String((source as Record<string, unknown>)['reinforcementMonsterName']).trim()
-          : null,
-      toHitPlusNeeded: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.toHitPlusNeeded), 0)),
-      npcGreeting: typeof source.npcGreeting === 'string' && source.npcGreeting.trim() ? source.npcGreeting : null,
-      npcInfo1: typeof source.npcInfo1 === 'string' && source.npcInfo1.trim() ? source.npcInfo1 : null,
-      npcInfo2: typeof source.npcInfo2 === 'string' && source.npcInfo2.trim() ? source.npcInfo2 : null,
-      npcInfo3: typeof source.npcInfo3 === 'string' && source.npcInfo3.trim() ? source.npcInfo3 : null,
-      npcOnlyAttackWhenAttacked: (source as Record<string, unknown>)['npcOnlyAttackWhenAttacked'] === true,
-      npcGivesInfoAfterDamaged: (source as Record<string, unknown>)['npcGivesInfoAfterDamaged'] === true,
-      npcAttacksAfterInfo: (source as Record<string, unknown>)['npcAttacksAfterInfo'] === true,
-      npcCanTrade: (source as Record<string, unknown>)['npcCanTrade'] === true,
-      awareness: typeof (source as Record<string, unknown>)['awareness'] === 'number' ? (source as Record<string, unknown>)['awareness'] as number : 5,
-    };
-  }
-
-  private parseMonsterPlacementItem(item: unknown): MonsterPlacement | null {
-    if (!item || typeof item !== 'object') {
-      return null;
-    }
-
-    const source = item as Partial<MonsterPlacement> & {
-      monsterID?: unknown;
-      monster_id?: unknown;
-      rownId?: unknown;
-      columnId?: unknown;
-      col?: unknown;
-      isRoaming?: unknown;
-      rome?: unknown;
-      tresherIds?: unknown;
-      keyIds?: unknown;
-    };
-
-    const monsterIdRaw =
-      source.monsterId !== undefined
-        ? source.monsterId
-        : source.monsterID !== undefined
-          ? source.monsterID
-          : source.monster_id;
-    const rowRaw = source.row !== undefined ? source.row : source.rownId;
-    const columnRaw =
-      source.column !== undefined
-        ? source.column
-        : source.columnId !== undefined
-          ? source.columnId
-          : source.col;
-    const roamRaw =
-      source.roam !== undefined
-        ? source.roam
-        : source.isRoaming !== undefined
-          ? source.isRoaming
-          : source.rome;
-
-    const monsterId = this.toFiniteNumber(monsterIdRaw);
-    const row = this.toFiniteNumber(rowRaw);
-    const column = this.toFiniteNumber(columnRaw);
-    if (monsterId === null || row === null || column === null) {
-      return null;
-    }
-
-    const result: MonsterPlacement = {
-      monsterId: Math.max(0, Math.floor(monsterId)),
-      row: Math.floor(row),
-      column: Math.floor(column),
-      roam: roamRaw === true,
-    };
-
-    if (source.isDead === true) {
-      result.isDead = true;
-    }
-    const savedHp = this.toFiniteNumber(source.currentHp);
-    if (savedHp !== null) {
-      result.currentHp = savedHp;
-    }
-    const savedMagic = this.toFiniteNumber((source as Record<string, unknown>)['currentMagic']);
-    if (savedMagic !== null) {
-      result.currentMagic = savedMagic;
-    }
-    const rawPermanentMods = (source as Record<string, unknown>)['permanentStatModifiers'];
-    if (rawPermanentMods && typeof rawPermanentMods === 'object' && !Array.isArray(rawPermanentMods)) {
-      const normalized: Record<string, number> = {};
-      for (const [rawKey, rawValue] of Object.entries(rawPermanentMods as Record<string, unknown>)) {
-        const key = typeof rawKey === 'string' ? rawKey.trim() : '';
-        const value = this.toFiniteNumber(rawValue);
-        if (!key || value === null || !Number.isFinite(value) || value === 0) continue;
-        normalized[key] = value;
-      }
-      if (Object.keys(normalized).length > 0) {
-        result.permanentStatModifiers = normalized;
-      }
-    }
-    if (Array.isArray(source.tresherIds)) {
-      result.tresherIds = source.tresherIds
-        .map((v) => this.toFiniteNumber(v))
-        .filter((v): v is number => v !== null)
-        .map((v) => Math.max(0, Math.floor(v)));
-    }
-    if (Array.isArray(source.keyIds)) {
-      result.keyIds = source.keyIds
-        .map((v) => this.toFiniteNumber(v))
-        .filter((v): v is number => v !== null)
-        .map((v) => Math.max(0, Math.floor(v)));
-    }
-    const rawItemIds = (source as Record<string, unknown>)['itemIds'];
-    if (Array.isArray(rawItemIds)) {
-      result.itemIds = rawItemIds
-        .map((v) => this.toFiniteNumber(v))
-        .filter((v): v is number => v !== null)
-        .map((v) => Math.max(0, Math.floor(v)));
-    }
-    const rawSpellIds = (source as Record<string, unknown>)['spellIds'];
-    if (Array.isArray(rawSpellIds)) {
-      result.spellIds = rawSpellIds
-        .map((v) => this.toFiniteNumber(v))
-        .filter((v): v is number => v !== null)
-        .map((v) => Math.max(0, Math.floor(v)));
-    }
-    const rawPotionIds = (source as Record<string, unknown>)['potionIds'];
-    if (Array.isArray(rawPotionIds)) {
-      result.potionIds = rawPotionIds
-        .map((v) => this.toFiniteNumber(v))
-        .filter((v): v is number => v !== null)
-        .map((v) => Math.max(0, Math.floor(v)));
-    }
-    const gold = this.toFiniteNumber((source as Record<string, unknown>)['gold']);
-    if (gold !== null && gold > 0) result.gold = Math.max(0, Math.floor(gold));
-    const silver = this.toFiniteNumber((source as Record<string, unknown>)['silver']);
-    if (silver !== null && silver > 0) result.silver = Math.max(0, Math.floor(silver));
-    const copper = this.toFiniteNumber((source as Record<string, unknown>)['copper']);
-    if (copper !== null && copper > 0) result.copper = Math.max(0, Math.floor(copper));
-    const zinc = this.toFiniteNumber((source as Record<string, unknown>)['zinc']);
-    if (zinc !== null && zinc > 0) result.zinc = Math.max(0, Math.floor(zinc));
-    const weaponItemId = this.toFiniteNumber((source as Record<string, unknown>)['weaponItemId']);
-    if (weaponItemId !== null) result.weaponItemId = Math.max(0, Math.floor(weaponItemId));
-
-    if (source.isDormant === true) {
-      result.isDormant = true;
-    }
-    const guardRow = this.toFiniteNumber((source as Record<string, unknown>)['guardRow']);
-    if (guardRow !== null) {
-      result.guardRow = Math.floor(guardRow);
-    }
-    const guardColRaw = this.toFiniteNumber((source as Record<string, unknown>)['guardColumn']);
-    if (guardColRaw !== null) {
-      result.guardColumn = Math.floor(guardColRaw);
-    }
-    if ((source as Record<string, unknown>)['isStationary'] === true) {
-      result.isStationary = true;
-    }
-    const stationaryTriggerRow = this.toFiniteNumber((source as Record<string, unknown>)['stationaryTriggerRow']);
-    if (stationaryTriggerRow !== null) {
-      result.stationaryTriggerRow = Math.floor(stationaryTriggerRow);
-    }
-    const stationaryTriggerCol = this.toFiniteNumber((source as Record<string, unknown>)['stationaryTriggerCol']);
-    if (stationaryTriggerCol !== null) {
-      result.stationaryTriggerCol = Math.floor(stationaryTriggerCol);
-    }
-    if ((source as Record<string, unknown>)['noAttackUnlessAttacked'] === true) {
-      result.noAttackUnlessAttacked = true;
-    }
-
-    return result;
-  }
-
-  private normalizeMonsterAttacks(value: unknown): MonsterAttack[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    return value
-      .map((item) => {
-        if (!item || typeof item !== 'object') {
-          return null;
-        }
-
-        const source = item as Partial<MonsterAttack> & { plus_to_hit?: unknown };
-        return {
-          type: typeof source.type === 'string' ? source.type : 'Weapon',
-          description: typeof source.description === 'string' ? source.description : '',
-          damage: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.damage), 0)),
-          plusToHit: Math.max(
-            0,
-            this.normalizeNumber(this.toFiniteNumber(source.plusToHit ?? source.plus_to_hit), 0)
-          ),
-          range: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source.range), 1)),
-          weaponItemId: typeof source.weaponItemId === 'number' ? source.weaponItemId : null,
-          spellId: typeof source.spellId === 'number' ? source.spellId : null,
-          curseId: typeof source.curseId === 'number' ? source.curseId : null,
-        };
-      })
-      .filter((item): item is MonsterAttack => item !== null);
-  }
-
   private normalizeCheaterInventory(
     inventory: CheaterInventory | null | undefined
   ): CheaterInventory {
@@ -11175,135 +10141,8 @@ const targetKind = this.getSpellTargetKind(spell);
     return (tresher.type ?? 'OtherTresher') === 'Potion' ? 6 : 0;
   }
 
-  private resolvePlayerMaxHp(value: unknown): number {
-    const parsedValue = this.toFiniteNumber(value);
-    if (parsedValue === null) {
-      return 20;
-    }
-
-    return Math.max(1, Math.floor(parsedValue));
-  }
-
-  private resolvePlayerCurrentHp(value: unknown, maxHp: number): number {
-    const parsedValue = this.toFiniteNumber(value);
-    if (parsedValue === null) {
-      return maxHp;
-    }
-
-    return Math.max(0, Math.min(Math.floor(parsedValue), maxHp));
-  }
-
   private setPcInventoryInitialized(dungonId: number, isInitialized: boolean): void {
     this.inventoryService.setPcInventoryInitialized(dungonId, isInitialized);
-  }
-
-  private toFiniteNumber(value: unknown): number | null {
-    return typeof value === 'number' && Number.isFinite(value) ? value : null;
-  }
-
-  private normalizeNumber(value: number | null, fallback: number): number {
-    return value === null ? fallback : value;
-  }
-
-  private normalizeNullableNumber(value: number | null): number | null {
-    if (value === null) {
-      return null;
-    }
-
-    return Math.floor(value);
-  }
-
-  private normalizeSpellRecord(raw: unknown): PcTresherSpellData | null {
-    if (!raw || typeof raw !== 'object') {
-      return null;
-    }
-
-    const source = raw as Record<string, unknown>;
-    const id = this.toFiniteNumber(source['id']);
-    if (id === null) {
-      return null;
-    }
-
-    const effectType = source['effectType'] === 'Fire' || source['effectType'] === 'Ice' || source['effectType'] === 'Lightning' || source['effectType'] === 'Other'
-      ? source['effectType'] as string
-      : source['effecttype'] === 'Fire' || source['effecttype'] === 'Ice' || source['effecttype'] === 'Lightning' || source['effecttype'] === 'Other'
-        ? source['effecttype'] as string
-        : 'Other';
-    const effectColorSource = source['effectColor'] ?? source['effectcolor'];
-    const effectColor = typeof effectColorSource === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(effectColorSource.trim())
-      ? effectColorSource.trim().toLowerCase()
-      : undefined;
-    const targetType = source['targetType'] === 'monster' || source['targetType'] === 'trap' || source['targetType'] === 'pc' || source['targetType'] === 'auto'
-      ? source['targetType'] as 'auto' | 'monster' | 'trap' | 'pc'
-      : source['targettype'] === 'monster' || source['targettype'] === 'trap' || source['targettype'] === 'pc' || source['targettype'] === 'auto'
-        ? source['targettype'] as 'auto' | 'monster' | 'trap' | 'pc'
-        : 'auto';
-    const soundPath = typeof source['soundPath'] === 'string'
-      ? source['soundPath'].trim()
-      : typeof source['path'] === 'string'
-        ? source['path'].trim()
-        : '';
-
-    return {
-      id: Math.floor(id),
-      name: typeof source['name'] === 'string' && source['name'].trim() ? source['name'].trim() : 'Unnamed Spell',
-      description: typeof source['description'] === 'string' ? source['description'] : '',
-      soundId: this.normalizeNullableNumber(this.toFiniteNumber(source['soundId'] ?? source['soundid'])),
-      soundPath: soundPath || null,
-      range: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['range']), 1)),
-      effectOn: typeof source['effectOn'] === 'string'
-        ? source['effectOn']
-        : (typeof source['effecton'] === 'string' ? source['effecton'] : 'HP'),
-      effectOn2: typeof source['effectOn2'] === 'string'
-        ? source['effectOn2']
-        : (typeof source['effecton2'] === 'string' ? source['effecton2'] : ''),
-      effectAmount: this.normalizeNumber(this.toFiniteNumber(source['effectAmount'] ?? source['damage']), 0),
-      effectAmount2: this.normalizeNumber(this.toFiniteNumber(source['effectAmount2'] ?? source['effectamount2']), 0),
-      successTestValue: this.normalizeNumber(this.toFiniteNumber(source['successTestValue'] ?? source['successtestvalue']), 10),
-      sp: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['sp']), 1)),
-      targetType,
-      lastFor: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['lastFor'] ?? source['lastfor']), 0)),
-      numberOfTargets: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['numberOfTargets'] ?? source['numberoftargets']), 1)),
-      magicCost: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source['magicCost'] ?? source['magiccost']), 1)),
-      effectType,
-      effectColor,
-      effectOnPc1: source['effectOnPc1'] === true || source['effectonpc1'] === true,
-      effectOnPc2: source['effectOnPc2'] === true || source['effectonpc2'] === true,
-      range1: this.normalizeNumber(this.toFiniteNumber(source['range1']), 0),
-      range2: this.normalizeNumber(this.toFiniteNumber(source['range2']), 0),
-      lastFor1: this.normalizeNumber(this.toFiniteNumber(source['lastFor1'] ?? source['lastfor1']), 0),
-      lastFor2: this.normalizeNumber(this.toFiniteNumber(source['lastFor2'] ?? source['lastfor2']), 0),
-    };
-  }
-
-  private normalizeCurseRecord(raw: unknown): PcTresherCurseData | null {
-    if (!raw || typeof raw !== 'object') {
-      return null;
-    }
-
-    const source = raw as Record<string, unknown>;
-    const id = this.toFiniteNumber(source['id']);
-    if (id === null) {
-      return null;
-    }
-
-    const effectTo = typeof source['effectTo'] === 'string'
-      ? source['effectTo']
-      : (typeof source['effectto'] === 'string' ? source['effectto'] : 'HP');
-    const effectTo2 = typeof source['effectTo2'] === 'string'
-      ? source['effectTo2']
-      : (typeof source['effectto2'] === 'string' ? source['effectto2'] : null);
-
-    return {
-      id: Math.floor(id),
-      name: typeof source['name'] === 'string' && source['name'].trim() ? source['name'].trim() : 'Unnamed Curse',
-      description: typeof source['description'] === 'string' ? source['description'] : '',
-      effectTo,
-      effectTo2: effectTo2 && effectTo2.trim() ? effectTo2 : null,
-      damage: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['damage']), 0)),
-      damage2: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['damage2'] ?? source['effectAmount2']), 0)),
-      lastFor: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source['lastFor'] ?? source['lastfor']), 0)),
-    };
   }
 
   private applyMonsterAttackCurseToPlayer(monsterName: string, attack: MonsterAttack): void {
@@ -11379,60 +10218,6 @@ const targetKind = this.getSpellTargetKind(spell);
         `${monsterName} curses you with ${curse.name} ${this.spellEffectDurationLabel(curse.lastFor)}. (${target} ${slot.amount})`
       );
     }
-  }
-
-  private parseExitItem(item: unknown): DungonExit | null {
-    if (!item || typeof item !== 'object') {
-      return null;
-    }
-
-    const source = item as Partial<DungonExit> & {
-      col?: unknown;
-      destinationDungonID?: unknown;
-      exitType?: unknown;
-    };
-
-    const parsedId = this.toFiniteNumber(source.id);
-    const row = this.toFiniteNumber(source.row);
-    const column = this.toFiniteNumber(source.column ?? source.col);
-    if (parsedId === null || row === null || column === null) {
-      return null;
-    }
-
-    const destinationType: ExitDestinationType =
-      source.destinationType === 'dungon' ? 'dungon' : 'outside';
-    const destinationRaw =
-      source.destinationDungonId !== undefined
-        ? source.destinationDungonId
-        : (source as unknown as Record<string, unknown>)['destinationDungonID'];
-    const parsedDestination = this.normalizeNullableNumber(this.toFiniteNumber(destinationRaw));
-    const transitionSource = source.transitionType ?? source.exitType;
-    const transitionType: ExitTransitionType =
-      transitionSource === 'stairsUp' || transitionSource === 'stairsDown' || transitionSource === 'open'
-        ? transitionSource
-        : 'open';
-
-    return {
-      id: Math.max(0, Math.floor(parsedId)),
-      row: Math.floor(row),
-      column: Math.floor(column),
-      destinationType,
-      destinationDungonId: destinationType === 'dungon' ? parsedDestination : null,
-      transitionType,
-      itemRequirement: this.parseExitItemRequirement((source as unknown as Record<string, unknown>)['itemRequirement']),
-    };
-  }
-
-  private parseExitItemRequirement(raw: unknown): { itemId: number; itemName: string; consume: boolean } | null {
-    if (!raw || typeof raw !== 'object') return null;
-    const src = raw as Partial<Record<string, unknown>>;
-    const itemId = typeof src['itemId'] === 'number' ? src['itemId'] : null;
-    if (itemId === null) return null;
-    return {
-      itemId,
-      itemName: typeof src['itemName'] === 'string' ? src['itemName'] : '',
-      consume: src['consume'] === true,
-    };
   }
 
   closeTavernModal(): void {
@@ -12373,7 +11158,7 @@ const targetKind = this.getSpellTargetKind(spell);
 
     if (hasSavedCombat) {
       this.playerHp.set(
-        this.resolvePlayerCurrentHp(saved.playerHp ?? this.playerStartingHp, this.playerMaxHp())
+        this.gameJsonParserService.resolvePlayerCurrentHp(saved.playerHp ?? this.playerStartingHp, this.playerMaxHp())
       );
       const effectiveAEMax = this.getEffectivePlayerMaxAE();
       const restoredAE = saved.playerAE ?? effectiveAEMax;
