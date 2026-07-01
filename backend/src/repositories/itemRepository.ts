@@ -367,9 +367,18 @@ export const deleteItemForUser = async (id: number, userguid: string): Promise<b
 export const getPublicItemsByNames = async (names: string[]): Promise<Array<{ id: number; name: string }>> => {
   if (names.length === 0) return [];
   const placeholders = names.map((_, i) => `$${i + 1}`).join(', ');
-  const { rows } = await pool.query<{ id: number; name: string }>(
-    `SELECT id, name FROM items WHERE ispublic = TRUE AND name IN (${placeholders})`,
-    names
-  );
-  return rows;
+  try {
+    const { rows } = await pool.query<{ id: number; name: string }>(
+      `SELECT id, name FROM items WHERE ispublic = TRUE AND name IN (${placeholders})`,
+      names
+    );
+    return rows;
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const { rows } = await pool.query<{ id: number; name: string }>(
+      `SELECT id, itemname AS name FROM items WHERE ispublic = TRUE AND itemname IN (${placeholders})`,
+      names
+    );
+    return rows;
+  }
 };

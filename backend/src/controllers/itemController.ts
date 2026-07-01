@@ -9,7 +9,7 @@ const UUID_REGEX =
 const ITEM_TYPES = new Set(['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'neckless', 'gem', 'other']);
 const ARMOR_SLOTS = new Set(['none', 'hand', 'shield', 'head', 'body', 'left-arm', 'right-arm', 'left-leg', 'right-leg']);
 const EFFECT_ON_OPTIONS = new Set(['HP', 'AC', 'MP', 'Mind', 'Stamina', 'Strength', 'SP', 'AE', 'NOA', 'ROS', 'Door Trap', 'To Pick', 'Placed Trap']);
-const EFFECT_TO_PC_OPTIONS = new Set(['HP', 'AC', 'Magic', 'Mind', 'Stamina', 'Strength', 'AE', 'NOA', 'ROS']);
+const EFFECT_TO_PC_OPTIONS = new Set(['HP', 'AC', 'Magic', 'Mind', 'Stamina', 'Strength', 'AE', 'NOA', 'ROS','ToHit','Damage']);
 const COLOR_HEX_REGEX = /^#[0-9a-f]{6}$/i;
 
 interface ItemWriteRequestBody {
@@ -109,6 +109,8 @@ function normalizeEffectToPc(value: unknown): string | null {
   if (raw.toLowerCase() === 'stamina') return 'Stamina';
   if (raw.toLowerCase() === 'strench') return 'Strength';
   if (raw.toLowerCase() === 'strength') return 'Strength';
+  if (raw.toLowerCase() === 'tohit') return 'ToHit';
+  if (raw.toLowerCase() === 'damage') return 'Damage';
   if (raw.toLowerCase() === 'ae' || raw.toLowerCase() === 'action economy') return 'AE';
   if (raw.toLowerCase() === 'noa' || raw.toLowerCase() === '# of attacks' || raw.toLowerCase() === '#oa' || raw.toLowerCase() === 'number of attacks') return 'NOA';
   if (raw.toLowerCase() === 'hp') return 'HP';

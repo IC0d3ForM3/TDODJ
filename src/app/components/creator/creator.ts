@@ -8036,6 +8036,8 @@ export class Creator implements OnInit {
         weaponEffectType: i.weaponEffectType,
         weaponEffectColor: i.weaponEffectColor,
         isTwoHanded: i.isTwoHanded,
+        effectToPc: i.effectToPc ?? null,
+        effectToPcValue: i.effectToPcValue ?? 0,
       }));
     const floorPotionList = allLibPotions
       .filter((p) => placedPotionIds.has(p.id))
@@ -9410,7 +9412,7 @@ export class Creator implements OnInit {
       }
     }
 
-    // Draw obstacle markers (unfilled circle)
+    // Draw obstacle markers using obstacle shape + fallback color.
     if (dungonId !== null) {
       const obFilledSquares = this.filledSquaresByDungon()[dungonId] ?? {};
       for (const obs of this.obstaclePlacementsByDungon()[dungonId] ?? []) {
@@ -9431,11 +9433,23 @@ export class Creator implements OnInit {
         const centerX = obs.column * this.gridCellSize + this.gridCellSize / 2;
         const centerY = obs.row * this.gridCellSize + this.gridCellSize / 2;
         const radius = this.gridCellSize * 0.32;
-        context.strokeStyle = '#a0856a';
+        const markerColor = (obs.color ?? '').trim() || '#a0856a';
+        context.fillStyle = markerColor;
+        context.strokeStyle = '#5c4532';
         context.lineWidth = 2;
-        context.beginPath();
-        context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-        context.stroke();
+
+        if ((obs.shape ?? 'circle') === 'square') {
+          const size = radius * 2;
+          const left = centerX - radius;
+          const top = centerY - radius;
+          context.fillRect(left, top, size, size);
+          context.strokeRect(left, top, size, size);
+        } else {
+          context.beginPath();
+          context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+          context.fill();
+          context.stroke();
+        }
       }
     }
 

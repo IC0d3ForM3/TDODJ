@@ -49,7 +49,51 @@
 			(withdrawFromStash)="onWithdrawFromStash($event)"
 			(resetProgress)="onResetMyProgress()"
 			(tresherGoldChanged)="onTavernTresherGoldChanged($event)"
-		></app-tavern-modal>
+	>
+		@if (isRangerClass()) {
+			<div class="ranger-upgrade-panel" style="margin: 0.75rem 0 0">
+				<p class="inventory-section-title ranger-upgrade-title">Ranger Upgrades</p>
+				<div class="ranger-upgrade-row">
+					<div>
+						<p class="ranger-upgrade-name">Ranged Hit Bonus at 2+ Squares</p>
+						<p class="ranger-upgrade-value">+{{ rangerRangedHitBonus() }}</p>
+					</div>
+					<button type="button" class="action-button ranger-upgrade-btn" [disabled]="!canBuyRangerRangedHitBonus()" (click)="buyRangerRangedHitBonus()">
+						Buy +1 ({{ getRangerRangedHitBonusUpgradeCost().sp }} SP / {{ getRangerRangedHitBonusUpgradeCost().gp }} G)
+					</button>
+				</div>
+				@for (entry of rangerFavoredTypeEntries(); track entry.type) {
+					<div class="ranger-upgrade-row">
+						<div>
+							<p class="ranger-upgrade-name">{{ entry.type }} Damage Bonus</p>
+							<p class="ranger-upgrade-value">+{{ entry.bonus }}</p>
+						</div>
+						<button type="button" class="action-button ranger-upgrade-btn" [disabled]="!canBuyRangerFavoredTypeDamageBonus(entry.type)" (click)="buyRangerFavoredTypeDamageBonus(entry.type)">
+							Buy +1 ({{ getRangerFavoredTypeDamageUpgradeCost(entry.type).sp }} SP / {{ getRangerFavoredTypeDamageUpgradeCost(entry.type).gp }} G)
+						</button>
+					</div>
+				}
+				@if (rangerAvailableFavoredTypeOptions().length > 0) {
+					<div class="ranger-upgrade-row ranger-upgrade-row-new-type">
+						<div>
+							<p class="ranger-upgrade-name">Add New Favored Type</p>
+							<p class="ranger-upgrade-value">Starts at +2 damage</p>
+						</div>
+						<div class="ranger-upgrade-controls">
+							<select class="ranger-upgrade-select" [value]="getSelectedRangerFavoredTypeToBuy() ?? ''" (change)="selectedRangerFavoredTypeToBuy.set(($any($event.target)).value)">
+								@for (type of rangerAvailableFavoredTypeOptions(); track type) {
+									<option [value]="type">{{ type }}</option>
+								}
+							</select>
+							<button type="button" class="action-button ranger-upgrade-btn" [disabled]="!canBuyNewRangerFavoredType()" (click)="buyNewRangerFavoredType()">
+								Buy Type (50000 SP / 1000 G)
+							</button>
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</app-tavern-modal>
 	}
 
 	@if (showYeOldMagiceShopModal()) {
@@ -74,6 +118,9 @@
 						<button type="button" class="shop-nav-btn" (click)="buyHealingAtShop()">Buy Healing ({{ shopHealingCost }} SP)</button>
 						<button type="button" class="shop-nav-btn" (click)="clearCursesAtShop()">Clear Curse ({{ shopCurseClearCost }} SP)</button>
 						<button type="button" class="shop-nav-btn" (click)="setYeOldMagiceShopView('info')">Talk to Keeper</button>
+						@if (isRangerClass()) {
+							<button type="button" class="shop-nav-btn" (click)="setYeOldMagiceShopView('upgrades')">🏹 Ranger Upgrades</button>
+						}
 						<button type="button" class="shop-nav-btn shop-nav-btn-exit" (click)="closeYeOldMagiceShop()">Exit</button>
 					</div>
 				}
@@ -159,7 +206,51 @@
 					}
 				}
 
-				@if (yeOldMagiceShopMessage(); as msg) {
+@if (yeOldMagiceShopView() === 'upgrades') {
+				<button type="button" class="shop-back-btn" (click)="setYeOldMagiceShopView('main')">← Back</button>
+				<div class="ranger-upgrade-panel">
+					<p class="inventory-section-title ranger-upgrade-title">Ranger Upgrades</p>
+					<div class="ranger-upgrade-row">
+						<div>
+							<p class="ranger-upgrade-name">Ranged Hit Bonus at 2+ Squares</p>
+							<p class="ranger-upgrade-value">+{{ rangerRangedHitBonus() }}</p>
+						</div>
+						<button type="button" class="action-button ranger-upgrade-btn" [disabled]="!canBuyRangerRangedHitBonus()" (click)="buyRangerRangedHitBonus()">
+							Buy +1 ({{ getRangerRangedHitBonusUpgradeCost().sp }} SP / {{ getRangerRangedHitBonusUpgradeCost().gp }} G)
+						</button>
+					</div>
+					@for (entry of rangerFavoredTypeEntries(); track entry.type) {
+						<div class="ranger-upgrade-row">
+							<div>
+								<p class="ranger-upgrade-name">{{ entry.type }} Damage Bonus</p>
+								<p class="ranger-upgrade-value">+{{ entry.bonus }}</p>
+							</div>
+							<button type="button" class="action-button ranger-upgrade-btn" [disabled]="!canBuyRangerFavoredTypeDamageBonus(entry.type)" (click)="buyRangerFavoredTypeDamageBonus(entry.type)">
+								Buy +1 ({{ getRangerFavoredTypeDamageUpgradeCost(entry.type).sp }} SP / {{ getRangerFavoredTypeDamageUpgradeCost(entry.type).gp }} G)
+							</button>
+						</div>
+					}
+					@if (rangerAvailableFavoredTypeOptions().length > 0) {
+						<div class="ranger-upgrade-row ranger-upgrade-row-new-type">
+							<div>
+								<p class="ranger-upgrade-name">Add New Favored Type</p>
+								<p class="ranger-upgrade-value">Starts at +2 damage</p>
+							</div>
+							<div class="ranger-upgrade-controls">
+								<select class="ranger-upgrade-select" [value]="getSelectedRangerFavoredTypeToBuy() ?? ''" (change)="selectedRangerFavoredTypeToBuy.set(($any($event.target)).value)">
+									@for (type of rangerAvailableFavoredTypeOptions(); track type) {
+										<option [value]="type">{{ type }}</option>
+									}
+								</select>
+								<button type="button" class="action-button ranger-upgrade-btn" [disabled]="!canBuyNewRangerFavoredType()" (click)="buyNewRangerFavoredType()">
+									Buy Type (50000 SP / 1000 G)
+								</button>
+							</div>
+						</div>
+					}
+				</div>
+			}
+			@if (yeOldMagiceShopMessage(); as msg) {
 					<p class="shop-message">{{ msg }}</p>
 				}
 			</div>
@@ -560,6 +651,35 @@
 		</div>
 	}
 
+	@if (showReadableNowModal()) {
+		<div class="inventory-modal-overlay" (click)="closeReadableNowModal()">
+			<div class="inventory-modal-box controls-help-modal-box" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Readable text">
+				<div class="inventory-modal-header">
+					<h3 class="inventory-modal-title">Readable Text</h3>
+					<button type="button" class="inventory-modal-close" (click)="closeReadableNowModal()">✕</button>
+				</div>
+				<div class="inventory-modal-scroll controls-help-scroll">
+					@if (readableTextsNow().length > 0) {
+						<ul class="discovery-list">
+							@for (entry of readableTextsNow(); track entry.row + ':' + entry.column + ':' + entry.name + ':' + entry.description) {
+								<li class="discovery-item">
+									<span class="discovery-kind">Text</span>
+									<p class="discovery-name">{{ entry.name || 'Text' }}</p>
+									<p class="discovery-description">r{{ entry.row }}, c{{ entry.column }}</p>
+									<div class="inventory-item-actions">
+										<button type="button" class="action-button action-button-strong" (click)="readFromReadableNow(entry)">Read</button>
+									</div>
+								</li>
+							}
+						</ul>
+					} @else {
+						<p class="shop-empty">Nothing readable right now.</p>
+					}
+				</div>
+			</div>
+		</div>
+	}
+
 	<header class="game-header">
 		<div class="game-header-row">
 			<h2 class="game-title">{{ gameName() }}</h2>
@@ -637,12 +757,12 @@
 								[playerMaxHp]="playerMaxHpForView()"
 									[startPoint]="previewStartPointForView()"
 														></app-dungeon-first-person>
-								@if (!showYeOldMagiceShopModal() && frontFacingYeOldMagiceShop(); as frontShop) {
+								@if (!showYeOldMagiceShopModal() && frontFacingYeOldMagiceShopPrompt(); as frontShop) {
 									<div class="shop-front-prompt">
 										<p class="shop-front-prompt-text">{{ frontShop.name }} is ahead. Enter?</p>
 										<div class="shop-front-prompt-actions">
 											<button type="button" class="shop-front-prompt-btn" (click)="enterFrontYeOldMagiceShop()">Enter Shop</button>
-											<button type="button" class="shop-front-prompt-btn shop-front-prompt-btn-later">Later</button>
+											<button type="button" class="shop-front-prompt-btn shop-front-prompt-btn-later" (click)="dismissFrontYeOldMagiceShopPrompt()">Later</button>
 										</div>
 									</div>
 								}
@@ -810,8 +930,19 @@
 									<button type="button" class="fpv-icon-btn" title="Face Down" (click)="setFacingDirectionFromPad('down')">↓</button>
 									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canPlayerDefend()" [attr.data-stacks]="playerDefendStacks() > 0 ? playerDefendStacks() : null" title="Defend (D) - costs 1 AE, +2 AC vs next attack" (click)="tryPlayerDefend()">🛡</button>
 								</div>
+								<div class="fpv-action-grid-row">
+									<button
+										type="button"
+										class="fpv-icon-btn"
+										[class.fpv-icon-btn-active]="canOpenReadableNowModal()"
+										[disabled]="!canOpenReadableNowModal()"
+										title="Readable text nearby"
+										(click)="openReadableNowModal()"
+									>📖</button>
+									<button type="button" class="fpv-icon-btn fpv-help-icon-btn" title="Controls Help" (click)="openControlsHelpModal()">?</button>
+									<span class="fpv-icon-btn-spacer" aria-hidden="true"></span>
+								</div>
 							</div>
-							<button type="button" class="fpv-help-btn" (click)="openControlsHelpModal()">? HELP ?</button>
 						</div>
 					</div>
 					</div>
@@ -1524,40 +1655,44 @@
 			</aside>
 
 				@if (pendingExitTransitionType()) {
-					<div class="exit-confirm-overlay" aria-live="assertive">
-						<p class="exit-confirm-title">You found an exit!</p>
-						@if (dungonSpReward() > 0 && pendingExitAwardsInnReward()) {
-							<p class="exit-confirm-sp">Reward: +{{ dungonSpReward() }} SP</p>
-						}
-						@if (!pendingExitAwardsInnReward()) {
-							<p class="exit-confirm-warning">
-								You need <strong>{{ pendingExitMissingItemName() || 'the required item' }}</strong> to claim the Inn Keeper reward.
-								You can still leave now, but no reward will be given.
-							</p>
-						}
-						<p class="exit-confirm-prompt">Do you want to leave the dungeon?</p>
-						<div class="exit-confirm-actions">
-							<button type="button" class="action-button action-button-strong" (click)="confirmExit()">Exit Dungeon</button>
-							<button type="button" class="action-button" (click)="cancelExit()">Stay</button>
+					<div class="exit-confirm-modal-overlay" aria-live="assertive">
+						<div class="exit-confirm-overlay" role="dialog" aria-modal="true" aria-label="Exit confirmation">
+							<p class="exit-confirm-title">You found an exit!</p>
+							@if (dungonSpReward() > 0 && pendingExitAwardsInnReward()) {
+								<p class="exit-confirm-sp">Reward: +{{ dungonSpReward() }} SP</p>
+							}
+							@if (!pendingExitAwardsInnReward()) {
+								<p class="exit-confirm-warning">
+									You need <strong>{{ pendingExitMissingItemName() || 'the required item' }}</strong> to claim the Inn Keeper reward.
+									You can still leave now, but no reward will be given.
+								</p>
+							}
+							<p class="exit-confirm-prompt">Do you want to leave the dungeon?</p>
+							<div class="exit-confirm-actions">
+								<button type="button" class="action-button action-button-strong" (click)="confirmExit()">Exit Dungeon</button>
+								<button type="button" class="action-button" (click)="cancelExit()">Stay</button>
+							</div>
 						</div>
 					</div>
 				}
 				@if (dungonWon()) {
-					<div class="win-overlay" aria-live="polite">
-						@if (winStairsImageIndex(); as imgIdx) {
-							<img
-								[src]="'/images/stup' + imgIdx + '.jpg'"
-								alt="Stairs Up"
-								class="win-stairs-image"
-							/>
-						}
-						<h2 class="win-title">You Won!</h2>
-						<p class="win-subtitle">You've reached the end of the dungeon!</p>
-						@if (dungonSpReward() > 0 && lastExitGrantedInnReward()) {
-							<p class="win-sp">+{{ dungonSpReward() }} SP awarded!</p>
-						} @else if (dungonSpReward() > 0) {
-							<p class="win-sp win-sp-muted">No Inn Keeper reward awarded.</p>
-						}
+					<div class="win-modal-overlay" aria-live="polite">
+						<div class="win-overlay" role="dialog" aria-modal="true" aria-label="Victory">
+							@if (winStairsImageIndex(); as imgIdx) {
+								<img
+									[src]="'/images/stup' + imgIdx + '.jpg'"
+									alt="Stairs Up"
+									class="win-stairs-image"
+								/>
+							}
+							<h2 class="win-title">You Won!</h2>
+							<p class="win-subtitle">You've reached the end of the dungeon!</p>
+							@if (dungonSpReward() > 0 && lastExitGrantedInnReward()) {
+								<p class="win-sp">+{{ dungonSpReward() }} SP awarded!</p>
+							} @else if (dungonSpReward() > 0) {
+								<p class="win-sp win-sp-muted">No Inn Keeper reward awarded.</p>
+							}
+						</div>
 					</div>
 				}
 			</section>

@@ -91,15 +91,17 @@ export class Items implements OnInit {
     { value: 'Placed Trap', label: 'Placed Trap' },
   ];
   readonly effectToPcOptions = [
-    { value: 'HP', label: 'HP' },
-    { value: 'Mind', label: 'Mind' },
-    { value: 'Magic', label: 'Magic' },
-    { value: 'Stamina', label: 'Stamina' },
-    { value: 'Strength', label: 'Strength' },
-    { value: 'AC', label: 'AC' },
-    { value: 'AE', label: 'AE (Action Economy)' },
-    { value: 'NOA', label: '# of Attacks' },
-    { value: 'ROS', label: 'ROS (Range of Sight)' },
+    { value: 'HP', label: 'PC: HP' },
+    { value: 'Mind', label: 'PC: Mind' },
+    { value: 'Magic', label: 'PC: Magic' },
+    { value: 'Stamina', label: 'PC: Stamina' },
+    { value: 'Strength', label: 'PC: Strength' },
+    { value: 'AC', label: 'PC: AC' },
+    { value: 'AE', label: 'PC: AE (Action Economy)' },
+    { value: 'NOA', label: 'PC: # of Attacks' },
+    { value: 'ROS', label: 'PC: ROS (Range of Sight)' },
+    { value: 'ToHit', label: 'To Hit (+weapon to-hit bonus)' },
+    { value: 'Damage', label: 'Damage (+bonus damage per hit)' },
   ];
   readonly weaponEffectTypeOptions = ['Blood', 'Lightning', 'Fire', 'Cold'] as const;
   readonly equippedAsOptions = [

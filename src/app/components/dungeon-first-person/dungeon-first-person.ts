@@ -37,8 +37,9 @@ import {
   TresherPlacement,
 } from '../../interfaces/game';
 
-type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind';
-type MonsterImpactState = { kind: MonsterImpactKind; color?: string | null; startedAt: number; expiresAt: number };
+type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind' | 'rangedTarget';
+type MonsterImpactProjectile = 'arrow' | 'knife';
+type MonsterImpactState = { kind: MonsterImpactKind; color?: string | null; projectile?: MonsterImpactProjectile | null; startedAt: number; expiresAt: number };
 
 @Component({
   selector: 'app-dungeon-first-person',
@@ -1808,6 +1809,243 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     const radius = Math.max(width, height) * (0.46 + pulse * 0.14);
     const accentColor = impact.color || this.getDefaultImpactColor(impact.kind);
 
+    if (impact.kind === 'rangedTarget') {
+      context.save();
+      context.globalAlpha = 0.94 * fade;
+      const targetWidth = Math.max(30, width * 0.54);
+      const targetHeight = Math.max(20, targetWidth * (2 / 3));
+      const targetCenterY = centerY - height * 0.02;
+      const rimColor = accentColor;
+
+      context.shadowColor = rimColor;
+      context.shadowBlur = 16 + pulse * 10;
+
+      const rings = [1, 0.74, 0.48, 0.25];
+      const ringFills = [
+        'rgba(122, 53, 40, 0.34)',
+        'rgba(242, 235, 213, 0.42)',
+        'rgba(181, 44, 53, 0.46)',
+        'rgba(245, 239, 226, 0.52)',
+      ];
+      for (let index = 0; index < rings.length; index += 1) {
+        context.fillStyle = ringFills[index];
+        context.beginPath();
+        context.ellipse(centerX, targetCenterY, (targetWidth * rings[index]) / 2, (targetHeight * rings[index]) / 2, 0, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      context.strokeStyle = `rgba(255, 244, 226, ${0.55 * fade})`;
+      context.lineWidth = 1.5;
+      context.beginPath();
+      context.ellipse(centerX, targetCenterY, targetWidth / 2, targetHeight / 2, 0, 0, Math.PI * 2);
+      context.stroke();
+
+      const projectileAngle = -0.52;
+      const projectileLength = targetWidth * 0.82;
+      const startX = centerX - Math.cos(projectileAngle) * projectileLength * 0.38;
+      const startY = targetCenterY - Math.sin(projectileAngle) * projectileLength * 0.38;
+      const endX = centerX + Math.cos(projectileAngle) * projectileLength * 0.48;
+      const endY = targetCenterY + Math.sin(projectileAngle) * projectileLength * 0.48;
+
+      if (impact.projectile === 'knife') {
+        // Shadow/depth layer
+        context.strokeStyle = 'rgba(20, 15, 10, 0.28)';
+        context.lineWidth = Math.max(2.5, targetHeight * 0.11) + 0.8;
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(startX + 1.2, startY + 1.2);
+        context.lineTo(endX - Math.cos(projectileAngle) * targetWidth * 0.18 + 1.2, endY - Math.sin(projectileAngle) * targetWidth * 0.18 + 1.2);
+        context.stroke();
+
+        // Main shaft
+        context.strokeStyle = 'rgba(74, 52, 36, 0.92)';
+        context.lineWidth = Math.max(2.5, targetHeight * 0.11);
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(startX, startY);
+        context.lineTo(endX - Math.cos(projectileAngle) * targetWidth * 0.18, endY - Math.sin(projectileAngle) * targetWidth * 0.18);
+        context.stroke();
+
+        // Highlight on shaft
+        context.strokeStyle = 'rgba(220, 210, 190, 0.52)';
+        context.lineWidth = Math.max(0.9, targetHeight * 0.03);
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(startX + 0.3, startY + 0.3);
+        context.lineTo(endX - Math.cos(projectileAngle) * targetWidth * 0.18 + 0.3, endY - Math.sin(projectileAngle) * targetWidth * 0.18 + 0.3);
+        context.stroke();
+
+        // Point shadow
+        context.fillStyle = 'rgba(30, 20, 15, 0.32)';
+        context.beginPath();
+        context.moveTo(endX + 0.8, endY + 0.8);
+        context.lineTo(endX - Math.cos(projectileAngle - 0.32) * targetWidth * 0.18 + 0.8, endY - Math.sin(projectileAngle - 0.32) * targetWidth * 0.18 + 0.8);
+        context.lineTo(endX - Math.cos(projectileAngle + 0.32) * targetWidth * 0.18 + 0.8, endY - Math.sin(projectileAngle + 0.32) * targetWidth * 0.18 + 0.8);
+        context.closePath();
+        context.fill();
+
+        // Main point
+        context.fillStyle = 'rgba(210, 216, 226, 0.95)';
+        context.beginPath();
+        context.moveTo(endX, endY);
+        context.lineTo(endX - Math.cos(projectileAngle - 0.32) * targetWidth * 0.18, endY - Math.sin(projectileAngle - 0.32) * targetWidth * 0.18);
+        context.lineTo(endX - Math.cos(projectileAngle + 0.32) * targetWidth * 0.18, endY - Math.sin(projectileAngle + 0.32) * targetWidth * 0.18);
+        context.closePath();
+        context.fill();
+
+        // Wound effect around impact point
+        context.strokeStyle = `rgba(181, 44, 53, ${0.35 * fade})`;
+        context.lineWidth = 1.8;
+        context.beginPath();
+        context.ellipse(centerX, targetCenterY, targetWidth * 0.18, targetHeight * 0.14, projectileAngle, 0, Math.PI * 2);
+        context.stroke();
+      } else {
+        // Shadow/depth layer for arrow
+        context.strokeStyle = 'rgba(20, 15, 10, 0.22)';
+        context.lineWidth = Math.max(2, targetHeight * 0.08) + 0.6;
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(startX + 1, startY + 1);
+        context.lineTo(endX + 1, endY + 1);
+        context.stroke();
+
+        // Main shaft
+        context.strokeStyle = 'rgba(108, 72, 30, 0.96)';
+        context.lineWidth = Math.max(2, targetHeight * 0.08);
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(startX, startY);
+        context.lineTo(endX, endY);
+        context.stroke();
+
+        // Highlight on shaft
+        context.strokeStyle = 'rgba(200, 160, 80, 0.58)';
+        context.lineWidth = Math.max(0.8, targetHeight * 0.025);
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(startX + 0.25, startY + 0.25);
+        context.lineTo(endX + 0.25, endY + 0.25);
+        context.stroke();
+
+        // Arrowhead shadow
+        context.fillStyle = 'rgba(30, 20, 15, 0.28)';
+        context.beginPath();
+        context.moveTo(endX + 0.8, endY + 0.8);
+        context.lineTo(endX - Math.cos(projectileAngle - 0.28) * targetWidth * 0.14 + 0.8, endY - Math.sin(projectileAngle - 0.28) * targetWidth * 0.14 + 0.8);
+        context.lineTo(endX - Math.cos(projectileAngle + 0.28) * targetWidth * 0.14 + 0.8, endY - Math.sin(projectileAngle + 0.28) * targetWidth * 0.14 + 0.8);
+        context.closePath();
+        context.fill();
+
+        // Main arrowhead
+        context.fillStyle = 'rgba(222, 225, 230, 0.94)';
+        context.beginPath();
+        context.moveTo(endX, endY);
+        context.lineTo(endX - Math.cos(projectileAngle - 0.28) * targetWidth * 0.14, endY - Math.sin(projectileAngle - 0.28) * targetWidth * 0.14);
+        context.lineTo(endX - Math.cos(projectileAngle + 0.28) * targetWidth * 0.14, endY - Math.sin(projectileAngle + 0.28) * targetWidth * 0.14);
+        context.closePath();
+        context.fill();
+
+        // Wound effect around impact point
+        context.strokeStyle = `rgba(181, 44, 53, ${0.35 * fade})`;
+        context.lineWidth = 1.8;
+        context.beginPath();
+        context.ellipse(centerX, targetCenterY, targetWidth * 0.15, targetHeight * 0.12, projectileAngle, 0, Math.PI * 2);
+        context.stroke();
+
+        // Fletching
+        const fletchX = startX + Math.cos(projectileAngle) * targetWidth * 0.08;
+        const fletchY = startY + Math.sin(projectileAngle) * targetWidth * 0.08;
+        context.strokeStyle = 'rgba(235, 245, 255, 0.86)';
+        context.lineWidth = 1.4;
+        context.beginPath();
+        context.moveTo(fletchX, fletchY);
+        context.lineTo(fletchX - Math.cos(projectileAngle - 1.8) * targetHeight * 0.3, fletchY - Math.sin(projectileAngle - 1.8) * targetHeight * 0.3);
+        context.moveTo(fletchX, fletchY);
+        context.lineTo(fletchX - Math.cos(projectileAngle + 1.8) * targetHeight * 0.3, fletchY - Math.sin(projectileAngle + 1.8) * targetHeight * 0.3);
+        context.stroke();
+      }
+
+      // Blood splatter spots around impact
+      context.fillStyle = `rgba(198, 29, 45, ${0.52 * fade})`;
+      for (let i = 0; i < 6; i += 1) {
+        const splatterAngle = (i / 6) * Math.PI * 2;
+        const splatterDist = targetWidth * (0.22 + Math.sin(pulse * 2.2 + i) * 0.08);
+        const splatterX = centerX + Math.cos(splatterAngle) * splatterDist;
+        const splatterY = targetCenterY + Math.sin(splatterAngle) * splatterDist;
+        const splatterSize = 1.2 + Math.sin(life * 3.1 + i) * 0.6;
+        context.beginPath();
+        context.arc(splatterX, splatterY, splatterSize, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      // Main blood drips (5 instead of 3)
+      const dripStartY = targetCenterY + targetHeight * 0.22;
+      for (let index = 0; index < 5; index += 1) {
+        const drift = (index - 2) * targetWidth * 0.12 + Math.sin(pulse * 1.7 + index) * 3.2;
+        const dripX = centerX + drift;
+        const dripLength = targetHeight * (0.4 + index * 0.12 + life * 0.18);
+        
+        // Drip shadow for depth
+        context.strokeStyle = 'rgba(60, 8, 18, 0.42)';
+        context.lineWidth = 3.8 + index * 0.42;
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(dripX + 0.8, dripStartY + 0.8);
+        context.quadraticCurveTo(dripX + (index - 2) * 3.2 + 0.8, dripStartY + dripLength * 0.45 + 0.8, dripX + 0.8, dripStartY + dripLength + 0.8);
+        context.stroke();
+        
+        // Main drip (darker, more opaque)
+        context.strokeStyle = 'rgba(132, 14, 26, 0.96)';
+        context.lineWidth = 3.4 + index * 0.38;
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(dripX, dripStartY);
+        context.quadraticCurveTo(dripX + (index - 2) * 3.2, dripStartY + dripLength * 0.45, dripX, dripStartY + dripLength);
+        context.stroke();
+        
+        // Bright blood highlight on drip
+        context.strokeStyle = `rgba(220, 60, 80, ${0.68 * fade})`;
+        context.lineWidth = 1.2 + index * 0.15;
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(dripX - 0.6, dripStartY);
+        context.quadraticCurveTo(dripX + (index - 2) * 3.2 - 0.6, dripStartY + dripLength * 0.45, dripX - 0.6, dripStartY + dripLength - 0.4);
+        context.stroke();
+        
+        // Drip pooling at end (larger globs)
+        const globRadius = 3.2 + index * 0.58;
+        context.fillStyle = 'rgba(156, 18, 30, 0.94)';
+        context.beginPath();
+        context.arc(dripX, dripStartY + dripLength + globRadius * 0.6, globRadius, 0, Math.PI * 2);
+        context.fill();
+        
+        // Glow around glob
+        context.fillStyle = `rgba(198, 50, 70, ${0.32 * fade})`;
+        context.beginPath();
+        context.arc(dripX, dripStartY + dripLength + globRadius * 0.6, globRadius + 1.4, 0, Math.PI * 2);
+        context.fill();
+      }
+      
+      // Extra side splatter streaks
+      for (let index = 0; index < 4; index += 1) {
+        const sideAngle = index < 2 ? -0.35 : 0.35;
+        const sideX = centerX + (index % 2 === 0 ? -1 : 1) * targetWidth * 0.16;
+        const sideY = targetCenterY + targetHeight * 0.08;
+        const sideLength = targetHeight * (0.22 + index * 0.08 + life * 0.1);
+        
+        context.strokeStyle = `rgba(156, 18, 30, ${0.52 * fade})`;
+        context.lineWidth = 1.6 + index * 0.2;
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(sideX, sideY);
+        context.quadraticCurveTo(sideX + Math.cos(sideAngle) * sideLength * 0.3, sideY - Math.sin(sideAngle) * sideLength * 0.2, sideX + Math.cos(sideAngle) * sideLength * 0.5, sideY - sideLength);
+        context.stroke();
+      }
+
+      context.restore();
+      return;
+    }
+
     if (impact.kind === 'blood') {
       context.save();
       context.globalAlpha = 0.92 * fade;
@@ -1999,6 +2237,7 @@ export class DungeonFirstPersonComponent implements OnDestroy {
 
   private getDefaultImpactColor(kind: MonsterImpactKind): string {
     if (kind === 'blood') return '#c61d2d';
+    if (kind === 'rangedTarget') return '#c61d2d';
     if (kind === 'fire') return '#ff5b2a';
     if (kind === 'lightning') return '#8de8ff';
     if (kind === 'ice') return '#71d6ff';

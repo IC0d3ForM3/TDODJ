@@ -117,8 +117,9 @@ interface PcTresherCurseData {
   lastFor: number;
 }
 
-type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind';
-type MonsterImpactState = { kind: MonsterImpactKind; color?: string | null; startedAt: number; expiresAt: number };
+type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind' | 'rangedTarget';
+type MonsterImpactProjectile = 'arrow' | 'knife';
+type MonsterImpactState = { kind: MonsterImpactKind; color?: string | null; projectile?: MonsterImpactProjectile | null; startedAt: number; expiresAt: number };
 type DiagonalFacingDirection = 'upRight' | 'downRight' | 'downLeft' | 'upLeft';
 type DisplayFacingDirection = FacingDirection | DiagonalFacingDirection;
 type DirectionPadDirection = DisplayFacingDirection | 'center';
@@ -158,6 +159,8 @@ interface NearbyObstacleInfo {
   canTakeItem: boolean;
   hasMatchingKey: boolean;
 }
+
+type RangerFavoredTypeBonuses = Record<string, number>;
 
 @Component({
   selector: 'app-game',
@@ -247,6 +250,56 @@ export class Game implements OnInit {
   readonly monsterImpactEffects = signal<Record<string, MonsterImpactState>>({});
   readonly monsterImpactPulse = signal(0);
   private monsterImpactPulseTimer: ReturnType<typeof setInterval> | null = null;
+  readonly rangerRangedHitBonus = signal(2);
+  readonly rangerFavoredTypeDamageBonuses = signal<RangerFavoredTypeBonuses>({ Beast: 2 });
+  readonly selectedRangerFavoredTypeToBuy = signal<string | null>(null);
+  readonly rangerFavoredTypeEntries = computed(() =>
+    Object.entries(this.rangerFavoredTypeDamageBonuses())
+      .map(([type, bonus]) => ({ type, bonus }))
+      .sort((left, right) => left.type.localeCompare(right.type))
+  );
+  readonly rangerAvailableFavoredTypeOptions = computed(() => {
+    const preview = this.gridPreviewContext();
+    const typesFromCurrentDungon = preview
+      ? (this.monsterListByDungon()[preview.dungonId] ?? [])
+          .map((monster) => this.normalizeMonsterTypeLabel(monster.type))
+          .filter((type) => type.length > 0)
+      : [];
+    const catalog = [
+      'Aberration',
+      'Beast',
+      'Celestial',
+      'Construct',
+      'Dragon',
+      'Demon',
+      'Elemental',
+      'Fey',
+      'Fiend',
+      'Giant',
+      'Humanoid',
+      'Monstrosity',
+      'Ooze',
+      'Plant',
+      'Specter',
+      'Swarm of Tiny Beasts',
+      'Undead',
+    ];
+    const ownedTypeKeys = new Set(
+      Object.keys(this.rangerFavoredTypeDamageBonuses()).map((type) => this.normalizeMonsterTypeKey(type))
+    );
+    const merged = [...typesFromCurrentDungon, ...catalog];
+    const unique: string[] = [];
+    const seen = new Set<string>();
+    for (const type of merged) {
+      const normalizedKey = this.normalizeMonsterTypeKey(type);
+      if (!normalizedKey || ownedTypeKeys.has(normalizedKey) || seen.has(normalizedKey)) {
+        continue;
+      }
+      seen.add(normalizedKey);
+      unique.push(this.normalizeMonsterTypeLabel(type));
+    }
+    return unique.sort((left, right) => left.localeCompare(right));
+  });
   readonly healerFreeHealUsedThisRound = signal(false);
   readonly playerSneekRoundsRemaining = signal(0);
   readonly playerSneekUsedThisRound = signal(false);
@@ -355,7 +408,9 @@ export class Game implements OnInit {
   get dungonWon() { return this.interactionService.dungonWon; }
   get showTavernModal() { return this.interactionService.showTavernModal; }
   readonly showYeOldMagiceShopModal = signal(false);
-  readonly yeOldMagiceShopView = signal<'main' | 'buyItems' | 'sellItems' | 'buySpells' | 'sellSpells' | 'buyPotions' | 'sellPotions' | 'info'>('main');
+  private readonly yeOldMagiceShopPromptDismissStorageKey = 'tdodj.yeOldMagiceShopPrompt.dismissed';
+  readonly dismissedYeOldMagiceShopPrompts = signal<Record<string, true>>(this.loadDismissedYeOldMagiceShopPrompts());
+  readonly yeOldMagiceShopView = signal<'main' | 'buyItems' | 'sellItems' | 'buySpells' | 'sellSpells' | 'buyPotions' | 'sellPotions' | 'info' | 'upgrades'>('main');
   readonly yeOldMagiceShopMessage = signal<string | null>(null);
   readonly yeOldMagiceShopInfoUnlocked = signal(false);
   readonly yeOldMagiceShopDrinkPurchased = signal(false);
@@ -387,6 +442,28 @@ export class Game implements OnInit {
   readonly showBackpackInventoryModal = signal(false);
   readonly showDrinkPotionModal = signal(false);
   readonly showControlsHelpModal = signal(false);
+  readonly showReadableNowModal = signal(false);
+  readonly readableTextsNow = computed<NearbyDiscoveryItem[]>(() => {
+    const unique = new Map<string, NearbyDiscoveryItem>();
+    for (const item of this.nearbyItemsForPreview()) {
+      if (item.kind !== 'Text') {
+        continue;
+      }
+      const note = (item.description ?? '').trim();
+      if (!note) {
+        continue;
+      }
+      const key = `${item.row}:${item.column}:${item.name}:${note}`;
+      if (!unique.has(key)) {
+        unique.set(key, {
+          ...item,
+          description: note,
+        });
+      }
+    }
+
+    return Array.from(unique.values());
+  });
   readonly defaultSpellIdByDungon = signal<Record<number, number | null>>({});
   readonly pendingExitAwardsInnReward = signal(true);
   readonly pendingExitMissingItemName = signal<string | null>(null);
@@ -443,6 +520,20 @@ export class Game implements OnInit {
   keyList: Key[] = [];
 
   readonly frontFacingYeOldMagiceShop = computed(() => this.getFrontFacingYeOldMagiceShop());
+  readonly frontFacingYeOldMagiceShopPrompt = computed(() => {
+    const shop = this.getFrontFacingYeOldMagiceShop();
+    if (!shop) return null;
+
+    const preview = this.gridPreviewContext();
+    if (!preview) return null;
+
+    const dismissKey = this.getYeOldMagiceShopPromptDismissKey(preview.dungonId, shop.id);
+    if (this.dismissedYeOldMagiceShopPrompts()[dismissKey]) {
+      return null;
+    }
+
+    return shop;
+  });
 
   readonly yeOldMagiceShopBuyableItems = computed<ShopCatalogEntry[]>(() => {
     const dungonId = this.activeYeOldMagiceShopDungonId();
@@ -608,6 +699,11 @@ export class Game implements OnInit {
     }
 
     if (direction === 'up' || direction === 'right' || direction === 'down' || direction === 'left') {
+      // If already facing this direction, move forward instead of just re-setting facing.
+      if (this.isFacingDirectionActive(direction)) {
+        this.tryMoveCheaterByDisplayedFacingStep(1);
+        return;
+      }
       this.applyCardinalFacingDirection(direction);
       return;
     }
@@ -1135,6 +1231,16 @@ export class Game implements OnInit {
         this.selectedCombatTarget.set({ row: cell.row, column: cell.column });
         this.previewActionMessage.set(`Target: ${trap.trap.name || 'trap'}.`);
         this.drawPreviewGridCanvas();
+        return;
+      }
+    }
+
+    // Allow direct click-to-enter when the clicked map cell is the front-facing shop tile.
+    // Keep this out of spell targeting mode so combat targeting behavior stays unchanged.
+    if (activeSpellId === null) {
+      const frontShop = this.frontFacingYeOldMagiceShop();
+      if (frontShop && frontShop.row === cell.row && frontShop.column === cell.column) {
+        this.enterFrontYeOldMagiceShop();
         return;
       }
     }
@@ -1840,6 +1946,26 @@ export class Game implements OnInit {
     this.showControlsHelpModal.set(false);
   }
 
+  canOpenReadableNowModal(): boolean {
+    return this.readableTextsNow().length > 0;
+  }
+
+  openReadableNowModal(): void {
+    if (!this.canOpenReadableNowModal()) {
+      return;
+    }
+    this.showReadableNowModal.set(true);
+  }
+
+  closeReadableNowModal(): void {
+    this.showReadableNowModal.set(false);
+  }
+
+  readFromReadableNow(entry: NearbyDiscoveryItem): void {
+    this.closeReadableNowModal();
+    this.readObstacleText(entry.name, entry.description);
+  }
+
   facingWallNoteForPreview(): { name: string; description: string; imageSrc?: string | null } | null {
     const note = this.nearbyItemsForPreview().find((item) => item.kind === 'Text' && (item.name || '').toLowerCase().includes('wall note'));
     if (!note) return null;
@@ -2157,14 +2283,15 @@ const targetKind = this.getSpellTargetKind(spell);
 
     this.selectedSpellId.set(null);
 
-    const spellCastBonus = this.getEffectivePlayerMind() + this.getSpellCastingClassModifier();
+    const dist = this.getSquareDistance(preview.centerRow, preview.centerColumn, target.row, target.column);
+    const rangerHitBonus = this.getRangerRangedHitBonusAtDistance(dist);
+    const spellCastBonus = this.getEffectivePlayerMind() + this.getSpellCastingClassModifier() + rangerHitBonus;
     const roll = this.rollD12(spellCastBonus);
     const dc = spell.successTestValue + magicResistance;
     const spellFlavor = this.formatSpellFlavor(spell);
     this.addCombatLog(`Cast ${spell.name}${spellFlavor} — rolled ${roll} (1d12${this.formatSignedModifier(spellCastBonus)}) vs DC ${dc} (TN ${spell.successTestValue} + MR ${magicResistance}).`);
 
     if (roll >= dc) {
-      const dist = Math.max(Math.abs(target.row - preview.centerRow), Math.abs(target.column - preview.centerColumn));
       const hasRangedMonsterHit = effectSlots.some((slot) => slot.targetType === 'monster' && slot.effectOn === 'HP' && slot.range > 1 && dist > 1 && dist <= slot.range);
       if (hasRangedMonsterHit) {
         this.triggerSpellBeam(preview.centerRow, preview.centerColumn, target.row, target.column, true);
@@ -2253,13 +2380,14 @@ const targetKind = this.getSpellTargetKind(spell);
       const template = this.getMonstersByIdForDungon(preview.dungonId).get(instance.monsterId);
       const monsterName = template?.name ?? 'monster';
       const magicResistance = template ? this.getEffectiveMonsterMagicResistance(instance, template) : 0;
-      const spellCastBonus = this.getEffectivePlayerMind() + this.getSpellCastingClassModifier();
+      const dist = this.getSquareDistance(preview.centerRow, preview.centerColumn, instance.row, instance.column);
+      const rangerHitBonus = this.getRangerRangedHitBonusAtDistance(dist);
+      const spellCastBonus = this.getEffectivePlayerMind() + this.getSpellCastingClassModifier() + rangerHitBonus;
       const roll = this.rollD12(spellCastBonus);
       const dc = spell.successTestValue + magicResistance;
       this.addCombatLog(`${spell.name}${spellFlavor} → ${monsterName}: rolled ${roll} vs DC ${dc}.`);
       if (roll >= dc) {
         anyHit = true;
-        const dist = Math.max(Math.abs(instance.row - preview.centerRow), Math.abs(instance.column - preview.centerColumn));
         const hasRangedMonsterHit = effectSlots.some((slot) => !slot.effectOnPc && slot.effectOn === 'HP' && slot.range > 1 && dist > 1 && dist <= slot.range);
         if (hasRangedMonsterHit) {
           this.triggerSpellBeam(preview.centerRow, preview.centerColumn, instance.row, instance.column, true);
@@ -2554,7 +2682,8 @@ const targetKind = this.getSpellTargetKind(spell);
 
     if (slot.effectOn === 'HP') {
       const calc = this.calculateSpellHpDamage(Math.max(1, Math.abs(amount)), magicResistance);
-      const damagePerTick = calc.damage;
+      const rangerDamageBonus = this.getRangerFavoredTypeDamageBonus(template);
+      const damagePerTick = Math.max(1, calc.damage + rangerDamageBonus);
       if (slot.lastFor === 0) {
         target.currentHp = Math.max(0, target.currentHp - damagePerTick);
       } else {
@@ -2626,7 +2755,19 @@ const targetKind = this.getSpellTargetKind(spell);
     this.triggerMonsterImpact(row, col, this.getMonsterImpactKind(spellName, effectOn, effectType), null);
   }
 
-  private triggerWeaponMonsterImpact(row: number, col: number, effectType: string, effectColor: string | null): void {
+  private triggerWeaponMonsterImpact(
+    row: number,
+    col: number,
+    effectType: string,
+    effectColor: string | null,
+    weaponName = '',
+    attackDistance = 1
+  ): void {
+    const projectile = this.getRangedImpactProjectile(weaponName, attackDistance);
+    if (projectile !== null) {
+      this.triggerMonsterImpact(row, col, 'rangedTarget', effectColor, projectile);
+      return;
+    }
     this.triggerMonsterImpact(row, col, this.getMonsterImpactKind('', '', effectType), effectColor);
   }
 
@@ -2641,16 +2782,24 @@ const targetKind = this.getSpellTargetKind(spell);
     return !!impactByKey[previewKey] || !!impactByKey[firstPersonKey];
   }
 
-  private triggerMonsterImpact(row: number, col: number, kind: MonsterImpactKind, color: string | null): void {
+  private triggerMonsterImpact(
+    row: number,
+    col: number,
+    kind: MonsterImpactKind,
+    color: string | null,
+    projectile: MonsterImpactProjectile | null = null
+  ): void {
     const previewKey = `${row}_${col}`;
     const firstPersonKey = `${row}:${col}`;
     const now = Date.now();
+    const durationMs = kind === 'rangedTarget' ? 2000 : 2100;
     this.monsterGlowKeys.update(s => { const n = new Set(s); n.add(previewKey); return n; });
     const impactState: MonsterImpactState = {
       kind,
       color: color || this.getDefaultMonsterImpactColor(kind),
+      projectile,
       startedAt: now,
-      expiresAt: now + 2100,
+      expiresAt: now + durationMs,
     };
     this.monsterImpactEffects.update((all) => ({
       ...all,
@@ -2669,7 +2818,7 @@ const targetKind = this.getSpellTargetKind(spell);
       });
       this.stopMonsterImpactPulseTimerIfIdle();
       this.drawPreviewGridCanvas();
-    }, 2100);
+    }, durationMs);
   }
 
   private getMonsterImpactKind(spellName: string, effectOn: string, effectType: string): MonsterImpactKind {
@@ -2723,6 +2872,7 @@ const targetKind = this.getSpellTargetKind(spell);
 
   private getDefaultMonsterImpactColor(kind: MonsterImpactKind): string {
     if (kind === 'blood') return '#c61d2d';
+    if (kind === 'rangedTarget') return '#c61d2d';
     if (kind === 'fire') return '#ff5b2a';
     if (kind === 'lightning') return '#8de8ff';
     if (kind === 'ice') return '#71d6ff';
@@ -2756,7 +2906,8 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private triggerSpellHitFlash(spellName: string, effectOn: string, effectType: string): void {
-    const kind = this.getMonsterImpactKind(spellName, effectOn, effectType);
+    const rawKind = this.getMonsterImpactKind(spellName, effectOn, effectType);
+    const kind = rawKind === 'rangedTarget' ? 'blood' : rawKind;
     this.spellHitFlash.set(kind);
     setTimeout(() => this.spellHitFlash.set(null), 1500);
   }
@@ -3217,16 +3368,19 @@ const targetKind = this.getSpellTargetKind(spell);
 
     // Roll to hit: d12 + effectValue (item's +toHit bonus) + player stamina
     const itemToHit = typeof item.effectValue === 'number' ? item.effectValue : 0;
-    const hitRoll = this.rollD12(itemToHit + this.getEffectivePlayerStamina());
+    const attackDistance = this.getSquareDistance(preview.centerRow, preview.centerColumn, target.row, target.column);
+    const rangerHitBonus = this.getRangerRangedHitBonusAtDistance(attackDistance);
+    const hitRoll = this.rollD12(itemToHit + this.getEffectivePlayerStamina() + rangerHitBonus);
     const template = this.getMonstersByIdForDungon(dungonId).get(target.monsterId);
     const monsterAC = template ? this.getEffectiveMonsterAC(target, template) : 10;
 
     if (hitRoll >= monsterAC) {
       const diceSize = Math.max(4, item.damage ?? 6);
-      const damage = Math.max(1, this.randomInt(1, diceSize) + this.getEffectivePlayerStrength());
+      const rangerDamageBonus = this.getRangerFavoredTypeDamageBonus(template ?? null);
+      const damage = Math.max(1, this.randomInt(1, diceSize) + this.getEffectivePlayerStrength() + rangerDamageBonus);
       target.currentHp -= damage;
       if (!target.npcIsHostile) target.npcIsHostile = true;
-      this.triggerWeaponMonsterImpact(target.row, target.column, 'Blood', '#cc0000');
+      this.triggerWeaponMonsterImpact(target.row, target.column, 'Blood', '#cc0000', item.name ?? '', attackDistance);
       this.addCombatLog(`You throw ${item.name || 'item'} at ${template?.name ?? 'monster'} for ${damage} dmg! (rolled ${hitRoll} vs AC ${monsterAC})`);
       if (target.currentHp <= 0) {
         target.isDead = true;
@@ -5283,8 +5437,6 @@ const targetKind = this.getSpellTargetKind(spell);
             this.loadMonsterImages(game.dungonid);
             this.loadObstacleImages(game.dungonid);
             this.loadLootImages(game.dungonid);
-            this.showTavernModal.set(true);
-            this.startTavernMusic();
           });
         },
         error: () => {
@@ -6677,7 +6829,7 @@ const targetKind = this.getSpellTargetKind(spell);
           const cy = gpRow * this.previewGridCellSize + this.previewGridCellSize / 2;
           const impact = impactByKey[key];
           const pulse = (Math.sin(this.monsterImpactPulse() * 0.55) + 1) / 2;
-          const ringColor = impact?.color ?? (impact?.kind === 'blood'
+          const ringColor = impact?.color ?? (impact?.kind === 'blood' || impact?.kind === 'rangedTarget'
             ? '#c61d2d'
             : impact?.kind === 'lightning'
               ? '#8de8ff'
@@ -6688,7 +6840,7 @@ const targetKind = this.getSpellTargetKind(spell);
                   : impact?.kind === 'mind'
                     ? '#44dd77'
                     : '#f4cf63');
-          const coreColor = impact?.kind === 'blood'
+          const coreColor = impact?.kind === 'blood' || impact?.kind === 'rangedTarget'
             ? 'rgba(198, 29, 45, 0.34)'
             : impact?.kind === 'lightning'
               ? 'rgba(140, 232, 255, 0.28)'
@@ -10348,6 +10500,9 @@ const targetKind = this.getSpellTargetKind(spell);
     }
 
     this.npcTradesPurchased.set(parsed.npcTradesPurchased);
+    this.rangerRangedHitBonus.set(parsed.rangerRangedHitBonus);
+    this.rangerFavoredTypeDamageBonuses.set(parsed.rangerFavoredTypeDamageBonuses);
+    this.selectedRangerFavoredTypeToBuy.set(null);
 
     this.savedCombatState = {
       playerHp: parsed.savedPlayerHp,
@@ -10384,6 +10539,8 @@ const targetKind = this.getSpellTargetKind(spell);
     collectedFloorSpells: PcTresherSpellData[];
     learnedFloorSpellIds: number[];
     equippedSpellIds: number[];
+    rangerRangedHitBonus: number;
+    rangerFavoredTypeDamageBonuses: RangerFavoredTypeBonuses;
     pcInventoryInitialized: boolean;
     savedPlayerHp: number | null;
     savedPlayerAE: number | null;
@@ -10420,6 +10577,8 @@ const targetKind = this.getSpellTargetKind(spell);
         collectedFloorSpells: [],
         learnedFloorSpellIds: [],
         equippedSpellIds: [],
+        rangerRangedHitBonus: 2,
+        rangerFavoredTypeDamageBonuses: { Beast: 2 },
         pcInventoryInitialized: false,
         savedPlayerHp: null,
         savedPlayerAE: null,
@@ -10472,6 +10631,8 @@ const targetKind = this.getSpellTargetKind(spell);
       collectedFloorSpells?: unknown[];
       learnedFloorSpellIds?: unknown[];
       equippedSpellIds?: unknown[];
+      rangerRangedHitBonus?: unknown;
+      rangerFavoredTypeDamageBonuses?: unknown;
       npcTradesPurchased?: unknown[];
       cheaterByPcId?: unknown;
     };
@@ -10889,6 +11050,21 @@ const targetKind = this.getSpellTargetKind(spell);
           .map((x) => Math.max(0, Math.floor(x)))
       : [];
 
+    const rangerRangedHitBonus =
+      typeof source.rangerRangedHitBonus === 'number' && Number.isFinite(source.rangerRangedHitBonus)
+        ? Math.max(2, Math.floor(source.rangerRangedHitBonus))
+        : 2;
+    const rangerFavoredTypeDamageBonuses: RangerFavoredTypeBonuses = { Beast: 2 };
+    if (source.rangerFavoredTypeDamageBonuses && typeof source.rangerFavoredTypeDamageBonuses === 'object') {
+      for (const [rawType, rawBonus] of Object.entries(source.rangerFavoredTypeDamageBonuses as Record<string, unknown>)) {
+        const type = this.normalizeMonsterTypeLabel(rawType);
+        if (!type || typeof rawBonus !== 'number' || !Number.isFinite(rawBonus)) {
+          continue;
+        }
+        rangerFavoredTypeDamageBonuses[type] = Math.max(2, Math.floor(rawBonus));
+      }
+    }
+
     const cheaterByPcId: Record<number, Cheater> = {};
     if (source.cheaterByPcId && typeof source.cheaterByPcId === 'object') {
       for (const [key, val] of Object.entries(source.cheaterByPcId as Record<string, unknown>)) {
@@ -10953,6 +11129,8 @@ const targetKind = this.getSpellTargetKind(spell);
       collectedFloorSpells,
       learnedFloorSpellIds,
       equippedSpellIds,
+      rangerRangedHitBonus,
+      rangerFavoredTypeDamageBonuses,
       pcInventoryInitialized,
       savedPlayerHp: savedPlayerHpRaw,
       savedPlayerAE: savedPlayerAERaw,
@@ -11521,6 +11699,23 @@ const targetKind = this.getSpellTargetKind(spell);
     this.startTavernMusic();
   }
 
+  dismissFrontYeOldMagiceShopPrompt(): void {
+    const shop = this.frontFacingYeOldMagiceShop();
+    const preview = this.gridPreviewContext();
+    if (!shop || !preview) return;
+
+    const dismissKey = this.getYeOldMagiceShopPromptDismissKey(preview.dungonId, shop.id);
+    this.dismissedYeOldMagiceShopPrompts.update((all) => {
+      if (all[dismissKey]) {
+        return all;
+      }
+
+      const next: Record<string, true> = { ...all, [dismissKey]: true };
+      this.persistDismissedYeOldMagiceShopPrompts(next);
+      return next;
+    });
+  }
+
   closeYeOldMagiceShop(): void {
     this.showYeOldMagiceShopModal.set(false);
     this.yeOldMagiceShopView.set('main');
@@ -11533,7 +11728,7 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   setYeOldMagiceShopView(
-    view: 'main' | 'buyItems' | 'sellItems' | 'buySpells' | 'sellSpells' | 'buyPotions' | 'sellPotions' | 'info'
+    view: 'main' | 'buyItems' | 'sellItems' | 'buySpells' | 'sellSpells' | 'buyPotions' | 'sellPotions' | 'info' | 'upgrades'
   ): void {
     this.yeOldMagiceShopView.set(view);
     this.yeOldMagiceShopMessage.set(null);
@@ -11820,6 +12015,38 @@ const targetKind = this.getSpellTargetKind(spell);
 
   private isYeOldMagiceShopObstacle(obs: ObstaclePlacement): boolean {
     return (obs.name ?? '').trim().toLowerCase() === 'ye old magice shop';
+  }
+
+  private getYeOldMagiceShopPromptDismissKey(dungonId: number, obstacleId: number): string {
+    const gameId = this.currentGameId() ?? 0;
+    return `${gameId}:${dungonId}:${obstacleId}`;
+  }
+
+  private loadDismissedYeOldMagiceShopPrompts(): Record<string, true> {
+    try {
+      const raw = sessionStorage.getItem(this.yeOldMagiceShopPromptDismissStorageKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return {};
+
+      const normalized: Record<string, true> = {};
+      for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+        if (value === true) {
+          normalized[key] = true;
+        }
+      }
+      return normalized;
+    } catch {
+      return {};
+    }
+  }
+
+  private persistDismissedYeOldMagiceShopPrompts(value: Record<string, true>): void {
+    try {
+      sessionStorage.setItem(this.yeOldMagiceShopPromptDismissStorageKey, JSON.stringify(value));
+    } catch {
+      // Ignore storage failures; prompt dismissal will still work for this runtime instance.
+    }
   }
 
   private getObstaclePrimaryWallSide(dungonId: number, row: number, column: number): SquareSide | null {
@@ -12294,8 +12521,12 @@ const targetKind = this.getSpellTargetKind(spell);
       this.playerSp.update((s) => s + spReward);
       this.awardSpToPC(spReward);
     }
-    this.showTavernModal.set(true);
-    this.startTavernMusic();
+    // Show win screen for 3 seconds, then transition to the tavern/shop.
+    setTimeout(() => {
+      this.dungonWon.set(false);
+      this.showTavernModal.set(true);
+      this.startTavernMusic();
+    }, 3000);
   }
 
   private awardSpToPC(amount: number): void {
@@ -12452,7 +12683,7 @@ const targetKind = this.getSpellTargetKind(spell);
     this.combatLog.update((log) => [...log.slice(-49), { text }]);
   }
 
-  private normalizeEffectToPcStat(stat: string | null | undefined): 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS' | 'RemoveCurse' | 'RemoveTrap' | null {
+  private normalizeEffectToPcStat(stat: string | null | undefined): 'HP' | 'AC' | 'Magic' | 'Mind' | 'Stamina' | 'Strength' | 'AE' | 'NOA' | 'ROS' | 'RemoveCurse' | 'RemoveTrap' | 'ToHit' | 'Damage' | null {
     if (!stat) return null;
     const s = stat.trim().toLowerCase();
     if (s === 'hp') return 'HP';
@@ -12466,6 +12697,8 @@ const targetKind = this.getSpellTargetKind(spell);
     if (s === 'ros' || s === 'sight' || s === 'range of sight') return 'ROS';
     if (s === 'remove curse' || s === 'cure curse' || s === 'cures curse') return 'RemoveCurse';
     if (s === 'remove trap' || s === 'cure trap' || s === 'cures trap') return 'RemoveTrap';
+    if (s === 'tohit' || s === 'to hit') return 'ToHit';
+    if (s === 'damage') return 'Damage';
     return null;
   }
 
@@ -13099,6 +13332,99 @@ const targetKind = this.getSpellTargetKind(spell);
     return t === 'fighter' || t === 'figher';
   }
 
+  isRangerClass(): boolean {
+    return (this.playerType() ?? '').trim().toLowerCase() === 'ranger';
+  }
+
+  getSelectedRangerFavoredTypeToBuy(): string | null {
+    const selected = this.selectedRangerFavoredTypeToBuy();
+    const options = this.rangerAvailableFavoredTypeOptions();
+    if (selected && options.includes(selected)) {
+      return selected;
+    }
+    return options[0] ?? null;
+  }
+
+  getRangerRangedHitBonusUpgradeCost(): { sp: number; gp: number } {
+    const currentValue = Math.max(1, this.rangerRangedHitBonus());
+    return {
+      sp: 100 * currentValue,
+      gp: 50 * currentValue,
+    };
+  }
+
+  getRangerFavoredTypeDamageUpgradeCost(type: string): { sp: number; gp: number } {
+    const currentValue = Math.max(1, this.rangerFavoredTypeDamageBonuses()[type] ?? 2);
+    return {
+      sp: 500 * currentValue,
+      gp: 50 * currentValue,
+    };
+  }
+
+  canBuyRangerRangedHitBonus(): boolean {
+    if (!this.isRangerClass()) {
+      return false;
+    }
+    const cost = this.getRangerRangedHitBonusUpgradeCost();
+    return this.playerSp() >= cost.sp && this.getTotalGoldInInventory() >= cost.gp;
+  }
+
+  buyRangerRangedHitBonus(): void {
+    if (!this.canBuyRangerRangedHitBonus()) {
+      return;
+    }
+    const cost = this.getRangerRangedHitBonusUpgradeCost();
+    this.playerSp.update((sp) => Math.max(0, sp - cost.sp));
+    this.deductGoldFromInventory(cost.gp);
+    this.rangerRangedHitBonus.update((value) => Math.max(2, value) + 1);
+    this.saveGameState();
+  }
+
+  canBuyRangerFavoredTypeDamageBonus(type: string): boolean {
+    if (!this.isRangerClass()) {
+      return false;
+    }
+    const cost = this.getRangerFavoredTypeDamageUpgradeCost(type);
+    return this.playerSp() >= cost.sp && this.getTotalGoldInInventory() >= cost.gp;
+  }
+
+  buyRangerFavoredTypeDamageBonus(type: string): void {
+    if (!this.canBuyRangerFavoredTypeDamageBonus(type)) {
+      return;
+    }
+    const cost = this.getRangerFavoredTypeDamageUpgradeCost(type);
+    this.playerSp.update((sp) => Math.max(0, sp - cost.sp));
+    this.deductGoldFromInventory(cost.gp);
+    this.rangerFavoredTypeDamageBonuses.update((all) => ({
+      ...all,
+      [type]: Math.max(2, all[type] ?? 2) + 1,
+    }));
+    this.saveGameState();
+  }
+
+  canBuyNewRangerFavoredType(): boolean {
+    const selectedType = this.getSelectedRangerFavoredTypeToBuy();
+    if (!this.isRangerClass() || !selectedType) {
+      return false;
+    }
+    return this.playerSp() >= 50000 && this.getTotalGoldInInventory() >= 1000;
+  }
+
+  buyNewRangerFavoredType(): void {
+    const selectedType = this.getSelectedRangerFavoredTypeToBuy();
+    if (!selectedType || !this.canBuyNewRangerFavoredType()) {
+      return;
+    }
+    this.playerSp.update((sp) => Math.max(0, sp - 50000));
+    this.deductGoldFromInventory(1000);
+    this.rangerFavoredTypeDamageBonuses.update((all) => ({
+      ...all,
+      [selectedType]: 2,
+    }));
+    this.selectedRangerFavoredTypeToBuy.set(null);
+    this.saveGameState();
+  }
+
   tryBoostAttack(): void {
     if (this.turnPhase() !== 'player') { this.addCombatLog('Boost: not your turn.'); return; }
     if (!this.isFighterClass()) { this.addCombatLog('Boost: only Fighters can use Boost Attack.'); return; }
@@ -13111,6 +13437,8 @@ const targetKind = this.getSpellTargetKind(spell);
     const bestWeapon = this.getBestEquippedWeaponAttackStats(preview.dungonId);
     let bestRange = bestWeapon?.bestRange ?? 0;
     const weaponToHit = bestWeapon?.weaponToHit ?? 0;
+    const weaponMagicPlus = bestWeapon?.weaponMagicPlus ?? 0;
+    const weaponDamageBonus = bestWeapon?.weaponDamageBonus ?? 0;
     const weaponDiceSize = bestWeapon?.weaponDiceSize ?? 6;
     const weaponName = bestWeapon?.weaponName ?? '';
 
@@ -13134,8 +13462,8 @@ const targetKind = this.getSpellTargetKind(spell);
       this.addCombatLog(`Your bare hands cannot hit ${template?.name ?? 'this monster'}! Need a +${toHitRequired} weapon.`);
       return;
     }
-    if (!isUnarmed && weaponToHit < toHitRequired) {
-      this.addCombatLog(`Your +${weaponToHit} weapon cannot hit ${template?.name ?? 'this monster'}! Need +${toHitRequired} or better.`);
+    if (!isUnarmed && weaponMagicPlus < toHitRequired) {
+      this.addCombatLog(`Your +${weaponMagicPlus} weapon cannot hit ${template?.name ?? 'this monster'}! Need +${toHitRequired} or better.`);
       return;
     }
 
@@ -13162,15 +13490,18 @@ const targetKind = this.getSpellTargetKind(spell);
     const level = this.playerLevel();
     const boostDieSize = level >= 6 ? 6 : level >= 3 ? 4 : 3;
     const boostDieRoll = this.rollWithBoost(boostDieSize);
+    const attackDistance = this.getSquareDistance(preview.centerRow, preview.centerColumn, adjacentMonster.row, adjacentMonster.column);
+    const rangerHitBonus = this.getRangerRangedHitBonusAtDistance(attackDistance);
 
-    const rollBonus = isUnarmed ? -1 : weaponToHit;
+    const rollBonus = (isUnarmed ? -1 : weaponToHit) + rangerHitBonus;
     const hitRoll = this.rollD12(rollBonus + this.getEffectivePlayerStamina() + comboBonus) + boostDieRoll;
     this.addCombatLog(`Boost Attack! +${boostDieRoll} (1d${boostDieSize}) to hit. Your AC is -4 until your next turn!`);
 
     if (hitRoll >= monsterAC) {
+      const rangerDamageBonus = this.getRangerFavoredTypeDamageBonus(template ?? null);
       const damage = isUnarmed
-        ? Math.max(1, 1 + Math.floor(this.getEffectivePlayerStrength() / 2))
-        : Math.max(1, this.randomInt(1, Math.max(4, weaponDiceSize)) + this.getEffectivePlayerStrength());
+        ? Math.max(1, 1 + Math.floor(this.getEffectivePlayerStrength() / 2) + rangerDamageBonus)
+        : Math.max(1, this.randomInt(1, Math.max(4, weaponDiceSize)) + this.getEffectivePlayerStrength() + rangerDamageBonus + weaponDamageBonus);
       adjacentMonster.currentHp -= damage;
       if (!adjacentMonster.npcIsHostile) {
         adjacentMonster.npcIsHostile = true;
@@ -13179,7 +13510,9 @@ const targetKind = this.getSpellTargetKind(spell);
         adjacentMonster.row,
         adjacentMonster.column,
         isUnarmed ? 'Blood' : (bestWeapon?.weaponEffectType ?? 'Blood'),
-        isUnarmed ? '#cc0000' : (bestWeapon?.weaponEffectColor ?? '#cc0000')
+        isUnarmed ? '#cc0000' : (bestWeapon?.weaponEffectColor ?? '#cc0000'),
+        bestWeapon?.weaponName ?? '',
+        attackDistance
       );
       this.addCombatLog(
         `You ${isUnarmed ? 'punch' : 'hit'} ${template?.name ?? 'monster'} with ${playerAttackSource} for ${damage} dmg! (rolled ${hitRoll} vs AC ${monsterAC})`
@@ -13234,6 +13567,8 @@ const targetKind = this.getSpellTargetKind(spell);
     const bestWeapon = this.getBestEquippedWeaponAttackStats(preview.dungonId);
     let bestRange = bestWeapon?.bestRange ?? 0;
     const weaponToHit = bestWeapon?.weaponToHit ?? 0;
+    const weaponMagicPlus = bestWeapon?.weaponMagicPlus ?? 0;
+    const weaponDamageBonus = bestWeapon?.weaponDamageBonus ?? 0;
     const weaponDiceSize = bestWeapon?.weaponDiceSize ?? 6;
     const weaponName = bestWeapon?.weaponName ?? '';
 
@@ -13257,8 +13592,8 @@ const targetKind = this.getSpellTargetKind(spell);
       this.addCombatLog(`Your bare hands cannot hit ${template?.name ?? 'this monster'}! Need a +${toHitRequired} weapon.`);
       return;
     }
-    if (!isUnarmed && weaponToHit < toHitRequired) {
-      this.addCombatLog(`Your +${weaponToHit} weapon cannot hit ${template?.name ?? 'this monster'}! Need +${toHitRequired} or better.`);
+    if (!isUnarmed && weaponMagicPlus < toHitRequired) {
+      this.addCombatLog(`Your +${weaponMagicPlus} weapon cannot hit ${template?.name ?? 'this monster'}! Need +${toHitRequired} or better.`);
       return;
     }
 
@@ -13287,7 +13622,9 @@ const targetKind = this.getSpellTargetKind(spell);
     if (coverPenalty !== 0) {
       this.addCombatLog(`Partial cover! ${coverPenalty} to hit.`);
     }
-    const rollBonus = (isUnarmed ? -1 : weaponToHit) + coverPenalty;
+    const attackDistance = this.getSquareDistance(preview.centerRow, preview.centerColumn, adjacentMonster.row, adjacentMonster.column);
+    const rangerHitBonus = this.getRangerRangedHitBonusAtDistance(attackDistance);
+    const rollBonus = (isUnarmed ? -1 : weaponToHit) + coverPenalty + rangerHitBonus;
     const healerDisadvantaged = !isUnarmed && this.isHealerClass() && this.isHealerWeaponDisadvantaged(weaponName);
     let hitRoll: number;
     if (healerDisadvantaged) {
@@ -13299,9 +13636,10 @@ const targetKind = this.getSpellTargetKind(spell);
       hitRoll = this.rollD12(rollBonus + this.getEffectivePlayerStamina() + comboBonus);
     }
     if (hitRoll >= monsterAC) {
+      const rangerDamageBonus = this.getRangerFavoredTypeDamageBonus(template ?? null);
       const damage = isUnarmed
-        ? Math.max(1, 1 + Math.floor(this.getEffectivePlayerStrength() / 2))
-        : Math.max(1, this.randomInt(1, Math.max(4, weaponDiceSize)) + this.getEffectivePlayerStrength());
+        ? Math.max(1, 1 + Math.floor(this.getEffectivePlayerStrength() / 2) + rangerDamageBonus)
+        : Math.max(1, this.randomInt(1, Math.max(4, weaponDiceSize)) + this.getEffectivePlayerStrength() + rangerDamageBonus);
       adjacentMonster.currentHp -= damage;
       // If this is an NPC that only attacks when attacked, mark it hostile now
       if (!adjacentMonster.npcIsHostile) {
@@ -13315,7 +13653,9 @@ const targetKind = this.getSpellTargetKind(spell);
         adjacentMonster.row,
         adjacentMonster.column,
         isUnarmed ? 'Blood' : (bestWeapon?.weaponEffectType ?? 'Blood'),
-        isUnarmed ? '#cc0000' : (bestWeapon?.weaponEffectColor ?? '#cc0000')
+        isUnarmed ? '#cc0000' : (bestWeapon?.weaponEffectColor ?? '#cc0000'),
+        bestWeapon?.weaponName ?? '',
+        attackDistance
       );
       this.addCombatLog(
         `You ${isUnarmed ? 'punch' : 'hit'} ${template?.name ?? 'monster'} with ${playerAttackSource} for ${damage} dmg! (rolled ${hitRoll} vs AC ${monsterAC})`
@@ -13355,6 +13695,8 @@ const targetKind = this.getSpellTargetKind(spell);
   private getBestEquippedWeaponAttackStats(dungonId: number): {
     bestRange: number;
     weaponToHit: number;
+    weaponMagicPlus: number;
+    weaponDamageBonus: number;
     weaponDiceSize: number;
     weaponName: string;
     weaponEffectType: string;
@@ -13366,6 +13708,8 @@ const targetKind = this.getSpellTargetKind(spell);
     let hasWeapon = false;
     let bestRange = 0;
     let weaponToHit = 0;
+    let weaponMagicPlus = 0;
+    let weaponDamageBonus = 0;
     let weaponDiceSize = 6;
     let weaponName = '';
     let weaponEffectType = 'Blood';
@@ -13383,13 +13727,31 @@ const targetKind = this.getSpellTargetKind(spell);
         bestRange = item.range;
       }
 
-      if (!weaponName || (item.effectValue ?? 0) > weaponToHit) {
-        weaponToHit = item.effectValue ?? 0;
+      // effectToPc === 'ToHit' adds to the weapon's effective plus for both the hit roll and magic check.
+      const toPcStat = this.normalizeEffectToPcStat(item.effectToPc ?? null);
+      const toPcValue = typeof item.effectToPcValue === 'number' ? item.effectToPcValue : 0;
+      const toHitBonus = toPcStat === 'ToHit' ? toPcValue : 0;
+      const effectiveToHit = (item.effectValue ?? 0) + toHitBonus;
+
+      if (!weaponName || effectiveToHit > weaponToHit) {
+        weaponToHit = effectiveToHit;
+        weaponDamageBonus = toPcStat === 'Damage' ? toPcValue : 0;
         weaponDiceSize = item.damage > 0 ? item.damage : 6;
         weaponName = item.name || '';
         weaponEffectType = item.weaponEffectType || 'Blood';
         weaponEffectColor = item.weaponEffectColor || '#cc0000';
         weaponSoundId = item.soundId ?? null;
+      }
+
+      // A weapon is considered magical (+1 minimum) if it has any enchantment:
+      // an explicit plus (effectValue/ToHit > 0), a non-standard elemental effect, or an effectOn property.
+      const isEnchanted = effectiveToHit > 0
+        || (!!item.weaponEffectType && item.weaponEffectType.toLowerCase() !== 'blood')
+        || item.effectOn !== null
+        || (toPcStat === 'Damage' && toPcValue > 0);
+      const itemMagicPlus = isEnchanted ? Math.max(1, effectiveToHit) : 0;
+      if (itemMagicPlus > weaponMagicPlus) {
+        weaponMagicPlus = itemMagicPlus;
       }
     }
 
@@ -13400,6 +13762,8 @@ const targetKind = this.getSpellTargetKind(spell);
     return {
       bestRange,
       weaponToHit,
+      weaponMagicPlus,
+      weaponDamageBonus,
       weaponDiceSize,
       weaponName,
       weaponEffectType,
@@ -15236,7 +15600,57 @@ const targetKind = this.getSpellTargetKind(spell);
       collectedFloorSpells: this.collectedFloorSpellsByDungon()[dungonId] ?? [],
       learnedFloorSpellIds: this.learnedFloorSpellIdsByDungon()[dungonId] ?? [],
       equippedSpellIds: this.equippedSpellIdsByDungon()[dungonId] ?? [],
+      rangerRangedHitBonus: this.rangerRangedHitBonus(),
+      rangerFavoredTypeDamageBonuses: this.rangerFavoredTypeDamageBonuses(),
     };
+  }
+
+  private normalizeMonsterTypeLabel(value: string | null | undefined): string {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  private normalizeMonsterTypeKey(value: string | null | undefined): string {
+    return this.normalizeMonsterTypeLabel(value).toLowerCase();
+  }
+
+  private getSquareDistance(fromRow: number, fromColumn: number, toRow: number, toColumn: number): number {
+    return Math.max(Math.abs(toRow - fromRow), Math.abs(toColumn - fromColumn));
+  }
+
+  private getRangerRangedHitBonusAtDistance(distance: number): number {
+    if (!this.isRangerClass() || distance < 2) {
+      return 0;
+    }
+    return Math.max(0, this.rangerRangedHitBonus());
+  }
+
+  private getRangerFavoredTypeDamageBonus(template: Monster | null): number {
+    if (!this.isRangerClass() || !template) {
+      return 0;
+    }
+
+    const monsterType = this.normalizeMonsterTypeKey(template.type);
+    for (const [favoredType, bonus] of Object.entries(this.rangerFavoredTypeDamageBonuses())) {
+      const favoredKey = this.normalizeMonsterTypeKey(favoredType);
+      if (favoredKey && (monsterType === favoredKey || monsterType.includes(favoredKey))) {
+        return Math.max(0, bonus);
+      }
+    }
+    return 0;
+  }
+
+  private getRangedImpactProjectile(weaponName: string, attackDistance: number): MonsterImpactProjectile | null {
+    if (attackDistance < 2) {
+      return null;
+    }
+    const normalizedWeaponName = weaponName.trim().toLowerCase();
+    if (normalizedWeaponName.includes('crossbow')) {
+      return 'knife';
+    }
+    if (normalizedWeaponName.includes('bow')) {
+      return 'arrow';
+    }
+    return null;
   }
 }
 

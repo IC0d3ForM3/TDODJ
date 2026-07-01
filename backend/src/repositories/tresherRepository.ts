@@ -1,4 +1,13 @@
 import pool from '../db';
+const PG_UNDEFINED_COLUMN = '42703';
+
+interface PgErrorWithCode {
+  code?: string;
+}
+
+function isUndefinedColumnError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as PgErrorWithCode).code === PG_UNDEFINED_COLUMN;
+}
 
 export interface TresherRecord {
   id: number;
@@ -390,10 +399,25 @@ export const tavernTurnInQuestItems = async (
   if (spAwarded === 0) return { spAwarded: 0, newSp: 0 };
 
   // Award SP to the PC
-  const { rows: pcRows } = await pool.query<{ sp: number }>(
-    `UPDATE pcs SET sp = COALESCE(sp, 0) + $1 WHERE id = $2 AND userguid = $3 RETURNING sp`,
-    [spAwarded, pcId, userguid]
-  );
+  let pcRows: { sp: number }[] = [];
+  try {
+    const result = await pool.query<{ sp: number }>(
+      `UPDATE pcs
+       SET sp_bank = COALESCE(sp_bank, 0) + $1,
+           sp_lifetime = COALESCE(sp_lifetime, 0) + $1
+       WHERE id = $2 AND userguid = $3
+       RETURNING COALESCE(sp_bank, 0) AS sp`,
+      [spAwarded, pcId, userguid]
+    );
+    pcRows = result.rows;
+  } catch (err) {
+    if (!isUndefinedColumnError(err)) throw err;
+    const result = await pool.query<{ sp: number }>(
+      `UPDATE pcs SET sp = COALESCE(sp, 0) + $1 WHERE id = $2 AND userguid = $3 RETURNING sp`,
+      [spAwarded, pcId, userguid]
+    );
+    pcRows = result.rows;
+  }
 
   if (!pcRows[0]) return null;
   return { spAwarded, newSp: pcRows[0].sp };

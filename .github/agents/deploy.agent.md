@@ -1,7 +1,7 @@
 ---
 description: "Use when: deploying to production, pushing changes live, deploying backend, deploying frontend, running deploy scripts, going live, shipping to EC2, syncing to S3"
 name: "TDODJ Deploy"
-tools: [execute, read, search, todo]
+tools: [execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/runTask, execute/createAndRunTask, execute/runInTerminal, read/getNotebookSummary, read/problems, read/readFile, read/terminalSelection, read/terminalLastCommand, read/getTaskOutput, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, todo]
 argument-hint: "What to deploy: 'backend', 'frontend', or 'both'"
 ---
 

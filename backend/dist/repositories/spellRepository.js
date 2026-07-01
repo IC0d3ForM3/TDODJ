@@ -59,8 +59,8 @@ const SELECT_SPELL_FIELDS_LEGACY = `
   CASE WHEN GREATEST(0, COALESCE(effectamount2, 0)) > 0 THEN 1 ELSE 0 END AS "effectAmount2DiceCount",
   GREATEST(0, COALESCE(effectamount2, 0)) AS "effectAmount2DiceSides",
   COALESCE(value, 0) AS value,
-  COALESCE(sp, 0) AS sp,
-  COALESCE(sp, 0) AS "minLtsp",
+  0 AS sp,
+  COALESCE(minltsp, 0) AS "minLtsp",
   0 AS "learnCostGp",
   COALESCE(successtestvalue, 0) AS "successTestValue",
   COALESCE(magiccost, 1) AS "magicCost",
@@ -104,8 +104,16 @@ const getPublicSpellsByNames = async (names) => {
     if (names.length === 0)
         return [];
     const placeholders = names.map((_, i) => `$${i + 1}`).join(', ');
-    const { rows } = await db_1.default.query(`SELECT id, name FROM spells WHERE ispublic = TRUE AND name IN (${placeholders})`, names);
-    return rows;
+    try {
+        const { rows } = await db_1.default.query(`SELECT id, name FROM spells WHERE ispublic = TRUE AND name IN (${placeholders})`, names);
+        return rows;
+    }
+    catch (err) {
+        if (!isUndefinedColumnError(err))
+            throw err;
+        const { rows } = await db_1.default.query(`SELECT id, spellname AS name FROM spells WHERE ispublic = TRUE AND spellname IN (${placeholders})`, names);
+        return rows;
+    }
 };
 exports.getPublicSpellsByNames = getPublicSpellsByNames;
 const isAdminUserByGuid = async (userguid) => {

@@ -255,7 +255,7 @@
 	margin: 0 0 0.35rem;
 	font-size: 0.95rem;
 	font-weight: 600;
-	color: #e2e8f0;
+	color: #800404;
 }
 
 .form-input,
@@ -314,7 +314,7 @@
 	align-items: center;
 	gap: 0.35rem;
 	font-size: 0.9rem;
-	color: #e2e8f0;
+	color: #970000;
 	cursor: pointer;
 }
 
@@ -802,7 +802,7 @@
 	padding: 0.55rem 0.65rem;
 	border: 1px solid #d9d9d9;
 	border-radius: 4px;
-	background-color: #fcfcfc;
+	background-color: #620505;
 	white-space: pre-wrap;
 }
 

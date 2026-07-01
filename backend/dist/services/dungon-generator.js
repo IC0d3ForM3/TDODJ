@@ -587,7 +587,7 @@ function buildDungonPayload(layout, blueprint, monsters, items, potions, spells)
             itemPlacements.push({ itemId, row: r, column: c });
             if (!seenItemIds.has(itemId)) {
                 seenItemIds.add(itemId);
-                floorItemList.push({ id: dbI.id, name: dbI.name, description: dbI.description, type: dbI.type, imageId: dbI.imageId, soundId: dbI.soundId ?? null, effectValue: dbI.effectValue, damage: dbI.damage, range: dbI.range, armorSlot: dbI.armorSlot, effectOn: dbI.effectOn, weaponEffectType: dbI.weaponEffectType, weaponEffectColor: dbI.weaponEffectColor, isTwoHanded: dbI.isTwoHanded, uses: dbI.uses ?? null });
+                floorItemList.push({ id: dbI.id, name: dbI.name, description: dbI.description, type: dbI.type, imageId: dbI.imageId, soundId: dbI.soundId ?? null, effectValue: dbI.effectValue, damage: dbI.damage, range: dbI.range, armorSlot: dbI.armorSlot, effectOn: dbI.effectOn, weaponEffectType: dbI.weaponEffectType, weaponEffectColor: dbI.weaponEffectColor, isTwoHanded: dbI.isTwoHanded, uses: dbI.uses ?? null, effectToPc: dbI.effectToPc ?? null, effectToPcValue: dbI.effectToPcValue ?? 0 });
             }
             offset++;
         }

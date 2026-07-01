@@ -5,6 +5,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.tavernTurnInQuestItems = exports.updateTresherForUser = exports.insertTresherForUser = exports.isTresherAccessibleByIdForUser = exports.getTreshersByIds = exports.getAllTreshersWithUsername = exports.getTresherLibraryByUserGuid = exports.getTreshersByUserGuid = exports.isAdminUserByGuid = exports.deleteTresherForUser = void 0;
 const db_1 = __importDefault(require("../db"));
+const PG_UNDEFINED_COLUMN = '42703';
+function isUndefinedColumnError(err) {
+    return typeof err === 'object' && err !== null && err.code === PG_UNDEFINED_COLUMN;
+}
 const SELECT_TRESHER_FIELDS = `
   id,
   userguid::text AS userguid,
@@ -270,7 +274,21 @@ const tavernTurnInQuestItems = async (pcId, userguid, tresherIds) => {
     if (spAwarded === 0)
         return { spAwarded: 0, newSp: 0 };
     // Award SP to the PC
-    const { rows: pcRows } = await db_1.default.query(`UPDATE pcs SET sp = COALESCE(sp, 0) + $1 WHERE id = $2 AND userguid = $3 RETURNING sp`, [spAwarded, pcId, userguid]);
+    let pcRows = [];
+    try {
+        const result = await db_1.default.query(`UPDATE pcs
+       SET sp_bank = COALESCE(sp_bank, 0) + $1,
+           sp_lifetime = COALESCE(sp_lifetime, 0) + $1
+       WHERE id = $2 AND userguid = $3
+       RETURNING COALESCE(sp_bank, 0) AS sp`, [spAwarded, pcId, userguid]);
+        pcRows = result.rows;
+    }
+    catch (err) {
+        if (!isUndefinedColumnError(err))
+            throw err;
+        const result = await db_1.default.query(`UPDATE pcs SET sp = COALESCE(sp, 0) + $1 WHERE id = $2 AND userguid = $3 RETURNING sp`, [spAwarded, pcId, userguid]);
+        pcRows = result.rows;
+    }
     if (!pcRows[0])
         return null;
     return { spAwarded, newSp: pcRows[0].sp };

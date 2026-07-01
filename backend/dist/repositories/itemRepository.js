@@ -276,7 +276,15 @@ const getPublicItemsByNames = async (names) => {
     if (names.length === 0)
         return [];
     const placeholders = names.map((_, i) => `$${i + 1}`).join(', ');
-    const { rows } = await db_1.default.query(`SELECT id, name FROM items WHERE ispublic = TRUE AND name IN (${placeholders})`, names);
-    return rows;
+    try {
+        const { rows } = await db_1.default.query(`SELECT id, name FROM items WHERE ispublic = TRUE AND name IN (${placeholders})`, names);
+        return rows;
+    }
+    catch (err) {
+        if (!isUndefinedColumnError(err))
+            throw err;
+        const { rows } = await db_1.default.query(`SELECT id, itemname AS name FROM items WHERE ispublic = TRUE AND itemname IN (${placeholders})`, names);
+        return rows;
+    }
 };
 exports.getPublicItemsByNames = getPublicItemsByNames;

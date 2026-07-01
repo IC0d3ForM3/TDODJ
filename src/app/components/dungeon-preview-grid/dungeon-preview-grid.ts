@@ -403,7 +403,7 @@ export class DungeonPreviewGridComponent {
       }
     }
 
-    // Draw obstacle markers (image thumbnail or unfilled circle)
+    // Draw obstacle markers (image thumbnail or shape/color fallback marker)
     const obstacleImages = this.obstacleImagesBySquare();
     for (const obs of this.obstaclePlacements()) {
       if (obs.isDestroyed) continue;
@@ -420,11 +420,22 @@ export class DungeonPreviewGridComponent {
           context.drawImage(obsImg, previewColumn * this.cellSize + 1, previewRow * this.cellSize + 1, imgSize, imgSize);
         } else {
           const radius = this.cellSize * 0.32;
-          context.strokeStyle = '#a0856a';
+          const markerColor = (obs.color ?? '').trim() || '#a0856a';
+          context.fillStyle = markerColor;
+          context.strokeStyle = '#5c4532';
           context.lineWidth = 1.5;
-          context.beginPath();
-          context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-          context.stroke();
+          if ((obs.shape ?? 'circle') === 'square') {
+            const size = radius * 2;
+            const left = centerX - radius;
+            const top = centerY - radius;
+            context.fillRect(left, top, size, size);
+            context.strokeRect(left, top, size, size);
+          } else {
+            context.beginPath();
+            context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            context.fill();
+            context.stroke();
+          }
         }
 
         if (obs.requiredKeyId !== null && obs.requiredKeyId !== undefined) {
