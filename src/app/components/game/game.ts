@@ -13,6 +13,7 @@ import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Account } from '../../services/account';
+import { GameDrawingAssetsService } from '../../services/game-drawing-assets';
 import { DungeonJsonService } from '../../services/dungeon-json';
 import { DungeonStateService } from '../../services/dungeon-state';
 import { GameInventoryService, PcTresherSpellData } from '../../services/game-inventory';
@@ -175,6 +176,7 @@ export class Game implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly account = inject(Account);
+  private readonly drawingAssets = inject(GameDrawingAssetsService);
   private readonly dungeonJsonService = inject(DungeonJsonService);
   private readonly dungeonState = inject(DungeonStateService);
   readonly inventoryService = inject(GameInventoryService);
@@ -234,18 +236,18 @@ export class Game implements OnInit {
   get squaresByDungon() { return this.dungeonState.squaresByDungon; }
   get squareTextsByDungon() { return this.dungeonState.squareTextsByDungon; };
 
-  private readonly monsterImageCache = new Map<number, HTMLImageElement>();
-  private readonly monsterImageCacheVersion = signal(0);
-  private readonly obstacleImageCache = new Map<number, HTMLImageElement>();
-  private readonly obstacleImageCacheVersion = signal(0);
+  private readonly monsterImageCache = this.drawingAssets.monsterImageCache;
+  private readonly monsterImageCacheVersion = this.drawingAssets.monsterImageCacheVersion;
+  private readonly obstacleImageCache = this.drawingAssets.obstacleImageCache;
+  private readonly obstacleImageCacheVersion = this.drawingAssets.obstacleImageCacheVersion;
   readonly examinedObstacleResults = signal<Map<number, string>>(new Map());
-  private readonly lootImageCache = new Map<number, HTMLImageElement>();
-  private readonly lootImageCacheVersion = signal(0);
+  private readonly lootImageCache = this.drawingAssets.lootImageCache;
+  private readonly lootImageCacheVersion = this.drawingAssets.lootImageCacheVersion;
   private readonly spellCatalogById = signal<Map<number, PcTresherSpellData>>(new Map());
   private readonly pcTresherCursesById = signal<Map<number, PcTresherCurseData>>(new Map());
   private readonly soundPathById = signal<Map<number, string>>(new Map());
   private readonly learnedFloorSpellIdsByDungon = signal<Record<number, number[]>>({});
-  private readonly doorImageCache = new Map<string, HTMLImageElement>();
+  private readonly doorImageCache = this.drawingAssets.doorImageCache;
   private readonly defaultSpellSoundPath = '/sounds/sfx-glowing-magic-default-01.wav';
   readonly monsterImpactEffects = signal<Record<string, MonsterImpactState>>({});
   readonly monsterImpactPulse = signal(0);
@@ -587,6 +589,10 @@ export class Game implements OnInit {
   private playerStartingHp = 20;
 
   ngOnInit(): void {
+    this.drawingAssets.setRedrawCallbacks(
+      () => this.drawPreviewGridCanvas(),
+      () => this.drawFirstPersonViewCanvas()
+    );
     if (localStorage.getItem('soundMuted') === null) {
       this.showSoundPreferenceModal.set(true);
     }
@@ -5499,92 +5505,7 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private loadMonsterImages(dungonId: number): void {
-    const monsters = this.monsterListByDungon()[dungonId] ?? [];
-    const imageIds = new Set<number>();
-    for (const monster of monsters) {
-      if (monster.imageId !== null && !this.monsterImageCache.has(monster.imageId)) {
-        imageIds.add(monster.imageId);
-      }
-    }
-
-    // Dox: load image from client assets if a Dox template is present in this dungeon
-    if (monsters.some(m => m.id === -666) && !this.monsterImageCache.has(-666)) {
-      const doxImg = new Image();
-      doxImg.onload = () => {
-        this.monsterImageCache.set(-666, doxImg);
-        this.monsterImageCacheVersion.update(v => v + 1);
-        this.drawPreviewGridCanvas();
-        this.drawFirstPersonViewCanvas();
-      };
-      doxImg.src = '/images/Doxs.png';
-    }
-
-    if (imageIds.size === 0) {
-      return;
-    }
-
-    const userKey = this.account.getKey();
-
-    if (!userKey) {
-      // Sample mode: fetch only public images by ID
-      this.http
-        .get<{ id: number; path: string }[]>(`${API_BASE_URL}/images/by-ids`, {
-          params: { ids: Array.from(imageIds).join(',') },
-        })
-        .subscribe({
-          next: (images) => {
-            console.log('[game] loadMonsterImages /by-ids response:', images.length);
-            for (const image of images) {
-              if (!imageIds.has(image.id) || !image.path) {
-                continue;
-              }
-              const url = this.resolveImageUrl(image.path);
-              if (!url) {
-                continue;
-              }
-              const img = new Image();
-              img.onload = () => {
-                console.log('[game] loadMonsterImages image LOADED id=', image.id);
-                this.monsterImageCache.set(image.id, img);
-                this.monsterImageCacheVersion.update((v) => v + 1);
-                this.drawFirstPersonViewCanvas();
-              };
-              img.onerror = () => {
-                console.error('[game] loadMonsterImages image FAILED id=', image.id, 'url=', url);
-              };
-              img.src = url;
-            }
-          },
-        });
-      return;
-    }
-
-    this.http
-      .get<ImageRecordPayload[]>(`${API_BASE_URL}/images`, {
-        params: { userkey: userKey, scope: 'library' },
-      })
-      .subscribe({
-        next: (images) => {
-          for (const image of images) {
-            if (!imageIds.has(image.id) || !image.path) {
-              continue;
-            }
-
-            const url = this.resolveImageUrl(image.path);
-            if (!url) {
-              continue;
-            }
-
-            const img = new Image();
-            img.onload = () => {
-              this.monsterImageCache.set(image.id, img);
-              this.monsterImageCacheVersion.update((v) => v + 1);
-              this.drawFirstPersonViewCanvas();
-            };
-            img.src = url;
-          }
-        },
-      });
+    this.drawingAssets.loadMonsterImages(dungonId);
   }
 
   private loadSpellCatalog(userKey: string, forceRefresh = false): void {
@@ -5693,149 +5614,15 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private loadObstacleImages(dungonId: number): void {
-    const placements = this.obstaclePlacementsByDungon()[dungonId] ?? [];
-    const imageIds = new Set<number>();
-    for (const p of placements) {
-      if (p.imageId !== null && !this.obstacleImageCache.has(p.imageId)) {
-        imageIds.add(p.imageId);
-      }
-      if (p.textImageId !== null && p.textImageId !== undefined && !this.obstacleImageCache.has(p.textImageId)) {
-        imageIds.add(p.textImageId);
-      }
-    }
-    if (imageIds.size === 0) return;
-    const userKey = this.account.getKey();
-    if (!userKey) {
-      this.http
-        .get<{ id: number; path: string }[]>(`${API_BASE_URL}/images/by-ids`, {
-          params: { ids: Array.from(imageIds).join(',') },
-        })
-        .subscribe({
-          next: (images) => {
-            for (const image of images) {
-              if (!imageIds.has(image.id) || !image.path) continue;
-              const url = this.resolveImageUrl(image.path);
-              if (!url) continue;
-              const img = new Image();
-              img.onload = () => {
-                this.obstacleImageCache.set(image.id, img);
-                this.obstacleImageCacheVersion.update((v) => v + 1);
-              };
-              img.src = url;
-            }
-          },
-        });
-      return;
-    }
-    this.http
-      .get<ImageRecordPayload[]>(`${API_BASE_URL}/images`, {
-        params: { userkey: userKey, scope: 'library' },
-      })
-      .subscribe({
-        next: (images) => {
-          for (const image of images) {
-            if (!imageIds.has(image.id) || !image.path) continue;
-            const url = this.resolveImageUrl(image.path);
-            if (!url) continue;
-            const img = new Image();
-            img.onload = () => {
-              this.obstacleImageCache.set(image.id, img);
-              this.obstacleImageCacheVersion.update((v) => v + 1);
-            };
-            img.src = url;
-          }
-        },
-      });
+    this.drawingAssets.loadObstacleImages(dungonId);
   }
 
   private loadLootImages(dungonId: number): void {
-    const imageIds = new Set<number>();
-
-    for (const tresher of this.tresherListByDungon()[dungonId] ?? []) {
-      if (typeof tresher.imageId === 'number' && tresher.imageId > 0 && !this.lootImageCache.has(tresher.imageId)) {
-        imageIds.add(tresher.imageId);
-      }
-    }
-
-    for (const item of this.floorItemListByDungon()[dungonId] ?? []) {
-      const imageId = (item as { imageId?: number | null }).imageId;
-      if (typeof imageId === 'number' && imageId > 0 && !this.lootImageCache.has(imageId)) {
-        imageIds.add(imageId);
-      }
-    }
-
-    for (const item of this.pcTresherItemsById().values()) {
-      const imageId = (item as { imageId?: number | null }).imageId;
-      if (typeof imageId === 'number' && imageId > 0 && !this.lootImageCache.has(imageId)) {
-        imageIds.add(imageId);
-      }
-    }
-
-    if (imageIds.size === 0) {
-      return;
-    }
-
-    const onImageLoaded = (id: number, path: string): void => {
-      if (!imageIds.has(id) || !path) {
-        return;
-      }
-
-      const url = this.resolveImageUrl(path);
-      if (!url) {
-        return;
-      }
-
-      const img = new Image();
-      img.onload = () => {
-        this.lootImageCache.set(id, img);
-        this.lootImageCacheVersion.update((v) => v + 1);
-        this.drawFirstPersonViewCanvas();
-      };
-      img.src = url;
-    };
-
-    const userKey = this.account.getKey();
-    if (!userKey) {
-      this.http
-        .get<{ id: number; path: string }[]>(`${API_BASE_URL}/images/by-ids`, {
-          params: { ids: Array.from(imageIds).join(',') },
-        })
-        .subscribe({
-          next: (images) => {
-            for (const image of images) {
-              onImageLoaded(image.id, image.path);
-            }
-          },
-        });
-      return;
-    }
-
-    this.http
-      .get<ImageRecordPayload[]>(`${API_BASE_URL}/images`, {
-        params: { userkey: userKey, scope: 'library' },
-      })
-      .subscribe({
-        next: (images) => {
-          for (const image of images) {
-            onImageLoaded(image.id, image.path);
-          }
-        },
-      });
+    this.drawingAssets.loadLootImages(dungonId);
   }
 
   private resolveImageUrl(imagePath: string): string {
-    const trimmed = typeof imagePath === 'string' ? imagePath.trim() : '';
-    if (!trimmed) {
-      return '';
-    }
-
-    if (/^https?:\/\//i.test(trimmed)) {
-      return trimmed;
-    }
-
-    return trimmed.startsWith('/')
-      ? `${API_BASE_URL}${trimmed}`
-      : `${API_BASE_URL}/${trimmed}`;
+    return this.drawingAssets.resolveImageUrl(imagePath);
   }
 
   private resolveSoundUrl(soundPath: string): string {
@@ -5855,17 +5642,7 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private resolveClientAssetUrl(assetPath: string): string {
-    const trimmed = typeof assetPath === 'string' ? assetPath.trim() : '';
-    if (!trimmed) {
-      return '';
-    }
-
-    if (/^https?:\/\//i.test(trimmed)) {
-      return encodeURI(trimmed);
-    }
-
-    // Keep path relative to the current site origin (tdodj.com in production).
-    return encodeURI(trimmed.startsWith('/') ? trimmed : `/${trimmed}`);
+    return this.drawingAssets.resolveClientAssetUrl(assetPath);
   }
 
   private playSpellSound(spell: PcTresherSpellData): void {
@@ -9055,15 +8832,7 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private loadDoorImages(): void {
-    for (const key of ['open', 'closed'] as const) {
-      if (this.doorImageCache.has(key)) continue;
-      const img = new Image();
-      img.onload = () => {
-        this.doorImageCache.set(key, img);
-        this.drawFirstPersonViewCanvas();
-      };
-      img.src = key === 'open' ? '/images/dooropen.jpg' : '/images/doorclosed.jpg';
-    }
+    this.drawingAssets.loadDoorImages();
   }
 
   private drawFirstPersonDoorFace(
