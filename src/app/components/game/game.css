@@ -1430,6 +1430,42 @@
 	margin-top: 0.5rem;
 }
 
+.inventory-item-main {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.55rem;
+}
+
+.inventory-item-copy {
+	display: flex;
+	flex-direction: column;
+	gap: 0.16rem;
+	min-width: 0;
+}
+
+.inventory-item-thumb-img,
+.inventory-item-thumb-fallback {
+	width: 36px;
+	height: 36px;
+	border-radius: 8px;
+	border: 1px solid #51637e;
+	flex: 0 0 36px;
+}
+
+.inventory-item-thumb-img {
+	object-fit: cover;
+	background: #101722;
+}
+
+.inventory-item-thumb-fallback {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 800;
+	color: #d8e7ff;
+	background: linear-gradient(135deg, #2a3342, #171e2a);
+}
+
 .spell-header-row {
 	display: flex;
 	align-items: center;
@@ -1523,6 +1559,19 @@
 
 .action-button-danger:hover {
 	background-color: #5e2020;
+}
+
+.action-button-info {
+	border-color: #3d6fa4;
+	background-color: #17385a;
+	color: #cbe6ff;
+	font-weight: 800;
+	min-width: 2rem;
+	padding-inline: 0.55rem;
+}
+
+.action-button-info:hover {
+	background-color: #1f4b77;
 }
 
 .action-button-ade {

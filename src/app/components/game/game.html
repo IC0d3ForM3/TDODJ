@@ -367,38 +367,24 @@
 					<button type="button" class="inventory-modal-close" (click)="closeBackpackInventoryModal()">✕</button>
 				</div>
 				<div class="inventory-modal-scroll">
-					@if (allTresherItemsGrouped().length > 0) {
-						<p class="inventory-section-title">Items ({{ backpackTresherItemCount() }})</p>
-						@for (group of allTresherItemsGrouped(); track group.type) {
-							<p class="inventory-section-label">{{ group.type }}</p>
-							<ul class="tresher-items-list">
-								@for (item of group.items; track item.id) {
-									<li class="tresher-inner-item">
-										<span class="tresher-item-name">{{ item.name }}@if (item.description) {{{ ': ' + item.description }}}</span>
-										@if (isItemEquipable(item.type, item.name)) {
-											<div class="inventory-item-actions">
-												<button
-													type="button"
-													class="action-button"
-													[class.action-button-strong]="isItemEquippedById(item.id)"
-													(click)="toggleItemEquipped(item.id)"
-												>
-													{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
-												</button>
-											</div>
-										}
-									</li>
-								}
-							</ul>
-						}
-					}
-
-					@if (collectedWeaponItemsForPreview().length > 0) {
-						<p class="inventory-section-title">Weapons ({{ collectedWeaponItemsForPreview().length }})</p>
+					@if (backpackWeaponsUnified().length > 0) {
+						<p class="inventory-section-title">Weapons ({{ backpackWeaponsUnified().length }})</p>
 						<ul class="tresher-items-list">
-							@for (item of collectedWeaponItemsForPreview(); track item.id) {
+							@for (item of backpackWeaponsUnified(); track item.id) {
 								<li class="tresher-inner-item">
-									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+									<div class="inventory-item-main">
+										@if (backpackItemImageSrc(item); as imageSrc) {
+											<img class="inventory-item-thumb-img" [src]="imageSrc" [alt]="item.name || 'Item'" />
+										} @else {
+											<span class="inventory-item-thumb-fallback" aria-hidden="true">?</span>
+										}
+										<div class="inventory-item-copy">
+											<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+											@if (item.description) {
+												<span class="tresher-item-desc">{{ item.description }}</span>
+											}
+										</div>
+									</div>
 									<div class="inventory-item-actions">
 										@if (isItemEquipable(item.type, item.name)) {
 											<button
@@ -410,18 +396,31 @@
 												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
 											</button>
 										}
+										<button type="button" class="action-button action-button-info" (click)="openBackpackItemDetails(item)">?</button>
 									</div>
 								</li>
 							}
 						</ul>
 					}
 
-					@if (collectedArmorItemsForPreview().length > 0) {
-						<p class="inventory-section-title">Armor ({{ collectedArmorItemsForPreview().length }})</p>
+					@if (backpackArmorUnified().length > 0) {
+						<p class="inventory-section-title">Armor ({{ backpackArmorUnified().length }})</p>
 						<ul class="tresher-items-list">
-							@for (item of collectedArmorItemsForPreview(); track item.id) {
+							@for (item of backpackArmorUnified(); track item.id) {
 								<li class="tresher-inner-item">
-									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+									<div class="inventory-item-main">
+										@if (backpackItemImageSrc(item); as imageSrc) {
+											<img class="inventory-item-thumb-img" [src]="imageSrc" [alt]="item.name || 'Item'" />
+										} @else {
+											<span class="inventory-item-thumb-fallback" aria-hidden="true">?</span>
+										}
+										<div class="inventory-item-copy">
+											<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+											@if (item.description) {
+												<span class="tresher-item-desc">{{ item.description }}</span>
+											}
+										</div>
+									</div>
 									<div class="inventory-item-actions">
 										@if (isItemEquipable(item.type, item.name)) {
 											<button
@@ -433,25 +432,38 @@
 												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
 											</button>
 										}
+										<button type="button" class="action-button action-button-info" (click)="openBackpackItemDetails(item)">?</button>
 									</div>
 								</li>
 							}
 						</ul>
 					}
 
-					@if (collectedOtherItemsForPreview().length > 0) {
-						<p class="inventory-section-title">Other Items ({{ collectedOtherItemsForPreview().length }})</p>
+					@if (backpackOtherItemsUnified().length > 0) {
+						<p class="inventory-section-title">Items ({{ backpackOtherItemsUnified().length }})</p>
 						<ul class="tresher-items-list">
-							@for (item of collectedOtherItemsForPreview(); track item.id) {
+							@for (item of backpackOtherItemsUnified(); track item.id) {
 								<li class="tresher-inner-item">
-									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+									<div class="inventory-item-main">
+										@if (backpackItemImageSrc(item); as imageSrc) {
+											<img class="inventory-item-thumb-img" [src]="imageSrc" [alt]="item.name || 'Item'" />
+										} @else {
+											<span class="inventory-item-thumb-fallback" aria-hidden="true">?</span>
+										}
+										<div class="inventory-item-copy">
+											<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+											@if (item.description) {
+												<span class="tresher-item-desc">{{ item.description }}</span>
+											}
+										</div>
+									</div>
 									<div class="inventory-item-actions">
 										@if (isOtherItemUsable(item)) {
 											<button
 												type="button"
 												class="action-button action-button-strong"
 												[disabled]="turnPhase() !== 'player' || playerHp() <= 0 || playerAE() < 1"
-												(click)="useCollectedOtherItem(item.id)"
+												(click)="useBackpackOtherItem(item)"
 											>
 												Use ({{ item.uses }})
 											</button>
@@ -466,6 +478,7 @@
 												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
 											</button>
 										}
+										<button type="button" class="action-button action-button-info" (click)="openBackpackItemDetails(item)">?</button>
 									</div>
 								</li>
 							}
@@ -477,10 +490,37 @@
 						<ul class="tresher-items-list">
 							@for (potion of allPotionsUnified(); track potion.id + ':' + potion.source) {
 								<li class="tresher-inner-item">
-									<span class="tresher-item-name">{{ potion.name }}</span>
-									@if (potion.description) {
-										<span class="tresher-item-desc">{{ potion.description }}</span>
-									}
+									<div class="inventory-item-main">
+										<span class="inventory-item-thumb-fallback" aria-hidden="true">?</span>
+										<div class="inventory-item-copy">
+											<span class="tresher-item-name">{{ potion.name }}</span>
+											@if (potion.description) {
+												<span class="tresher-item-desc">{{ potion.description }}</span>
+											}
+										</div>
+									</div>
+									<div class="inventory-item-actions">
+										@if (potion.source === 'tresher' && isInnerPotionDrinkable(potion) && potion.tresherIdx !== undefined) {
+											<button
+												type="button"
+												class="action-button action-button-strong"
+												[disabled]="!canDrinkInnerPotion()"
+												(click)="drinkBackpackPotion(potion)"
+											>
+												Drink
+											</button>
+										} @else if (potion.source === 'collected') {
+											<button
+												type="button"
+												class="action-button action-button-strong"
+												[disabled]="turnPhase() !== 'player' || playerHp() <= 0"
+												(click)="drinkBackpackPotion(potion)"
+											>
+												Drink
+											</button>
+										}
+										<button type="button" class="action-button action-button-info" (click)="openBackpackPotionDetails(potion)">?</button>
+									</div>
 								</li>
 							}
 						</ul>
@@ -517,6 +557,7 @@
 										>
 											{{ isSpellEquippedById(spell.id) ? 'Unequip' : 'Equip' }}
 										</button>
+										<button type="button" class="action-button action-button-info" (click)="openBackpackSpellDetails(spell)">?</button>
 									</div>
 								</li>
 							}
@@ -541,6 +582,7 @@
 										>
 											Learn
 										</button>
+										<button type="button" class="action-button action-button-info" (click)="openBackpackSpellDetails(spell)">?</button>
 										@if (isSpellLearned(spell.id)) {
 											<span class="inventory-equipped-status">Learned</span>
 										}
@@ -549,6 +591,26 @@
 							}
 						</ul>
 					}
+				</div>
+			</div>
+		</div>
+	}
+
+	@if (inventoryDetailsModal(); as details) {
+		<div class="inventory-modal-overlay" (click)="closeInventoryDetailsModal()">
+			<div class="inventory-modal-box" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Inventory details">
+				<div class="inventory-modal-header">
+					<h3 class="inventory-modal-title">{{ details.title }}</h3>
+					<button type="button" class="inventory-modal-close" (click)="closeInventoryDetailsModal()">✕</button>
+				</div>
+				<div class="inventory-modal-scroll">
+					<ul class="tresher-items-list">
+						@for (line of details.lines; track line) {
+							<li class="tresher-inner-item">
+								<span class="tresher-item-desc">{{ line }}</span>
+							</li>
+						}
+					</ul>
 				</div>
 			</div>
 		</div>
@@ -1344,189 +1406,24 @@
 							</ul>
 						}
 
-						@if (inventoryTreshersForPreview().length > 0) {
-							<p class="inventory-section-title">Tresher Items</p>
-
-							@for (group of allTresherItemsGrouped(); track group.type) {
-								<p class="inventory-section-label">{{ group.type }}</p>
-								<ul class="tresher-items-list">
-									@for (item of group.items; track item.id) {
-										<li class="tresher-inner-item">
-											<span class="tresher-item-name">{{ item.name }}@if (item.description) {{{ ': ' + item.description }}}</span>
-											@if (item.type === 'weapon' && item.damage > 0) {
-												<span class="tresher-item-stat">Dmg: 1–{{ item.damage }} | Range: {{ item.range }}</span>
+					@if (backpackWeaponsUnified().length > 0) {
+						<p class="inventory-section-title">Weapons ({{ backpackWeaponsUnified().length }})</p>
+						<ul class="tresher-items-list">
+							@for (item of backpackWeaponsUnified(); track item.id) {
+								<li class="tresher-inner-item">
+									<div class="inventory-item-main">
+										@if (backpackItemImageSrc(item); as imageSrc) {
+											<img class="inventory-item-thumb-img" [src]="imageSrc" [alt]="item.name || 'Item'" />
+										} @else {
+											<span class="inventory-item-thumb-fallback" aria-hidden="true">?</span>
+										}
+										<div class="inventory-item-copy">
+											<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+											@if (item.description) {
+												<span class="tresher-item-desc">{{ item.description }}</span>
 											}
-											@for (effectLine of inventoryItemEffectsForView(item); track effectLine) {
-												<span class="tresher-item-desc">{{ effectLine }}</span>
-											}
-											<div class="inventory-item-actions">
-												@if (isItemEquipable(item.type, item.name)) {
-													<button
-														type="button"
-														class="action-button"
-														[class.action-button-strong]="isItemEquippedById(item.id)"
-														(click)="toggleItemEquipped(item.id)"
-													>
-														{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
-													</button>
-												}
-												<button
-													type="button"
-													class="action-button action-button-danger"
-													(click)="dropInventoryInnerItem(item.tresherIdx, item.id)"
-												>
-													Drop
-												</button>
-											</div>
-										</li>
-									}
-								</ul>
-							}
-
-							@if (allPotionsUnified().length > 0) {
-								<p class="inventory-section-label">Potions</p>
-								<p class="tresher-item-desc">Hint: "Magic"/"MP" potions apply Arcane Infusion: +MP and +spell effect while active.</p>
-								<ul class="tresher-items-list">
-									@for (potion of allPotionsUnified(); track potion.id) {
-										<li class="tresher-inner-item">
-											<span class="tresher-item-name">{{ potion.name }}@if (potion.description) {{{ ': ' + potion.description }}}</span>
-											@if (potion.source === 'tresher' && isInnerPotionDrinkable(potion) && potion.tresherIdx !== undefined) {
-												<div class="inventory-item-actions">
-													<button
-														type="button"
-														class="action-button action-button-strong"
-														[disabled]="!canDrinkInnerPotion()"
-														(click)="drinkTresherInnerPotion(potion.tresherIdx, potion.id)"
-													>
-														Drink
-													</button>
-												</div>
-											} @else if (potion.source === 'collected') {
-												<div class="inventory-item-actions">
-													<button
-														type="button"
-														class="action-button action-button-strong"
-														[disabled]="turnPhase() !== 'player' || playerHp() <= 0"
-														(click)="drinkCollectedFloorPotion(potion.id)"
-													>
-														Drink
-													</button>
-												</div>
-											}
-										</li>
-									}
-								</ul>
-							}
-
-							@if (allTresherSpellsFlat().length > 0) {
-								<p class="inventory-section-label">Spells</p>
-								<p class="tresher-item-desc">Spell Loadout: {{ equippedSpellMagicCostForPreview() }} / {{ playerMindForView() }} Mind</p>
-								@if (spellTargetMode(); as targetMode) {
-									<div class="spell-target-banner">
-										<span class="spell-target-banner-text">
-											{{ pcTresherSpellsById().get(targetMode.spellId)?.name ?? 'Spell' }}:
-											{{ targetMode.targets.length }}/{{ targetMode.maxTargets }} targets selected
-											(click monsters on map)
-										</span>
-										<div class="spell-target-banner-actions">
-											<button type="button" class="action-button action-button-strong"
-												[disabled]="targetMode.targets.length === 0"
-												(click)="executeMultiTargetSpell()">
-												Cast (1 AE)
-											</button>
-											<button type="button" class="action-button" (click)="cancelSpellTargetMode()">Cancel</button>
 										</div>
 									</div>
-								}
-								<ul class="tresher-items-list">
-									@for (spell of allTresherSpellsFlat(); track spell.id) {
-										<li class="tresher-inner-item">
-											<div class="spell-header-row">
-												<span class="tresher-item-name">{{ spell.name }}</span>
-												<label class="spell-default-radio">
-													<input
-														type="radio"
-														name="defaultSpell"
-														[checked]="isDefaultSpell(spell.id)"
-														[disabled]="!isSpellEquippedById(spell.id)"
-														(change)="setDefaultSpell(spell.id)"
-													/>
-													Default
-												</label>
-											</div>
-											@if (spell.description) {
-												<span class="tresher-item-desc">{{ spell.description }}</span>
-											}
-											<span class="tresher-item-desc">
-												Min LTSP: {{ spell.minLtsp ?? spell.sp }} | Magic Cost: {{ spell.magicCost ?? 1 }} | Range: {{ spell.range }} | Effect: {{ spell.effectOn }}@if (spell.numberOfTargets > 1) { | Targets: {{ spell.numberOfTargets }}}
-											</span>
-											<div class="inventory-item-actions">
-												<button
-													type="button"
-													class="action-button"
-													[class.action-button-strong]="isSpellEquippedById(spell.id)"
-													(click)="toggleSpellEquipped(spell.id)"
-												>
-													{{ isSpellEquippedById(spell.id) ? 'Unequip' : 'Equip' }}
-												</button>
-												<button
-													type="button"
-													class="action-button action-button-strong"
-													[disabled]="!canCastSpell(spell) || spellTargetMode() !== null"
-													(click)="initSpellCast(spell.id)"
-												>
-													Cast (1 AE)
-												</button>
-											</div>
-										</li>
-									}
-								</ul>
-							}
-
-							@if (collectedFloorSpellsForPreview().length > 0) {
-								<p class="inventory-section-title">Spells</p>
-								<ul class="tresher-items-list">
-									@for (spell of collectedFloorSpellsForPreview(); track spell.id + ':' + $index) {
-										<li class="tresher-inner-item">
-											<span class="tresher-item-name">{{ spell.name }}</span>
-											@if (spell.description) {
-												<span class="tresher-item-desc">{{ spell.description }}</span>
-											}
-											<span class="tresher-item-desc">Learn Cost: {{ spell.sp }} SP @if ((spell.learnCostGp ?? 0) > 0) { | {{ spell.learnCostGp }} GP } | Min LTSP: {{ spell.minLtsp ?? spell.sp }} | Learn TN: {{ spell.successTestValue }}</span>
-											<div class="inventory-item-actions">
-												<button
-													type="button"
-													class="action-button action-button-strong"
-													[disabled]="!canLearnCollectedSpell(spell)"
-													(click)="learnCollectedFloorSpell(spell.id)"
-												>
-													Learn
-												</button>
-												@if (isSpellLearned(spell.id)) {
-													<span class="inventory-equipped-status">Learned</span>
-												}
-											</div>
-										</li>
-									}
-								</ul>
-							}
-						}
-					} @else {
-						<p class="discovery-empty">Inventory is empty.</p>
-					}
-
-					@if (collectedWeaponItemsForPreview().length > 0) {
-						<p class="inventory-section-title">Weapons</p>
-						<ul class="tresher-items-list">
-							@for (item of collectedWeaponItemsForPreview(); track item.id) {
-								<li class="tresher-inner-item">
-									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
-									@if (item.type === 'weapon' && item.damage > 0) {
-										<span class="tresher-item-stat">Dmg: 1–{{ item.damage }} | Range: {{ item.range }}</span>
-									}
-									@for (effectLine of inventoryItemEffectsForView(item); track effectLine) {
-										<span class="tresher-item-desc">{{ effectLine }}</span>
-									}
 									<div class="inventory-item-actions">
 										@if (isItemEquipable(item.type, item.name)) {
 											<button
@@ -1538,28 +1435,32 @@
 												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
 											</button>
 										}
-										<button
-											type="button"
-											class="action-button action-button-danger"
-											(click)="dropCollectedFloorItem(item.id)"
-										>
-											Drop
-										</button>
+										<button type="button" class="action-button action-button-info" (click)="openBackpackItemDetails(item)">?</button>
+										<button type="button" class="action-button action-button-danger" (click)="dropBackpackItem(item)">Drop</button>
 									</div>
 								</li>
 							}
 						</ul>
 					}
 
-					@if (collectedArmorItemsForPreview().length > 0) {
-						<p class="inventory-section-title">Armor</p>
+					@if (backpackArmorUnified().length > 0) {
+						<p class="inventory-section-title">Armor ({{ backpackArmorUnified().length }})</p>
 						<ul class="tresher-items-list">
-							@for (item of collectedArmorItemsForPreview(); track item.id) {
+							@for (item of backpackArmorUnified(); track item.id) {
 								<li class="tresher-inner-item">
-									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
-									@for (effectLine of inventoryItemEffectsForView(item); track effectLine) {
-										<span class="tresher-item-desc">{{ effectLine }}</span>
-									}
+									<div class="inventory-item-main">
+										@if (backpackItemImageSrc(item); as imageSrc) {
+											<img class="inventory-item-thumb-img" [src]="imageSrc" [alt]="item.name || 'Item'" />
+										} @else {
+											<span class="inventory-item-thumb-fallback" aria-hidden="true">?</span>
+										}
+										<div class="inventory-item-copy">
+											<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+											@if (item.description) {
+												<span class="tresher-item-desc">{{ item.description }}</span>
+											}
+										</div>
+									</div>
 									<div class="inventory-item-actions">
 										@if (isItemEquipable(item.type, item.name)) {
 											<button
@@ -1571,35 +1472,39 @@
 												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
 											</button>
 										}
-										<button
-											type="button"
-											class="action-button action-button-danger"
-											(click)="dropCollectedFloorItem(item.id)"
-										>
-											Drop
-										</button>
+										<button type="button" class="action-button action-button-info" (click)="openBackpackItemDetails(item)">?</button>
+										<button type="button" class="action-button action-button-danger" (click)="dropBackpackItem(item)">Drop</button>
 									</div>
 								</li>
 							}
 						</ul>
 					}
 
-					@if (collectedOtherItemsForPreview().length > 0) {
-						<p class="inventory-section-title">Items</p>
+					@if (backpackOtherItemsUnified().length > 0) {
+						<p class="inventory-section-title">Items ({{ backpackOtherItemsUnified().length }})</p>
 						<ul class="tresher-items-list">
-							@for (item of collectedOtherItemsForPreview(); track item.id) {
+							@for (item of backpackOtherItemsUnified(); track item.id) {
 								<li class="tresher-inner-item">
-									<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
-									@for (effectLine of inventoryItemEffectsForView(item); track effectLine) {
-										<span class="tresher-item-desc">{{ effectLine }}</span>
-									}
+									<div class="inventory-item-main">
+										@if (backpackItemImageSrc(item); as imageSrc) {
+											<img class="inventory-item-thumb-img" [src]="imageSrc" [alt]="item.name || 'Item'" />
+										} @else {
+											<span class="inventory-item-thumb-fallback" aria-hidden="true">?</span>
+										}
+										<div class="inventory-item-copy">
+											<span class="tresher-item-name">{{ item.name || 'Unnamed Item' }}</span>
+											@if (item.description) {
+												<span class="tresher-item-desc">{{ item.description }}</span>
+											}
+										</div>
+									</div>
 									<div class="inventory-item-actions">
 										@if (isOtherItemUsable(item)) {
 											<button
 												type="button"
 												class="action-button action-button-strong"
 												[disabled]="turnPhase() !== 'player' || playerHp() <= 0 || playerAE() < 1"
-												(click)="useCollectedOtherItem(item.id)"
+												(click)="useBackpackOtherItem(item)"
 											>
 												Use ({{ item.uses }})
 											</button>
@@ -1614,20 +1519,154 @@
 												{{ isItemEquippedById(item.id) ? 'Unequip' : 'Equip' }}
 											</button>
 										}
-										<button
-											type="button"
-											class="action-button action-button-danger"
-											(click)="dropCollectedFloorItem(item.id)"
-										>
-											Drop
-										</button>
+										<button type="button" class="action-button action-button-info" (click)="openBackpackItemDetails(item)">?</button>
+										<button type="button" class="action-button action-button-danger" (click)="dropBackpackItem(item)">Drop</button>
 									</div>
 								</li>
 							}
 						</ul>
 					}
 
-					<!-- Collected floor potions are now unified above -->
+					@if (allPotionsUnified().length > 0) {
+						<p class="inventory-section-title">Potions</p>
+						<p class="tresher-item-desc">Hint: "Magic"/"MP" potions apply Arcane Infusion: +MP and +spell effect while active.</p>
+						<ul class="tresher-items-list">
+							@for (potion of allPotionsUnified(); track potion.id + ':' + potion.source) {
+								<li class="tresher-inner-item">
+									<div class="inventory-item-main">
+										<span class="inventory-item-thumb-fallback" aria-hidden="true">?</span>
+										<div class="inventory-item-copy">
+											<span class="tresher-item-name">{{ potion.name }}</span>
+											@if (potion.description) {
+												<span class="tresher-item-desc">{{ potion.description }}</span>
+											}
+										</div>
+									</div>
+									<div class="inventory-item-actions">
+										@if (potion.source === 'tresher' && isInnerPotionDrinkable(potion) && potion.tresherIdx !== undefined) {
+											<button
+												type="button"
+												class="action-button action-button-strong"
+												[disabled]="!canDrinkInnerPotion()"
+												(click)="drinkTresherInnerPotion(potion.tresherIdx, potion.id)"
+											>
+												Drink
+											</button>
+										} @else if (potion.source === 'collected') {
+											<button
+												type="button"
+												class="action-button action-button-strong"
+												[disabled]="turnPhase() !== 'player' || playerHp() <= 0"
+												(click)="drinkCollectedFloorPotion(potion.id)"
+											>
+												Drink
+											</button>
+										}
+										<button type="button" class="action-button action-button-info" (click)="openBackpackPotionDetails(potion)">?</button>
+									</div>
+								</li>
+							}
+						</ul>
+					}
+
+					@if (allTresherSpellsFlat().length > 0) {
+						<p class="inventory-section-title">Spells</p>
+						<p class="tresher-item-desc">Spell Loadout: {{ equippedSpellMagicCostForPreview() }} / {{ playerMindForView() }} Mind</p>
+						@if (spellTargetMode(); as targetMode) {
+							<div class="spell-target-banner">
+								<span class="spell-target-banner-text">
+									{{ pcTresherSpellsById().get(targetMode.spellId)?.name ?? 'Spell' }}:
+									{{ targetMode.targets.length }}/{{ targetMode.maxTargets }} targets selected
+									(click monsters on map)
+								</span>
+								<div class="spell-target-banner-actions">
+									<button type="button" class="action-button action-button-strong"
+										[disabled]="targetMode.targets.length === 0"
+										(click)="executeMultiTargetSpell()">
+										Cast (1 AE)
+									</button>
+									<button type="button" class="action-button" (click)="cancelSpellTargetMode()">Cancel</button>
+								</div>
+							</div>
+						}
+						<ul class="tresher-items-list">
+							@for (spell of allTresherSpellsFlat(); track spell.id) {
+								<li class="tresher-inner-item">
+									<div class="spell-header-row">
+										<span class="tresher-item-name">{{ spell.name }}</span>
+										<label class="spell-default-radio">
+											<input
+												type="radio"
+												name="defaultSpell"
+												[checked]="isDefaultSpell(spell.id)"
+												[disabled]="!isSpellEquippedById(spell.id)"
+												(change)="setDefaultSpell(spell.id)"
+											/>
+											Default
+										</label>
+									</div>
+									@if (spell.description) {
+										<span class="tresher-item-desc">{{ spell.description }}</span>
+									}
+									<span class="tresher-item-desc">
+										Min LTSP: {{ spell.minLtsp ?? spell.sp }} | Magic Cost: {{ spell.magicCost ?? 1 }} | Range: {{ spell.range }} | Effect: {{ spell.effectOn }}@if (spell.numberOfTargets > 1) { | Targets: {{ spell.numberOfTargets }}}
+									</span>
+									<div class="inventory-item-actions">
+										<button
+											type="button"
+											class="action-button"
+											[class.action-button-strong]="isSpellEquippedById(spell.id)"
+											(click)="toggleSpellEquipped(spell.id)"
+										>
+											{{ isSpellEquippedById(spell.id) ? 'Unequip' : 'Equip' }}
+										</button>
+										<button
+											type="button"
+											class="action-button action-button-strong"
+											[disabled]="!canCastSpell(spell) || spellTargetMode() !== null"
+											(click)="initSpellCast(spell.id)"
+										>
+											Cast (1 AE)
+										</button>
+										<button type="button" class="action-button action-button-info" (click)="openBackpackSpellDetails(spell)">?</button>
+									</div>
+								</li>
+							}
+						</ul>
+					}
+
+					@if (collectedFloorSpellsForPreview().length > 0) {
+						<p class="inventory-section-title">Learnable Spells</p>
+						<ul class="tresher-items-list">
+							@for (spell of collectedFloorSpellsForPreview(); track spell.id + ':' + $index) {
+								<li class="tresher-inner-item">
+									<span class="tresher-item-name">{{ spell.name }}</span>
+									@if (spell.description) {
+										<span class="tresher-item-desc">{{ spell.description }}</span>
+									}
+									<span class="tresher-item-desc">Learn Cost: {{ spell.sp }} SP @if ((spell.learnCostGp ?? 0) > 0) { | {{ spell.learnCostGp }} GP } | Min LTSP: {{ spell.minLtsp ?? spell.sp }} | Learn TN: {{ spell.successTestValue }}</span>
+									<div class="inventory-item-actions">
+										<button
+											type="button"
+											class="action-button action-button-strong"
+											[disabled]="!canLearnCollectedSpell(spell)"
+											(click)="learnCollectedFloorSpell(spell.id)"
+										>
+											Learn
+										</button>
+										<button type="button" class="action-button action-button-info" (click)="openBackpackSpellDetails(spell)">?</button>
+										@if (isSpellLearned(spell.id)) {
+											<span class="inventory-equipped-status">Learned</span>
+										}
+									</div>
+								</li>
+							}
+						</ul>
+						}
+					} @else {
+						<p class="discovery-empty">Inventory is empty.</p>
+					}
+
 					</div>
 					<div class="inventory-pc-card">
 						@if (playerPortraitUrl(); as portraitUrl) {

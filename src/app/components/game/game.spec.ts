@@ -206,6 +206,12 @@ describe('Game', () => {
 
   it('lets a fighter attack a monster in range', () => {
     const dungonId = 1;
+    const emptySquare = {
+      toTop: null,
+      toRight: null,
+      toBottom: null,
+      toLeft: null,
+    };
     component.gridPreviewContext.set({ dungonId, centerRow: 5, centerColumn: 5 } as never);
     component.turnPhase.set('player');
     component.playerType.set('fighter');
@@ -218,8 +224,8 @@ describe('Game', () => {
 
     component.squaresByDungon.set({
       [dungonId]: {
-        '5,5': {} as never,
-        '5,6': {} as never,
+        '5:5': { ...emptySquare } as never,
+        '5:6': { ...emptySquare } as never,
       },
     });
 
@@ -357,14 +363,15 @@ describe('Game', () => {
     playSoundPathSpy.mockRestore();
   });
 
-  it('monster death drops coin tresher loot on its square', () => {
+  it('monster death drops configured item loot on its square', () => {
     const dungonId = 1;
+    const droppedItemId = 77;
     const monster = {
       row: 2,
       column: 3,
       dropTresherIds: [],
       dropKeyIds: [],
-      dropItemIds: [],
+      dropItemIds: [droppedItemId],
       dropSpellIds: [],
       dropPotionIds: [],
       dropGold: 4,
@@ -376,19 +383,28 @@ describe('Game', () => {
 
     component.tresherListByDungon.set({ [dungonId]: [] });
     component.tresherPlacementsByDungon.set({ [dungonId]: [] });
+    component.floorItemListByDungon.set({
+      [dungonId]: [
+        {
+          id: droppedItemId,
+          name: 'Monster Fang',
+          description: 'test drop',
+          type: 'other',
+          effectValue: 0,
+          damage: 0,
+          range: 0,
+          armorSlot: null,
+          effectOn: null,
+          isTwoHanded: false,
+        },
+      ],
+    } as never);
+    component.floorItemPlacementsByDungon.set({ [dungonId]: [] } as never);
 
     (component as any).dropMonsterLoot(dungonId, monster as never, template as never);
 
-    const treshers = component.tresherListByDungon()[dungonId] ?? [];
-    const placements = component.tresherPlacementsByDungon()[dungonId] ?? [];
-    const droppedCoins = treshers.find((t) => t.name === 'Dropped Coins');
-
-    expect(droppedCoins).toBeTruthy();
-    expect(droppedCoins?.gold).toBe(4);
-    expect(droppedCoins?.silver).toBe(3);
-    expect(droppedCoins?.copper).toBe(2);
-    expect(droppedCoins?.zinc).toBe(1);
-    expect(placements.some((p) => p.row === 2 && p.column === 3 && p.tresherId === droppedCoins?.id)).toBe(true);
+    const itemPlacements = component.floorItemPlacementsByDungon()[dungonId] ?? [];
+    expect(itemPlacements.some((p) => p.row === 2 && p.column === 3 && p.itemId === droppedItemId)).toBe(true);
   });
 
   it('useInventoryHealingPotion consumes a potion and restores HP', () => {
@@ -429,5 +445,140 @@ describe('Game', () => {
 
     saveSpy.mockRestore();
     startMonstersSpy.mockRestore();
+  });
+
+  it('dungon test 1 (20), pc #13: move right, pick up loot, repeat until blocked', () => {
+    const dungonId = 20;
+    const emptySquare = {
+      toTop: null,
+      toRight: null,
+      toBottom: null,
+      toLeft: null,
+    };
+
+    component.gridPreviewContext.set({ dungonId, centerRow: 0, centerColumn: 0 } as never);
+    component.turnPhase.set('player');
+    component.playerHp.set(25);
+    component.playerAE.set(50);
+
+    component.cheaterByDungon.set({
+      [dungonId]: {
+        facingDir: 'right',
+        inventory: { keys: [], treshers: [] },
+      },
+    } as never);
+    component.visualFacingByDungon.set({ [dungonId]: 'right' } as never);
+
+    component.filledSquaresByDungon.set({
+      [dungonId]: {
+        '0:0': true,
+        '0:1': true,
+        '0:2': true,
+        '0:3': true,
+        '0:4': true,
+        '0:5': true,
+      },
+    } as never);
+
+    component.squaresByDungon.set({
+      [dungonId]: {
+        '0:0': { ...emptySquare } as never,
+        '0:1': { ...emptySquare } as never,
+        '0:2': { ...emptySquare } as never,
+        '0:3': { ...emptySquare } as never,
+        '0:4': { ...emptySquare } as never,
+        '0:5': { ...emptySquare } as never,
+      },
+    } as never);
+
+    component.floorItemListByDungon.set({
+      [dungonId]: [
+        {
+          id: 1001,
+          name: 'Bronze Dagger',
+          description: 'test item',
+          type: 'Weapon',
+          effectValue: 0,
+          damage: 2,
+          range: 1,
+          armorSlot: null,
+          effectOn: null,
+          isTwoHanded: false,
+        },
+        {
+          id: 1002,
+          name: 'Leather Vest',
+          description: 'test item',
+          type: 'Armor',
+          effectValue: 1,
+          damage: 0,
+          range: 0,
+          armorSlot: 'chest',
+          effectOn: 'AC',
+          isTwoHanded: false,
+        },
+      ],
+    } as never);
+
+    component.floorItemPlacementsByDungon.set({
+      [dungonId]: [
+        { itemId: 1001, row: 0, column: 2 },
+        { itemId: 1002, row: 0, column: 4 },
+      ],
+    } as never);
+    component.collectedFloorItemsByDungon.set({ [dungonId]: [] } as never);
+
+    const drawSpy = vi.spyOn(component as any, 'drawPreviewGridCanvas').mockImplementation(() => {});
+    const stepSpy = vi.spyOn(component as any, 'playStepSound').mockImplementation(() => {});
+
+    const pickedItemIds: number[] = [];
+    let movementBlocked = false;
+
+    for (let step = 0; step < 10; step++) {
+      const beforeMove = component.gridPreviewContext();
+      expect(beforeMove).toBeTruthy();
+      if (!beforeMove) {
+        break;
+      }
+
+      component.setFacingDirectionFromPad('right');
+
+      const afterMove = component.gridPreviewContext();
+      expect(afterMove).toBeTruthy();
+      if (!afterMove) {
+        break;
+      }
+
+      if (afterMove.centerColumn === beforeMove.centerColumn) {
+        movementBlocked = true;
+        break;
+      }
+
+      if (component.hasCurrentSquarePickupItems()) {
+        const beforeCollected = component.collectedFloorItemsByDungon()[dungonId] ?? [];
+        component.takeAllFromCurrentSquare();
+        const afterCollected = component.collectedFloorItemsByDungon()[dungonId] ?? [];
+
+        expect(afterCollected.length).toBeGreaterThan(beforeCollected.length);
+
+        const newlyCollected = afterCollected.slice(beforeCollected.length);
+        const newlyCollectedIds = newlyCollected.map((item) => item.id);
+        pickedItemIds.push(...newlyCollectedIds);
+
+        for (const pickedId of newlyCollectedIds) {
+          expect(
+            (component.floorItemPlacementsByDungon()[dungonId] ?? []).some((p) => p.itemId === pickedId)
+          ).toBe(false);
+        }
+      }
+    }
+
+    expect(movementBlocked).toBe(true);
+    expect(component.gridPreviewContext()?.centerColumn).toBe(5);
+    expect(pickedItemIds).toEqual([1001, 1002]);
+    expect((component.collectedFloorItemsByDungon()[dungonId] ?? []).map((item) => item.id)).toEqual([1001, 1002]);
+
+    drawSpy.mockRestore();
+    stepSpy.mockRestore();
   });
 });

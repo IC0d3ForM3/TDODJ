@@ -184,34 +184,33 @@ export class GameDrawingAssetsService {
   }
 
   loadLootImages(dungonId: number): void {
-    const imageIds = new Set<number>();
+    const userPersonalImageIds = new Set<number>();
+    const dungeonLootImageIds = new Set<number>();
 
+    // Store treshers and floor items separately (these are dungeon loot, not user personal)
     for (const tresher of this.dungeonState.tresherListByDungon()[dungonId] ?? []) {
       if (typeof tresher.imageId === 'number' && tresher.imageId > 0 && !this.lootImageCache.has(tresher.imageId)) {
-        imageIds.add(tresher.imageId);
+        dungeonLootImageIds.add(tresher.imageId);
       }
     }
 
     for (const item of this.inventoryService.floorItemListByDungon()[dungonId] ?? []) {
       const imageId = (item as { imageId?: number | null }).imageId;
       if (typeof imageId === 'number' && imageId > 0 && !this.lootImageCache.has(imageId)) {
-        imageIds.add(imageId);
+        dungeonLootImageIds.add(imageId);
       }
     }
 
+    // User personal items come from their tresher collection
     for (const item of this.inventoryService.pcTresherItemsById().values()) {
       const imageId = (item as { imageId?: number | null }).imageId;
       if (typeof imageId === 'number' && imageId > 0 && !this.lootImageCache.has(imageId)) {
-        imageIds.add(imageId);
+        userPersonalImageIds.add(imageId);
       }
     }
 
-    if (imageIds.size === 0) {
-      return;
-    }
-
     const onImageLoaded = (id: number, path: string): void => {
-      if (!imageIds.has(id) || !path) {
+      if ((!userPersonalImageIds.has(id) && !dungeonLootImageIds.has(id)) || !path) {
         return;
       }
 
@@ -229,11 +228,11 @@ export class GameDrawingAssetsService {
       img.src = url;
     };
 
-    const userKey = this.account.getKey();
-    if (!userKey) {
+    // Always fetch dungeon loot images from public endpoint
+    if (dungeonLootImageIds.size > 0) {
       this.http
         .get<{ id: number; path: string }[]>(`${API_BASE_URL}/images/by-ids`, {
-          params: { ids: Array.from(imageIds).join(',') },
+          params: { ids: Array.from(dungeonLootImageIds).join(',') },
         })
         .subscribe({
           next: (images) => {
@@ -242,20 +241,38 @@ export class GameDrawingAssetsService {
             }
           },
         });
-      return;
     }
 
-    this.http
-      .get<ImageRecordPayload[]>(`${API_BASE_URL}/images`, {
-        params: { userkey: userKey, scope: 'library' },
-      })
-      .subscribe({
-        next: (images) => {
-          for (const image of images) {
-            onImageLoaded(image.id, image.path);
-          }
-        },
-      });
+    // Fetch user's personal library if logged in
+    const userKey = this.account.getKey();
+    if (userKey && userPersonalImageIds.size > 0) {
+      this.http
+        .get<ImageRecordPayload[]>(`${API_BASE_URL}/images`, {
+          params: { userkey: userKey, scope: 'library' },
+        })
+        .subscribe({
+          next: (images) => {
+            for (const image of images) {
+              onImageLoaded(image.id, image.path);
+            }
+          },
+        });
+    }
+
+    // If no userKey but have personal images, fetch from public endpoint as fallback
+    if (!userKey && userPersonalImageIds.size > 0) {
+      this.http
+        .get<{ id: number; path: string }[]>(`${API_BASE_URL}/images/by-ids`, {
+          params: { ids: Array.from(userPersonalImageIds).join(',') },
+        })
+        .subscribe({
+          next: (images) => {
+            for (const image of images) {
+              onImageLoaded(image.id, image.path);
+            }
+          },
+        });
+    }
   }
 
   resolveImageUrl(imagePath: string): string {

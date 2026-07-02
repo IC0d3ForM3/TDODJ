@@ -16,6 +16,8 @@ import { Account } from '../../services/account';
 import { GameDrawingAssetsService } from '../../services/game-drawing-assets';
 import { DungeonStateService } from '../../services/dungeon-state';
 import { GameJsonParserService, ParsedPcTresherCurseData as PcTresherCurseData } from '../../services/game-json-parser';
+import { GameShopService, ShopCatalogEntry, ShopSellEntry } from '../../services/game-shop';
+import { GameSoundService } from '../../services/game-sound';
 import { GameInventoryService, PcTresherSpellData } from '../../services/game-inventory';
 import { GameCombatService, TurnPhase, GameMonsterInstance, CombatLogEntry, ActiveEffect } from '../../services/game-combat';
 import { GameMovementService } from '../../services/game-movement';
@@ -102,11 +104,6 @@ interface ImageRecordPayload {
   path: string;
 }
 
-interface SoundRecordPayload {
-  id: number;
-  path: string;
-}
-
 type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind' | 'rangedTarget';
 type MonsterImpactProjectile = 'arrow' | 'knife';
 type MonsterImpactState = { kind: MonsterImpactKind; color?: string | null; projectile?: MonsterImpactProjectile | null; startedAt: number; expiresAt: number };
@@ -120,26 +117,6 @@ interface DirectionPadButton {
   ariaLabel: string;
 }
 
-interface ShopCatalogEntry {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-}
-
-type ShopSlotKey =
-  | 'item1Id' | 'item2Id' | 'item3Id' | 'item4Id'
-  | 'spell1Id' | 'spell2Id' | 'spell3Id' | 'spell4Id'
-  | 'potion1Id' | 'potion2Id' | 'potion3Id';
-
-interface ShopSellEntry {
-  tresherIndex: number;
-  slotKey: ShopSlotKey;
-  sourceId: number;
-  name: string;
-  sellPrice: number;
-}
-
 interface NearbyObstacleInfo {
   obstacle: ObstaclePlacement;
   direction: string;
@@ -148,6 +125,29 @@ interface NearbyObstacleInfo {
   canPick: boolean;
   canTakeItem: boolean;
   hasMatchingKey: boolean;
+}
+
+interface BackpackItemEntry {
+  id: number;
+  name: string;
+  description: string;
+  type: string;
+  effectValue: number | null;
+  armorSlot: string | null;
+  damage: number;
+  range: number;
+  effectOn: string | null;
+  effectToPc?: string | null;
+  effectToPcValue?: number;
+  uses?: number | null;
+  imageId?: number | null;
+  source: 'tresher' | 'collected';
+  tresherIdx?: number;
+}
+
+interface InventoryDetailsModalData {
+  title: string;
+  lines: string[];
 }
 
 type RangerFavoredTypeBonuses = Record<string, number>;
@@ -168,6 +168,8 @@ export class Game implements OnInit {
   private readonly drawingAssets = inject(GameDrawingAssetsService);
   private readonly dungeonState = inject(DungeonStateService);
   private readonly gameJsonParserService = inject(GameJsonParserService);
+  private readonly gameShopService = inject(GameShopService);
+  private readonly gameSoundService = inject(GameSoundService);
   readonly inventoryService = inject(GameInventoryService);
   readonly combatService = inject(GameCombatService);
   readonly movementService = inject(GameMovementService);
@@ -234,10 +236,10 @@ export class Game implements OnInit {
   private readonly lootImageCacheVersion = this.drawingAssets.lootImageCacheVersion;
   private readonly spellCatalogById = signal<Map<number, PcTresherSpellData>>(new Map());
   private readonly pcTresherCursesById = signal<Map<number, PcTresherCurseData>>(new Map());
-  private readonly soundPathById = signal<Map<number, string>>(new Map());
+  private readonly soundPathById = this.gameSoundService.soundPathById;
   private readonly learnedFloorSpellIdsByDungon = signal<Record<number, number[]>>({});
   private readonly doorImageCache = this.drawingAssets.doorImageCache;
-  private readonly defaultSpellSoundPath = '/sounds/sfx-glowing-magic-default-01.wav';
+  private readonly defaultSpellSoundPath = this.gameSoundService.defaultSpellSoundPath;
   readonly monsterImpactEffects = signal<Record<string, MonsterImpactState>>({});
   readonly monsterImpactPulse = signal(0);
   private monsterImpactPulseTimer: ReturnType<typeof setInterval> | null = null;
@@ -398,23 +400,22 @@ export class Game implements OnInit {
   get dungonSpReward() { return this.interactionService.dungonSpReward; }
   get dungonWon() { return this.interactionService.dungonWon; }
   get showTavernModal() { return this.interactionService.showTavernModal; }
-  readonly showYeOldMagiceShopModal = signal(false);
-  private readonly yeOldMagiceShopPromptDismissStorageKey = 'tdodj.yeOldMagiceShopPrompt.dismissed';
-  readonly dismissedYeOldMagiceShopPrompts = signal<Record<string, true>>(this.loadDismissedYeOldMagiceShopPrompts());
-  readonly yeOldMagiceShopView = signal<'main' | 'buyItems' | 'sellItems' | 'buySpells' | 'sellSpells' | 'buyPotions' | 'sellPotions' | 'info' | 'upgrades'>('main');
-  readonly yeOldMagiceShopMessage = signal<string | null>(null);
-  readonly yeOldMagiceShopInfoUnlocked = signal(false);
-  readonly yeOldMagiceShopDrinkPurchased = signal(false);
-  readonly yeOldMagiceShopImage = signal<'taren1' | 'taren2'>('taren1');
-  readonly yeOldMagiceShopKeeperInfo = signal('');
-  readonly activeYeOldMagiceShopDungonId = signal<number | null>(null);
-  readonly activeYeOldMagiceShopObstacleId = signal<number | null>(null);
-  readonly shopBuyItemCost = 24;
-  readonly shopBuySpellCost = 30;
-  readonly shopBuyPotionCost = 18;
-  readonly shopDrinkCost = 6;
-  readonly shopHealingCost = 10;
-  readonly shopCurseClearCost = 22;
+  get showYeOldMagiceShopModal() { return this.gameShopService.showYeOldMagiceShopModal; }
+  get dismissedYeOldMagiceShopPrompts() { return this.gameShopService.dismissedYeOldMagiceShopPrompts; }
+  get yeOldMagiceShopView() { return this.gameShopService.yeOldMagiceShopView; }
+  get yeOldMagiceShopMessage() { return this.gameShopService.yeOldMagiceShopMessage; }
+  get yeOldMagiceShopInfoUnlocked() { return this.gameShopService.yeOldMagiceShopInfoUnlocked; }
+  get yeOldMagiceShopDrinkPurchased() { return this.gameShopService.yeOldMagiceShopDrinkPurchased; }
+  get yeOldMagiceShopImage() { return this.gameShopService.yeOldMagiceShopImage; }
+  get yeOldMagiceShopKeeperInfo() { return this.gameShopService.yeOldMagiceShopKeeperInfo; }
+  get activeYeOldMagiceShopDungonId() { return this.gameShopService.activeYeOldMagiceShopDungonId; }
+  get activeYeOldMagiceShopObstacleId() { return this.gameShopService.activeYeOldMagiceShopObstacleId; }
+  get shopBuyItemCost() { return this.gameShopService.shopBuyItemCost; }
+  get shopBuySpellCost() { return this.gameShopService.shopBuySpellCost; }
+  get shopBuyPotionCost() { return this.gameShopService.shopBuyPotionCost; }
+  get shopDrinkCost() { return this.gameShopService.shopDrinkCost; }
+  get shopHealingCost() { return this.gameShopService.shopHealingCost; }
+  get shopCurseClearCost() { return this.gameShopService.shopCurseClearCost; }
   readonly soundMuted = signal<boolean>((() => {
     const stored = localStorage.getItem('soundMuted');
     if (stored === 'true') return true;
@@ -430,6 +431,7 @@ export class Game implements OnInit {
   readonly bugReportError = signal<string | null>(null);
   readonly npcResponseDraft = signal<string>('');
   readonly itemNoteModal = signal<{ itemName: string; note: string; canRead: boolean; minMindToRead: number } | null>(null);
+  readonly inventoryDetailsModal = signal<InventoryDetailsModalData | null>(null);
   readonly showBackpackInventoryModal = signal(false);
   readonly showDrinkPotionModal = signal(false);
   readonly showControlsHelpModal = signal(false);
@@ -459,9 +461,7 @@ export class Game implements OnInit {
   readonly pendingExitAwardsInnReward = signal(true);
   readonly pendingExitMissingItemName = signal<string | null>(null);
   readonly lastExitGrantedInnReward = signal(true);
-  private tavernMusicAudio: HTMLAudioElement | null = null;
-  private readonly tavernWindowSoundPaths = ['/sounds/game sounds/1.mp3', '/sounds/game sounds/2.mp3'];
-  private readonly portalTraverseSoundPath = '/sounds/game sounds/portal sound.wav';
+  private readonly portalTraverseSoundPath = this.gameSoundService.portalTraverseSoundPath;
 
   get questItemsForTavern(): Tresher[] {
     const result: Tresher[] = [];
@@ -518,8 +518,7 @@ export class Game implements OnInit {
     const preview = this.gridPreviewContext();
     if (!preview) return null;
 
-    const dismissKey = this.getYeOldMagiceShopPromptDismissKey(preview.dungonId, shop.id);
-    if (this.dismissedYeOldMagiceShopPrompts()[dismissKey]) {
+    if (this.gameShopService.isYeOldMagiceShopPromptDismissed(this.currentGameId() ?? 0, preview.dungonId, shop.id)) {
       return null;
     }
 
@@ -527,45 +526,30 @@ export class Game implements OnInit {
   });
 
   readonly yeOldMagiceShopBuyableItems = computed<ShopCatalogEntry[]>(() => {
-    const dungonId = this.activeYeOldMagiceShopDungonId();
-    const obstacleId = this.activeYeOldMagiceShopObstacleId();
-    if (dungonId == null || obstacleId == null) return [];
-    const obs = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find((o) => o.id === obstacleId);
-    let itemIds: number[] = [];
-    try { itemIds = JSON.parse(obs?.note ?? '{}').itemIds ?? []; } catch { return []; }
-    const allItems = this.pcTresherItemsById();
-    return (itemIds as number[])
-      .map((id) => allItems.get(id))
-      .filter((item): item is NonNullable<typeof item> => item != null)
-      .map((item) => ({ id: item.id, name: item.name, description: item.description, price: this.shopBuyItemCost }));
+    return this.gameShopService.getBuyableItems(
+      this.obstaclePlacementsByDungon(),
+      this.activeYeOldMagiceShopDungonId(),
+      this.activeYeOldMagiceShopObstacleId(),
+      this.pcTresherItemsById()
+    );
   });
 
   readonly yeOldMagiceShopBuyableSpells = computed<ShopCatalogEntry[]>(() => {
-    const dungonId = this.activeYeOldMagiceShopDungonId();
-    const obstacleId = this.activeYeOldMagiceShopObstacleId();
-    if (dungonId == null || obstacleId == null) return [];
-    const obs = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find((o) => o.id === obstacleId);
-    let spellIds: number[] = [];
-    try { spellIds = JSON.parse(obs?.note ?? '{}').spellIds ?? []; } catch { return []; }
-    const allSpells = this.pcTresherSpellsById();
-    return (spellIds as number[])
-      .map((id) => allSpells.get(id))
-      .filter((spell): spell is NonNullable<typeof spell> => spell != null)
-      .map((spell) => ({ id: spell.id, name: spell.name, description: spell.description, price: this.shopBuySpellCost }));
+    return this.gameShopService.getBuyableSpells(
+      this.obstaclePlacementsByDungon(),
+      this.activeYeOldMagiceShopDungonId(),
+      this.activeYeOldMagiceShopObstacleId(),
+      this.pcTresherSpellsById()
+    );
   });
 
   readonly yeOldMagiceShopBuyablePotions = computed<ShopCatalogEntry[]>(() => {
-    const dungonId = this.activeYeOldMagiceShopDungonId();
-    const obstacleId = this.activeYeOldMagiceShopObstacleId();
-    if (dungonId == null || obstacleId == null) return [];
-    const obs = (this.obstaclePlacementsByDungon()[dungonId] ?? []).find((o) => o.id === obstacleId);
-    let potionIds: number[] = [];
-    try { potionIds = JSON.parse(obs?.note ?? '{}').potionIds ?? []; } catch { return []; }
-    const allPotions = this.pcTresherPotionsById();
-    return (potionIds as number[])
-      .map((id) => allPotions.get(id))
-      .filter((potion): potion is NonNullable<typeof potion> => potion != null)
-      .map((potion) => ({ id: potion.id, name: potion.name, description: potion.description, price: this.shopBuyPotionCost }));
+    return this.gameShopService.getBuyablePotions(
+      this.obstaclePlacementsByDungon(),
+      this.activeYeOldMagiceShopDungonId(),
+      this.activeYeOldMagiceShopObstacleId(),
+      this.pcTresherPotionsById()
+    );
   });
 
   private savedCombatState: {
@@ -845,7 +829,7 @@ export class Game implements OnInit {
     return this.floorSpellPlacementsByDungon()[preview.dungonId] ?? [];
   }
 
-  collectedFloorItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean; uses?: number | null }> {
+  collectedFloorItemsForPreview(): Array<{ id: number; name: string; description: string; type: string; imageId?: number | null; effectValue: number; damage: number; range: number; armorSlot: string | null; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; isTwoHanded: boolean; uses?: number | null }> {
     const preview = this.gridPreviewContext();
     if (!preview) return [];
     return this.collectedFloorItemsByDungon()[preview.dungonId] ?? [];
@@ -1081,20 +1065,80 @@ export class Game implements OnInit {
   }
 
   backpackTresherItemCount(): number {
-    return this.allTresherItemsGrouped().reduce((sum, group) => sum + group.items.length, 0);
+    return this.backpackOtherItemsUnified().length;
   }
 
   backpackTotalItemCount(): number {
     return (
-      this.backpackTresherItemCount() +
-      this.collectedWeaponItemsForPreview().length +
-      this.collectedArmorItemsForPreview().length +
-      this.collectedOtherItemsForPreview().length +
+      this.backpackWeaponsUnified().length +
+      this.backpackArmorUnified().length +
+      this.backpackOtherItemsUnified().length +
       this.allPotionsUnified().length +
       this.allTresherSpellsFlat().length +
       this.collectedFloorSpellsForPreview().length
     );
   }
+
+  readonly backpackItemsUnified = computed<BackpackItemEntry[]>(() => {
+    const merged = new Map<number, BackpackItemEntry>();
+
+    for (const group of this.allTresherItemsGrouped()) {
+      for (const item of group.items) {
+        merged.set(item.id, {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          type: item.type,
+          effectValue: item.effectValue,
+          armorSlot: item.armorSlot,
+          damage: item.damage,
+          range: item.range,
+          effectOn: item.effectOn,
+          effectToPc: item.effectToPc,
+          effectToPcValue: item.effectToPcValue,
+          uses: item.uses,
+          imageId: item.imageId,
+          source: 'tresher' as const,
+          tresherIdx: item.tresherIdx,
+        });
+      }
+    }
+
+    for (const item of this.collectedFloorItemsForPreview()) {
+      merged.set(item.id, {
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        type: item.type,
+        effectValue: item.effectValue,
+        armorSlot: item.armorSlot,
+        damage: item.damage,
+        range: item.range,
+        effectOn: item.effectOn,
+        effectToPc: item.effectToPc,
+        effectToPcValue: item.effectToPcValue,
+        uses: item.uses,
+        imageId: item.imageId ?? null,
+        source: 'collected' as const,
+      });
+    }
+
+    return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  readonly backpackWeaponsUnified = computed(() =>
+    this.backpackItemsUnified().filter((item) => this.isWeaponItemType(item.type))
+  );
+
+  readonly backpackArmorUnified = computed(() =>
+    this.backpackItemsUnified().filter((item) => this.isArmorItemType(item.type, item.name) || item.armorSlot !== null)
+  );
+
+  readonly backpackOtherItemsUnified = computed(() =>
+    this.backpackItemsUnified().filter(
+      (item) => !this.isWeaponItemType(item.type) && !this.isArmorItemType(item.type, item.name) && item.armorSlot === null
+    )
+  );
 
   isTresherEquipable(tresher: Tresher): boolean {
     return this.inventoryService.isTresherEquipable(tresher);
@@ -1735,14 +1779,14 @@ export class Game implements OnInit {
   readonly allTresherItemsGrouped = computed(() => {
     const treshers = this.inventoryTreshersForPreview();
     const itemsMap = this.pcTresherItemsById();
-    type FlatItem = { id: number; name: string; description: string; type: string; effectValue: number | null; armorSlot: string | null; damage: number; range: number; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; tresherIdx: number };
+    type FlatItem = { id: number; name: string; description: string; type: string; effectValue: number | null; armorSlot: string | null; damage: number; range: number; effectOn: string | null; effectToPc?: string | null; effectToPcValue?: number; uses?: number | null; imageId?: number | null; tresherIdx: number };
     const flat: FlatItem[] = [];
     for (let i = 0; i < treshers.length; i++) {
       const t = treshers[i];
       for (const itemId of [t.item1Id, t.item2Id, t.item3Id, t.item4Id]) {
         if (itemId != null) {
           const item = itemsMap.get(itemId);
-          if (item) flat.push({ id: item.id, name: item.name, description: item.description, type: item.type, effectValue: item.effectValue, armorSlot: item.armorSlot, damage: item.damage, range: item.range, effectOn: item.effectOn ?? null, effectToPc: item.effectToPc ?? null, effectToPcValue: item.effectToPcValue ?? 0, tresherIdx: i });
+          if (item) flat.push({ id: item.id, name: item.name, description: item.description, type: item.type, effectValue: item.effectValue, armorSlot: item.armorSlot, damage: item.damage, range: item.range, effectOn: item.effectOn ?? null, effectToPc: item.effectToPc ?? null, effectToPcValue: item.effectToPcValue ?? 0, uses: item.uses ?? null, imageId: item.imageId ?? null, tresherIdx: i });
         }
       }
     }
@@ -1918,11 +1962,119 @@ export class Game implements OnInit {
   }
 
   openBackpackInventoryModal(): void {
+    const preview = this.gridPreviewContext();
+    if (preview) {
+      this.loadLootImages(preview.dungonId);
+    }
     this.showBackpackInventoryModal.set(true);
   }
 
   closeBackpackInventoryModal(): void {
     this.showBackpackInventoryModal.set(false);
+  }
+
+  closeInventoryDetailsModal(): void {
+    this.inventoryDetailsModal.set(null);
+  }
+
+  openBackpackItemDetails(item: BackpackItemEntry): void {
+    const lines: string[] = [];
+    lines.push(`Type: ${item.type || 'Unknown'}`);
+    if (item.damage > 0) {
+      lines.push(`Damage: 1-${item.damage}`);
+    }
+    if (item.range > 0) {
+      lines.push(`Range: ${item.range}`);
+    }
+    if (item.armorSlot) {
+      lines.push(`Armor Slot: ${item.armorSlot}`);
+    }
+    for (const effectLine of this.inventoryItemEffectsForView(item)) {
+      lines.push(effectLine);
+    }
+    if (typeof item.uses === 'number') {
+      lines.push(`Uses: ${item.uses}`);
+    }
+    if (item.description?.trim()) {
+      lines.push(`Description: ${item.description.trim()}`);
+    }
+
+    this.inventoryDetailsModal.set({
+      title: item.name || 'Item',
+      lines,
+    });
+  }
+
+  openBackpackPotionDetails(potion: { name: string; description?: string; effectTo: string; effectAmount: number; lastFor: number }): void {
+    const lines = [
+      `Effect: ${potion.effectTo} ${potion.effectAmount >= 0 ? '+' : ''}${potion.effectAmount}`,
+      `Duration: ${potion.lastFor} turns`,
+    ];
+    if (potion.description?.trim()) {
+      lines.push(`Description: ${potion.description.trim()}`);
+    }
+
+    this.inventoryDetailsModal.set({
+      title: potion.name || 'Potion',
+      lines,
+    });
+  }
+
+  openBackpackSpellDetails(spell: PcTresherSpellData): void {
+    const lines = [
+      `Range: ${spell.range}`,
+      `Effect: ${spell.effectOn} ${spell.effectAmount >= 0 ? '+' : ''}${spell.effectAmount}`,
+      `Magic Cost: ${spell.magicCost ?? 1}`,
+      `Min LTSP: ${spell.minLtsp ?? spell.sp}`,
+    ];
+    if (spell.numberOfTargets > 1) {
+      lines.push(`Targets: ${spell.numberOfTargets}`);
+    }
+    if (spell.description?.trim()) {
+      lines.push(`Description: ${spell.description.trim()}`);
+    }
+
+    this.inventoryDetailsModal.set({
+      title: spell.name || 'Spell',
+      lines,
+    });
+  }
+
+  backpackItemImageSrc(item: BackpackItemEntry): string | null {
+    this.lootImageCacheVersion();
+    const preview = this.gridPreviewContext();
+    const floorFallbackImageId = preview
+      ? (this.floorItemListByDungon()[preview.dungonId] ?? []).find((it) => it.id === item.id)?.imageId ?? null
+      : null;
+    const fallbackImageId = this.pcTresherItemsById().get(item.id)?.imageId ?? floorFallbackImageId ?? null;
+    const imageId = typeof item.imageId === 'number' && item.imageId > 0
+      ? item.imageId
+      : typeof fallbackImageId === 'number' && fallbackImageId > 0
+        ? fallbackImageId
+        : null;
+    if (imageId === null) {
+      return null;
+    }
+
+    return this.lootImageCache.get(imageId)?.src ?? null;
+  }
+
+  drinkBackpackPotion(potion: { id: number; source: 'tresher' | 'collected'; tresherIdx?: number }): void {
+    if (potion.source === 'tresher' && potion.tresherIdx !== undefined) {
+      this.drinkTresherInnerPotion(potion.tresherIdx, potion.id);
+      return;
+    }
+
+    this.drinkCollectedFloorPotion(potion.id);
+  }
+
+  useBackpackOtherItem(item: BackpackItemEntry): void {
+    if (item.source !== 'collected') {
+      this.previewActionMessage.set('This item can only be used after being collected from the floor.');
+      return;
+    }
+
+    this.useCollectedOtherItem(item.id);
   }
 
   openDrinkPotionModal(): void {
@@ -3280,6 +3432,14 @@ const targetKind = this.getSpellTargetKind(spell);
     this.saveGameState();
     if (this.playerAE() <= 0 && this.turnPhase() !== 'gameover') {
       this.startMonsterTurns();
+    }
+  }
+
+  dropBackpackItem(item: BackpackItemEntry): void {
+    if (item.source === 'tresher' && item.tresherIdx !== undefined) {
+      this.dropInventoryInnerItem(item.tresherIdx, item.id);
+    } else {
+      this.dropCollectedFloorItem(item.id);
     }
   }
 
@@ -5369,18 +5529,7 @@ const targetKind = this.getSpellTargetKind(spell);
 
   private preloadGameAssets(game: GameSessionPayload): Promise<void> {
     // Populate sound path map synchronously from bundled server data
-    if (Array.isArray(game.soundPaths) && game.soundPaths.length > 0) {
-      this.soundPathById.update((existingMap) => {
-        const merged = new Map(existingMap);
-        for (const asset of game.soundPaths!) {
-          if (typeof asset.id !== 'number' || typeof asset.path !== 'string') continue;
-          const trimmed = asset.path.trim();
-          if (!trimmed) continue;
-          merged.set(asset.id, trimmed);
-        }
-        return merged;
-      });
-    }
+    this.gameSoundService.seedBundledSoundPaths(game.soundPaths);
 
     const imageAssets: { cacheType: 'monster' | 'obstacle' | 'loot'; id: number; path: string }[] = [
       ...(game.monsterImages ?? []).map((a) => ({ cacheType: 'monster' as const, ...a })),
@@ -5471,53 +5620,7 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private loadSoundCatalog(userKey: string, forceRefresh = false): void {
-    if (this.soundPathById().size > 0 && !forceRefresh) {
-      console.log('[sound] loadSoundCatalog skipped — already have', this.soundPathById().size, 'entries');
-      return;
-    }
-
-    console.log('[sound] loadSoundCatalog fetching from API (forceRefresh=' + forceRefresh + ')');
-    this.http
-      .get<SoundRecordPayload[]>(`${API_BASE_URL}/sounds`, {
-        params: { userkey: userKey, scope: 'library' },
-      })
-      .subscribe({
-        next: (items) => {
-          console.log('[sound] loadSoundCatalog response:', items?.length ?? 0, 'items');
-          if (!Array.isArray(items) || items.length === 0) {
-            return;
-          }
-
-          const map = new Map<number, string>();
-          for (const item of items) {
-            if (typeof item?.id !== 'number' || typeof item?.path !== 'string') {
-              continue;
-            }
-
-            const trimmedPath = item.path.trim();
-            if (!trimmedPath) {
-              continue;
-            }
-
-            map.set(item.id, trimmedPath);
-          }
-
-          console.log('[sound] loadSoundCatalog built map with', map.size, 'entries');
-          if (map.size > 0) {
-            this.soundPathById.update((existingMap) => {
-              const merged = new Map(existingMap);
-              for (const [id, path] of map) {
-                merged.set(id, path);
-              }
-              return merged;
-            });
-            console.log('[sound] soundPathById now has', this.soundPathById().size, 'entries');
-          }
-        },
-        error: (err) => {
-          console.error('[sound] loadSoundCatalog ERROR:', err);
-        },
-      });
+    this.gameSoundService.loadSoundCatalog(userKey, forceRefresh);
   }
 
   private resolveSpellData(dungonId: number, spellId: number): PcTresherSpellData | null {
@@ -5539,22 +5642,6 @@ const targetKind = this.getSpellTargetKind(spell);
 
   private resolveImageUrl(imagePath: string): string {
     return this.drawingAssets.resolveImageUrl(imagePath);
-  }
-
-  private resolveSoundUrl(soundPath: string): string {
-    const trimmed = typeof soundPath === 'string' ? soundPath.trim() : '';
-    if (!trimmed) {
-      return '';
-    }
-
-    if (/^https?:\/\//i.test(trimmed)) {
-      return encodeURI(trimmed);
-    }
-
-    const baseUrl = trimmed.startsWith('/')
-      ? `${API_BASE_URL}${trimmed}`
-      : `${API_BASE_URL}/${trimmed}`;
-    return encodeURI(baseUrl);
   }
 
   private resolveClientAssetUrl(assetPath: string): string {
@@ -5599,116 +5686,15 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private playSoundPath(soundPath: string): void {
-    if (this.soundMuted()) {
-      return;
-    }
-
-    const soundUrls = this.buildSoundUrlCandidates(soundPath);
-    if (soundUrls.length === 0) {
-      return;
-    }
-
-    this.playSoundFromUrls(soundUrls, 0);
-  }
-
-  private buildSoundUrlCandidates(soundPath: string): string[] {
-    const trimmed = typeof soundPath === 'string' ? soundPath.trim() : '';
-    if (!trimmed) {
-      return [];
-    }
-
-    if (/^https?:\/\//i.test(trimmed)) {
-      return [encodeURI(trimmed)];
-    }
-
-    const apiUrl = this.resolveSoundUrl(trimmed);
-    const clientUrl = this.resolveClientAssetUrl(trimmed);
-    const looksLikeHostedSound = /^\/?sounds\//i.test(trimmed);
-    const preferClientFirst = this.isSampleMode() || !this.account.getKey();
-
-    if (!looksLikeHostedSound) {
-      return apiUrl ? [apiUrl] : [];
-    }
-
-    const ordered = preferClientFirst
-      ? [clientUrl, apiUrl]
-      : [apiUrl, clientUrl];
-
-    const unique: string[] = [];
-    for (const url of ordered) {
-      if (!url || unique.includes(url)) {
-        continue;
-      }
-      unique.push(url);
-    }
-    return unique;
-  }
-
-  private playSoundFromUrls(soundUrls: string[], index: number): void {
-    if (index >= soundUrls.length || this.soundMuted()) {
-      if (index >= soundUrls.length) {
-        console.warn('[sound] playSoundFromUrls exhausted all candidates:', soundUrls);
-      }
-      return;
-    }
-
-    const soundUrl = soundUrls[index];
-    console.log('[sound] playSoundFromUrls trying [' + index + '/' + soundUrls.length + ']:', soundUrl);
-
-    try {
-      const audio = new Audio(soundUrl);
-      audio.volume = 0.55;
-
-      let advanced = false;
-      const tryNext = () => {
-        if (advanced) {
-          return;
-        }
-        advanced = true;
-        console.warn('[sound] playSoundFromUrls FAILED:', soundUrl);
-        this.playSoundFromUrls(soundUrls, index + 1);
-      };
-
-      audio.addEventListener('error', tryNext, { once: true });
-      void audio.play().then(() => {
-        console.log('[sound] playSoundFromUrls OK:', soundUrl);
-      }).catch(tryNext);
-    } catch {
-      console.warn('[sound] playSoundFromUrls exception for:', soundUrl);
-      this.playSoundFromUrls(soundUrls, index + 1);
-    }
+    this.gameSoundService.playSoundPath(soundPath, {
+      muted: this.soundMuted(),
+      preferClientFirst: this.isSampleMode() || !this.account.getKey(),
+      resolveClientAssetUrl: (assetPath) => this.resolveClientAssetUrl(assetPath),
+    });
   }
 
   private playDoorOpenClickSound(): void {
-    if (this.soundMuted()) {
-      return;
-    }
-
-    try {
-      const ctx = new AudioContext();
-      const now = ctx.currentTime;
-
-      const osc = ctx.createOscillator();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(620, now);
-      osc.frequency.exponentialRampToValueAtTime(380, now + 0.05);
-
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.003);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.065);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.07);
-      osc.onended = () => {
-        void ctx.close();
-      };
-    } catch {
-      // Audio API unavailable.
-    }
+    this.gameSoundService.playDoorOpenClickSound(this.soundMuted());
   }
 
   private setInitialPreviewContext(dungonId: number): void {
@@ -10234,22 +10220,7 @@ const targetKind = this.getSpellTargetKind(spell);
     const preview = this.gridPreviewContext();
     if (!preview) return;
 
-    this.activeYeOldMagiceShopDungonId.set(preview.dungonId);
-    this.activeYeOldMagiceShopObstacleId.set(shop.id);
-    let keeperKnows = 'The keeper squints. "I have rumors, but ale loosens the tongue."';
-    try {
-      const cfg = JSON.parse(shop.note ?? '{}');
-      if (typeof cfg.keeperKnows === 'string' && cfg.keeperKnows.trim()) {
-        keeperKnows = cfg.keeperKnows.trim();
-      }
-    } catch { /* use default */ }
-    this.yeOldMagiceShopKeeperInfo.set(keeperKnows);
-    this.yeOldMagiceShopView.set('main');
-    this.yeOldMagiceShopMessage.set(null);
-    this.yeOldMagiceShopInfoUnlocked.set(false);
-    this.yeOldMagiceShopDrinkPurchased.set(false);
-    this.yeOldMagiceShopImage.set(Math.random() < 0.5 ? 'taren1' : 'taren2');
-    this.showYeOldMagiceShopModal.set(true);
+    this.gameShopService.openYeOldMagiceShop(preview.dungonId, shop.id, this.gameShopService.resolveKeeperInfo(shop.note));
     this.startTavernMusic();
   }
 
@@ -10258,24 +10229,11 @@ const targetKind = this.getSpellTargetKind(spell);
     const preview = this.gridPreviewContext();
     if (!shop || !preview) return;
 
-    const dismissKey = this.getYeOldMagiceShopPromptDismissKey(preview.dungonId, shop.id);
-    this.dismissedYeOldMagiceShopPrompts.update((all) => {
-      if (all[dismissKey]) {
-        return all;
-      }
-
-      const next: Record<string, true> = { ...all, [dismissKey]: true };
-      this.persistDismissedYeOldMagiceShopPrompts(next);
-      return next;
-    });
+    this.gameShopService.dismissYeOldMagiceShopPrompt(this.currentGameId() ?? 0, preview.dungonId, shop.id);
   }
 
   closeYeOldMagiceShop(): void {
-    this.showYeOldMagiceShopModal.set(false);
-    this.yeOldMagiceShopView.set('main');
-    this.yeOldMagiceShopMessage.set(null);
-    this.activeYeOldMagiceShopDungonId.set(null);
-    this.activeYeOldMagiceShopObstacleId.set(null);
+    this.gameShopService.closeYeOldMagiceShop();
     if (!this.npcDialog() && !this.showTavernModal()) {
       this.stopTavernMusic();
     }
@@ -10284,8 +10242,7 @@ const targetKind = this.getSpellTargetKind(spell);
   setYeOldMagiceShopView(
     view: 'main' | 'buyItems' | 'sellItems' | 'buySpells' | 'sellSpells' | 'buyPotions' | 'sellPotions' | 'info' | 'upgrades'
   ): void {
-    this.yeOldMagiceShopView.set(view);
-    this.yeOldMagiceShopMessage.set(null);
+    this.gameShopService.setYeOldMagiceShopView(view);
   }
 
   buyDrinkForKeeperInfo(): void {
@@ -10474,35 +10431,7 @@ const targetKind = this.getSpellTargetKind(spell);
   ): Tresher {
     const dungonId = this.activeYeOldMagiceShopDungonId() ?? this.gridPreviewContext()?.dungonId ?? 0;
     const existing = this.cheaterByDungon()[dungonId]?.inventory.treshers ?? [];
-    const nextId = existing.reduce((max, t) => Math.max(max, t.id), 0) + 1;
-    return {
-      id: nextId,
-      name,
-      description,
-      type: 'Shop',
-      gold: 0,
-      silver: 0,
-      copper: 0,
-      zinc: 0,
-      item1Id: payload.itemId ?? null,
-      item2Id: null,
-      item3Id: null,
-      item4Id: null,
-      spell1Id: payload.spellId ?? null,
-      spell2Id: null,
-      spell3Id: null,
-      spell4Id: null,
-      curse1Id: null,
-      curse2Id: null,
-      potion1Id: payload.potionId ?? null,
-      potion2Id: null,
-      potion3Id: null,
-      imageId: null,
-      soundId: null,
-      spReward: 0,
-      trap: null,
-      isquest: false,
-    };
+    return this.gameShopService.buildShopPurchaseTresher(name, description, payload, existing);
   }
 
   private getYeOldMagiceShopSellEntries(kind: 'item' | 'spell' | 'potion'): ShopSellEntry[] {
@@ -10513,33 +10442,7 @@ const targetKind = this.getSpellTargetKind(spell);
     const spellMap = this.pcTresherSpellsById();
     const potionMap = this.pcTresherPotionsById();
 
-    const slotsByKind: Record<'item' | 'spell' | 'potion', ShopSlotKey[]> = {
-      item: ['item1Id', 'item2Id', 'item3Id', 'item4Id'],
-      spell: ['spell1Id', 'spell2Id', 'spell3Id', 'spell4Id'],
-      potion: ['potion1Id', 'potion2Id', 'potion3Id'],
-    };
-
-    const entries: ShopSellEntry[] = [];
-    for (let tresherIndex = 0; tresherIndex < inventory.length; tresherIndex += 1) {
-      const tresher = inventory[tresherIndex];
-      for (const slotKey of slotsByKind[kind]) {
-        const value = tresher[slotKey];
-        if (typeof value !== 'number') continue;
-        let name = 'Unknown';
-        if (kind === 'item') name = itemMap.get(value)?.name ?? `Item ${value}`;
-        if (kind === 'spell') name = spellMap.get(value)?.name ?? `Spell ${value}`;
-        if (kind === 'potion') name = potionMap.get(value)?.name ?? `Potion ${value}`;
-        entries.push({
-          tresherIndex,
-          slotKey,
-          sourceId: value,
-          name,
-          sellPrice: Math.max(2, Math.floor(kind === 'spell' ? this.shopBuySpellCost : kind === 'potion' ? this.shopBuyPotionCost : this.shopBuyItemCost) / 2),
-        });
-      }
-    }
-
-    return entries;
+    return this.gameShopService.getSellEntries(kind, inventory, itemMap, spellMap, potionMap);
   }
 
   private getFrontFacingYeOldMagiceShop(): ObstaclePlacement | null {
@@ -10568,39 +10471,7 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private isYeOldMagiceShopObstacle(obs: ObstaclePlacement): boolean {
-    return (obs.name ?? '').trim().toLowerCase() === 'ye old magice shop';
-  }
-
-  private getYeOldMagiceShopPromptDismissKey(dungonId: number, obstacleId: number): string {
-    const gameId = this.currentGameId() ?? 0;
-    return `${gameId}:${dungonId}:${obstacleId}`;
-  }
-
-  private loadDismissedYeOldMagiceShopPrompts(): Record<string, true> {
-    try {
-      const raw = sessionStorage.getItem(this.yeOldMagiceShopPromptDismissStorageKey);
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return {};
-
-      const normalized: Record<string, true> = {};
-      for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-        if (value === true) {
-          normalized[key] = true;
-        }
-      }
-      return normalized;
-    } catch {
-      return {};
-    }
-  }
-
-  private persistDismissedYeOldMagiceShopPrompts(value: Record<string, true>): void {
-    try {
-      sessionStorage.setItem(this.yeOldMagiceShopPromptDismissStorageKey, JSON.stringify(value));
-    } catch {
-      // Ignore storage failures; prompt dismissal will still work for this runtime instance.
-    }
+    return this.gameShopService.isYeOldMagiceShopObstacle(obs);
   }
 
   private getObstaclePrimaryWallSide(dungonId: number, row: number, column: number): SquareSide | null {
@@ -10665,38 +10536,14 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private startTavernMusic(): void {
-    if (this.soundMuted() || this.tavernMusicAudio) return;
-    const candidates = this.tavernWindowSoundPaths.filter((path) => typeof path === 'string' && path.trim().length > 0);
-    if (candidates.length === 0) return;
-
-    const randomIndex = Math.floor(Math.random() * candidates.length);
-    const selectedPath = candidates[randomIndex] ?? candidates[0];
-    const soundUrl = this.resolveClientAssetUrl(selectedPath);
-    if (!soundUrl) return;
-
-    try {
-      const audio = new Audio(soundUrl);
-      audio.loop = true;
-      audio.volume = 0.38;
-      this.tavernMusicAudio = audio;
-      void audio.play().catch(() => {
-        if (this.tavernMusicAudio === audio) {
-          this.tavernMusicAudio = null;
-        }
-      });
-    } catch { /* audio not supported */ }
+    this.gameSoundService.startTavernMusic({
+      muted: this.soundMuted(),
+      resolveClientAssetUrl: (assetPath) => this.resolveClientAssetUrl(assetPath),
+    });
   }
 
   private stopTavernMusic(): void {
-    if (this.tavernMusicAudio) {
-      try {
-        this.tavernMusicAudio.pause();
-        this.tavernMusicAudio.currentTime = 0;
-      } catch {
-        // Ignore media cleanup issues.
-      }
-      this.tavernMusicAudio = null;
-    }
+    this.gameSoundService.stopTavernMusic();
   }
 
   get currentUserKey(): string {
@@ -12947,45 +12794,7 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private playStepSound(volume = 0.2): void {
-    if (this.soundMuted()) return;
-    try {
-      const ctx = new AudioContext();
-      const now = ctx.currentTime;
-
-      // Short noise burst — stone scuff texture
-      const bufSize = Math.ceil(ctx.sampleRate * 0.04);
-      const noiseBuffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-      const noiseData = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < bufSize; i++) noiseData[i] = Math.random() * 2 - 1;
-      const noiseSource = ctx.createBufferSource();
-      noiseSource.buffer = noiseBuffer;
-      const noiseFilter = ctx.createBiquadFilter();
-      noiseFilter.type = 'bandpass';
-      noiseFilter.frequency.value = 800;
-      noiseFilter.Q.value = 0.8;
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(volume * 0.9, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-      noiseSource.connect(noiseFilter);
-      noiseFilter.connect(noiseGain);
-      noiseGain.connect(ctx.destination);
-      noiseSource.start(now);
-      noiseSource.stop(now + 0.04);
-
-      // Low thud — heel impact body
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(180, now);
-      osc.frequency.exponentialRampToValueAtTime(55, now + 0.07);
-      gain.gain.setValueAtTime(volume * 2.0, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.1);
-      osc.onended = () => ctx.close();
-    } catch { /* audio not supported */ }
+    this.gameSoundService.playStepSound(this.soundMuted(), volume);
   }
 
   private playWeaponHitSound(soundId: number | null): void {
@@ -13005,65 +12814,7 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private playClangSound(): void {
-    if (this.soundMuted()) return;
-    try {
-      const ctx = new AudioContext();
-      const now = ctx.currentTime;
-
-      // Very short high-freq noise burst for the sharp metallic transient
-      const bufSize = Math.ceil(ctx.sampleRate * 0.016);
-      const noiseBuffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-      const noiseData = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < bufSize; i++) noiseData[i] = Math.random() * 2 - 1;
-      const noiseSource = ctx.createBufferSource();
-      noiseSource.buffer = noiseBuffer;
-      const noiseFilter = ctx.createBiquadFilter();
-      noiseFilter.type = 'bandpass';
-      noiseFilter.frequency.value = 9000;
-      noiseFilter.Q.value = 1.8;
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(0.85, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.016);
-      noiseSource.connect(noiseFilter);
-      noiseFilter.connect(noiseGain);
-      noiseGain.connect(ctx.destination);
-      noiseSource.start(now);
-      noiseSource.stop(now + 0.016);
-
-      // Inharmonic square-wave partials — very short decay for sharpness
-      for (const [freq, vol, decay] of [
-        [2400, 0.22, 0.07],
-        [3700, 0.16, 0.05],
-        [5500, 0.09, 0.04],
-        [1200, 0.14, 0.09],
-      ] as [number, number, number][]) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(freq, now);
-        gain.gain.setValueAtTime(vol, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + decay);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + decay);
-      }
-
-      // Hard snap thump — fast frequency drop, very short
-      const thump = ctx.createOscillator();
-      const thumpGain = ctx.createGain();
-      thump.type = 'sine';
-      thump.frequency.setValueAtTime(300, now);
-      thump.frequency.exponentialRampToValueAtTime(90, now + 0.022);
-      thumpGain.gain.setValueAtTime(0.72, now);
-      thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
-      thump.connect(thumpGain);
-      thumpGain.connect(ctx.destination);
-      thump.start(now);
-      thump.stop(now + 0.035);
-
-      setTimeout(() => ctx.close(), 300);
-    } catch { /* audio not supported */ }
+    this.gameSoundService.playClangSound(this.soundMuted());
   }
 
   private playBiteSound(): void {
