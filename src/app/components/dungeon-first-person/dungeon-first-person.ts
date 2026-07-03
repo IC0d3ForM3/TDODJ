@@ -672,6 +672,9 @@ export class DungeonFirstPersonComponent implements OnDestroy {
       if (typeMatches('spiked pit')) {
         this.drawFirstPersonSpikedPitTrap(context, nearFrame, farFrame);
       }
+      if (typeMatches('ceiling spikes')) {
+        this.drawFirstPersonCeilingSpikesTrap(context, nearFrame, farFrame);
+      }
       if (typeMatches('floor glue')) {
         this.drawFirstPersonFloorGlueTrap(context, nearFrame, farFrame);
       }
@@ -1481,31 +1484,7 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     nearFrame: { left: number; right: number; top: number; bottom: number },
     farFrame: { left: number; right: number; top: number; bottom: number }
   ): void {
-    // Draw a dark ellipse on the floor to look like a pit / black hole
-    const midLeft = (nearFrame.left + farFrame.left) / 2;
-    const midRight = (nearFrame.right + farFrame.right) / 2;
-    const midFloor = (nearFrame.bottom + farFrame.bottom) / 2;
-    const cellW = midRight - midLeft;
-    const rx = Math.max(4, cellW * 0.38);
-    const ry = Math.max(2, rx * 0.32);
-    const cx = (midLeft + midRight) / 2;
-    const cy = midFloor - ry * 0.5;
-
-    // dark pit fill
-    const pitGrad = context.createRadialGradient(cx, cy, 0, cx, cy, rx);
-    pitGrad.addColorStop(0, 'rgba(0,0,0,0.95)');
-    pitGrad.addColorStop(0.7, 'rgba(10,10,10,0.85)');
-    pitGrad.addColorStop(1, 'rgba(30,20,10,0.3)');
-    context.save();
-    context.beginPath();
-    context.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-    context.fillStyle = pitGrad;
-    context.fill();
-    // faint dark‐brown rim
-    context.strokeStyle = 'rgba(80,50,20,0.7)';
-    context.lineWidth = 1.5;
-    context.stroke();
-    context.restore();
+    this.drawFirstPersonTrapFloorBlock(context, nearFrame, farFrame, '#111111', '#6a6a6a');
   }
 
   private drawFirstPersonSpikedPitTrap(
@@ -1518,17 +1497,67 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     const midRight = (nearFrame.right + farFrame.right) / 2;
     const midFloor = (nearFrame.bottom + farFrame.bottom) / 2;
     const cx = (midLeft + midRight) / 2;
-    const cy = midFloor - 1;
+    const cy = midFloor - 3;
+    const trapWidth = midRight - midLeft;
+    const spikeSpan = Math.max(12, trapWidth * 0.84 * 0.8);
+    const leftEdge = cx - spikeSpan / 2;
+    const spikeStep = spikeSpan / 4;
+    const backSectionHeight = Math.max(4, (farFrame.bottom - farFrame.top) * 0.2);
+    const backWallTop = farFrame.bottom;
+    const backWallBottom = Math.min(midFloor, backWallTop + backSectionHeight);
+    const spikePeakY = backWallTop;
+    const spikeBaseY = backWallBottom + 1;
     context.save();
-    context.strokeStyle = '#c0392b';
-    context.lineWidth = 1.2;
-    context.beginPath();
-    context.moveTo(cx - 6, cy + 1);
-    context.lineTo(cx - 3, cy - 3);
-    context.lineTo(cx, cy + 1);
-    context.lineTo(cx + 3, cy - 3);
-    context.lineTo(cx + 6, cy + 1);
-    context.stroke();
+    context.fillStyle = '#ff5c5c';
+    context.strokeStyle = '#ff4d4d';
+    context.lineWidth = 1.35;
+    for (let i = 0; i < 5; i += 1) {
+      const spikeCenterX = leftEdge + spikeStep * i;
+      const halfBase = Math.max(1.5, spikeStep * 0.18);
+      context.beginPath();
+      context.moveTo(spikeCenterX - halfBase, spikeBaseY);
+      context.lineTo(spikeCenterX, spikePeakY);
+      context.lineTo(spikeCenterX + halfBase, spikeBaseY);
+      context.closePath();
+      context.fill();
+      context.stroke();
+    }
+    context.restore();
+  }
+
+  private drawFirstPersonCeilingSpikesTrap(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number }
+  ): void {
+    this.drawFirstPersonTrapCeilingBlock(context, nearFrame, farFrame, '#111111', '#6a6a6a');
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const trapWidth = midRight - midLeft;
+    const cx = (midLeft + midRight) / 2;
+    const spikeSpan = Math.max(12, trapWidth * 0.84 * 0.8);
+    const leftEdge = cx - spikeSpan / 2;
+    const spikeStep = spikeSpan / 4;
+    const backSectionHeight = Math.max(4, (farFrame.bottom - farFrame.top) * 0.2);
+    const backCeilingBottom = farFrame.top;
+    const backCeilingTop = Math.max(nearFrame.top, backCeilingBottom - backSectionHeight);
+    const spikePeakY = backCeilingBottom;
+    const spikeBaseY = backCeilingTop - 1;
+    context.save();
+    context.fillStyle = '#ff5c5c';
+    context.strokeStyle = '#ff4d4d';
+    context.lineWidth = 1.35;
+    for (let i = 0; i < 5; i += 1) {
+      const spikeCenterX = leftEdge + spikeStep * i;
+      const halfBase = Math.max(1.5, spikeStep * 0.18);
+      context.beginPath();
+      context.moveTo(spikeCenterX - halfBase, spikeBaseY);
+      context.lineTo(spikeCenterX, spikePeakY);
+      context.lineTo(spikeCenterX + halfBase, spikeBaseY);
+      context.closePath();
+      context.fill();
+      context.stroke();
+    }
     context.restore();
   }
 
@@ -1540,11 +1569,69 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     const midLeft = (nearFrame.left + farFrame.left) / 2;
     const midRight = (nearFrame.right + farFrame.right) / 2;
     const midFloor = (nearFrame.bottom + farFrame.bottom) / 2;
+    const cx = (midLeft + midRight) / 2;
+    const cy = midFloor - 1;
+    const trapWidth = midRight - midLeft;
+    const rx = Math.max(8, trapWidth * 0.34);
+    const ry = Math.max(3.5, rx * 0.42);
+    const points = 22;
+
     context.save();
-    context.fillStyle = 'rgba(70, 180, 70, 0.75)';
+
+    // Irregular floor-glue pool silhouette (bulges in and out).
     context.beginPath();
-    context.ellipse((midLeft + midRight) / 2, midFloor - 1, (midRight - midLeft) * 0.24, 4, 0, 0, Math.PI * 2);
+    for (let i = 0; i <= points; i += 1) {
+      const t = (i / points) * Math.PI * 2;
+      const bulge = 1
+        + Math.sin(t * 3.1 + 0.55) * 0.15
+        + Math.cos(t * 5.0 - 0.4) * 0.09;
+      const px = cx + Math.cos(t) * rx * bulge;
+      const py = cy + Math.sin(t) * ry * (0.88 + Math.cos(t * 2.0) * 0.08);
+      if (i === 0) {
+        context.moveTo(px, py);
+      } else {
+        context.lineTo(px, py);
+      }
+    }
+    context.closePath();
+
+    const glueGrad = context.createRadialGradient(cx - rx * 0.2, cy - ry * 0.22, 1, cx, cy, rx * 1.12);
+    glueGrad.addColorStop(0, 'rgba(188, 178, 52, 0.88)');
+    glueGrad.addColorStop(0.38, 'rgba(120, 158, 42, 0.9)');
+    glueGrad.addColorStop(0.72, 'rgba(72, 114, 34, 0.92)');
+    glueGrad.addColorStop(1, 'rgba(66, 48, 22, 0.95)');
+    context.fillStyle = glueGrad;
     context.fill();
+
+    context.strokeStyle = 'rgba(92, 66, 26, 0.95)';
+    context.lineWidth = 1.35;
+    context.stroke();
+
+    // Color pockets to sell muddy glue depth.
+    const blobs = [
+      { ox: -0.34, oy: -0.16, sx: 0.27, sy: 0.22, color: 'rgba(88, 132, 35, 0.68)' },
+      { ox: 0.25, oy: -0.04, sx: 0.23, sy: 0.2, color: 'rgba(154, 146, 52, 0.56)' },
+      { ox: -0.02, oy: 0.14, sx: 0.3, sy: 0.25, color: 'rgba(95, 68, 30, 0.52)' },
+    ] as const;
+    for (const blob of blobs) {
+      context.beginPath();
+      context.ellipse(cx + rx * blob.ox, cy + ry * blob.oy, rx * blob.sx, ry * blob.sy, 0, 0, Math.PI * 2);
+      context.fillStyle = blob.color;
+      context.fill();
+    }
+
+    // Thin shiny streaks for sticky surface.
+    context.strokeStyle = 'rgba(214, 218, 126, 0.42)';
+    context.lineWidth = 0.9;
+    context.beginPath();
+    context.moveTo(cx - rx * 0.52, cy - ry * 0.22);
+    context.quadraticCurveTo(cx - rx * 0.1, cy - ry * 0.4, cx + rx * 0.34, cy - ry * 0.16);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(cx - rx * 0.28, cy + ry * 0.16);
+    context.quadraticCurveTo(cx + rx * 0.06, cy + ry * 0.3, cx + rx * 0.42, cy + ry * 0.1);
+    context.stroke();
+
     context.restore();
   }
 
@@ -1590,19 +1677,117 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     nearFrame: { left: number; right: number; top: number; bottom: number },
     farFrame: { left: number; right: number; top: number; bottom: number }
   ): void {
-    const midLeft = (nearFrame.left + farFrame.left) / 2;
-    const midRight = (nearFrame.right + farFrame.right) / 2;
-    const midTop = (nearFrame.top + farFrame.top) / 2;
-    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
-    const cx = (midLeft + midRight) / 2;
-    const cy = (midTop + midBottom) / 2 - 1;
+    this.drawFirstPersonTrapFloorBlock(context, nearFrame, farFrame, 'rgba(50, 35, 92, 0.9)', 'rgba(126, 101, 199, 0.95)');
+  }
+
+  private drawFirstPersonTrapFloorBlock(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    floorColor: string,
+    backWallColor: string
+  ): void {
+    const insetNearX = Math.max(3, (nearFrame.right - nearFrame.left) * 0.08);
+    const insetFarX = Math.max(2, (farFrame.right - farFrame.left) * 0.08);
+    const nearLeft = nearFrame.left + insetNearX;
+    const nearRight = nearFrame.right - insetNearX;
+    const farLeft = farFrame.left + insetFarX;
+    const farRight = farFrame.right - insetFarX;
+    const nearBottom = nearFrame.bottom;
+    const farBottom = farFrame.bottom;
+    // Start gray panel at the black trap's back edge and drop it forward.
+    const backSectionHeight = Math.max(4, (farFrame.bottom - farFrame.top) * 0.2);
+    const backWallTop = farBottom;
+    const backWallBottom = Math.min(nearBottom, backWallTop + backSectionHeight);
+    const backWallHeight = Math.max(1, backWallBottom - backWallTop);
+
     context.save();
-    context.fillStyle = 'rgba(108, 75, 217, 0.35)';
     context.beginPath();
-    context.arc(cx - 3, cy, 4, 0, Math.PI * 2);
-    context.arc(cx + 3, cy - 1, 5, 0, Math.PI * 2);
-    context.arc(cx + 1, cy + 2, 4, 0, Math.PI * 2);
+    context.moveTo(nearLeft, nearBottom);
+    context.lineTo(nearRight, nearBottom);
+    context.lineTo(farRight, farBottom);
+    context.lineTo(farLeft, farBottom);
+    context.closePath();
+    context.fillStyle = floorColor;
     context.fill();
+
+    context.beginPath();
+    context.moveTo(farLeft, backWallTop);
+    context.lineTo(farRight, backWallTop);
+    context.lineTo(farRight, backWallBottom);
+    context.lineTo(farLeft, backWallBottom);
+    context.closePath();
+    context.fillStyle = backWallColor;
+    context.fill();
+
+    context.strokeStyle = 'rgba(220, 220, 220, 0.55)';
+    context.lineWidth = 1;
+    context.strokeRect(farLeft + 0.5, backWallTop + 0.5, Math.max(1, farRight - farLeft - 1), Math.max(1, backWallHeight - 1));
+
+    context.beginPath();
+    context.moveTo(nearLeft, nearBottom);
+    context.lineTo(nearRight, nearBottom);
+    context.lineTo(farRight, farBottom);
+    context.lineTo(farLeft, farBottom);
+    context.closePath();
+    context.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+    context.lineWidth = 1.2;
+    context.stroke();
+    context.restore();
+  }
+
+  private drawFirstPersonTrapCeilingBlock(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    ceilingColor: string,
+    backWallColor: string
+  ): void {
+    const insetNearX = Math.max(3, (nearFrame.right - nearFrame.left) * 0.08);
+    const insetFarX = Math.max(2, (farFrame.right - farFrame.left) * 0.08);
+    const nearLeft = nearFrame.left + insetNearX;
+    const nearRight = nearFrame.right - insetNearX;
+    const farLeft = farFrame.left + insetFarX;
+    const farRight = farFrame.right - insetFarX;
+    const nearTop = nearFrame.top;
+    const farTop = farFrame.top;
+    const backSectionHeight = Math.max(4, (farFrame.bottom - farFrame.top) * 0.2);
+    const backWallBottom = farTop;
+    const backWallTop = Math.max(nearTop, backWallBottom - backSectionHeight);
+    const backWallHeight = Math.max(1, backWallBottom - backWallTop);
+
+    context.save();
+    context.beginPath();
+    context.moveTo(nearLeft, nearTop);
+    context.lineTo(nearRight, nearTop);
+    context.lineTo(farRight, farTop);
+    context.lineTo(farLeft, farTop);
+    context.closePath();
+    context.fillStyle = ceilingColor;
+    context.fill();
+
+    context.beginPath();
+    context.moveTo(farLeft, backWallTop);
+    context.lineTo(farRight, backWallTop);
+    context.lineTo(farRight, backWallBottom);
+    context.lineTo(farLeft, backWallBottom);
+    context.closePath();
+    context.fillStyle = backWallColor;
+    context.fill();
+
+    context.strokeStyle = 'rgba(220, 220, 220, 0.55)';
+    context.lineWidth = 1;
+    context.strokeRect(farLeft + 0.5, backWallTop + 0.5, Math.max(1, farRight - farLeft - 1), Math.max(1, backWallHeight - 1));
+
+    context.beginPath();
+    context.moveTo(nearLeft, nearTop);
+    context.lineTo(nearRight, nearTop);
+    context.lineTo(farRight, farTop);
+    context.lineTo(farLeft, farTop);
+    context.closePath();
+    context.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+    context.lineWidth = 1.2;
+    context.stroke();
     context.restore();
   }
 

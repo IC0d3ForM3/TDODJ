@@ -82,13 +82,20 @@ export class DungeonJsonService {
           .filter((entry) => !!entry && typeof entry === 'object')
           .map((entry) => {
             const req = entry as Partial<Record<string, unknown>>;
-            const id = typeof req['itemId'] === 'number' ? Math.floor(req['itemId']) : NaN;
+            const idRaw = req['itemId'] ?? req['itemid'] ?? req['itemID'];
+            const id =
+              typeof idRaw === 'number'
+                ? Math.floor(idRaw)
+                : typeof idRaw === 'string' && idRaw.trim()
+                  ? Number.parseInt(idRaw, 10)
+                  : NaN;
             if (!Number.isFinite(id) || id < 0) {
               return null;
             }
+            const itemNameRaw = req['itemName'] ?? req['itemname'] ?? req['name'];
             return {
               itemId: id,
-              itemName: typeof req['itemName'] === 'string' ? req['itemName'] : `Item ${id}`,
+              itemName: typeof itemNameRaw === 'string' ? itemNameRaw : `Item ${id}`,
             };
           })
           .filter((entry): entry is { itemId: number; itemName: string } => entry !== null)

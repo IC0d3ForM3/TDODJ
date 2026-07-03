@@ -150,6 +150,21 @@ interface InventoryDetailsModalData {
   lines: string[];
 }
 
+interface PendingTrapCrossingPrompt {
+  dungonId: number;
+  fromRow: number;
+  fromColumn: number;
+  rowOffset: number;
+  columnOffset: number;
+  trapId: number;
+  trapName: string;
+  requiredItems: Array<{
+    itemId: number;
+    itemName: string;
+    owned: boolean;
+  }>;
+}
+
 type RangerFavoredTypeBonuses = Record<string, number>;
 
 @Component({
@@ -432,6 +447,7 @@ export class Game implements OnInit {
   readonly npcResponseDraft = signal<string>('');
   readonly itemNoteModal = signal<{ itemName: string; note: string; canRead: boolean; minMindToRead: number } | null>(null);
   readonly inventoryDetailsModal = signal<InventoryDetailsModalData | null>(null);
+  readonly pendingTrapCrossingPrompt = signal<PendingTrapCrossingPrompt | null>(null);
   readonly showBackpackInventoryModal = signal(false);
   readonly showDrinkPotionModal = signal(false);
   readonly showControlsHelpModal = signal(false);
@@ -924,6 +940,20 @@ export class Game implements OnInit {
       .filter(p => (p.isDetected || p.isTriggered) && !p.isDisarmed);
   }
 
+  previewCrossableTrapIdsForView(): Set<number> {
+    const preview = this.gridPreviewContext();
+    if (!preview) return new Set();
+    const traps = (this.floorTrapPlacementsByDungon()[preview.dungonId] ?? [])
+      .filter(p => (p.isDetected || p.isTriggered) && !p.isDisarmed);
+    const ids = new Set<number>();
+    for (const fp of traps) {
+      if (this.canBypassTrapWithCrossingItem(fp.trap)) {
+        ids.add(fp.id);
+      }
+    }
+    return ids;
+  }
+
   previewObstaclePlacementsForView(): ObstaclePlacement[] {
     const preview = this.gridPreviewContext();
     if (!preview) return [];
@@ -1332,6 +1362,9 @@ export class Game implements OnInit {
     }
 
     if (this.foundTrap()) {
+      if (this.tryPromptForFoundTrapCrossing()) {
+        return;
+      }
       this.tryDisarmTrap();
       return;
     }
@@ -1346,6 +1379,74 @@ export class Game implements OnInit {
     if (doorInfo) {
       this.pickLockDoor(doorInfo);
     }
+  }
+
+  foundTrapPrimaryActionLabel(): string {
+    return this.shouldPromptForFoundTrapCrossing() ? 'Use Crossing Item' : 'Disarm Trap';
+  }
+
+  private shouldPromptForFoundTrapCrossing(): boolean {
+    const crossing = this.getFoundTrapCrossingContext();
+    if (!crossing) {
+      return false;
+    }
+
+    return (
+      this.getTrapCrossingItems(crossing.trapPlacement.trap).length > 0 &&
+      this.isMoveTowardFacingDirection(crossing.preview.dungonId, crossing.rowOffset, crossing.columnOffset)
+    );
+  }
+
+  private tryPromptForFoundTrapCrossing(): boolean {
+    const crossing = this.getFoundTrapCrossingContext();
+    if (!crossing) {
+      return false;
+    }
+
+    if (!this.shouldPromptForFoundTrapCrossing()) {
+      return false;
+    }
+
+    this.openTrapCrossingPrompt(
+      crossing.preview,
+      crossing.rowOffset,
+      crossing.columnOffset,
+      crossing.trapPlacement
+    );
+    return true;
+  }
+
+  private getFoundTrapCrossingContext(): {
+    preview: GridPreviewContext;
+    trapPlacement: FloorTrapPlacement;
+    rowOffset: number;
+    columnOffset: number;
+  } | null {
+    const found = this.foundTrap();
+    const preview = this.gridPreviewContext();
+    if (
+      !found ||
+      !preview ||
+      found.source !== 'floor' ||
+      found.floorTrapId == null ||
+      found.adjacentRow == null ||
+      found.adjacentColumn == null
+    ) {
+      return null;
+    }
+
+    const trapPlacement = (this.floorTrapPlacementsByDungon()[preview.dungonId] ?? [])
+      .find((p) => p.id === found.floorTrapId) ?? null;
+    if (!trapPlacement) {
+      return null;
+    }
+
+    return {
+      preview,
+      trapPlacement,
+      rowOffset: found.adjacentRow - preview.centerRow,
+      columnOffset: found.adjacentColumn - preview.centerColumn,
+    };
   }
 
   handleUnlockActionIcon(): void {
@@ -3945,11 +4046,26 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private playerHasItem(itemId: number): boolean {
-    const inv = this.getInventoryContextForPreview()?.inventory;
-    if (!inv) return false;
-    return inv.treshers.some(
+    const preview = this.gridPreviewContext();
+    if (!preview) {
+      return false;
+    }
+
+    return this.playerHasItemInDungon(preview.dungonId, itemId);
+  }
+
+  private playerHasItemInDungon(dungonId: number, itemId: number): boolean {
+    const cheater = this.cheaterByDungon()[dungonId];
+    const inv = this.normalizeCheaterInventory(cheater?.inventory);
+    const hasInTreshers = inv.treshers.some(
       (t) => t.item1Id === itemId || t.item2Id === itemId || t.item3Id === itemId || t.item4Id === itemId
     );
+    if (hasInTreshers) {
+      return true;
+    }
+
+    const collectedItems = this.collectedFloorItemsByDungon()[dungonId] ?? [];
+    return collectedItems.some((item) => item.id === itemId);
   }
 
   private removeItemFromInventory(dungonId: number, itemId: number): void {
@@ -3972,6 +4088,25 @@ const targetKind = this.getSpellTargetKind(spell);
       ...all,
       [dungonId]: { ...existingCheater, inventory: { keys: inv.keys, treshers: updatedTreshers } },
     }));
+
+    if (!removed) {
+      const collected = this.collectedFloorItemsByDungon()[dungonId] ?? [];
+      const collectedIndex = collected.findIndex((item) => item.id === itemId);
+      if (collectedIndex >= 0) {
+        this.collectedFloorItemsByDungon.update((all) => ({
+          ...all,
+          [dungonId]: (all[dungonId] ?? []).filter((_, index) => index !== collectedIndex),
+        }));
+        removed = true;
+      }
+    }
+
+    if (removed && !this.playerHasItemInDungon(dungonId, itemId)) {
+      this.equippedItemIdsByDungon.update((all) => ({
+        ...all,
+        [dungonId]: (all[dungonId] ?? []).filter((id) => id !== itemId),
+      }));
+    }
   }
 
   unlockAdjacentDoor(doorInfo: NearbyDoorInfo): void {
@@ -4149,7 +4284,7 @@ const targetKind = this.getSpellTargetKind(spell);
     for (const fp of floorTraps) {
       if (mindRoll >= fp.trap.toDetect) {
         this.foundTrap.set({ trap: fp.trap, source: 'floor', floorTrapId: fp.id });
-        this.previewActionMessage.set(`You find a floor trap: ${fp.trap.name || 'Unknown Trap'} (rolled ${mindRoll} vs DC ${fp.trap.toDetect}).`);
+        this.previewActionMessage.set(`You find a floor trap: ${fp.trap.name || 'Unknown Trap'} (rolled ${mindRoll} vs DC ${fp.trap.toDetect}).${this.getTrapCrossingHintText(fp.trap)}`);
         // Mark the trap as detected so it shows on the map
         this.floorTrapPlacementsByDungon.update(all => ({
           ...all,
@@ -4186,7 +4321,7 @@ const targetKind = this.getSpellTargetKind(spell);
       for (const fp of adjFloorTraps) {
         if (mindRoll >= fp.trap.toDetect) {
           this.foundTrap.set({ trap: fp.trap, source: 'floor', floorTrapId: fp.id, adjacentRow: adjRow, adjacentColumn: adjCol });
-          this.previewActionMessage.set(`You find a floor trap to the ${adj.label}: ${fp.trap.name || 'Unknown Trap'} (rolled ${mindRoll} vs DC ${fp.trap.toDetect}).`);
+          this.previewActionMessage.set(`You find a floor trap to the ${adj.label}: ${fp.trap.name || 'Unknown Trap'} (rolled ${mindRoll} vs DC ${fp.trap.toDetect}).${this.getTrapCrossingHintText(fp.trap)}`);
           // Mark the trap as detected so it shows on the map
           this.floorTrapPlacementsByDungon.update(all => ({
             ...all,
@@ -9242,7 +9377,8 @@ const targetKind = this.getSpellTargetKind(spell);
   private tryMoveCheaterByDelta(
     preview: GridPreviewContext,
     rowOffset: number,
-    columnOffset: number
+    columnOffset: number,
+    forcedBypassTriggerDecision: boolean | null = null
   ): void {
     if (rowOffset === 0 && columnOffset === 0) {
       return;
@@ -9303,27 +9439,30 @@ const targetKind = this.getSpellTargetKind(spell);
       return;
     }
 
-    const activeFloorTrap = this.getActiveFloorTrapAtSquare(preview.dungonId, nextRow, nextColumn);
-    if (activeFloorTrap) {
-      const trapType = this.getTrapType(activeFloorTrap.trap);
-      const isFloorTrap = trapType === 'Pit' || trapType === 'Spiked Pit' || trapType === 'Floor Glue' || trapType === 'Drop Net';
-      if (isFloorTrap) {
-        if (trapType === 'Floor Glue' || trapType === 'Drop Net') {
-          this.previewActionMessage.set(`${activeFloorTrap.trap.name || 'Trap'} blocks the way.`);
-          return;
-        }
+    const currentTriggeredFloorTrap = this.getTriggeredFloorTrapAtSquare(
+      preview.dungonId,
+      preview.centerRow,
+      preview.centerColumn
+    );
+    const isTrapped = currentTriggeredFloorTrap !== null;
 
-        const canCross = this.canSafelyCrossFloorTrap(activeFloorTrap.trap);
-        if (!canCross) {
-          this.floorTrapPlacementsByDungon.update((all) => ({
-            ...all,
-            [preview.dungonId]: (all[preview.dungonId] ?? []).map((p) =>
-              p.id === activeFloorTrap.id ? { ...p, isTriggered: true, isDetected: true } : p
-            ),
-          }));
-          this.triggerTrap(activeFloorTrap.trap);
-          return;
-        }
+    const activeFloorTrap = this.getActiveFloorTrapAtSquare(preview.dungonId, nextRow, nextColumn);
+    const trapHasCrossingRequirements =
+      activeFloorTrap !== null &&
+      this.getTrapCrossingItems(activeFloorTrap.trap).length > 0;
+    const canBypassTriggerWithItem =
+      activeFloorTrap !== null &&
+      this.isMoveTowardFacingDirection(preview.dungonId, rowOffset, columnOffset) &&
+      this.canBypassTrapWithCrossingItem(activeFloorTrap.trap);
+    let bypassTriggerForThisMove = false;
+    if (trapHasCrossingRequirements && this.isMoveTowardFacingDirection(preview.dungonId, rowOffset, columnOffset) && activeFloorTrap) {
+      if (forcedBypassTriggerDecision === null) {
+        this.openTrapCrossingPrompt(preview, rowOffset, columnOffset, activeFloorTrap);
+        return;
+      }
+      if (canBypassTriggerWithItem && forcedBypassTriggerDecision) {
+        bypassTriggerForThisMove = true;
+        this.previewActionMessage.set(`You use a crossing item to pass ${activeFloorTrap.trap.name || 'the trap'} safely.`);
       }
     }
 
@@ -9336,8 +9475,11 @@ const targetKind = this.getSpellTargetKind(spell);
       return;
     }
 
-    const moveCost = isDiagonalStep ? 2 : 1;
+    const moveCost = isTrapped ? 3 : (isDiagonalStep ? 2 : 1);
     if (this.turnPhase() === 'player' && this.playerAE() < moveCost) {
+      if (isTrapped) {
+        this.previewActionMessage.set('You are trapped and need at least 3 AE to move again.');
+      }
       return;
     }
 
@@ -9399,7 +9541,7 @@ const targetKind = this.getSpellTargetKind(spell);
     }
 
     // Check if player stepped onto a floor trap
-    this.checkFloorTrapsAtCurrentSquare(preview.dungonId, nextRow, nextColumn);
+    this.checkFloorTrapsAtCurrentSquare(preview.dungonId, nextRow, nextColumn, bypassTriggerForThisMove);
 
     this.drawPreviewGridCanvas();
 
@@ -9526,12 +9668,23 @@ const targetKind = this.getSpellTargetKind(spell);
     return map[side];
   }
 
-  private checkFloorTrapsAtCurrentSquare(dungonId: number, row: number, column: number): void {
+  private checkFloorTrapsAtCurrentSquare(dungonId: number, row: number, column: number, skipTrigger = false): void {
     const traps = this.floorTrapPlacementsByDungon()[dungonId] ?? [];
     const activeTrap = traps.find(
       (p) => p.row === row && p.column === column && !p.isTriggered && !p.isDisarmed
     );
     if (!activeTrap) return;
+
+    if (skipTrigger) {
+      this.floorTrapPlacementsByDungon.update((all) => ({
+        ...all,
+        [dungonId]: (all[dungonId] ?? []).map((p) =>
+          p.id === activeTrap.id ? { ...p, isDetected: true } : p
+        ),
+      }));
+      this.saveGameState();
+      return;
+    }
 
     this.floorTrapPlacementsByDungon.update((all) => ({
       ...all,
@@ -9547,6 +9700,12 @@ const targetKind = this.getSpellTargetKind(spell);
   private getActiveFloorTrapAtSquare(dungonId: number, row: number, column: number): FloorTrapPlacement | null {
     return (this.floorTrapPlacementsByDungon()[dungonId] ?? []).find(
       (p) => p.row === row && p.column === column && !p.isTriggered && !p.isDisarmed
+    ) ?? null;
+  }
+
+  private getTriggeredFloorTrapAtSquare(dungonId: number, row: number, column: number): FloorTrapPlacement | null {
+    return (this.floorTrapPlacementsByDungon()[dungonId] ?? []).find(
+      (p) => p.row === row && p.column === column && p.isTriggered && !p.isDisarmed
     ) ?? null;
   }
 
@@ -9567,6 +9726,124 @@ const targetKind = this.getSpellTargetKind(spell);
 
   private getTrapCrossingItems(trap: Trap): { itemId: number; itemName: string }[] {
     return Array.isArray(trap.crossingRequirements) ? trap.crossingRequirements : [];
+  }
+
+  private getOwnedTrapCrossingItems(trap: Trap): { itemId: number; itemName: string }[] {
+    return this.getTrapCrossingItems(trap).filter((req) => this.playerHasItem(req.itemId));
+  }
+
+  private getTrapCrossingHintText(trap: Trap): string {
+    const requirements = this.getTrapCrossingItems(trap);
+    if (requirements.length === 0) {
+      return '';
+    }
+    const names = requirements
+      .map((req) => (req.itemName && req.itemName.trim() ? req.itemName.trim() : `Item ${req.itemId}`))
+      .join(', ');
+    return ` Need one of these items to cross safely: ${names}.`;
+  }
+
+  private canBypassTrapWithCrossingItem(trap: Trap): boolean {
+    return (
+      this.getTrapCrossingItems(trap).length > 0 &&
+      this.getOwnedTrapCrossingItems(trap).length > 0
+    );
+  }
+
+  private openTrapCrossingPrompt(
+    preview: GridPreviewContext,
+    rowOffset: number,
+    columnOffset: number,
+    trapPlacement: FloorTrapPlacement
+  ): void {
+    const allRequirements = this.getTrapCrossingItems(trapPlacement.trap);
+    if (allRequirements.length === 0) {
+      return;
+    }
+
+    const requiredItems = allRequirements.map((req) => ({
+      itemId: req.itemId,
+      itemName: req.itemName && req.itemName.trim() ? req.itemName.trim() : `Item ${req.itemId}`,
+      owned: this.playerHasItemInDungon(preview.dungonId, req.itemId),
+    }));
+
+    this.pendingTrapCrossingPrompt.set({
+      dungonId: preview.dungonId,
+      fromRow: preview.centerRow,
+      fromColumn: preview.centerColumn,
+      rowOffset,
+      columnOffset,
+      trapId: trapPlacement.id,
+      trapName: trapPlacement.trap.name?.trim() || this.getTrapType(trapPlacement.trap),
+      requiredItems,
+    });
+  }
+
+  private isMoveTowardFacingDirection(dungonId: number, rowOffset: number, columnOffset: number): boolean {
+    if (Math.abs(rowOffset) + Math.abs(columnOffset) !== 1) {
+      return false;
+    }
+    const cheater = this.cheaterByDungon()[dungonId] ?? DEFAULT_CHEATER;
+    const forwardDelta = this.getMovementDeltaForFacingDirection(cheater.facingDir);
+    return forwardDelta.rowOffset === rowOffset && forwardDelta.columnOffset === columnOffset;
+  }
+
+  useTrapCrossingItem(itemId: number): void {
+    const prompt = this.pendingTrapCrossingPrompt();
+    if (!prompt) {
+      return;
+    }
+
+    const required = prompt.requiredItems.find((entry) => entry.itemId === itemId) ?? null;
+    if (!required) {
+      return;
+    }
+
+    if (!this.playerHasItemInDungon(prompt.dungonId, itemId)) {
+      this.previewActionMessage.set(`You don't have the required item to cross ${prompt.trapName} safely.`);
+      this.pendingTrapCrossingPrompt.set({
+        ...prompt,
+        requiredItems: prompt.requiredItems.map((entry) => ({
+          ...entry,
+          owned: this.playerHasItemInDungon(prompt.dungonId, entry.itemId),
+        })),
+      });
+      return;
+    }
+
+    this.pendingTrapCrossingPrompt.set(null);
+    const itemName = required.itemName?.trim() || `Item ${itemId}`;
+    this.previewActionMessage.set(`You use ${itemName} to cross ${prompt.trapName} safely.`);
+    this.resumeTrapCrossingMove(prompt, true);
+  }
+
+  cancelTrapCrossingPrompt(): void {
+    if (!this.pendingTrapCrossingPrompt()) {
+      return;
+    }
+    this.pendingTrapCrossingPrompt.set(null);
+  }
+
+  declineTrapCrossingUseItem(): void {
+    const prompt = this.pendingTrapCrossingPrompt();
+    if (!prompt) {
+      return;
+    }
+    this.pendingTrapCrossingPrompt.set(null);
+    this.resumeTrapCrossingMove(prompt, false);
+  }
+
+  private resumeTrapCrossingMove(prompt: PendingTrapCrossingPrompt, useItem: boolean): void {
+    const preview = this.gridPreviewContext();
+    if (!preview || preview.dungonId !== prompt.dungonId) {
+      return;
+    }
+    if (preview.centerRow !== prompt.fromRow || preview.centerColumn !== prompt.fromColumn) {
+      this.previewActionMessage.set('You moved before answering the trap prompt. Try again.');
+      return;
+    }
+
+    this.tryMoveCheaterByDelta(preview, prompt.rowOffset, prompt.columnOffset, useItem);
   }
 
   private hasAnyTrapCrossingItem(trap: Trap): boolean {

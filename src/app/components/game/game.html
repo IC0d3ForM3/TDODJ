@@ -20,6 +20,39 @@
 		</div>
 	}
 
+	@if (pendingTrapCrossingPrompt(); as trapPrompt) {
+		<div class="sound-pref-overlay" (click)="cancelTrapCrossingPrompt()"></div>
+		<div class="trap-crossing-modal" role="dialog" aria-modal="true" aria-labelledby="trap-crossing-title" aria-describedby="trap-crossing-desc" (click)="$event.stopPropagation()">
+			<div class="sound-pref-header">
+				<p id="trap-crossing-title" class="sound-pref-title">Cross Trap Safely?</p>
+				<button type="button" class="sound-pref-close" (click)="cancelTrapCrossingPrompt()" aria-label="Close">✕</button>
+			</div>
+			<p id="trap-crossing-desc" class="sound-pref-text">
+				Use an item to cross <strong>{{ trapPrompt.trapName }}</strong> without triggering it?
+			</p>
+			<p class="trap-crossing-items-label">Items needed:</p>
+			<ul class="trap-crossing-items-list">
+				@for (item of trapPrompt.requiredItems; track item.itemId + ':' + item.itemName) {
+					<li class="trap-crossing-item-row">
+						<span>{{ item.itemName }}</span>
+						@if (item.owned) {
+							<button type="button" class="trap-crossing-use-btn" (click)="useTrapCrossingItem(item.itemId)">Use to Cross</button>
+						} @else {
+							<span class="trap-crossing-missing">Missing</span>
+						}
+					</li>
+				}
+			</ul>
+			@if (!trapPrompt.requiredItems.some(item => item.owned)) {
+				<p style="color: #ffb2b2; font-size: 0.9rem; margin: 0.5rem 0;">You don't have any of these items.</p>
+			}
+			<div class="sound-pref-actions">
+				<button type="button" class="sound-pref-btn sound-pref-btn-on" (click)="cancelTrapCrossingPrompt()">Cancel</button>
+				<button type="button" class="sound-pref-btn sound-pref-btn-off" (click)="declineTrapCrossingUseItem()">No, Trigger Trap</button>
+			</div>
+		</div>
+	}
+
 	@if (showTavernModal()) {
 		<button type="button" class="sound-toggle-btn tavern-mute-overlay" (click)="toggleMute()"
 			[title]="soundMuted() ? 'Unmute sounds' : 'Mute sounds'" aria-label="Toggle sound">
@@ -861,6 +894,7 @@
 								[startPoint]="previewStartPointForView()"
 								[squareTexts]="previewSquareTextsForView()"
 								[floorTrapPlacements]="previewDetectedFloorTrapsForView()"
+								[crossableTrapIds]="previewCrossableTrapIdsForView()"
 								[obstaclePlacements]="previewObstaclePlacementsForView()"
 								[obstacleImagesBySquare]="previewObstacleImagesBySquareForView()"
 								[exits]="previewExitsForView()"
@@ -1307,8 +1341,8 @@
 							Search
 							</button>
 							@if (foundTrap()) {
-								<button type="button" class="action-button action-button-strong" (click)="tryDisarmTrap()">
-									Disarm Trap
+								<button type="button" class="action-button action-button-strong" (click)="handlePickActionIcon()">
+									{{ foundTrapPrimaryActionLabel() }}
 								</button>
 							}
 						</div>
@@ -1318,8 +1352,8 @@
 								Search
 							</button>
 							@if (foundTrap()) {
-								<button type="button" class="action-button action-button-strong" (click)="tryDisarmTrap()">
-									Disarm Trap
+								<button type="button" class="action-button action-button-strong" (click)="handlePickActionIcon()">
+									{{ foundTrapPrimaryActionLabel() }}
 								</button>
 							}
 						</div>

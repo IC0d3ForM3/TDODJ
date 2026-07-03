@@ -27,6 +27,66 @@
 	font-family: inherit;
 }
 
+.trap-crossing-modal {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: min(92vw, 500px);
+	background: linear-gradient(180deg, #1d1a1a 0%, #171313 100%);
+	border: 1px solid rgba(255, 120, 120, 0.45);
+	border-radius: 14px;
+	box-shadow: 0 16px 54px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+	padding: 1.15rem 1.25rem 1.2rem;
+	z-index: 9101;
+	color: #f3e8e8;
+	font-family: inherit;
+}
+
+.trap-crossing-items-label {
+	margin: 0.25rem 0 0.4rem;
+	font-size: 0.85rem;
+	color: #ffb2b2;
+	font-weight: 700;
+}
+
+.trap-crossing-items-list {
+	margin: 0 0 0.9rem 1.1rem;
+	padding: 0;
+	color: #f5d9d9;
+	font-size: 0.88rem;
+	line-height: 1.35;
+}
+
+.trap-crossing-item-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	margin: 0.25rem 0;
+}
+
+.trap-crossing-use-btn {
+	border: 1px solid rgba(255, 184, 140, 0.75);
+	background: linear-gradient(180deg, rgba(120, 72, 35, 0.95) 0%, rgba(83, 49, 22, 0.95) 100%);
+	color: #fff1dc;
+	border-radius: 8px;
+	font-size: 0.75rem;
+	line-height: 1.1;
+	padding: 0.22rem 0.5rem;
+	cursor: pointer;
+}
+
+.trap-crossing-use-btn:hover {
+	filter: brightness(1.12);
+}
+
+.trap-crossing-missing {
+	color: #ffb2b2;
+	font-size: 0.76rem;
+	font-weight: 700;
+}
+
 .sound-pref-header {
 	display: flex;
 	align-items: flex-start;

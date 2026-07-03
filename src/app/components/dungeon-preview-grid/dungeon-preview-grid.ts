@@ -71,6 +71,8 @@ export class DungeonPreviewGridComponent {
   readonly itemPlacements = input<ItemPlacement[]>([]);
   readonly potionPlacements = input<PotionPlacement[]>([]);
   readonly spellPlacements = input<SpellPlacement[]>([]);
+  /** IDs of detected floor traps the player can cross safely (shown in green). */
+  readonly crossableTrapIds = input<Set<number>>(new Set());
   /** Chebyshev range for combat targeting overlay (0 = no overlay). */
   readonly combatRange = input<number>(0);
   /** Row of the currently selected combat target (null = none). */
@@ -111,6 +113,7 @@ export class DungeonPreviewGridComponent {
       this.itemPlacements();
       this.potionPlacements();
       this.spellPlacements();
+      this.crossableTrapIds();
       this.combatRange();
       this.selectedTargetRow();
       this.selectedTargetColumn();
@@ -469,7 +472,7 @@ export class DungeonPreviewGridComponent {
       }
     }
 
-    // Draw type-aware markers for detected or triggered floor traps
+    // Draw detected/triggered traps as full-cell dark squares with a lighter back wall strip.
     for (const fp of this.floorTrapPlacements()) {
       if (fp.isDisarmed) continue;
       if (!(fp.isDetected || fp.isTriggered)) continue;
@@ -477,56 +480,35 @@ export class DungeonPreviewGridComponent {
       const previewRow = fp.row - preview.startRow;
       const previewColumn = fp.column - preview.startColumn;
       if (previewRow >= 0 && previewColumn >= 0 && previewRow < this.dimension && previewColumn < this.dimension) {
-        const centerX = previewColumn * this.cellSize + this.cellSize / 2;
-        const centerY = previewRow * this.cellSize + this.cellSize / 2;
-        const trapType = (fp.trap.trapType ?? fp.trap.name ?? '').toLowerCase();
+        const left = previewColumn * this.cellSize;
+        const top = previewRow * this.cellSize;
+        const wallStripHeight = Math.max(3, Math.floor(this.cellSize * 0.24));
+        const isCrossable = !fp.isTriggered && this.crossableTrapIds().has(fp.id);
+        const trapType = ((fp.trap.trapType ?? fp.trap.name ?? '') as string).toLowerCase();
+        const isCeilingSpikes = trapType.includes('ceiling spikes');
         context.save();
-        if (trapType.includes('pit') && !trapType.includes('spiked')) {
-          context.fillStyle = fp.isTriggered ? '#111' : '#222';
-          context.beginPath();
-          context.ellipse(centerX, centerY, 4, 3, 0, 0, Math.PI * 2);
-          context.fill();
-          context.strokeStyle = '#000';
-          context.stroke();
-        } else if (trapType.includes('spiked pit')) {
-          context.fillStyle = fp.isTriggered ? '#1a1a1a' : '#2a1e1e';
-          context.beginPath();
-          context.ellipse(centerX, centerY, 4, 3, 0, 0, Math.PI * 2);
-          context.fill();
-          context.strokeStyle = '#c0392b';
-          context.beginPath();
-          context.moveTo(centerX - 4, centerY - 1);
-          context.lineTo(centerX - 1, centerY - 4);
-          context.lineTo(centerX + 1, centerY - 4);
-          context.lineTo(centerX + 4, centerY - 1);
-          context.stroke();
-        } else if (trapType.includes('glue')) {
-          context.fillStyle = '#4caf50';
-          context.fillRect(centerX - 4, centerY - 3, 8, 6);
-        } else if (trapType.includes('net')) {
-          context.strokeStyle = '#d9c7a0';
-          context.lineWidth = 1;
-          context.strokeRect(centerX - 4, centerY - 3, 8, 6);
-          context.beginPath();
-          context.moveTo(centerX - 4, centerY - 3);
-          context.lineTo(centerX + 4, centerY + 3);
-          context.moveTo(centerX + 4, centerY - 3);
-          context.lineTo(centerX - 4, centerY + 3);
-          context.stroke();
-        } else if (trapType.includes('dart') || trapType.includes('gas') || trapType.includes('wall spikes')) {
-          context.fillStyle = trapType.includes('gas') ? '#6c4bd9' : '#f5f5f5';
-          context.beginPath();
-          context.arc(centerX, centerY, 3, 0, Math.PI * 2);
-          context.fill();
-          context.strokeStyle = trapType.includes('wall spikes') ? '#7a3db8' : '#7f8c8d';
-          context.stroke();
+        if (isCrossable) {
+          context.fillStyle = '#0a2e0a';
+          context.fillRect(left, top, this.cellSize, this.cellSize);
+          context.fillStyle = '#2e7a2e';
+          context.fillRect(left, top, this.cellSize, wallStripHeight);
+          context.strokeStyle = '#6ecf6e';
+        } else if (isCeilingSpikes && !fp.isTriggered) {
+          // Ceiling spikes get a cooler tint so overhead hazards read differently on the minimap.
+          context.fillStyle = '#121836';
+          context.fillRect(left, top, this.cellSize, this.cellSize);
+          context.fillStyle = '#48508f';
+          context.fillRect(left, top, this.cellSize, wallStripHeight);
+          context.strokeStyle = '#9fa8ff';
         } else {
-          context.fillStyle = '#ffcc00';
-          context.font = 'bold 8px sans-serif';
-          context.textAlign = 'center';
-          context.textBaseline = 'middle';
-          context.fillText('t', centerX + 4, centerY + 4);
+          context.fillStyle = fp.isTriggered ? '#080808' : '#121212';
+          context.fillRect(left, top, this.cellSize, this.cellSize);
+          context.fillStyle = fp.isTriggered ? '#5a5a5a' : '#6a6a6a';
+          context.fillRect(left, top, this.cellSize, wallStripHeight);
+          context.strokeStyle = fp.isTriggered ? '#c9c9c9' : '#b7b7b7';
         }
+        context.lineWidth = 1;
+        context.strokeRect(left + 0.5, top + 0.5, this.cellSize - 1, this.cellSize - 1);
         context.restore();
       }
     }
