@@ -792,6 +792,48 @@
 	transition: background-color 0.12s, border-color 0.12s;
 }
 
+.fpv-forward-btn {
+	flex-direction: column;
+	gap: 0.1rem;
+	padding: 0.2rem 0;
+	font-size: 0.72rem;
+	line-height: 1;
+	text-align: center;
+}
+
+.fpv-forward-icon {
+	display: block;
+	font-size: 1.05rem;
+	line-height: 1;
+	transform: scaleX(-1);
+}
+
+.fpv-forward-label {
+	display: block;
+	font-size: 0.52rem;
+	line-height: 1;
+	letter-spacing: 0;
+	text-transform: lowercase;
+}
+
+.fpv-ade-btn {
+	gap: 0.01rem;
+	padding: 0.1rem 0.05rem;
+	font-size: 0.55rem;
+	line-height: 1;
+	letter-spacing: 0;
+}
+
+.fpv-ade-icon {
+	display: inline-block;
+	font-size: 0.66rem;
+	line-height: 1;
+}
+
+.fpv-ade-arrow {
+	color: #d94b4b;
+}
+
 .fpv-icon-btn:hover {
 	background-color: #1f2b3d;
 	color: #c8ddf0;

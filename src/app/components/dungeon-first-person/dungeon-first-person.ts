@@ -564,6 +564,7 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     const monsterImpactEffects = this.monsterImpactEffects();
     const detectedTraps = this.floorTrapPlacements();
     const trapSquaresByType = new Map<string, Set<string>>();
+    const wallSpikeSourcesBySquare = new Map<string, Array<'north' | 'east' | 'south' | 'west'>>();
     for (const fp of detectedTraps) {
       if (fp.isDisarmed) continue;
       if (!(fp.isDetected || fp.isTriggered)) continue;
@@ -572,6 +573,15 @@ export class DungeonFirstPersonComponent implements OnDestroy {
       const set = trapSquaresByType.get(trapType) ?? new Set<string>();
       set.add(squareKey);
       trapSquaresByType.set(trapType, set);
+
+      if (trapType.includes('wall spikes')) {
+        const sourceSide = fp.trap.sourceSide;
+        if (sourceSide === 'north' || sourceSide === 'east' || sourceSide === 'south' || sourceSide === 'west') {
+          const existing = wallSpikeSourcesBySquare.get(squareKey) ?? [];
+          existing.push(sourceSide);
+          wallSpikeSourcesBySquare.set(squareKey, existing);
+        }
+      }
     }
 
     for (const segment of farToNearSegments) {
@@ -688,7 +698,20 @@ export class DungeonFirstPersonComponent implements OnDestroy {
         this.drawFirstPersonGasCloudTrap(context, nearFrame, farFrame);
       }
       if (typeMatches('wall spikes')) {
-        this.drawFirstPersonWallSpikesTrap(context, nearFrame, farFrame);
+        const sourceSides = wallSpikeSourcesBySquare.get(squareKey) ?? [];
+        const renderedSides = new Set<'front' | 'left' | 'right' | 'back'>();
+        if (sourceSides.length === 0) {
+          this.drawFirstPersonWallSpikesTrap(context, nearFrame, farFrame, 'front');
+        } else {
+          for (const sourceSide of sourceSides) {
+            const relativeSide = this.getRelativeWallSideForFacing(cheater.facingDir, sourceSide);
+            if (renderedSides.has(relativeSide)) {
+              continue;
+            }
+            renderedSides.add(relativeSide);
+            this.drawFirstPersonWallSpikesTrap(context, nearFrame, farFrame, relativeSide);
+          }
+        }
       }
 
       if (bagSquareKeys.has(squareKey) && !obstacleItemSquareKeys.has(squareKey)) {
@@ -1640,15 +1663,72 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     nearFrame: { left: number; right: number; top: number; bottom: number },
     farFrame: { left: number; right: number; top: number; bottom: number }
   ): void {
-    const midLeft = (nearFrame.left + farFrame.left) / 2;
-    const midRight = (nearFrame.right + farFrame.right) / 2;
-    const midTop = (nearFrame.top + farFrame.top) / 2;
-    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
+    const insetNearX = Math.max(3, (nearFrame.right - nearFrame.left) * 0.1);
+    const insetFarX = Math.max(2, (farFrame.right - farFrame.left) * 0.1);
+    const nearLeft = nearFrame.left + insetNearX;
+    const nearRight = nearFrame.right - insetNearX;
+    const farLeft = farFrame.left + insetFarX;
+    const farRight = farFrame.right - insetFarX;
+    const nearTop = nearFrame.top;
+    const farTop = farFrame.top;
+
     context.save();
-    context.strokeStyle = '#c9b58a';
+
+    // Draw net stretched across the ceiling plane.
+    context.beginPath();
+    context.moveTo(nearLeft, nearTop);
+    context.lineTo(nearRight, nearTop);
+    context.lineTo(farRight, farTop);
+    context.lineTo(farLeft, farTop);
+    context.closePath();
+    context.fillStyle = 'rgba(172, 150, 109, 0.24)';
+    context.fill();
+    context.strokeStyle = 'rgba(206, 186, 148, 0.78)';
     context.lineWidth = 1;
-    context.strokeRect(midLeft + 6, midTop + 2, (midRight - midLeft) - 12, (midBottom - midTop) - 4);
-    context.strokeRect(midLeft + 8, midTop + 4, (midRight - midLeft) - 16, (midBottom - midTop) - 8);
+    context.stroke();
+
+    const tCols = 5;
+    const tRows = 5;
+    context.strokeStyle = 'rgba(214, 197, 167, 0.72)';
+    context.lineWidth = 0.95;
+
+    // Vertical strands (near-to-far on ceiling perspective).
+    for (let i = 1; i < tCols; i += 1) {
+      const t = i / tCols;
+      const xNear = nearLeft + (nearRight - nearLeft) * t;
+      const xFar = farLeft + (farRight - farLeft) * t;
+      context.beginPath();
+      context.moveTo(xNear, nearTop);
+      context.lineTo(xFar, farTop);
+      context.stroke();
+    }
+
+    // Horizontal strands (side-to-side with perspective shortening).
+    for (let i = 1; i < tRows; i += 1) {
+      const t = i / tRows;
+      const xLeft = nearLeft + (farLeft - nearLeft) * t;
+      const xRight = nearRight + (farRight - nearRight) * t;
+      const y = nearTop + (farTop - nearTop) * t;
+      context.beginPath();
+      context.moveTo(xLeft, y);
+      context.lineTo(xRight, y);
+      context.stroke();
+    }
+
+    // A few hanging tassels to reinforce that the net is overhead.
+    const tasselCount = 4;
+    context.strokeStyle = 'rgba(180, 155, 108, 0.85)';
+    context.lineWidth = 0.9;
+    for (let i = 0; i < tasselCount; i += 1) {
+      const t = (i + 0.5) / tasselCount;
+      const x = nearLeft + (nearRight - nearLeft) * t;
+      const len = 3 + (i % 2) * 1.5;
+      context.beginPath();
+      context.moveTo(x, nearTop + 0.5);
+      context.lineTo(x, nearTop + len);
+      context.stroke();
+    }
+
     context.restore();
   }
 
@@ -1677,7 +1757,57 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     nearFrame: { left: number; right: number; top: number; bottom: number },
     farFrame: { left: number; right: number; top: number; bottom: number }
   ): void {
-    this.drawFirstPersonTrapFloorBlock(context, nearFrame, farFrame, 'rgba(50, 35, 92, 0.9)', 'rgba(126, 101, 199, 0.95)');
+    const midLeft = (nearFrame.left + farFrame.left) / 2;
+    const midRight = (nearFrame.right + farFrame.right) / 2;
+    const midTop = (nearFrame.top + farFrame.top) / 2;
+    const midBottom = (nearFrame.bottom + farFrame.bottom) / 2;
+    const cx = (midLeft + midRight) / 2;
+
+    // Fill most of the square width/length and around half of visual height.
+    const cloudWidth = Math.max(16, (midRight - midLeft) * 0.94);
+    const cloudHeight = Math.max(10, (midBottom - midTop) * 0.5);
+    const baseY = midBottom - cloudHeight * 0.08;
+
+    context.save();
+
+    const gasGrad = context.createRadialGradient(
+      cx - cloudWidth * 0.08,
+      baseY - cloudHeight * 0.3,
+      cloudWidth * 0.08,
+      cx,
+      baseY - cloudHeight * 0.1,
+      cloudWidth * 0.62
+    );
+    gasGrad.addColorStop(0, 'rgba(128, 212, 106, 0.72)');
+    gasGrad.addColorStop(0.36, 'rgba(82, 176, 70, 0.64)');
+    gasGrad.addColorStop(0.72, 'rgba(50, 136, 47, 0.56)');
+    gasGrad.addColorStop(1, 'rgba(24, 72, 27, 0.34)');
+
+    // Main cloud body made of overlapping blobs centered in the cell.
+    context.fillStyle = gasGrad;
+    context.beginPath();
+    context.ellipse(cx - cloudWidth * 0.24, baseY - cloudHeight * 0.18, cloudWidth * 0.26, cloudHeight * 0.38, 0, 0, Math.PI * 2);
+    context.ellipse(cx, baseY - cloudHeight * 0.34, cloudWidth * 0.29, cloudHeight * 0.44, 0, 0, Math.PI * 2);
+    context.ellipse(cx + cloudWidth * 0.24, baseY - cloudHeight * 0.18, cloudWidth * 0.26, cloudHeight * 0.38, 0, 0, Math.PI * 2);
+    context.ellipse(cx - cloudWidth * 0.1, baseY - cloudHeight * 0.02, cloudWidth * 0.34, cloudHeight * 0.34, 0, 0, Math.PI * 2);
+    context.ellipse(cx + cloudWidth * 0.12, baseY, cloudWidth * 0.32, cloudHeight * 0.3, 0, 0, Math.PI * 2);
+    context.fill();
+
+    // Softer outer haze so the cloud bleeds to near full cell width.
+    context.fillStyle = 'rgba(56, 132, 51, 0.2)';
+    context.beginPath();
+    context.ellipse(cx, baseY - cloudHeight * 0.08, cloudWidth * 0.52, cloudHeight * 0.42, 0, 0, Math.PI * 2);
+    context.fill();
+
+    // Bright toxic pockets inside the cloud.
+    context.fillStyle = 'rgba(146, 204, 110, 0.24)';
+    context.beginPath();
+    context.ellipse(cx - cloudWidth * 0.16, baseY - cloudHeight * 0.22, cloudWidth * 0.12, cloudHeight * 0.18, 0, 0, Math.PI * 2);
+    context.ellipse(cx + cloudWidth * 0.17, baseY - cloudHeight * 0.2, cloudWidth * 0.11, cloudHeight * 0.17, 0, 0, Math.PI * 2);
+    context.ellipse(cx + cloudWidth * 0.02, baseY - cloudHeight * 0.06, cloudWidth * 0.12, cloudHeight * 0.16, 0, 0, Math.PI * 2);
+    context.fill();
+
+    context.restore();
   }
 
   private drawFirstPersonTrapFloorBlock(
@@ -1794,23 +1924,145 @@ export class DungeonFirstPersonComponent implements OnDestroy {
   private drawFirstPersonWallSpikesTrap(
     context: CanvasRenderingContext2D,
     nearFrame: { left: number; right: number; top: number; bottom: number },
-    farFrame: { left: number; right: number; top: number; bottom: number }
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    wallSide: 'front' | 'left' | 'right' | 'back' = 'front'
   ): void {
-    const midLeft = (nearFrame.left + farFrame.left) / 2;
-    const midRight = (nearFrame.right + farFrame.right) / 2;
-    const midTop = (nearFrame.top + farFrame.top) / 2;
     context.save();
-    context.strokeStyle = '#6c3483';
-    context.lineWidth = 1;
-    const x = (midLeft + midRight) / 2;
+
+    if (wallSide === 'back') {
+      context.restore();
+      return;
+    }
+
+    const drawSpikeColumns = (
+      columns: number[],
+      rows: number[],
+      getPoint: (colT: number, rowT: number) => { x: number; y: number },
+      tip: (base: { x: number; y: number }, rowT: number) => { x: number; y: number },
+      spikeFill: string,
+      spikeStroke: string
+    ): void => {
+      context.fillStyle = spikeFill;
+      context.strokeStyle = spikeStroke;
+      context.lineWidth = 1;
+      for (const colT of columns) {
+        for (const rowT of rows) {
+          const base = getPoint(colT, rowT);
+          const spikeTip = tip(base, rowT);
+          const baseSize = 2.3 + rowT * 0.9;
+          context.beginPath();
+          context.moveTo(base.x, base.y - baseSize);
+          context.lineTo(spikeTip.x, spikeTip.y);
+          context.lineTo(base.x, base.y + baseSize);
+          context.closePath();
+          context.fill();
+          context.stroke();
+        }
+      }
+    };
+
+    if (wallSide === 'front') {
+      const panelLeft = farFrame.left + (farFrame.right - farFrame.left) * 0.14;
+      const panelRight = farFrame.right - (farFrame.right - farFrame.left) * 0.14;
+      const panelTop = farFrame.top + (farFrame.bottom - farFrame.top) * 0.12;
+      const panelBottom = farFrame.bottom - (farFrame.bottom - farFrame.top) * 0.14;
+      context.fillStyle = '#808080';
+      context.fillRect(panelLeft, panelTop, panelRight - panelLeft, panelBottom - panelTop);
+      context.strokeStyle = '#b3b3b3';
+      context.lineWidth = 1;
+      context.strokeRect(panelLeft + 0.5, panelTop + 0.5, Math.max(1, panelRight - panelLeft - 1), Math.max(1, panelBottom - panelTop - 1));
+
+      const columns = [0.33, 0.67];
+      const rows = [0.18, 0.38, 0.58, 0.78];
+      const panelWidth = panelRight - panelLeft;
+      const panelHeight = panelBottom - panelTop;
+      drawSpikeColumns(
+        columns,
+        rows,
+        (colT, rowT) => ({
+          x: panelLeft + panelWidth * colT,
+          y: panelTop + panelHeight * rowT,
+        }),
+        (base, rowT) => ({
+          x: base.x,
+          y: base.y + Math.max(6, panelHeight * (0.12 + rowT * 0.08)),
+        }),
+        '#ff6969',
+        '#ff5252'
+      );
+      context.restore();
+      return;
+    }
+
+    const isLeft = wallSide === 'left';
+    const wallNearX = isLeft ? nearFrame.left : nearFrame.right;
+    const wallFarX = isLeft ? farFrame.left : farFrame.right;
+    const wallTop = farFrame.top;
+    const wallBottom = nearFrame.bottom;
+    const wallWidthNear = 7;
+    const wallWidthFar = 4;
+    const columns = [0.33, 0.67];
+    const rows = [0.18, 0.38, 0.58, 0.78];
+
+    context.fillStyle = '#808080';
     context.beginPath();
-    context.moveTo(x - 5, midTop + 4);
-    context.lineTo(x - 2, midTop + 1);
-    context.lineTo(x + 1, midTop + 4);
-    context.lineTo(x + 4, midTop + 1);
-    context.lineTo(x + 7, midTop + 4);
+    if (isLeft) {
+      context.moveTo(wallNearX, nearFrame.top);
+      context.lineTo(wallNearX + wallWidthNear, nearFrame.top);
+      context.lineTo(wallFarX + wallWidthFar, farFrame.top);
+      context.lineTo(wallFarX, farFrame.top);
+      context.lineTo(wallFarX, farFrame.bottom);
+      context.lineTo(wallFarX + wallWidthFar, farFrame.bottom);
+      context.lineTo(wallNearX + wallWidthNear, nearFrame.bottom);
+      context.lineTo(wallNearX, nearFrame.bottom);
+    } else {
+      context.moveTo(wallNearX, nearFrame.top);
+      context.lineTo(wallNearX - wallWidthNear, nearFrame.top);
+      context.lineTo(wallFarX - wallWidthFar, farFrame.top);
+      context.lineTo(wallFarX, farFrame.top);
+      context.lineTo(wallFarX, farFrame.bottom);
+      context.lineTo(wallFarX - wallWidthFar, farFrame.bottom);
+      context.lineTo(wallNearX - wallWidthNear, nearFrame.bottom);
+      context.lineTo(wallNearX, nearFrame.bottom);
+    }
+    context.closePath();
+    context.fill();
+
+    context.strokeStyle = '#b3b3b3';
+    context.lineWidth = 1;
     context.stroke();
+
+    const wallSpan = wallBottom - wallTop;
+    drawSpikeColumns(
+      columns,
+      rows,
+      (colT, rowT) => {
+        const y = wallTop + wallSpan * rowT;
+        const x = wallFarX + (wallNearX - wallFarX) * colT;
+        return { x, y };
+      },
+      (base, rowT) => ({
+        x: base.x + (isLeft ? 1 : -1) * Math.max(6, 8 + rowT * 2),
+        y: base.y,
+      }),
+      '#ff6969',
+      '#ff5252'
+    );
+
     context.restore();
+  }
+
+  private getRelativeWallSideForFacing(
+    facing: FacingDirection,
+    sourceSide: 'north' | 'east' | 'south' | 'west'
+  ): 'front' | 'right' | 'back' | 'left' {
+    const mapByFacing: Record<FacingDirection, Record<'north' | 'east' | 'south' | 'west', 'front' | 'right' | 'back' | 'left'>> = {
+      up: { north: 'front', east: 'right', south: 'back', west: 'left' },
+      right: { north: 'left', east: 'front', south: 'right', west: 'back' },
+      down: { north: 'back', east: 'left', south: 'front', west: 'right' },
+      left: { north: 'right', east: 'back', south: 'left', west: 'front' },
+    };
+    return mapByFacing[facing][sourceSide];
   }
 
   private drawFirstPersonFloorKey(

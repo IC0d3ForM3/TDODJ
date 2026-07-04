@@ -1519,7 +1519,7 @@ export class Creator implements OnInit {
 
   isFloorTrapCrossingConfigVisible(): boolean {
     const type = this.floorTrapForm.controls.trapType.value;
-    return type === 'Pit' || type === 'Spiked Pit' || type === 'Ceiling Spikes';
+    return type === 'Pit' || type === 'Spiked Pit' || type === 'Ceiling Spikes' || type === 'Drop Net' || type === 'Wall Spikes';
   }
 
   isFloorTrapSourceConfigVisible(): boolean {

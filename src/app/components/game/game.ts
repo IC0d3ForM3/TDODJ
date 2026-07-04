@@ -1541,6 +1541,144 @@ export class Game implements OnInit {
     this.tryMoveCheaterBackward();
   }
 
+  canJump(): boolean {
+    if (this.turnPhase() !== 'player' || this.playerHp() <= 0 || this.playerAE() < 3) return false;
+    const preview = this.gridPreviewContext();
+    if (!preview) return false;
+
+    const cheater = this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER;
+    const moveDelta = this.getMovementDeltaForFacingDirection(cheater.facingDir);
+
+    // Target is 2 squares away in facing direction
+    const targetRow = preview.centerRow + (moveDelta.rowOffset * 2);
+    const targetColumn = preview.centerColumn + (moveDelta.columnOffset * 2);
+
+    // Check bounds
+    if (targetRow < 0 || targetColumn < 0 || targetRow >= this.gridRowCount || targetColumn >= this.gridColumnCount) {
+      return false;
+    }
+
+    // Check if square is filled
+    const filledSquares = this.filledSquaresByDungon()[preview.dungonId] ?? {};
+    if (!filledSquares[this.getSquareKey(targetRow, targetColumn)]) {
+      return false;
+    }
+
+    // Check for live monster at target
+    const hasMonsterAtTarget = this.monsterInstances().some(
+      (m) => !m.isDead && m.row === targetRow && m.column === targetColumn
+    );
+    if (hasMonsterAtTarget) return false;
+
+    // Check for obstacle at target
+    const obstaclesForDungon = this.obstaclePlacementsByDungon()[preview.dungonId] ?? [];
+    const hasObstacleAtTarget = obstaclesForDungon.some(
+      (obs) => obs.row === targetRow && obs.column === targetColumn && !obs.isDestroyed
+    );
+    if (hasObstacleAtTarget) return false;
+
+    // Check for visible trap at target
+    const visibleTrap = this.getActiveFloorTrapAtSquare(preview.dungonId, targetRow, targetColumn);
+    if (visibleTrap !== null && !visibleTrap.isDisarmed) {
+      return false;
+    }
+
+    return true;
+  }
+
+  tryJump(): void {
+    if (!this.canJump()) return;
+
+    const preview = this.gridPreviewContext();
+    if (!preview) return;
+
+    const cheater = this.cheaterByDungon()[preview.dungonId] ?? DEFAULT_CHEATER;
+    const moveDelta = this.getMovementDeltaForFacingDirection(cheater.facingDir);
+    const targetRow = preview.centerRow + (moveDelta.rowOffset * 2);
+    const targetColumn = preview.centerColumn + (moveDelta.columnOffset * 2);
+
+    // Get jump bonuses
+    let jumpBonus = 0;
+    const cls = (this.playerType() ?? '').trim().toLowerCase();
+    const species = (this.playerSpecies() ?? '').trim().toLowerCase();
+
+    // +3 for Thiefs
+    if (cls === 'thieph' || cls === 'theph') {
+      jumpBonus += 3;
+    }
+    // +2 for Elves
+    if (cls === 'elf' || cls === 'elve' || cls === 'elves' || species === 'elf' || species === 'elve' || species === 'elves') {
+      jumpBonus += 2;
+    }
+
+    // Roll jump check (Str + 1d6 + bonus)
+    const strModifier = Math.floor(this.getEffectivePlayerStrength() / 2); // Str as modifier (floor division by 2)
+    const d6Roll = this.randomInt(1, 6);
+
+    let jumpRoll = strModifier + d6Roll + jumpBonus;
+    let roll2 = null;
+    let adv = false;
+
+    // Thiefs get advantage on jump
+    if (cls === 'thieph' || cls === 'theph') {
+      const d6Roll2 = this.randomInt(1, 6);
+      roll2 = strModifier + d6Roll2 + jumpBonus;
+      jumpRoll = Math.max(jumpRoll, roll2);
+      adv = true;
+    }
+
+    // Determine DC - base 3 + (trap damage if there's a hidden trap at destination)
+    // NOTE: Awaiting clarification on whether to use max or average trap damage
+    let dc = 3;
+    const hiddenTrap = this.getActiveFloorTrapAtSquare(preview.dungonId, targetRow, targetColumn);
+    if (hiddenTrap !== null && hiddenTrap.isTriggered) {
+      // If there's a triggered trap (shouldn't be visible but might be marked triggered), still check
+      if (hiddenTrap.trap.damage) {
+        dc += hiddenTrap.trap.damage; // Using damage field directly; TODO: confirm if max or avg
+      }
+    }
+
+    const success = jumpRoll >= dc;
+
+    // Build log message
+    let logMsg = `Jump attempt: (Str mod ${strModifier} + 1d6(${d6Roll})${jumpBonus > 0 ? ` + ${jumpBonus}` : ''} = ${jumpRoll}`;
+    if (adv && roll2 !== null) {
+      logMsg += ` advantage rolls: ${jumpRoll} and ${roll2})`;
+    } else {
+      logMsg += `)`;
+    }
+    logMsg += ` vs DC ${dc}: ${success ? 'SUCCESS!' : 'FAILED!'}`;
+    this.addCombatLog(logMsg);
+
+    if (success) {
+      // Move player
+      this.consumePlayerAE(3, preview.dungonId);
+      const halfDimension = Math.floor(this.previewGridDimension / 2);
+      this.gridPreviewContext.set({
+        ...preview,
+        centerRow: targetRow,
+        centerColumn: targetColumn,
+        startRow: targetRow - halfDimension,
+        startColumn: targetColumn - halfDimension,
+      });
+
+      this.addCombatLog(`You leap forward safely, landing 2 squares away!`);
+      this.previewActionMessage.set(`Jump successful! You land safely.`);
+      this.logNearbyAfterMove();
+      this.triggerNpcGreetings();
+      this.playStepSound(0.22);
+      this.drawPreviewGridCanvas();
+
+      // Skip floor trap triggering for successful jump
+      if (this.turnPhase() === 'player' && this.playerAE() <= 0) {
+        this.startMonsterTurns();
+      }
+    } else {
+      this.addCombatLog(`Your jump fails. You stay in place.`);
+      this.previewActionMessage.set(`Jump failed! You couldn't make the distance.`);
+    }
+  }
+
   isHealingPotion(tresher: Tresher): boolean {
     return (tresher.type ?? 'OtherTresher') === 'Potion' || this.getHealingPotionAmount(tresher) > 0;
   }

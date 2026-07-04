@@ -996,45 +996,52 @@
 						</div>
 						<div class="fpv-actions-block">
 							<div class="fpv-action-grid" aria-label="Action icons">
-								<div class="fpv-action-grid-row">
-									<button type="button" class="fpv-icon-btn fpv-icon-btn-eye" title="Search (costs 1 AE)" [class.fpv-icon-btn-active]="canSearch()" [class.fpv-icon-btn-blink]="isThiephTrapSenseActive()" [disabled]="!canSearch()" (click)="searchForTraps()">👁</button>
-									<button type="button" class="fpv-icon-btn" title="Drink Potion" (click)="openDrinkPotionModal()">🧪</button>
-									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canPickAny()" title="Pick Lock / Disarm Trap" (click)="handlePickActionIcon()"><span class="pick-icon">&#x2310;&#xAC;</span></button>
-								</div>
-								<div class="fpv-action-grid-row">
-									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="hasCurrentSquarePickupItems()" title="Take Tresher" (click)="takeAllFromCurrentSquare()">&#x1F4B0;</button>
-									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canUseSneek()" [class.fpv-icon-btn-sneek-active]="playerSneekRoundsRemaining() > 0" [disabled]="!canUseSneek() && playerSneekRoundsRemaining() === 0" title="Sneek (Thieph/Shorties: free, lasts round | Others: 1 AE, re-check each action)" (click)="trySneek()">🤷</button>
-									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canTalkToNpc()" title="Talk to NPC" (click)="talkToNpc()">💬</button>
-								</div>
-								<div class="fpv-action-grid-row">
-									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canUnlockAnyDoor()" title="Use Key" (click)="handleUnlockActionIcon()">🔑</button>
-									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canOpenAnyDoor()" title="Open Door" (click)="handleOpenActionIcon()">🚪</button>
-									<button type="button" class="fpv-icon-btn" title="Backpack Inventory" (click)="openBackpackInventoryModal()">🎒</button>
-								</div>
+								<!-- Row 1: Back, Up, Forward -->
 								<div class="fpv-action-grid-row">
 									<button type="button" class="fpv-icon-btn" title="Move Backward" (click)="moveBackward()">🔙</button>
 									<button type="button" class="fpv-icon-btn" title="Face Up" (click)="setFacingDirectionFromPad('up')">↑</button>
-									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canUseQuickCastIcon() || canBoostAttack()" [disabled]="!(canUseQuickCastIcon() || canBoostAttack())" title="{{ isFighterClass() ? 'Boost Attack' : 'Cast Default Spell' }}" (click)="quickCastFromIcon()">{{ isFighterClass() ? '💥' : '✨' }}</button>
+									<button type="button" class="fpv-icon-btn fpv-forward-btn" title="Move Forward (costs 1 AE)" [disabled]="playerAE() < 1 || turnPhase() !== 'player'" (click)="moveForward()">
+										<span class="fpv-forward-icon" aria-hidden="true">🦶</span>
+										<span class="fpv-forward-label">forward</span>
+									</button>
 								</div>
+								<!-- Row 2: Left, Attack, Right -->
 								<div class="fpv-action-grid-row">
 									<button type="button" class="fpv-icon-btn" title="Face Left" (click)="setFacingDirectionFromPad('left')">←</button>
 									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canPlayerAttack() || canAttackUnarmed()" title="{{ hasWeaponEquipped() ? 'Attack' : 'Unarmed Attack' }}" [disabled]="!canPlayerAttack()" (click)="tryPlayerAttack()">{{ hasWeaponEquipped() ? '⚔' : '✊' }}</button>
 									<button type="button" class="fpv-icon-btn" title="Face Right" (click)="setFacingDirectionFromPad('right')">→</button>
 								</div>
+								<!-- Row 3: Defend, Down, Class Ability -->
+								<div class="fpv-action-grid-row">
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canPlayerDefend()" [attr.data-stacks]="playerDefendStacks() > 0 ? playerDefendStacks() : null" title="Defend (costs 1 AE, +2 AC vs next attack)" (click)="tryPlayerDefend()">🛡</button>
+									<button type="button" class="fpv-icon-btn" title="Face Down" (click)="setFacingDirectionFromPad('down')">↓</button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canUseQuickCastIcon() || canBoostAttack()" [disabled]="!(canUseQuickCastIcon() || canBoostAttack())" title="{{ isFighterClass() ? 'Boost Attack' : 'Cast Default Spell' }}" (click)="quickCastFromIcon()">{{ isFighterClass() ? '💥' : (isMageClass() ? '✨' : (isHealerClass() ? '✨' : (isThiephClass() ? '🤐' : '✨'))) }}</button>
+								</div>
+								<!-- Row 4: Take Tresher, Search, Jump -->
+								<div class="fpv-action-grid-row">
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="hasCurrentSquarePickupItems()" title="Take Tresher" (click)="takeAllFromCurrentSquare()">💰</button>
+									<button type="button" class="fpv-icon-btn fpv-icon-btn-eye" title="Search (costs 1 AE)" [class.fpv-icon-btn-active]="canSearch()" [class.fpv-icon-btn-blink]="isThiephTrapSenseActive()" [disabled]="!canSearch()" (click)="searchForTraps()">👁</button>
+									<button type="button" class="fpv-icon-btn" title="Jump — costs 3 AE. Jump 2 squares forward. Target square must be clear of monsters, obstacles, and visible traps. Roll: Str + 1d6 + class bonus vs DC 3 + trap damage. Thiefs get +3 and advantage." [disabled]="!canJump()" (click)="tryJump()">🦘</button>
+								</div>
+								<!-- Row 5: Use Key, Pick Lock, Open Door -->
+								<div class="fpv-action-grid-row">
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canUnlockAnyDoor()" title="Use Key" (click)="handleUnlockActionIcon()">🔑</button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canPickAny()" title="Pick Lock / Disarm Trap" (click)="handlePickActionIcon()"><span class="pick-icon">&#x2310;&#xAC;</span></button>
+									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canOpenAnyDoor()" title="Open Door" (click)="handleOpenActionIcon()">🚪</button>
+								</div>
+								<!-- Row 6: Backpack, Potion, ADE -->
+								<div class="fpv-action-grid-row">
+									<button type="button" class="fpv-icon-btn" title="Backpack Inventory" (click)="openBackpackInventoryModal()">🎒</button>
+									<button type="button" class="fpv-icon-btn" title="Drink Potion" (click)="openDrinkPotionModal()">🧪</button>
+									<button type="button" class="fpv-icon-btn fpv-ade-btn" title="Attack + Defend + End Turn (requires 2 AE)" [disabled]="!canAde()" (click)="tryAde()">
+										<span class="fpv-ade-icon" aria-hidden="true">⚔</span>
+										<span class="fpv-ade-icon" aria-hidden="true">🛡</span>
+										<span class="fpv-ade-icon fpv-ade-arrow" aria-hidden="true">▶</span>
+									</button>
+								</div>
+								<!-- Row 7: End Turn, Help -->
 								<div class="fpv-action-grid-row">
 									<button type="button" class="fpv-icon-btn" title="End Turn" (click)="endPlayerTurnEarly()">⏭️</button>
-									<button type="button" class="fpv-icon-btn" title="Face Down" (click)="setFacingDirectionFromPad('down')">↓</button>
-									<button type="button" class="fpv-icon-btn" [class.fpv-icon-btn-active]="canPlayerDefend()" [attr.data-stacks]="playerDefendStacks() > 0 ? playerDefendStacks() : null" title="Defend (D) - costs 1 AE, +2 AC vs next attack" (click)="tryPlayerDefend()">🛡</button>
-								</div>
-								<div class="fpv-action-grid-row">
-									<button
-										type="button"
-										class="fpv-icon-btn"
-										[class.fpv-icon-btn-active]="canOpenReadableNowModal()"
-										[disabled]="!canOpenReadableNowModal()"
-										title="Readable text nearby"
-										(click)="openReadableNowModal()"
-									>📖</button>
 									<button type="button" class="fpv-icon-btn fpv-help-icon-btn" title="Controls Help" (click)="openControlsHelpModal()">?</button>
 									<span class="fpv-icon-btn-spacer" aria-hidden="true"></span>
 								</div>
