@@ -50,6 +50,73 @@
   </div>
 }
 
+<!-- ── Tavern dungeon picker modal ─────────────────────────────────── -->
+@if (showTavernDungeonPicker()) {
+  <div class="tut-backdrop">
+    <div class="tut-modal">
+
+      <!-- Keeper image -->
+      <div class="tut-keeper-wrap">
+        <img
+          src="images/taren1.jpg"
+          alt="Tavern Keeper Cellen"
+          class="tut-keeper-img"
+        />
+      </div>
+
+      <!-- Content -->
+      <div class="tut-content">
+        <div class="tut-header">
+          <span class="tut-speaker">Cellen:</span>
+          <h2 class="tut-title">Welcome, Adventurer!</h2>
+        </div>
+
+        <p class="tut-text">Which dungeon would you like to explore?</p>
+
+        <!-- Dungeon carousel -->
+        <div class="sg-tavern-carousel">
+          <button
+            type="button"
+            class="sg-tavern-nav"
+            [disabled]="sampleDungons().length <= 1"
+            (click)="tavernPreviousDungon()"
+            aria-label="Previous dungeon"
+          >
+            &#10094;
+          </button>
+
+          @if (tavernPickerDungon(); as dungon) {
+            <article class="sg-tavern-card">
+              <p class="sg-carousel-count">{{ tavernDungeonPickerIndex() + 1 }} / {{ sampleDungons().length }}</p>
+              <h4 class="sg-tavern-dungon-name">{{ dungon.name }}</h4>
+              <p class="sg-tavern-dungon-desc">{{ dungon.description }}</p>
+            </article>
+          }
+
+          <button
+            type="button"
+            class="sg-tavern-nav"
+            [disabled]="sampleDungons().length <= 1"
+            (click)="tavernNextDungon()"
+            aria-label="Next dungeon"
+          >
+            &#10095;
+          </button>
+        </div>
+
+        <!-- Navigation buttons -->
+        <div class="tut-nav">
+          <button type="button" class="tut-btn tut-btn-back" (click)="changePc()">← Change Character</button>
+          @if (tavernPickerDungon(); as dungon) {
+            <button type="button" class="tut-btn tut-btn-play" (click)="selectDungonFromTavern(dungon)">Choose Dungeon ▶</button>
+          }
+        </div>
+      </div>
+
+    </div>
+  </div>
+}
+
 <section class="sg-page">
 
   <!-- ── Beta notice ───────────────────────────────────────────── -->
@@ -61,44 +128,11 @@
   <header class="sg-hero">
     <h2>Try a Sample Game</h2>
     <p>
-      See what TDODJ is all about before you sign up. Below are the published sample dungeons and
-      the pre-built character you would take into them. When you're ready to play for real — create
-      an account, pick your own character, and dive in.
+      See what TDODJ is all about before you sign up. Choose a pre-built character below and pick
+      a sample dungeon from the tavern. When you're ready to play for real — create an account,
+      pick your own character, and dive in.
     </p>
   </header>
-
-  @if (!isLoading() && !hasError() && sampleDungons().length > 0) {
-    <section class="sg-dungeon-picker">
-      <div class="sg-dungeon-picker-header">
-        <h3>Choose a Sample Dungeon</h3>
-        <p>Pick one dungeon below. Switching dungeons will reset the chosen character.</p>
-      </div>
-
-      <div class="sg-dungeon-grid">
-        @for (sample of sampleDungons(); track sample.id) {
-          <button
-            type="button"
-            class="sg-dungeon-card"
-            [class.sg-dungeon-card-active]="dungon()?.id === sample.id"
-            (click)="selectDungon(sample)"
-          >
-            <span class="sg-dungeon-card-name">{{ sample.name }}</span>
-            @if (resolveImageUrl(sample.imagePath); as imageUrl) {
-              @if (imageUrl) {
-                <img
-                  class="sg-dungeon-card-image"
-                  [src]="imageUrl"
-                  [alt]="sample.name + ' image'"
-                />
-              } @else {
-                <span class="sg-dungeon-card-no-image">No image</span>
-              }
-            }
-          </button>
-        }
-      </div>
-    </section>
-  }
 
   <section class="sg-howto">
     <h3>How it Works in 30 Seconds</h3>
@@ -143,8 +177,8 @@
     </div>
   }
 
-  <!-- ── PC picker (dungeon loaded, no PC selected yet, multiple choices) ── -->
-  @if (!isLoading() && !hasError() && dungon() && samplePcs().length > 0 && !selectedPc()) {
+  <!-- ── PC picker (PC selection at start) ── -->
+  @if (!isLoading() && !hasError() && samplePcs().length > 0 && !selectedPc()) {
     <section class="sg-picker">
       <h3 class="sg-picker-title">Choose Your Character</h3>
       <p class="sg-picker-subtitle">Pick one of these pre-built adventurers to take into the dungeon.</p>
@@ -232,14 +266,14 @@
   }
 
   <!-- ── No sample PCs configured ─────────────────────────────── -->
-  @if (!isLoading() && !hasError() && dungon() && samplePcs().length === 0) {
+  @if (!isLoading() && !hasError() && samplePcs().length === 0) {
     <div class="sg-no-sample">
       <p>No sample characters have been configured yet. Check back soon!</p>
     </div>
   }
 
   <!-- ── Sample dungeon + selected PC ──────────────────────────── -->
-  @if (!isLoading() && !hasError() && dungon()) {
+  @if (!isLoading() && !hasError() && dungon() && selectedPc()) {
     <section class="sg-card sg-card-dungon sg-dungeon-overview">
       <div class="sg-card-label">Sample Dungeon</div>
       <h3>{{ dungon()!.name }}</h3>
@@ -253,11 +287,6 @@
           <p class="sg-intro-label">Dungeon Intro</p>
           <p class="sg-intro-text">{{ dungon()!.intro }}</p>
         </div>
-      }
-      @if (selectedPc()) {
-        <button type="button" class="sg-play-btn" (click)="playNow()">
-          ▶ Play {{ dungon()!.name }}
-        </button>
       }
     </section>
   }

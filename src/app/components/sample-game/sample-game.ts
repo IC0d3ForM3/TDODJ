@@ -179,6 +179,10 @@ export class SampleGame implements OnInit {
   readonly isLoading = signal(true);
   readonly hasError = signal(false);
 
+  // ── Tavern dungeon picker modal ───────────────────────────────
+  readonly showTavernDungeonPicker = signal(false);
+  readonly tavernDungeonPickerIndex = signal(0);
+
   // ── Tavern tutorial ───────────────────────────────────────────
   readonly showTutorial = signal(false);
   readonly tutorialPageIndex = signal(0);
@@ -272,6 +276,8 @@ export class SampleGame implements OnInit {
 
   selectPc(pc: SamplePc): void {
     this.selectedPc.set(pc);
+    this.tavernDungeonPickerIndex.set(0);
+    this.showTavernDungeonPicker.set(true);
   }
 
   selectDungon(dungon: SampleDungon): void {
@@ -311,16 +317,51 @@ export class SampleGame implements OnInit {
 
   startWithPickerPc(): void {
     const pc = this.pickerPc();
-    if (!pc || !this.dungon()) {
+    if (!pc) {
       return;
     }
     this.selectPc(pc);
-    this.tutorialPageIndex.set(0);
-    this.showTutorial.set(true);
   }
 
   changePc(): void {
     this.selectedPc.set(null);
+    this.showTavernDungeonPicker.set(false);
+  }
+
+  tavernPickerDungon(): SampleDungon | null {
+    const dungons = this.sampleDungons();
+    if (dungons.length === 0) {
+      return null;
+    }
+    const index = this.tavernDungeonPickerIndex();
+    if (index < 0 || index >= dungons.length) {
+      this.tavernDungeonPickerIndex.set(0);
+      return dungons[0];
+    }
+    return dungons[index];
+  }
+
+  tavernPreviousDungon(): void {
+    const dungons = this.sampleDungons();
+    if (dungons.length <= 1) {
+      return;
+    }
+    this.tavernDungeonPickerIndex.update((index) => (index - 1 + dungons.length) % dungons.length);
+  }
+
+  tavernNextDungon(): void {
+    const dungons = this.sampleDungons();
+    if (dungons.length <= 1) {
+      return;
+    }
+    this.tavernDungeonPickerIndex.update((index) => (index + 1) % dungons.length);
+  }
+
+  selectDungonFromTavern(dungon: SampleDungon): void {
+    this.dungon.set(dungon);
+    this.showTavernDungeonPicker.set(false);
+    this.tutorialPageIndex.set(0);
+    this.showTutorial.set(true);
   }
 
   playNow(): void {
