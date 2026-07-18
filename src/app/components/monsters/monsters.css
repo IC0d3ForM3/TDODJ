@@ -359,7 +359,8 @@
   font-size: 0.85rem;
   margin: 0.25rem 0;
 }
-.mn-message-error { color: #f08080; }
+.mn-message--success { color: #6fcf7a; font-weight: 600; }
+.mn-message--error   { color: #f08080; font-weight: 600; }
 
 /* ── Responsive: stack on small screens ────── */
 @media (max-width: 720px) {

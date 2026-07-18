@@ -21,11 +21,38 @@
 					type="button"
 					class="details-toggle"
 					(click)="toggleSelectedDungonDetails()"
-					[attr.aria-label]="isSelectedDungonExpanded() ? 'Hide dungeon details' : 'Show dungeon details'"
+					[attr.aria-label]="isSelectedDungonExpanded() ? 'Show toolbar' : 'Hide toolbar'"
 					[attr.aria-expanded]="!isSelectedDungonExpanded()"
 				>
-					{{ isSelectedDungonExpanded() ? '▼' : '▶' }}
+					{{ isSelectedDungonExpanded() ? '▶' : '▼' }}
 				</button>
+				<div class="publish-actions-column" style="margin-left:auto; flex-direction:row; gap:0.4rem;">
+					<button
+						type="button"
+						class="save-button"
+						[disabled]="isSavingDungonJson() || isPublishingDungon() || !selectedDungonId()"
+						(click)="openTestPcDialog()"
+					>Test</button>
+					<button
+						type="button"
+						class="save-button"
+						[disabled]="isPublishingDungon() || !canOpenPublishDialog()"
+						(click)="openPublishDialog()"
+					>
+						@if (isPublishingDungon()) { Publishing... } @else { {{ publishButtonText() }} }
+					</button>
+					@if (account.isAdmin() && selectedDungon()?.status === 'pending') {
+						<button type="button" class="save-button" (click)="approveDungon()">Approve Public</button>
+					}
+					@if (hasUnsavedDungonJson()) {
+						<button
+							type="button"
+							class="save-button"
+							[disabled]="isSavingDungonJson()"
+							(click)="saveDungonJson()"
+						>@if (isSavingDungonJson()) { Saving... } @else { Save }</button>
+					}
+				</div>
 			}
 		</div>
 		<div class="creator-divider" aria-hidden="true"></div>
@@ -200,10 +227,10 @@
 							type="button"
 							class="details-toggle"
 							(click)="toggleSelectedDungonDetails()"
-							[attr.aria-label]="isSelectedDungonExpanded() ? 'Hide dungeon details' : 'Show dungeon details'"
+							[attr.aria-label]="isSelectedDungonExpanded() ? 'Show toolbar' : 'Hide toolbar'"
 							[attr.aria-expanded]="!isSelectedDungonExpanded()"
 						>
-							{{ isSelectedDungonExpanded() ? '▼' : '▶' }}
+							{{ isSelectedDungonExpanded() ? '▶' : '▼' }}
 						</button>
 					</div>
 				}
@@ -401,49 +428,7 @@
 									<button type="button" class="cancel-button" style="padding:0.2rem 0.45rem" (click)="cancelGenerateAnchorPickMode()">Cancel</button>
 								</div>
 							}
-							<div class="publish-actions-column">
-								<button
-									type="button"
-									class="save-button"
-									[disabled]="isPublishingDungon() || !canOpenPublishDialog()"
-									(click)="openPublishDialog()"
-								>
-									@if (isPublishingDungon()) {
-										Publishing...
-									} @else {
-										{{ publishButtonText() }}
-									}
-								</button>
-
-								@if (account.isAdmin() && selectedDungon()?.status === 'pending') {
-									<button
-										type="button"
-										class="save-button"
-										(click)="approveDungon()"
-									>
-										Approve Public
-									</button>
-								}
-
-								@if (hasUnsavedDungonJson()) {
-									<button
-										type="button"
-										class="save-button"
-										[disabled]="isSavingDungonJson()"
-										(click)="saveDungonJson()"
-									>
-										@if (isSavingDungonJson()) {
-											Saving...
-										} @else {
-											Save
-										}
-									</button>
-								}
-							</div>
 						</div>
-						@if (dungonJsonSaveError()) {
-							<small class="details-message details-message-error">{{ dungonJsonSaveError() }}</small>
-						}
 						@if (selectedKeyForPlacement(); as selectedKey) {
 							<span class="details-message">
 								{{ isKeyPlacedOnGrid(selectedKey.id) ? 'moving' : 'placing' }} {{ selectedKey.name }} — click a white square
@@ -810,6 +795,10 @@
 						</select>
 						</div>
 					</div>
+				}
+
+				@if (dungonJsonSaveError()) {
+					<small class="details-message details-message-error">{{ dungonJsonSaveError() }}</small>
 				}
 
 				@if (isSelectedDungonExpanded()) {
@@ -1204,7 +1193,7 @@
 						<label class="tresher-field"><span>Last For 2 (0 = Indefinite)</span><input type="number" formControlName="lastFor2" min="0" /></label>
 						<div class="spell-effect-divider" aria-hidden="true"></div>
 
-						<label class="tresher-field"><span>Effect Type</span><select formControlName="effectType" (change)="onSpellEffectTypeChange()"><option value="Fire">Fire</option><option value="Ice">Ice</option><option value="Lightning">Lightning</option><option value="Other">Other</option></select></label>
+						<label class="tresher-field"><span>Effect Type</span><select formControlName="effectType" (change)="onSpellEffectTypeChange()"><option value="Fire">Fire</option><option value="Ice">Ice</option><option value="Lightning">Lightning</option><option value="Splah">Splah</option><option value="Other">Other</option></select></label>
 						<label class="tresher-field"><span>Effect Color</span><input type="color" formControlName="effectColor" style="width:3.5rem;height:2rem;padding:0.1rem;cursor:pointer" /></label>
 						<label class="tresher-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
 						<label class="tresher-field"><span>Skill Points</span><input type="number" formControlName="sp" min="0" /></label>
@@ -2209,7 +2198,7 @@
 				<label class="form-label" for="monster-ac">AC</label>
 				<input id="monster-ac" class="form-input" type="number" min="0" formControlName="ac" />
 
-				<label class="form-label" for="monster-movement-economy">Movement Economy</label>
+				<label class="form-label" for="monster-movement-economy">Action Economy (AE)</label>
 				<input
 					id="monster-movement-economy"
 					class="form-input"
@@ -2220,6 +2209,15 @@
 
 				<label class="form-label" for="monster-run-at">Run At (HP)</label>
 				<input id="monster-run-at" class="form-input" type="number" min="0" formControlName="runAt" />
+
+				<label class="form-label" for="monster-magic">Magic</label>
+				<input id="monster-magic" class="form-input" type="number" min="0" formControlName="magic" />
+
+				<label class="form-label" for="monster-magic-resistance">Magic Resistance</label>
+				<input id="monster-magic-resistance" class="form-input" type="number" min="0" formControlName="magicResistance" />
+
+				<label class="form-label" for="monster-cast-plus">Cast+</label>
+				<input id="monster-cast-plus" class="form-input" type="number" min="0" formControlName="castPlus" />
 
 				<label class="form-label" for="monster-number-of-attacks"># Attacks (per turn)</label>
 				<input id="monster-number-of-attacks" class="form-input" type="number" min="1" max="10" [value]="editingMonsterNumberOfAttacks()" (input)="setMonsterNumberOfAttacks($any($event.target).value)" title="How many times this monster attacks per turn (independent of how many attack types it has)" />
@@ -3396,5 +3394,128 @@
 				</div>
 			</form>
 		</section>
+	</div>
+}
+@if (isTestPcDialogVisible()) {
+	<div class="door-dialog-backdrop" (click)="closeTestPcDialog()">
+		<div class="door-dialog test-pc-dialog" role="dialog" aria-modal="true" aria-label="Test dungeon setup" (click)="$event.stopPropagation()">
+			<h3 class="door-dialog-title">Dungeon Test Setup</h3>
+
+			@if (testPcError()) {
+				<p class="details-message details-message-error">{{ testPcError() }}</p>
+			}
+
+			@if (testPcMode() === 'select') {
+				@if (testPcProfiles().length === 0) {
+					<p class="details-message">No test PC yet. Create one now.</p>
+					<button type="button" class="save-button" (click)="switchToCreateTestPc()">Create Test PC</button>
+				} @else {
+					<label class="form-label" for="test-pc-select">Select Test PC</label>
+					<select id="test-pc-select" class="form-input" [value]="selectedTestPcId() ?? ''" (change)="selectedTestPcId.set(($any($event.target)).value || null)">
+						@for (profile of testPcProfiles(); track profile.id) {
+							<option [value]="profile.id">{{ profile.name }} ({{ profile.species }} {{ profile.type }})</option>
+						}
+					</select>
+
+					<div class="form-actions">
+						<button type="button" class="save-button" (click)="launchTestWithSelectedPc()">Start Test</button>
+						<button type="button" class="save-button" (click)="editSelectedTestPc()">Edit</button>
+						<button type="button" class="cancel-button" (click)="deleteSelectedTestPc()">Delete</button>
+						<button type="button" class="save-button" (click)="switchToCreateTestPc()">New Test PC</button>
+						<button type="button" class="cancel-button" (click)="closeTestPcDialog()">Close</button>
+					</div>
+				}
+			} @else {
+				<form [formGroup]="testPcForm" class="create-dungon-form" (ngSubmit)="saveTestPcProfile()">
+					<label class="form-label" for="test-pc-name">Name</label>
+					<input id="test-pc-name" class="form-input" type="text" formControlName="name" />
+
+					<label class="form-label" for="test-pc-species">Species</label>
+					<select id="test-pc-species" class="form-input" formControlName="species">
+						@for (option of testPcSpeciesOptions; track option.value) {
+							<option [value]="option.value">{{ option.label }}</option>
+						}
+					</select>
+
+					<label class="form-label" for="test-pc-type">Class</label>
+					<select id="test-pc-type" class="form-input" formControlName="type">
+						@for (option of testPcClassOptions; track option.value) {
+							<option [value]="option.value">{{ option.label }}</option>
+						}
+					</select>
+
+					<div class="test-pc-grid">
+						<label class="form-label" for="test-pc-maxhp">Max HP</label>
+						<input id="test-pc-maxhp" class="form-input" type="number" min="1" formControlName="maxHP" />
+						<label class="form-label" for="test-pc-curhp">Current HP</label>
+						<input id="test-pc-curhp" class="form-input" type="number" min="0" formControlName="currentHP" />
+						<label class="form-label" for="test-pc-ac">AC</label>
+						<input id="test-pc-ac" class="form-input" type="number" min="1" formControlName="ac" />
+						<label class="form-label" for="test-pc-ae">AE</label>
+						<input id="test-pc-ae" class="form-input" type="number" min="1" formControlName="actionEconomy" />
+						<label class="form-label" for="test-pc-str">STR</label>
+						<input id="test-pc-str" class="form-input" type="number" min="0" formControlName="strength" />
+						<label class="form-label" for="test-pc-sta">STA</label>
+						<input id="test-pc-sta" class="form-input" type="number" min="0" formControlName="stamina" />
+						<label class="form-label" for="test-pc-mind">MIND</label>
+						<input id="test-pc-mind" class="form-input" type="number" min="0" formControlName="mind" />
+						<label class="form-label" for="test-pc-mp">Magic Power</label>
+						<input id="test-pc-mp" class="form-input" type="number" min="0" formControlName="magicPower" />
+						<label class="form-label" for="test-pc-noa"># Attacks</label>
+						<input id="test-pc-noa" class="form-input" type="number" min="1" formControlName="numberOfAttacks" />
+						<label class="form-label" for="test-pc-nod"># Defends</label>
+						<input id="test-pc-nod" class="form-input" type="number" min="1" formControlName="numberOfDefends" />
+						<label class="form-label" for="test-pc-rov">Range of View</label>
+						<input id="test-pc-rov" class="form-input" type="number" min="1" formControlName="rangeOfView" />
+					</div>
+
+					<div class="test-pc-assets-row">
+						<div class="test-pc-assets-col">
+							<p class="form-label">Items</p>
+							<div class="test-pc-assets-list">
+								@for (entry of testPcItemOptions(); track entry.id) {
+									<label class="form-checkbox test-pc-assets-option">
+										<input type="checkbox" [checked]="isTestPcAssetSelected('item', entry.id)" (change)="onTestPcAssetToggle('item', entry.id, $event)" />
+										<span>{{ entry.name }}</span>
+									</label>
+								}
+							</div>
+						</div>
+						<div class="test-pc-assets-col">
+							<p class="form-label">Spells</p>
+							<div class="test-pc-assets-list">
+								@for (entry of testPcSpellOptions(); track entry.id) {
+									<label class="form-checkbox test-pc-assets-option">
+										<input type="checkbox" [checked]="isTestPcAssetSelected('spell', entry.id)" (change)="onTestPcAssetToggle('spell', entry.id, $event)" />
+										<span>{{ entry.name }}</span>
+									</label>
+								}
+							</div>
+						</div>
+						<div class="test-pc-assets-col">
+							<p class="form-label">Potions</p>
+							<div class="test-pc-assets-list">
+								@for (entry of testPcPotionOptions(); track entry.id) {
+									<label class="form-checkbox test-pc-assets-option">
+										<input type="checkbox" [checked]="isTestPcAssetSelected('potion', entry.id)" (change)="onTestPcAssetToggle('potion', entry.id, $event)" />
+										<span>{{ entry.name }}</span>
+									</label>
+								}
+							</div>
+						</div>
+					</div>
+
+					@if (testPcSaveError()) {
+						<p class="details-message details-message-error">{{ testPcSaveError() }}</p>
+					}
+
+					<div class="form-actions">
+						<button type="submit" class="save-button">Save Test PC</button>
+						<button type="button" class="cancel-button" (click)="testPcMode.set('select')">Back</button>
+						<button type="button" class="cancel-button" (click)="closeTestPcDialog()">Close</button>
+					</div>
+				</form>
+			}
+		</div>
 	</div>
 }

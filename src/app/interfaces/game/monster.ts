@@ -12,6 +12,7 @@ export interface MonsterAttack {
 
 export interface Monster {
   id: number;
+  monsterDbId?: number;
   imageId: number | null;
   soundId: number | null;
   tresherIds: number[];
@@ -28,6 +29,7 @@ export interface Monster {
   spReward: number;
   magic: number;
   magicResistance: number;
+  castPlus?: number;
   callsReinforcements: boolean;
   reinforcementCount: number;
   reinforcementMonsterName: string | null;

@@ -287,6 +287,7 @@ CREATE TABLE IF NOT EXISTS monsters (
   numberofattacks            INTEGER      NOT NULL DEFAULT 1,
   magic                      INTEGER      NOT NULL DEFAULT 0,
   magicresistance            INTEGER      NOT NULL DEFAULT 0,
+  castplus                   INTEGER      NOT NULL DEFAULT 0,
   spreward                   INTEGER      NOT NULL DEFAULT 0,
   tohitplusneeded            INTEGER      NOT NULL DEFAULT 0,
   callsreinforcements        BOOLEAN      NOT NULL DEFAULT FALSE,

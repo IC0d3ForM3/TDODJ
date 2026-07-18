@@ -40,11 +40,12 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 const EFFECT_TO_OPTIONS = new Set([
     'HP', 'Defense', 'Stamina', 'Mind', 'Magic', 'Sight', 'ROS', 'AE', 'Action Economy', '# of Attacks', '# of attacks #OA', 'Remove Curse',
 ]);
-const EFFECT_TYPE_OPTIONS = new Set(['Fire', 'Ice', 'Lightning', 'Other']);
+const EFFECT_TYPE_OPTIONS = new Set(['Fire', 'Ice', 'Lightning', 'Splah', 'Other']);
 const EFFECT_TYPE_DEFAULT_COLORS = {
     Fire: '#ee3300',
     Ice: '#88ddff',
     Lightning: '#4466ff',
+    Splah: '#55dd88',
     Other: '#ffffff',
 };
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{3,8}$/;

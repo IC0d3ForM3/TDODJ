@@ -35,6 +35,8 @@ import { Square } from '../../interfaces/square';
 import { Wall } from '../../interfaces/wall';
 import { Key } from '../../interfaces/key';
 import { API_BASE_URL } from '../../api-config';
+import { ActivatedRoute, Router } from '@angular/router';
+import { CreatorTestPcProfile, CreatorTestPcService } from '../../services/creator-test-pc';
 import {
   AdjacentConnectionInfo,
   Cheater,
@@ -213,6 +215,34 @@ interface GenerateItemBatch {
   count: number;
 }
 
+interface CreatorTestAssetOption {
+  id: number;
+  name: string;
+  description?: string;
+  payload: Record<string, unknown>;
+}
+
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+const TEST_PC_SPECIES_OPTIONS: SelectOption[] = [
+  { value: 'Human', label: 'Human' },
+  { value: 'Elph', label: 'Elph' },
+  { value: 'DwarPh', label: 'DwarPh' },
+  { value: 'Shorties', label: 'Shorties' },
+];
+
+const TEST_PC_CLASS_OPTIONS: SelectOption[] = [
+  { value: 'Fighter', label: 'Fighter' },
+  { value: 'Ranger', label: 'Ranger' },
+  { value: 'Wizard', label: 'Wizard' },
+  { value: 'Thieph', label: 'Thieph' },
+  { value: 'Cleric', label: 'Cleric' },
+  { value: 'Healer', label: 'Healer' },
+];
+
 interface SquareActionEntry {
   key: string;
   type: 'start' | 'exit' | 'portal' | 'monster' | 'tresher' | 'door' | 'trap' | 'obstacle' | 'item' | 'potion' | 'spell';
@@ -252,6 +282,9 @@ const DOOR_OBSTACLE_TRAP_TYPE_OPTIONS: TrapType[] = ['Dart', 'Gas Cloud'];
 })
 export class Creator implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly creatorTestPcService = inject(CreatorTestPcService);
   private readonly doorImageCache = new Map<string, HTMLImageElement>();
   private readonly stairsUpImageCache = new Map<string, HTMLImageElement>();
   private readonly stairsUpSquareAssignment = new Map<string, 1 | 2 | 3>();
@@ -315,6 +348,7 @@ export class Creator implements OnInit {
   readonly isGenerateAnchorPickMode = signal(false);
   readonly generateAnchorSquare = signal<{ row: number; column: number } | null>(null);
   readonly generateDungonError = signal<string | null>(null);
+  readonly pendingInitialSelectDungonId = signal<number | null>(null);
   get isPublishingDungon() { return this.publishService.isPublishingDungon; }
   get isPublishDialogVisible() { return this.publishService.isPublishDialogVisible; }
   get savedPublishUpdatesByDungon() { return this.publishService.savedPublishUpdatesByDungon; }
@@ -728,6 +762,38 @@ export class Creator implements OnInit {
   readonly createDungonImagePreviewUrl = signal<string>('');
   readonly editDungonImagePreviewUrl = signal<string>('');
 
+  readonly isTestPcDialogVisible = signal(false);
+  readonly testPcSpeciesOptions = TEST_PC_SPECIES_OPTIONS;
+  readonly testPcClassOptions = TEST_PC_CLASS_OPTIONS;
+  readonly testPcError = signal<string | null>(null);
+  readonly testPcSaveError = signal<string | null>(null);
+  readonly selectedTestPcId = signal<string | null>(null);
+  readonly testPcProfiles = signal<CreatorTestPcProfile[]>([]);
+  readonly testPcMode = signal<'select' | 'create' | 'edit'>('select');
+  readonly testPcItemOptions = signal<CreatorTestAssetOption[]>([]);
+  readonly testPcSpellOptions = signal<CreatorTestAssetOption[]>([]);
+  readonly testPcPotionOptions = signal<CreatorTestAssetOption[]>([]);
+  readonly testPcSelectedItemIds = signal<number[]>([]);
+  readonly testPcSelectedSpellIds = signal<number[]>([]);
+  readonly testPcSelectedPotionIds = signal<number[]>([]);
+
+  readonly testPcForm = new FormGroup({
+    name: new FormControl<string>('Test PC', { nonNullable: true, validators: [Validators.required] }),
+    species: new FormControl<string>('Human', { nonNullable: true, validators: [Validators.required] }),
+    type: new FormControl<string>('Fighter', { nonNullable: true, validators: [Validators.required] }),
+    maxHP: new FormControl<number>(20, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
+    currentHP: new FormControl<number>(20, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
+    ac: new FormControl<number>(10, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
+    actionEconomy: new FormControl<number>(3, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
+    mind: new FormControl<number>(10, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
+    stamina: new FormControl<number>(10, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
+    strength: new FormControl<number>(10, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
+    magicPower: new FormControl<number>(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
+    numberOfAttacks: new FormControl<number>(1, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
+    numberOfDefends: new FormControl<number>(1, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
+    rangeOfView: new FormControl<number>(5, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
+  });
+
   readonly editMetadataForm = new FormGroup<CreateDungonForm>({
     name: new FormControl('', {
       nonNullable: true,
@@ -873,6 +939,9 @@ export class Creator implements OnInit {
     movementEconomy: new FormControl<number>(0, { nonNullable: true }),
     ac: new FormControl<number>(10, { nonNullable: true }),
     runAt: new FormControl<number>(0, { nonNullable: true }),
+    magic: new FormControl<number>(0, { nonNullable: true }),
+    magicResistance: new FormControl<number>(0, { nonNullable: true }),
+    castPlus: new FormControl<number>(0, { nonNullable: true }),
     spReward: new FormControl<number>(0, {
       nonNullable: true,
       validators: [Validators.min(0)],
@@ -944,6 +1013,11 @@ export class Creator implements OnInit {
   }
 
   ngOnInit(): void {
+    const initialDungonIdRaw = this.route.snapshot.queryParamMap.get('dungonId') ?? '';
+    const initialDungonId = Number(initialDungonIdRaw);
+    if (Number.isInteger(initialDungonId) && initialDungonId > 0) {
+      this.pendingInitialSelectDungonId.set(initialDungonId);
+    }
     this.loadDungons();
     this.loadPublishFriends();
     this.loadTresherLibrary();
@@ -3109,6 +3183,287 @@ export class Creator implements OnInit {
       });
   }
 
+  openTestPcDialog(): void {
+    const dungonId = this.selectedDungonId();
+    if (!dungonId) {
+      this.testPcError.set('Save or select a dungeon first.');
+      return;
+    }
+
+    const userKey = this.account.getKey();
+    if (!userKey) {
+      this.testPcError.set('You must be logged in to test this dungeon.');
+      return;
+    }
+
+    this.testPcError.set(null);
+    this.testPcSaveError.set(null);
+    const profiles = this.creatorTestPcService.getProfiles(userKey, dungonId);
+    this.testPcProfiles.set(profiles);
+    this.selectedTestPcId.set(profiles[0]?.id ?? null);
+    this.testPcMode.set(profiles.length > 0 ? 'select' : 'create');
+    this.resetTestPcForm();
+    this.loadTestPcAssetOptions(userKey);
+    this.isTestPcDialogVisible.set(true);
+  }
+
+  closeTestPcDialog(): void {
+    this.isTestPcDialogVisible.set(false);
+  }
+
+  switchToCreateTestPc(): void {
+    this.testPcMode.set('create');
+    this.selectedTestPcId.set(null);
+    this.testPcSaveError.set(null);
+    this.resetTestPcForm();
+  }
+
+  editSelectedTestPc(): void {
+    const profile = this.currentSelectedTestPc();
+    if (!profile) {
+      this.testPcError.set('Select a test PC first.');
+      return;
+    }
+
+    this.testPcMode.set('edit');
+    this.testPcSaveError.set(null);
+    this.applyTestPcToForm(profile);
+  }
+
+  saveTestPcProfile(): void {
+    const userKey = this.account.getKey();
+    const dungonId = this.selectedDungonId();
+    if (!userKey || !dungonId) {
+      this.testPcSaveError.set('You must be logged in to save a test PC.');
+      return;
+    }
+
+    if (this.testPcForm.invalid) {
+      this.testPcSaveError.set('Please fix invalid test PC values.');
+      return;
+    }
+
+    const values = this.testPcForm.getRawValue();
+    const maxHP = Math.max(1, Math.floor(values.maxHP));
+    const currentHP = Math.max(0, Math.min(Math.floor(values.currentHP), maxHP));
+    const mode = this.testPcMode();
+
+    const saved = this.creatorTestPcService.saveProfile(userKey, dungonId, {
+      id: mode === 'edit' ? this.selectedTestPcId() ?? undefined : undefined,
+      name: values.name.trim() || 'Test PC',
+      species: values.species.trim() || 'Human',
+      type: values.type.trim() || 'Fighter',
+      maxHP,
+      currentHP,
+      ac: Math.max(1, Math.floor(values.ac)),
+      actionEconomy: Math.max(1, Math.floor(values.actionEconomy)),
+      mind: Math.max(0, Math.floor(values.mind)),
+      stamina: Math.max(0, Math.floor(values.stamina)),
+      strength: Math.max(0, Math.floor(values.strength)),
+      magicPower: Math.max(0, Math.floor(values.magicPower)),
+      numberOfAttacks: Math.max(1, Math.floor(values.numberOfAttacks)),
+      numberOfDefends: Math.max(1, Math.floor(values.numberOfDefends)),
+      rangeOfView: Math.max(1, Math.floor(values.rangeOfView)),
+      items: this.mapSelectedAssets(this.testPcItemOptions(), this.testPcSelectedItemIds()),
+      spells: this.mapSelectedAssets(this.testPcSpellOptions(), this.testPcSelectedSpellIds()),
+      potions: this.mapSelectedAssets(this.testPcPotionOptions(), this.testPcSelectedPotionIds()),
+    });
+
+    const profiles = this.creatorTestPcService.getProfiles(userKey, dungonId);
+    this.testPcProfiles.set(profiles);
+    this.selectedTestPcId.set(saved.id);
+    this.testPcMode.set('select');
+    this.testPcSaveError.set(null);
+  }
+
+  deleteSelectedTestPc(): void {
+    const userKey = this.account.getKey();
+    const dungonId = this.selectedDungonId();
+    const selectedId = this.selectedTestPcId();
+    if (!userKey || !dungonId || !selectedId) {
+      this.testPcError.set('Select a test PC first.');
+      return;
+    }
+
+    this.creatorTestPcService.removeProfile(userKey, dungonId, selectedId);
+    const profiles = this.creatorTestPcService.getProfiles(userKey, dungonId);
+    this.testPcProfiles.set(profiles);
+    this.selectedTestPcId.set(profiles[0]?.id ?? null);
+    if (profiles.length === 0) {
+      this.testPcMode.set('create');
+      this.resetTestPcForm();
+    }
+  }
+
+  launchTestWithSelectedPc(): void {
+    const dungonId = this.selectedDungonId();
+    const selected = this.currentSelectedTestPc();
+    if (!dungonId || !selected) {
+      this.testPcError.set('Select or create a test PC first.');
+      return;
+    }
+
+    this.router.navigate(['/sample-play'], {
+      queryParams: {
+        testMode: 'creator',
+        dungonId,
+        testPcProfileId: selected.id,
+      },
+    });
+  }
+
+  onTestPcAssetToggle(kind: 'item' | 'spell' | 'potion', assetId: number, event: Event): void {
+    const checked = Boolean((event.target as HTMLInputElement | null)?.checked);
+    const toggle = (current: number[]) => {
+      if (checked) {
+        return current.includes(assetId) ? current : [...current, assetId];
+      }
+      return current.filter((id) => id !== assetId);
+    };
+
+    if (kind === 'item') {
+      this.testPcSelectedItemIds.update(toggle);
+      return;
+    }
+    if (kind === 'spell') {
+      this.testPcSelectedSpellIds.update(toggle);
+      return;
+    }
+    this.testPcSelectedPotionIds.update(toggle);
+  }
+
+  isTestPcAssetSelected(kind: 'item' | 'spell' | 'potion', assetId: number): boolean {
+    if (kind === 'item') return this.testPcSelectedItemIds().includes(assetId);
+    if (kind === 'spell') return this.testPcSelectedSpellIds().includes(assetId);
+    return this.testPcSelectedPotionIds().includes(assetId);
+  }
+
+  private currentSelectedTestPc(): CreatorTestPcProfile | null {
+    const selectedId = this.selectedTestPcId();
+    if (!selectedId) return null;
+    return this.testPcProfiles().find((profile) => profile.id === selectedId) ?? null;
+  }
+
+  private loadTestPcAssetOptions(userKey: string): void {
+    this.http
+      .get<Array<Record<string, unknown>>>(`${API_BASE_URL}/items`, { params: { userkey: userKey } })
+      .subscribe({
+        next: (items) => {
+          this.testPcItemOptions.set(
+            items
+              .filter((item) => typeof item['id'] === 'number')
+              .map((item) => ({
+                id: item['id'] as number,
+                name: String(item['name'] ?? `Item ${item['id']}`),
+                description: typeof item['description'] === 'string' ? item['description'] : '',
+                payload: item,
+              }))
+          );
+        },
+        error: () => this.testPcItemOptions.set([]),
+      });
+
+    this.http
+      .get<Array<Record<string, unknown>>>(`${API_BASE_URL}/spells`, { params: { userkey: userKey } })
+      .subscribe({
+        next: (spells) => {
+          this.testPcSpellOptions.set(
+            spells
+              .filter((spell) => typeof spell['id'] === 'number')
+              .map((spell) => ({
+                id: spell['id'] as number,
+                name: String(spell['name'] ?? `Spell ${spell['id']}`),
+                description: typeof spell['description'] === 'string' ? spell['description'] : '',
+                payload: spell,
+              }))
+          );
+        },
+        error: () => this.testPcSpellOptions.set([]),
+      });
+
+    this.http
+      .get<Array<Record<string, unknown>>>(`${API_BASE_URL}/potions`, { params: { userkey: userKey } })
+      .subscribe({
+        next: (potions) => {
+          this.testPcPotionOptions.set(
+            potions
+              .filter((potion) => typeof potion['id'] === 'number')
+              .map((potion) => ({
+                id: potion['id'] as number,
+                name: String(potion['name'] ?? `Potion ${potion['id']}`),
+                description: typeof potion['description'] === 'string' ? potion['description'] : '',
+                payload: potion,
+              }))
+          );
+        },
+        error: () => this.testPcPotionOptions.set([]),
+      });
+  }
+
+  private resetTestPcForm(): void {
+    this.testPcForm.reset({
+      name: 'Test PC',
+      species: 'Human',
+      type: 'Fighter',
+      maxHP: 20,
+      currentHP: 20,
+      ac: 10,
+      actionEconomy: 3,
+      mind: 10,
+      stamina: 10,
+      strength: 10,
+      magicPower: 0,
+      numberOfAttacks: 1,
+      numberOfDefends: 1,
+      rangeOfView: 5,
+    });
+    this.testPcSelectedItemIds.set([]);
+    this.testPcSelectedSpellIds.set([]);
+    this.testPcSelectedPotionIds.set([]);
+  }
+
+  private applyTestPcToForm(profile: CreatorTestPcProfile): void {
+    this.selectedTestPcId.set(profile.id);
+    this.testPcForm.setValue({
+      name: profile.name,
+      species: profile.species,
+      type: profile.type,
+      maxHP: profile.maxHP,
+      currentHP: profile.currentHP,
+      ac: profile.ac,
+      actionEconomy: profile.actionEconomy,
+      mind: profile.mind,
+      stamina: profile.stamina,
+      strength: profile.strength,
+      magicPower: profile.magicPower,
+      numberOfAttacks: profile.numberOfAttacks,
+      numberOfDefends: profile.numberOfDefends,
+      rangeOfView: profile.rangeOfView,
+    });
+    this.testPcSelectedItemIds.set(this.extractAssetIds(profile.items));
+    this.testPcSelectedSpellIds.set(this.extractAssetIds(profile.spells));
+    this.testPcSelectedPotionIds.set(this.extractAssetIds(profile.potions));
+  }
+
+  private mapSelectedAssets(options: CreatorTestAssetOption[], selectedIds: number[]): Array<Record<string, unknown>> {
+    const byId = new Map(options.map((entry) => [entry.id, entry]));
+    return selectedIds
+      .map((id) => byId.get(id))
+      .filter((entry): entry is CreatorTestAssetOption => !!entry)
+      .map((entry) => ({ ...entry.payload }));
+  }
+
+  private extractAssetIds(rawAssets: unknown[]): number[] {
+    if (!Array.isArray(rawAssets)) return [];
+    return rawAssets
+      .map((asset) => {
+        if (!asset || typeof asset !== 'object') return null;
+        const id = (asset as Record<string, unknown>)['id'];
+        return typeof id === 'number' ? id : null;
+      })
+      .filter((id): id is number => id !== null);
+  }
+
   selectKeyForPlacement(keyId: number): void {
     const key = this.keyList.find((item) => item.id === keyId);
     if (!key) {
@@ -4827,6 +5182,7 @@ export class Creator implements OnInit {
     const attacks = this.normalizeMonsterAttacks(libraryMonster.attacks);
     const nextLocalMonster: Monster = {
       id: this.nextMonsterId,
+      monsterDbId: libraryMonster.id,
       imageId: this.normalizeNullableNumber(this.toFiniteNumber(libraryMonster.imageId)),
       soundId: this.normalizeNullableNumber(this.toFiniteNumber(libraryMonster.soundId)),
       tresherIds: this.normalizeIdList(libraryMonster.tresherIds),
@@ -4848,6 +5204,7 @@ export class Creator implements OnInit {
       attacks,
       magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.magic), 0)),
       magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.magicResistance), 0)),
+      castPlus: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.castPlus), 0)),
       spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.spReward), 0)),
       callsReinforcements: libraryMonster.callsReinforcements === true,
       reinforcementCount: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.reinforcementCount), 0)),
@@ -4907,6 +5264,7 @@ export class Creator implements OnInit {
       left.ac !== right.ac ||
       left.runAt !== right.runAt ||
       left.numberOfAttacks !== right.numberOfAttacks ||
+      (left.castPlus ?? 0) !== (right.castPlus ?? 0) ||
       left.imageId !== (this.normalizeNullableNumber(this.toFiniteNumber(right.imageId)))
     ) {
       return false;
@@ -4985,8 +5343,9 @@ export class Creator implements OnInit {
       runAt: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.runAt.value), 0)),
       numberOfAttacks: Math.max(1, this.normalizeNumber(this.toFiniteNumber(this.editingMonsterNumberOfAttacks()), 1)),
       attacks: editingAttacks,
-      magic: 0,
-      magicResistance: 0,
+      magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.magic?.value), 0)),
+      magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.magicResistance?.value), 0)),
+      castPlus: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.castPlus?.value), 0)),
       spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(controls.spReward?.value), 0)),
       callsReinforcements: this.editingMonsterCallsReinforcements(),
       reinforcementCount: Math.max(0, this.editingMonsterReinforcementCount()),
@@ -5043,6 +5402,9 @@ export class Creator implements OnInit {
       movementEconomy: 0,
       ac: 10,
       runAt: 0,
+      magic: 0,
+      magicResistance: 0,
+      castPlus: 0,
       toHitPlusNeeded: 0,
     });
   }
@@ -5078,6 +5440,9 @@ export class Creator implements OnInit {
       movementEconomy: selectedMonster.movementEconomy,
       ac: selectedMonster.ac,
       runAt: selectedMonster.runAt,
+      magic: selectedMonster.magic ?? 0,
+      magicResistance: selectedMonster.magicResistance ?? 0,
+      castPlus: selectedMonster.castPlus ?? 0,
       toHitPlusNeeded: selectedMonster.toHitPlusNeeded ?? 0,
     });
   }
@@ -7544,6 +7909,11 @@ export class Creator implements OnInit {
       .subscribe({
         next: (items) => {
           this.dungons.set(items);
+          const pendingDungonId = this.pendingInitialSelectDungonId();
+          if (pendingDungonId && items.some((item) => item.id === pendingDungonId)) {
+            this.pendingInitialSelectDungonId.set(null);
+            this.selectDungon(pendingDungonId);
+          }
         },
         error: () => {
           this.dungons.set([]);
@@ -8566,7 +8936,25 @@ export class Creator implements OnInit {
       numberOfAttacks,
       attacks,
       magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magic), 0)),
-      magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magicResistance), 0)),
+      magicResistance: Math.max(
+        0,
+        this.normalizeNumber(
+          this.toFiniteNumber(
+            (source as Record<string, unknown>)['magicResistance'] ??
+              (source as Record<string, unknown>)['magicresistance']
+          ),
+          0
+        )
+      ),
+      castPlus: Math.max(
+        0,
+        this.normalizeNumber(
+          this.toFiniteNumber(
+            (source as Record<string, unknown>)['castPlus'] ?? (source as Record<string, unknown>)['castplus']
+          ),
+          0
+        )
+      ),
       spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.spReward), 0)),
       callsReinforcements: (source as Record<string, unknown>)['callsReinforcements'] === true,
       reinforcementCount: Math.max(0, this.normalizeNumber(this.toFiniteNumber((source as Record<string, unknown>)['reinforcementCount']), 0)),
@@ -8769,7 +9157,18 @@ export class Creator implements OnInit {
   }
 
   private toFiniteNumber(value: unknown): number | null {
-    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+
+    return null;
   }
 
   private normalizeNumber(value: number | null, fallback: number): number {
@@ -8785,7 +9184,7 @@ export class Creator implements OnInit {
   }
 
   private normalizeSpellEffectType(value: unknown): string {
-    return value === 'Fire' || value === 'Ice' || value === 'Lightning' || value === 'Other'
+    return value === 'Fire' || value === 'Ice' || value === 'Lightning' || value === 'Splah' || value === 'Other'
       ? value
       : 'Other';
   }
@@ -9499,9 +9898,11 @@ export class Creator implements OnInit {
         const color = portal.look === 'magicDoor'
           ? (portal.isTwoWay === false ? '#ff2a2a' : '#b26dff')
           : (portalColors[pi % portalColors.length] ?? '#cc44ff');
-        const symbol = portal.look === 'starDown' ? '▼' : portal.look === 'magicDoor' ? '⊡' : '▲';
+        const symbolFor = (look: PortalLook) => (look === 'starDown' ? '▼' : look === 'magicDoor' ? '⊡' : '▲');
+        // The far end of a two-way star portal shows the opposite look (starUp <-> starDown).
+        const endLook: PortalLook = portal.look === 'starUp' ? 'starDown' : portal.look === 'starDown' ? 'starUp' : portal.look;
 
-        const drawPortalMarker = (row: number | null, col: number | null, label: string): void => {
+        const drawPortalMarker = (row: number | null, col: number | null, label: string, symbol: string): void => {
           if (row === null || col === null) return;
           if (row < 0 || col < 0 || row >= this.gridRowCount || col >= this.gridColumnCount) return;
           const key = this.getSquareKey(row, col);
@@ -9515,8 +9916,8 @@ export class Creator implements OnInit {
           context.fillText(symbol + label, cx, cy);
         };
 
-        drawPortalMarker(portal.startRow, portal.startColumn, 'S');
-        drawPortalMarker(portal.endRow, portal.endColumn, 'E');
+        drawPortalMarker(portal.startRow, portal.startColumn, 'S', symbolFor(portal.look));
+        drawPortalMarker(portal.endRow, portal.endColumn, 'E', symbolFor(endLook));
 
         // Draw a connecting line between start and end if both exist
         if (
@@ -13187,7 +13588,7 @@ export class Creator implements OnInit {
   }
 
   private spellEffectTypeDefaultColor(type: string): string {
-    const defaults: Record<string, string> = { Fire: '#ee3300', Ice: '#88ddff', Lightning: '#4466ff', Other: '#ffffff' };
+    const defaults: Record<string, string> = { Fire: '#ee3300', Ice: '#88ddff', Lightning: '#4466ff', Splah: '#55dd88', Other: '#ffffff' };
     return defaults[type] ?? '#ffffff';
   }
 

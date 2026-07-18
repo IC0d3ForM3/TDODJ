@@ -186,6 +186,7 @@ const normalizeMonsterPayload = (value) => {
         spReward: Math.max(0, normalizeNumber(input.spReward, 0)),
         magic: Math.max(0, normalizeNumber(input.magic, 0)),
         magicResistance: Math.max(0, normalizeNumber(input.magicResistance, 0)),
+        castPlus: Math.max(0, normalizeNumber(input.castPlus, 0)),
         callsReinforcements,
         reinforcementCount,
         reinforcementMonsterName: callsReinforcements

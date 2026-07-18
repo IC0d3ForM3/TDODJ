@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 
-import { Router, RouterLinkActive, RouterLinkWithHref, RouterOutlet } from '@angular/router';
+import { ActivatedRoute, Router, RouterLinkActive, RouterLinkWithHref, RouterOutlet } from '@angular/router';
 import { Account } from './services/account';
 import { NgIf } from '@angular/common';
 import { CreatorLayout } from './services/creator-layout';
@@ -16,6 +16,7 @@ export class App {
   readonly account = inject(Account);
   readonly creatorLayout = inject(CreatorLayout);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly title = signal('TDODJ');
   constructor() {
@@ -50,10 +51,40 @@ export class App {
   }
 
   exitGame() {
+    // Extract query params from current URL
+    const urlTree = this.router.parseUrl(this.router.url);
+    const isCreatorTestMode = urlTree.queryParams['testMode'] === 'creator';
+    
+    if (isCreatorTestMode) {
+      const rawDungonId = urlTree.queryParams['dungonId'] ?? '';
+      const dungonId = Number(rawDungonId);
+      if (Number.isInteger(dungonId) && dungonId > 0) {
+        void this.router.navigate(['/create'], {
+          queryParams: { dungonId },
+        });
+        return;
+      }
+    }
+
     this.router.navigate(['/dashboard']);
   }
 
   exitSamplePlay() {
+    // Extract query params from current URL
+    const urlTree = this.router.parseUrl(this.router.url);
+    const isCreatorTestMode = urlTree.queryParams['testMode'] === 'creator';
+    
+    if (isCreatorTestMode) {
+      const rawDungonId = urlTree.queryParams['dungonId'] ?? '';
+      const dungonId = Number(rawDungonId);
+      if (Number.isInteger(dungonId) && dungonId > 0) {
+        void this.router.navigate(['/create'], {
+          queryParams: { dungonId },
+        });
+        return;
+      }
+    }
+
     this.router.navigate(['/sample-game']);
   }
 

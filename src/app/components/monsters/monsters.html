@@ -39,14 +39,19 @@
                   </div>
                 </div>
                 <small class="mn-item-meta">ID {{ item.id }} Â· HP {{ item.hp }} Â· AC {{ item.ac }} Â· Move {{ item.movementEconomy }} Â· Run&#64; {{ item.runAt }}</small>
-                <small class="mn-item-meta">Attacks {{ item.numberOfAttacks }} · Magic {{ item.magic }} · SP {{ item.spReward }} · +Hit Req {{ item.toHitPlusNeeded }} · {{ item.isPublic ? 'Public' : 'Private' }}</small>
+                <small class="mn-item-meta">Attacks {{ item.numberOfAttacks }} · Magic {{ item.magic }} · MR {{ item.magicResistance }} · Cast+ {{ item.castPlus }} · SP {{ item.spReward }} · +Hit Req {{ item.toHitPlusNeeded }} · {{ item.isPublic ? 'Public' : 'Private' }}</small>
                 @if (item.description) {
                   <small class="mn-item-desc">{{ item.description }}</small>
                 }
                 @if (item.attacks.length > 0) {
                   <ul class="mn-attack-list">
                     @for (attack of item.attacks; track $index) {
-                      <li>{{ attack.type }} Â· {{ attack.description || 'Attack' }} Â· Dmg {{ attack.damage }} Â· +Hit {{ attack.plusToHit }}</li>
+                      <li>
+                        {{ attack.type }} · {{ attack.description || 'Attack' }} · Dmg {{ attack.damage }} · +Hit {{ attack.plusToHit }}
+                        @if (attackLinkedSummary(attack)) {
+                          · {{ attackLinkedSummary(attack) }}
+                        }
+                      </li>
                     }
                   </ul>
                 }
@@ -102,6 +107,14 @@
           <label class="mn-field">
             <span>Magic</span>
             <input type="number" formControlName="magic" min="0" />
+          </label>
+          <label class="mn-field">
+            <span>Magic Resistance</span>
+            <input type="number" formControlName="magicResistance" min="0" />
+          </label>
+          <label class="mn-field">
+            <span>Cast+</span>
+            <input type="number" formControlName="castPlus" />
           </label>
           <label class="mn-field">
             <span>SP Reward</span>
@@ -199,7 +212,7 @@
             <button type="button" class="mn-btn-muted" (click)="addAttack()">+ Attack</button>
           </div>
           <div formArrayName="attacks">
-            @for (attackForm of attackControls(); track $index) {
+            @for (attackForm of attackControls(); track attackForm) {
               <div class="mn-attack-card" [formGroupName]="$index">
                 <div class="mn-form-grid">
                   <label class="mn-field">
@@ -226,7 +239,7 @@
                     <span>Weapon Item</span>
                     <select formControlName="weaponItemId">
                       <option [ngValue]="null">None</option>
-                      @for (item of itemOptions(); track item.id) {
+                      @for (item of normalizedItemOptions(); track item.id) {
                         <option [ngValue]="item.id">{{ item.name }}</option>
                       }
                     </select>
@@ -235,7 +248,7 @@
                     <span>Spell</span>
                     <select formControlName="spellId">
                       <option [ngValue]="null">None</option>
-                      @for (spell of spellOptions(); track spell.id) {
+                      @for (spell of normalizedSpellOptions(); track spell.id) {
                         <option [ngValue]="spell.id">{{ spell.name }}</option>
                       }
                     </select>
@@ -244,7 +257,7 @@
                     <span>Curse</span>
                     <select formControlName="curseId">
                       <option [ngValue]="null">None</option>
-                      @for (curse of curseOptions(); track curse.id) {
+                      @for (curse of normalizedCurseOptions(); track curse.id) {
                         <option [ngValue]="curse.id">{{ curse.name }}</option>
                       }
                     </select>
@@ -344,7 +357,7 @@
         </div>
 
         @if (saveMessage()) {
-          <p class="mn-message" style="margin-top:0.5rem">{{ saveMessage() }}</p>
+          <p class="mn-message" [class.mn-message--success]="!saveIsError()" [class.mn-message--error]="saveIsError()" style="margin-top:0.5rem">{{ saveMessage() }}</p>
         }
       </form>
 

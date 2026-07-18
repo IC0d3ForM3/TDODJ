@@ -150,9 +150,9 @@ export class GameJsonParserService {
       return null;
     }
 
-    const effectType = source['effectType'] === 'Fire' || source['effectType'] === 'Ice' || source['effectType'] === 'Lightning' || source['effectType'] === 'Other'
+    const effectType = source['effectType'] === 'Fire' || source['effectType'] === 'Ice' || source['effectType'] === 'Lightning' || source['effectType'] === 'Splah' || source['effectType'] === 'Other'
       ? source['effectType'] as string
-      : source['effecttype'] === 'Fire' || source['effecttype'] === 'Ice' || source['effecttype'] === 'Lightning' || source['effecttype'] === 'Other'
+      : source['effecttype'] === 'Fire' || source['effecttype'] === 'Ice' || source['effecttype'] === 'Lightning' || source['effecttype'] === 'Splah' || source['effecttype'] === 'Other'
         ? source['effecttype'] as string
         : 'Other';
     const effectColorSource = source['effectColor'] ?? source['effectcolor'];
@@ -199,6 +199,10 @@ export class GameJsonParserService {
       range2: this.normalizeNumber(this.toFiniteNumber(source['range2']), 0),
       lastFor1: this.normalizeNumber(this.toFiniteNumber(source['lastFor1'] ?? source['lastfor1']), 0),
       lastFor2: this.normalizeNumber(this.toFiniteNumber(source['lastFor2'] ?? source['lastfor2']), 0),
+      effectDiceCount: this.toFiniteNumber(source['effectDiceCount'] ?? source['effectdicecount']) ?? undefined,
+      effectDiceSides: this.toFiniteNumber(source['effectDiceSides'] ?? source['effectdicesides']) ?? undefined,
+      effectAmount2DiceCount: this.toFiniteNumber(source['effectAmount2DiceCount'] ?? source['effectamount2dicecount']) ?? undefined,
+      effectAmount2DiceSides: this.toFiniteNumber(source['effectAmount2DiceSides'] ?? source['effectamount2dicesides']) ?? undefined,
     };
   }
 
@@ -566,7 +570,9 @@ export class GameJsonParserService {
       ? this.parseSpellArray(source['floorSpellList'])
       : Array.isArray(source['spellList'])
         ? this.parseSpellArray(source['spellList'])
-        : [];
+        : Array.isArray(source['spells'])
+          ? this.parseSpellArray(source['spells'])
+          : [];
 
     const collectedFloorItems = Array.isArray(source['collectedFloorItems']) ? this.parseItemArray(source['collectedFloorItems']) : [];
     const collectedFloorPotions = Array.isArray(source['collectedFloorPotions']) ? this.parsePotionArray(source['collectedFloorPotions']) : [];
@@ -764,6 +770,7 @@ export class GameJsonParserService {
 
     return {
       id: Math.max(0, Math.floor(parsedId)),
+      monsterDbId: typeof (source as Record<string, unknown>)['monsterDbId'] === 'number' ? (source as Record<string, unknown>)['monsterDbId'] as number : undefined,
       imageId: typeof source.imageId === 'number' ? source.imageId : null,
       tresherIds: Array.isArray(source.tresherIds) ? source.tresherIds.map((val) => this.toFiniteNumber(val)).filter((val): val is number => val !== null) : [],
       keyIds: Array.isArray(source.keyIds) ? source.keyIds.map((val) => this.toFiniteNumber(val)).filter((val): val is number => val !== null) : [],
@@ -780,6 +787,13 @@ export class GameJsonParserService {
       soundId: typeof source.soundId === 'number' ? source.soundId : null,
       magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magic), 0)),
       magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.magicResistance), 0)),
+      castPlus: Math.max(
+        0,
+        this.normalizeNumber(
+          this.toFiniteNumber((source as Record<string, unknown>)['castPlus'] ?? (source as Record<string, unknown>)['castplus']),
+          0
+        )
+      ),
       callsReinforcements: (source as Record<string, unknown>)['callsReinforcements'] === true,
       reinforcementCount: Math.max(0, this.normalizeNumber(this.toFiniteNumber((source as Record<string, unknown>)['reinforcementCount']), 0)),
       reinforcementMonsterName:

@@ -6,12 +6,58 @@ import * as tresherService from '../services/tresherService';
 import * as itemService from '../services/itemService';
 import * as potionService from '../services/potionService';
 import * as spellService from '../services/spellService';
+import type { SpellRecord } from '../repositories/spellRepository';
 import * as curseService from '../services/curseService';
 import * as imageService from '../services/imageService';
 import * as soundService from '../services/soundService';
 import { getUserByKey } from '../repositories/userRepository';
+import { getMonstersByIds } from '../repositories/monsterRepository';
 
 type PublishVisibility = 'public' | 'friends' | 'private';
+
+/**
+ * For any monster in the dungenJson monsterList that carries a monsterDbId,
+ * replace the snapshot data with the current DB record so edits to a monster
+ * are reflected the next time the dungeon is saved from the creator.
+ */
+async function refreshMonsterDataFromDb(dungonJson: unknown): Promise<unknown> {
+  const root = asRecord(dungonJson);
+  const monsterList = Array.isArray(root['monsterList']) ? (root['monsterList'] as unknown[]) : [];
+  if (monsterList.length === 0) return dungonJson;
+
+  const dbIdToLocalId = new Map<number, number>();
+  for (const raw of monsterList) {
+    const m = asRecord(raw);
+    const localId = typeof m['id'] === 'number' ? (m['id'] as number) : null;
+    const dbId = typeof m['monsterDbId'] === 'number' ? (m['monsterDbId'] as number) : null;
+    if (localId !== null && dbId !== null) {
+      dbIdToLocalId.set(dbId, localId);
+    }
+  }
+
+  if (dbIdToLocalId.size === 0) return dungonJson;
+
+  const freshRecords = await getMonstersByIds(Array.from(dbIdToLocalId.keys()));
+  if (freshRecords.length === 0) return dungonJson;
+
+  const freshByDbId = new Map(freshRecords.map((r) => [r.id, r]));
+
+  const updatedMonsterList = monsterList.map((raw) => {
+    const m = asRecord(raw);
+    const dbId = typeof m['monsterDbId'] === 'number' ? (m['monsterDbId'] as number) : null;
+    if (dbId === null) return raw;
+    const fresh = freshByDbId.get(dbId);
+    if (!fresh) return raw;
+    // Keep the local id and monsterDbId; replace everything else with fresh DB data.
+    return {
+      ...fresh,
+      id: m['id'],
+      monsterDbId: dbId,
+    };
+  });
+
+  return { ...root, monsterList: updatedMonsterList, monsters: updatedMonsterList };
+}
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -68,6 +114,73 @@ function collectCurseIdsFromDungeonJson(dungenJson: unknown): Set<number> {
   }
 
   return ids;
+}
+
+// Monster attacks reference spells by ID regardless of who owns the spell (the dungeon
+// creator, or a public spell). These must resolve for every player, not just the current
+// session's userkey, so we fetch them by ID directly rather than through the owner-scoped
+// `/spells` catalog.
+function collectMonsterSpellIdsFromDungeonJson(dungenJson: unknown): Set<number> {
+  const ids = new Set<number>();
+  const root = asRecord(dungenJson);
+
+  const readArray = (...keys: string[]): unknown[] => {
+    for (const key of keys) {
+      const value = root[key];
+      if (Array.isArray(value)) {
+        return value;
+      }
+    }
+    return [];
+  };
+
+  const monsterList = readArray('monsterList', 'monsters');
+  for (const rawMonster of monsterList) {
+    const monster = asRecord(rawMonster);
+    const attacks = Array.isArray(monster['attacks']) ? (monster['attacks'] as unknown[]) : [];
+    for (const rawAttack of attacks) {
+      const attack = asRecord(rawAttack);
+      const spellId = attack['spellId'];
+      if (typeof spellId === 'number' && Number.isInteger(spellId) && spellId > 0) {
+        ids.add(spellId);
+      }
+    }
+  }
+
+  return ids;
+}
+
+function mapSpellRecordForSession(s: SpellRecord): Record<string, unknown> {
+  return {
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    soundId: s.soundId,
+    range: s.range,
+    effectOn: s.effectOn,
+    effectOn2: s.effectOn2,
+    effectAmount: s.effectAmount,
+    effectAmount2: s.effectAmount2,
+    effectDiceCount: s.effectDiceCount,
+    effectDiceSides: s.effectDiceSides,
+    effectAmount2DiceCount: s.effectAmount2DiceCount,
+    effectAmount2DiceSides: s.effectAmount2DiceSides,
+    successTestValue: s.successTestValue,
+    sp: s.sp,
+    minLtsp: s.minLtsp,
+    learnCostGp: s.learnCostGp,
+    lastFor: s.lastFor,
+    numberOfTargets: s.numberOfTargets,
+    magicCost: s.magicCost,
+    effectType: s.effectType,
+    effectColor: s.effectColor,
+    effectOnPc1: s.effectOnPc1,
+    effectOnPc2: s.effectOnPc2,
+    range1: s.range1,
+    range2: s.range2,
+    lastFor1: s.lastFor1,
+    lastFor2: s.lastFor2,
+  };
 }
 
 async function resolveSessionCurses(curseIds: Set<number>): Promise<CurseSessionPayload[]> {
@@ -251,10 +364,11 @@ export const updateDungonJson = async (req: Request, res: Response) => {
   }
 
   try {
+    const refreshedDungonJson = await refreshMonsterDataFromDb(dungonJson);
     const wasUpdated = await dungonService.saveDungonJsonForUser(
       id,
       userkey.trim(),
-      dungonJson
+      refreshedDungonJson
     );
 
     if (!wasUpdated) {
@@ -700,6 +814,13 @@ export const getGameById = async (req: Request, res: Response) => {
         : game.dungenJson;
       for (const curseId of collectCurseIdsFromDungeonJson(dungonJsonObj)) {
         sessionCurseIds.add(curseId);
+      }
+      const existingSpellIds = new Set(pcTresherSpells.map((s) => (s as { id: number }).id));
+      const monsterSpellIds = Array.from(collectMonsterSpellIdsFromDungeonJson(dungonJsonObj))
+        .filter((spellId) => !existingSpellIds.has(spellId));
+      if (monsterSpellIds.length > 0) {
+        const monsterSpells = await spellService.fetchSpellsByIdsForGame(monsterSpellIds);
+        pcTresherSpells = [...pcTresherSpells, ...monsterSpells.map(mapSpellRecordForSession)];
       }
       const rawTresherList: unknown[] = Array.isArray((dungonJsonObj as Record<string, unknown>)?.['tresherList'])
         ? (dungonJsonObj as Record<string, unknown[]>)['tresherList']
@@ -1265,6 +1386,13 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
         : dungon.dungenJson;
       for (const curseId of collectCurseIdsFromDungeonJson(dungonJsonObj)) {
         sessionCurseIds.add(curseId);
+      }
+      const existingSpellIds = new Set(pcTresherSpells.map((s) => (s as { id: number }).id));
+      const monsterSpellIds = Array.from(collectMonsterSpellIdsFromDungeonJson(dungonJsonObj))
+        .filter((spellId) => !existingSpellIds.has(spellId));
+      if (monsterSpellIds.length > 0) {
+        const monsterSpells = await spellService.fetchSpellsByIdsForGame(monsterSpellIds);
+        pcTresherSpells = [...pcTresherSpells, ...monsterSpells.map(mapSpellRecordForSession)];
       }
       const rawTresherList: unknown[] = Array.isArray((dungonJsonObj as Record<string, unknown>)?.['tresherList'])
         ? (dungonJsonObj as Record<string, unknown[]>)['tresherList']

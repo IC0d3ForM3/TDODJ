@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, ElementRef, inject, input, OnInit, signal } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { API_BASE_URL } from '../../api-config';
@@ -43,6 +43,8 @@ export class Monsters implements OnInit {
   private readonly account = inject(Account);
   private readonly monsterService = inject(MonsterService);
   private readonly tresherService = inject(TresherService);
+  private readonly changeDetectorRef = inject(ChangeDetectorRef);
+  private readonly elementRef = inject(ElementRef);
 
   readonly imageOptions = input<ImageOption[]>([]);
   readonly soundOptions = input<SoundOption[]>([]);
@@ -56,6 +58,51 @@ export class Monsters implements OnInit {
   readonly itemOptions = input<ItemOption[]>([]);
   readonly spellOptions = input<SpellOption[]>([]);
   readonly curseOptions = input<CurseOption[]>([]);
+  readonly normalizedItemOptions = computed(() =>
+    this.itemOptions()
+      .map((item) => ({
+        id: this.normalizeNullableNumber((item as { id: unknown }).id),
+        name: item.name,
+      }))
+      .filter((item): item is ItemOption => item.id !== null)
+  );
+  readonly normalizedSpellOptions = computed(() =>
+    this.spellOptions()
+      .map((spell) => ({
+        id: this.normalizeNullableNumber((spell as { id: unknown }).id),
+        name: spell.name,
+      }))
+      .filter((spell): spell is SpellOption => spell.id !== null)
+  );
+  readonly normalizedCurseOptions = computed(() =>
+    this.curseOptions()
+      .map((curse) => ({
+        id: this.normalizeNullableNumber((curse as { id: unknown }).id),
+        name: curse.name,
+      }))
+      .filter((curse): curse is CurseOption => curse.id !== null)
+  );
+  readonly itemNameById = computed(() => {
+    const map = new Map<number, string>();
+    for (const item of this.normalizedItemOptions()) {
+      map.set(item.id, item.name);
+    }
+    return map;
+  });
+  readonly spellNameById = computed(() => {
+    const map = new Map<number, string>();
+    for (const spell of this.normalizedSpellOptions()) {
+      map.set(spell.id, spell.name);
+    }
+    return map;
+  });
+  readonly curseNameById = computed(() => {
+    const map = new Map<number, string>();
+    for (const curse of this.normalizedCurseOptions()) {
+      map.set(curse.id, curse.name);
+    }
+    return map;
+  });
 
   readonly monsterTypeOptions = [
     'Aberration', 'Beast', 'Celestial', 'Construct', 'Dragon',
@@ -68,6 +115,7 @@ export class Monsters implements OnInit {
   readonly isSaving = signal(false);
   readonly editingId = signal<number | null>(null);
   readonly saveMessage = signal<string | null>(null);
+  readonly saveIsError = signal(false);
   readonly filterQuery = signal('');
   readonly filteredItems = computed(() => {
     const q = this.filterQuery().toLowerCase().trim();
@@ -94,6 +142,8 @@ export class Monsters implements OnInit {
     runAt: new FormControl<number>(0, { nonNullable: true }),
     numberOfAttacks: new FormControl<number>(1, { nonNullable: true }),
     magic: new FormControl<number>(0, { nonNullable: true }),
+    magicResistance: new FormControl<number>(0, { nonNullable: true }),
+    castPlus: new FormControl<number>(0, { nonNullable: true }),
     spReward: new FormControl<number>(0, { nonNullable: true }),
     attacks: new FormArray<MonsterAttackFormGroup>([this.createMonsterAttackForm()]),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
@@ -210,6 +260,30 @@ export class Monsters implements OnInit {
     return this.buildTresherSummary(monster.tresherIds);
   }
 
+  attackLinkedSummary(attack: UserMonsterAttackListItem): string {
+    const weaponId = this.normalizeNullableNumber(attack.weaponItemId);
+    const spellId = this.normalizeNullableNumber(attack.spellId);
+    const curseId = this.normalizeNullableNumber(attack.curseId);
+    const parts: string[] = [];
+
+    if (weaponId !== null) {
+      const weaponName = this.itemNameById().get(weaponId) || `ID ${weaponId}`;
+      parts.push(`Weapon: ${weaponName}`);
+    }
+
+    if (spellId !== null) {
+      const spellName = this.spellNameById().get(spellId) || `ID ${spellId}`;
+      parts.push(`Spell: ${spellName}`);
+    }
+
+    if (curseId !== null) {
+      const curseName = this.curseNameById().get(curseId) || `ID ${curseId}`;
+      parts.push(`Curse: ${curseName}`);
+    }
+
+    return parts.join(' | ');
+  }
+
   imageForMonster(monster: UserMonsterListItem): ImageOption | null {
     if (monster.imageId === null) return null;
     return this.allImageOptions().find((i) => i.id === monster.imageId) ?? null;
@@ -257,8 +331,8 @@ export class Monsters implements OnInit {
     this.editingId.set(item.id);
     this.saveMessage.set(null);
 
-    const attacks = Array.isArray(item.attacks)
-      ? item.attacks.map((a) => ({
+    const normalizedAttackList = this.normalizeAttackList(item.attacks);
+    const attacks = normalizedAttackList.map((a) => ({
           type: a.type || 'Bite',
           description: a.description || '',
           damage: this.normalizeNumber(a.damage, 0),
@@ -266,10 +340,19 @@ export class Monsters implements OnInit {
           weaponItemId: this.normalizeNullableNumber(a.weaponItemId),
           spellId: this.normalizeNullableNumber(a.spellId),
           curseId: this.normalizeNullableNumber(a.curseId),
-        }))
-      : [];
+        }));
+
+    const mappedSpellIds = attacks
+      .map((attack) => attack.spellId)
+      .filter((id): id is number => id !== null);
+    const availableSpellIds = new Set(this.normalizedSpellOptions().map((spell) => spell.id));
+    const missingSpellIds = mappedSpellIds.filter((id) => !availableSpellIds.has(id));
 
     this.replaceAttackForms(attacks);
+
+    // Force change detection after FormArray mutation (OnPush issue)
+    this.changeDetectorRef.markForCheck();
+
     this.replaceTresherForms(item.tresherIds ?? []);
 
     const c = this.userMonsterForm.controls;
@@ -286,6 +369,8 @@ export class Monsters implements OnInit {
       Math.max(this.normalizeNumber(item.numberOfAttacks, 0), this.monsterAttacksArray.length)
     );
     c.magic.setValue(this.normalizeNumber(item.magic, 0));
+    c.magicResistance.setValue(this.normalizeNumber(item.magicResistance, 0));
+    c.castPlus.setValue(this.normalizeNumber(item.castPlus, 0));
     c.spReward.setValue(this.normalizeNumber(item.spReward, 0));
     c.isPublic.setValue(item.isPublic);
     c.callsReinforcements.setValue(item.callsReinforcements === true);
@@ -324,20 +409,26 @@ export class Monsters implements OnInit {
 
     this.isSaving.set(true);
     this.saveMessage.set(null);
+    this.saveIsError.set(false);
 
     request$
       .pipe(finalize(() => this.isSaving.set(false)))
       .subscribe({
         next: (response) => {
           if (response.result !== 1 || !response.monster) {
+            this.saveIsError.set(true);
             this.saveMessage.set(response.error || 'Failed to save monster.');
             return;
           }
           this.monsterService.loadMonsters(this.account.getKey()!);
+          this.saveIsError.set(false);
           this.saveMessage.set(editingId ? 'Monster updated.' : 'Monster created.');
+          this.filterQuery.set('');
           this.beginCreate(false);
+          (this.elementRef.nativeElement as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
         },
         error: () => {
+          this.saveIsError.set(true);
           this.saveMessage.set('Failed to save monster.');
         },
       });
@@ -418,6 +509,8 @@ export class Monsters implements OnInit {
       runAt: Math.max(0, this.normalizeNumber(c.runAt.value, 0)),
       numberOfAttacks: Math.max(requestedAttackCount, attacks.length),
       magic: this.normalizeNumber(c.magic.value, 0),
+      magicResistance: this.normalizeNumber(c.magicResistance.value, 0),
+      castPlus: this.normalizeNumber(c.castPlus.value, 0),
       spReward: Math.max(0, this.normalizeNumber(c.spReward.value, 0)),
       attacks,
       isPublic: this.isAdminUser() ? c.isPublic.value === true : false,
@@ -460,6 +553,8 @@ export class Monsters implements OnInit {
     c.runAt.setValue(0);
     c.numberOfAttacks.setValue(1);
     c.magic.setValue(0);
+    c.magicResistance.setValue(0);
+    c.castPlus.setValue(0);
     c.spReward.setValue(0);
     c.isPublic.setValue(false);
     c.callsReinforcements.setValue(false);
@@ -482,11 +577,13 @@ export class Monsters implements OnInit {
     const normalized = this.normalizeIdList(tresherIds);
     if (normalized.length === 0) {
       this.monsterTresherIdsArray.push(this.createMonsterTresherControl());
+      this.changeDetectorRef.markForCheck();
       return;
     }
     for (const id of normalized) {
       this.monsterTresherIdsArray.push(this.createMonsterTresherControl(id));
     }
+    this.changeDetectorRef.markForCheck();
   }
 
   private replaceAttackForms(
@@ -509,6 +606,31 @@ export class Monsters implements OnInit {
     for (const attack of normalized) {
       this.monsterAttacksArray.push(this.createMonsterAttackForm(attack));
     }
+    // Force change detection after FormArray mutation (OnPush issue)
+    this.changeDetectorRef.markForCheck();
+  }
+
+  private normalizeAttackList(value: unknown): UserMonsterAttackListItem[] {
+    if (Array.isArray(value)) {
+      return value.filter(
+        (entry): entry is UserMonsterAttackListItem => !!entry && typeof entry === 'object'
+      );
+    }
+
+    if (typeof value === 'string' && value.trim() !== '') {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        if (Array.isArray(parsed)) {
+          return parsed.filter(
+            (entry): entry is UserMonsterAttackListItem => !!entry && typeof entry === 'object'
+          );
+        }
+      } catch {
+        return [];
+      }
+    }
+
+    return [];
   }
 
   private syncAttackCount(): void {
@@ -524,8 +646,11 @@ export class Monsters implements OnInit {
   private createMonsterAttackForm(
     value?: Partial<UserMonsterAttackEditorValue>
   ): MonsterAttackFormGroup {
+    const typeValue = value?.type || 'Bite';
+    const spellIdValue = this.normalizeNullableNumber(value?.spellId ?? null);
+
     return new FormGroup({
-      type: new FormControl<string>(value?.type || 'Bite', { nonNullable: true }),
+      type: new FormControl<string>(typeValue, { nonNullable: true }),
       description: new FormControl<string>(value?.description || '', { nonNullable: true }),
       damage: new FormControl<number>(this.normalizeNumber(value?.damage ?? null, 0), {
         nonNullable: true,
@@ -536,9 +661,7 @@ export class Monsters implements OnInit {
       weaponItemId: new FormControl<number | null>(
         this.normalizeNullableNumber(value?.weaponItemId ?? null)
       ),
-      spellId: new FormControl<number | null>(
-        this.normalizeNullableNumber(value?.spellId ?? null)
-      ),
+      spellId: new FormControl<number | null>(spellIdValue),
       curseId: new FormControl<number | null>(
         this.normalizeNullableNumber(value?.curseId ?? null)
       ),
@@ -549,14 +672,22 @@ export class Monsters implements OnInit {
     return new FormControl<number | null>(value);
   }
 
-  private normalizeNumber(value: number | null, fallback: number): number {
-    if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
-    return Math.trunc(value);
+  private normalizeNumber(value: unknown, fallback: number): number {
+    if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return Math.trunc(parsed);
+    }
+    return fallback;
   }
 
-  private normalizeNullableNumber(value: number | null): number | null {
-    if (value === null || typeof value !== 'number' || !Number.isFinite(value)) return null;
-    return Math.trunc(value);
+  private normalizeNullableNumber(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return Math.trunc(parsed);
+    }
+    return null;
   }
 
   private normalizeIdList(value: unknown): number[] {

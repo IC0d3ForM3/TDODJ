@@ -136,6 +136,7 @@ async function fetchPublicMonsters() {
       COALESCE(attacks, '[]'::jsonb) AS attacks,
       COALESCE(spreward, 0) AS "spReward", COALESCE(magic, 0) AS magic,
       COALESCE(magicresistance, 0) AS "magicResistance",
+      COALESCE(castplus, 0) AS "castPlus",
       COALESCE(callsreinforcements, false) AS "callsReinforcements",
       COALESCE(reinforcementcount, 0) AS "reinforcementCount",
       reinforcementmonstername AS "reinforcementMonsterName",
@@ -488,7 +489,7 @@ function buildDungonPayload(layout, blueprint, monsters, items, potions, spells)
             continue;
         const localId = nextMonsterId++;
         dbIdToLocalId.set(dbId, localId);
-        monsterList.push({ id: localId, imageId: dbM.imageId, soundId: dbM.soundId, tresherIds: dbM.tresherIds ?? [], keyIds: [], name: dbM.name, type: dbM.type, description: dbM.description ?? '', hp: dbM.hp, movementEconomy: dbM.movementEconomy, ac: dbM.ac, runAt: dbM.runAt, numberOfAttacks: dbM.numberOfAttacks, attacks: dbM.attacks ?? [], spReward: dbM.spReward, magic: dbM.magic, magicResistance: dbM.magicResistance, callsReinforcements: dbM.callsReinforcements, reinforcementCount: dbM.reinforcementCount, reinforcementMonsterName: dbM.reinforcementMonsterName, toHitPlusNeeded: dbM.toHitPlusNeeded, npcGreeting: dbM.npcGreeting, npcInfo1: dbM.npcInfo1, npcInfo2: dbM.npcInfo2, npcInfo3: dbM.npcInfo3, npcOnlyAttackWhenAttacked: dbM.npcOnlyAttackWhenAttacked, npcGivesInfoAfterDamaged: dbM.npcGivesInfoAfterDamaged, npcAttacksAfterInfo: dbM.npcAttacksAfterInfo, npcCanTrade: dbM.npcCanTrade, awareness: dbM.awareness });
+        monsterList.push({ id: localId, imageId: dbM.imageId, soundId: dbM.soundId, tresherIds: dbM.tresherIds ?? [], keyIds: [], name: dbM.name, type: dbM.type, description: dbM.description ?? '', hp: dbM.hp, movementEconomy: dbM.movementEconomy, ac: dbM.ac, runAt: dbM.runAt, numberOfAttacks: dbM.numberOfAttacks, attacks: dbM.attacks ?? [], spReward: dbM.spReward, magic: dbM.magic, magicResistance: dbM.magicResistance, castPlus: dbM.castPlus, callsReinforcements: dbM.callsReinforcements, reinforcementCount: dbM.reinforcementCount, reinforcementMonsterName: dbM.reinforcementMonsterName, toHitPlusNeeded: dbM.toHitPlusNeeded, npcGreeting: dbM.npcGreeting, npcInfo1: dbM.npcInfo1, npcInfo2: dbM.npcInfo2, npcInfo3: dbM.npcInfo3, npcOnlyAttackWhenAttacked: dbM.npcOnlyAttackWhenAttacked, npcGivesInfoAfterDamaged: dbM.npcGivesInfoAfterDamaged, npcAttacksAfterInfo: dbM.npcAttacksAfterInfo, npcCanTrade: dbM.npcCanTrade, awareness: dbM.awareness });
     }
     // Determine which rooms should give their first monster a key
     const roomMonsterKeyMap = new Map();
@@ -1069,6 +1070,7 @@ function buildFilledDungonPayload(payload, params, blueprint, monsters) {
             spReward: monster.spReward,
             magic: monster.magic,
             magicResistance: monster.magicResistance,
+            castPlus: monster.castPlus,
             callsReinforcements: monster.callsReinforcements,
             reinforcementCount: monster.reinforcementCount,
             reinforcementMonsterName: monster.reinforcementMonsterName,
@@ -1274,6 +1276,7 @@ function buildManualFilledDungonPayload(payload, params, blueprint, monsters, it
             spReward: monster.spReward,
             magic: monster.magic,
             magicResistance: monster.magicResistance,
+            castPlus: monster.castPlus,
             callsReinforcements: monster.callsReinforcements,
             reinforcementCount: monster.reinforcementCount,
             reinforcementMonsterName: monster.reinforcementMonsterName,

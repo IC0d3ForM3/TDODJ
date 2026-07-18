@@ -71,12 +71,13 @@ interface SpellWriteInput {
   lastfor2?: unknown;
 }
 
-const EFFECT_TYPE_OPTIONS = new Set(['Fire', 'Ice', 'Lightning', 'Other']);
+const EFFECT_TYPE_OPTIONS = new Set(['Fire', 'Ice', 'Lightning', 'Splah', 'Other']);
 
 const EFFECT_TYPE_DEFAULT_COLORS: Record<string, string> = {
   Fire: '#ee3300',
   Ice: '#88ddff',
   Lightning: '#4466ff',
+  Splah: '#55dd88',
   Other: '#ffffff',
 };
 

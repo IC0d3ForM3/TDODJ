@@ -104,7 +104,8 @@ export class GameCombatService {
   readonly bloodSplatter = signal<{ x: number; y: number; r: number }[]>([]);
   readonly playerHitFlash = signal(false);
   readonly playerYellowHitFlash = signal(false);
-  readonly spellHitFlash = signal<'blood' | 'arcane' | 'fire' | 'ice' | 'lightning' | 'mind' | null>(null);
+  readonly spellHitFlash = signal<'blood' | 'arcane' | 'fire' | 'ice' | 'lightning' | 'mind' | 'splah' | null>(null);
+  readonly spellHitFlashColor = signal<string | null>(null);
   readonly spellBeamEffects = signal<{ fromRow: number; fromCol: number; toRow: number; toCol: number; isHP: boolean }[]>([]);
   readonly monsterGlowKeys = signal<Set<string>>(new Set());
   readonly spellTargetMode = signal<{ spellId: number; maxTargets: number; targets: { row: number; column: number }[]; targetType?: 'monster' | 'trap' } | null>(null);

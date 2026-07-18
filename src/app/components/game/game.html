@@ -875,7 +875,7 @@
 									<div class="fpv-yellow-hit-flash"></div>
 								}
 								@if (spellHitFlash(); as kind) {
-									<div [class]="'fpv-spell-hit-' + kind"></div>
+									<div [class]="'fpv-spell-hit-' + kind" [style.--fpv-splah-color]="spellHitFlashColor() ?? '#55dd88'"></div>
 								}
 							</div>
 						</div>

@@ -61,6 +61,7 @@ import {
   PotionPlacement,
   ObstaclePlacement,
   PortalPlacement,
+  PortalLook,
 } from '../../interfaces/game';
 
 interface GameSessionPayload {
@@ -99,12 +100,43 @@ interface GameSessionPayload {
   dungonCoverImagePath?: string | null;
 }
 
+interface CreatorTestAssetRecord {
+  id: number;
+  name: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+interface CreatorTestPcProfilePayload {
+  id: string;
+  name: string;
+  species: string;
+  type: string;
+  maxHP: number;
+  currentHP: number;
+  ac: number;
+  actionEconomy: number;
+  mind: number;
+  stamina: number;
+  strength: number;
+  magicPower: number;
+  numberOfAttacks: number;
+  numberOfDefends: number;
+  rangeOfView: number;
+  items: CreatorTestAssetRecord[];
+  spells: CreatorTestAssetRecord[];
+  potions: CreatorTestAssetRecord[];
+  updatedAt: string;
+}
+
 interface ImageRecordPayload {
   id: number;
   path: string;
 }
 
-type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind' | 'rangedTarget';
+const CREATOR_TEST_PC_KEY_PREFIX = 'tdodj_creator_test_pcs_v1';
+
+type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind' | 'splah' | 'rangedTarget';
 type MonsterImpactProjectile = 'arrow' | 'knife';
 type MonsterImpactState = { kind: MonsterImpactKind; color?: string | null; projectile?: MonsterImpactProjectile | null; startedAt: number; expiresAt: number };
 type DiagonalFacingDirection = 'upRight' | 'downRight' | 'downLeft' | 'upLeft';
@@ -411,6 +443,7 @@ export class Game implements OnInit {
   get monsterGlowKeys() { return this.combatService.monsterGlowKeys; }
   get playerYellowHitFlash() { return this.combatService.playerYellowHitFlash; }
   get spellHitFlash() { return this.combatService.spellHitFlash; }
+  get spellHitFlashColor() { return this.combatService.spellHitFlashColor; }
   readonly currentPcId_ = signal<number | null>(null);
   get dungonSpReward() { return this.interactionService.dungonSpReward; }
   get dungonWon() { return this.interactionService.dungonWon; }
@@ -2809,6 +2842,8 @@ const targetKind = this.getSpellTargetKind(spell);
   private getSpellEffectSlots(spell: PcTresherSpellData): Array<{
     effectOn: string;
     effectAmount: number;
+    effectDiceCount?: number;
+    effectDiceSides?: number;
     effectOnPc: boolean;
     range: number;
     lastFor: number;
@@ -2822,7 +2857,7 @@ const targetKind = this.getSpellTargetKind(spell);
     const effectOn2 = (spell.effectOn2 ?? '').trim();
     const explicitTargetType = spell.targetType && spell.targetType !== 'auto' ? spell.targetType : null;
 
-    const slots: Array<{ effectOn: string; effectAmount: number; effectOnPc: boolean; range: number; lastFor: number; targetType: 'pc' | 'monster' | 'trap'; }> = [];
+    const slots: Array<{ effectOn: string; effectAmount: number; effectDiceCount?: number; effectDiceSides?: number; effectOnPc: boolean; range: number; lastFor: number; targetType: 'pc' | 'monster' | 'trap'; }> = [];
 
     const effectOn1 = (spell.effectOn ?? '').trim();
     if (effectOn1) {
@@ -2834,6 +2869,8 @@ const targetKind = this.getSpellTargetKind(spell);
       slots.push({
         effectOn: effectOn1,
         effectAmount: spell.effectAmount,
+        effectDiceCount: spell.effectDiceCount,
+        effectDiceSides: spell.effectDiceSides,
         effectOnPc: explicitTargetType === 'pc' || inferredTargetType === 'pc',
         range: range1,
         lastFor: lastFor1,
@@ -2850,6 +2887,8 @@ const targetKind = this.getSpellTargetKind(spell);
       slots.push({
         effectOn: effectOn2,
         effectAmount: effectAmount2,
+        effectDiceCount: spell.effectAmount2DiceCount,
+        effectDiceSides: spell.effectAmount2DiceSides,
         effectOnPc: explicitTargetType === 'pc' || inferredTargetType === 'pc',
         range: range2,
         lastFor: lastFor2,
@@ -2974,7 +3013,7 @@ const targetKind = this.getSpellTargetKind(spell);
     if (this.normalizeEffectToPcStat(slot.effectOn) === 'RemoveCurse') {
       const preview = this.gridPreviewContext();
       const removedCount = preview ? this.clearPlayerCursesForDungon(preview.dungonId) : 0;
-      this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '');
+      this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '', spell.effectColor);
       this.addCombatLog(
         removedCount > 0
           ? `${spell.name}${spellFlavor} removes your curses.`
@@ -2985,7 +3024,7 @@ const targetKind = this.getSpellTargetKind(spell);
 
     if (slot.lastFor === 0) {
       this.applyPermanentPlayerSpellEffect(slot.effectOn, amount);
-      this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '');
+      this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '', spell.effectColor);
       this.addCombatLog(`${spell.name}${spellFlavor} permanently affects you. (${slot.effectOn} ${amount >= 0 ? '+' : ''}${amount})`);
       return;
     }
@@ -3017,7 +3056,7 @@ const targetKind = this.getSpellTargetKind(spell);
         this.playerMp.set(Math.max(0, Math.min(this.playerMp() + amount, this.getEffectivePlayerMagicPower())));
       }
     }
-    this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '');
+    this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '', spell.effectColor);
     this.addCombatLog(`${spell.name}${spellFlavor} affects you ${this.spellEffectDurationLabel(slot.lastFor)}. (${slot.effectOn} ${amount >= 0 ? '+' : ''}${amount})`);
   }
 
@@ -3081,7 +3120,7 @@ const targetKind = this.getSpellTargetKind(spell);
           behavior: 'tick',
         });
       }
-      this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '');
+      this.triggerSpellHitFlash(spell.name, slot.effectOn, spell.effectType ?? '', spell.effectColor);
       this.triggerMonsterGlow(target.row, target.column, spell.name, slot.effectOn, spell.effectType ?? '');
       this.addCombatLog(`${spell.name}${spellFlavor} afflicts ${monsterName} ${this.spellEffectDurationLabel(slot.lastFor)}. (${slot.effectOn} -${damagePerTick})`);
     } else {
@@ -3212,6 +3251,9 @@ const targetKind = this.getSpellTargetKind(spell);
     if (normalizedType.includes('blood') || normalizedType.includes('bleed')) {
       return 'blood';
     }
+    if (normalizedType.includes('splah') || normalizedType.includes('splash') || normalizedType.includes('ooze') || normalizedType.includes('slime')) {
+      return 'splah';
+    }
     if (normalizedType.includes('fire')) {
       return 'fire';
     }
@@ -3227,6 +3269,9 @@ const targetKind = this.getSpellTargetKind(spell);
     const normalized = `${spellName} ${effectOn} ${effectType}`.toLowerCase();
     if (normalized.includes('blood') || normalized.includes('bleed')) {
       return 'blood';
+    }
+    if (normalized.includes('splah') || normalized.includes('splash') || normalized.includes('ooze') || normalized.includes('slime') || normalized.includes('bubble')) {
+      return 'splah';
     }
     if (normalized.includes('fire') || normalized.includes('burn') || normalized.includes('flame')) {
       return 'fire';
@@ -3263,6 +3308,7 @@ const targetKind = this.getSpellTargetKind(spell);
     if (kind === 'lightning') return '#8de8ff';
     if (kind === 'ice') return '#71d6ff';
     if (kind === 'mind') return '#44dd77';
+    if (kind === 'splah') return '#55dd88';
     return '#c85fff';
   }
 
@@ -3291,11 +3337,15 @@ const targetKind = this.getSpellTargetKind(spell);
     setTimeout(() => this.playerYellowHitFlash.set(false), 1500);
   }
 
-  private triggerSpellHitFlash(spellName: string, effectOn: string, effectType: string): void {
+  private triggerSpellHitFlash(spellName: string, effectOn: string, effectType: string, effectColor: string | undefined): void {
     const rawKind = this.getMonsterImpactKind(spellName, effectOn, effectType);
     const kind = rawKind === 'rangedTarget' ? 'blood' : rawKind;
     this.spellHitFlash.set(kind);
-    setTimeout(() => this.spellHitFlash.set(null), 1500);
+    this.spellHitFlashColor.set(kind === 'splah' ? (effectColor ?? this.getDefaultMonsterImpactColor(kind)) : null);
+    setTimeout(() => {
+      this.spellHitFlash.set(null);
+      this.spellHitFlashColor.set(null);
+    }, 1500);
   }
 
   getBeamFpvLine(beam: { fromRow: number; fromCol: number; toRow: number; toCol: number; isHP: boolean }): { x1: number; y1: number; x2: number; y2: number } | null {
@@ -5616,6 +5666,12 @@ const targetKind = this.getSpellTargetKind(spell);
     const gameId = Number.parseInt(this.route.snapshot.paramMap.get('gameId') ?? '', 10);
     const isSample = !Number.isInteger(gameId) || gameId <= 0;
 
+    const testMode = this.route.snapshot.queryParamMap?.get('testMode');
+    if (testMode === 'creator') {
+      this.loadCreatorTestSession();
+      return;
+    }
+
     if (isSample) {
       // Sample play mode — no auth required
       const pcIdRaw = this.route.snapshot.queryParamMap?.get('pcId') ?? '';
@@ -5800,6 +5856,193 @@ const targetKind = this.getSpellTargetKind(spell);
       });
   }
 
+  private loadCreatorTestSession(): void {
+    const userKey = this.account.getKey();
+    if (!userKey) {
+      this.gameLoadError.set('Please log in to test this dungeon.');
+      return;
+    }
+
+    const profileId = this.route.snapshot.queryParamMap?.get('testPcProfileId') ?? '';
+    const dungonIdRaw = this.route.snapshot.queryParamMap?.get('dungonId') ?? '';
+    const dungonId = Number.parseInt(dungonIdRaw, 10);
+    if (!profileId || !Number.isInteger(dungonId) || dungonId <= 0) {
+      this.gameLoadError.set('Invalid creator test parameters.');
+      return;
+    }
+
+    const profile = this.getCreatorTestPcProfile(userKey, dungonId, profileId);
+    if (!profile) {
+      this.gameLoadError.set('Test PC profile not found.');
+      return;
+    }
+
+    // Ensure monster spells (owned by this creator, or admin-visible) resolve during test play.
+    this.loadSpellCatalog(userKey);
+
+    this.isSampleMode.set(true);
+    this.isLoadingGame.set(true);
+    this.gameLoadError.set(null);
+
+    this.http
+      .get<unknown>(`${API_BASE_URL}/dungons/${dungonId}`, { params: { userkey: userKey } })
+      .pipe(finalize(() => this.isLoadingGame.set(false)))
+      .subscribe({
+        next: (dungon) => {
+          const source = (dungon ?? {}) as Record<string, unknown>;
+          const dungenJson = source['dungenJson'];
+          const name = typeof source['name'] === 'string' ? source['name'] : 'Dungeon Test';
+
+          this.loadCreatorTestPayload(dungonId, name, dungenJson, profile);
+        },
+        error: () => {
+          this.gameLoadError.set('Failed to load dungeon for creator test mode.');
+        },
+      });
+  }
+
+  private loadCreatorTestPayload(
+    dungonId: number,
+    dungonName: string,
+    dungenJson: unknown,
+    profile: CreatorTestPcProfilePayload
+  ): void {
+    const payload: GameSessionPayload = {
+      id: 0,
+      dungonid: dungonId,
+      name: `TEST: ${dungonName}`,
+      dungenJson: dungenJson ?? {},
+      lastupdated: new Date().toISOString(),
+      pcCurrentHP: profile.currentHP,
+      pcMaxHP: profile.maxHP,
+      pcSp: 0,
+      pcMind: profile.mind,
+      pcStamina: profile.stamina,
+      pcAc: profile.ac,
+      pcStrength: profile.strength,
+      pcMagicPower: profile.magicPower,
+      pcNumberOfAttacks: profile.numberOfAttacks,
+      pcNumberOfDefends: profile.numberOfDefends,
+      pcType: profile.type,
+      pcSpecies: profile.species,
+      pcName: profile.name,
+      pcImagePath: null,
+      currentPcId: null,
+      isMainGame: false,
+      resettablePerPc: false,
+      dungonSpReward: 0,
+      pcTreshers: this.buildTestPcTreshers(profile),
+      pcTresherItems: this.buildTestPcItems(profile),
+      pcTresherPotions: this.buildTestPcPotions(profile),
+      pcTresherSpells: this.buildTestPcSpells(profile),
+      pcTresherCurses: [],
+      monsterImages: [],
+      lootImages: [],
+      obstacleImages: [],
+      soundPaths: [],
+      dungonCoverImagePath: null,
+    };
+
+    this.currentGameId.set(null);
+    this.gameName.set(payload.name || 'Dungeon Test');
+    this.gameLastUpdated.set(null);
+    this.playerSp.set(0);
+    this.playerMind.set(Math.max(0, Math.floor(payload.pcMind ?? 0)));
+    this.playerStamina.set(Math.max(0, Math.floor(payload.pcStamina ?? 0)));
+    this.playerBaseAC.set(Math.max(1, payload.pcAc ?? 10));
+    this.playerStrength.set(Math.max(0, Math.floor(payload.pcStrength ?? 0)));
+    this.playerMagicPower.set(Math.max(0, Math.floor(payload.pcMagicPower ?? 0)));
+    this.playerMp.set(this.getEffectivePlayerMagicPower());
+    this.playerNOA.set(Math.max(1, Math.floor(payload.pcNumberOfAttacks ?? 1)));
+    this.playerNOD.set(Math.max(1, Math.floor(payload.pcNumberOfDefends ?? 1)));
+    this.currentPcId_.set(null);
+    this.playerType.set(payload.pcType ?? null);
+    this.playerSpecies.set(payload.pcSpecies ?? null);
+    this.playerName.set(payload.pcName ?? null);
+    this.playerPortraitUrl.set(null);
+    this.dungonSpReward.set(0);
+
+    const playerMaxHp = this.gameJsonParserService.resolvePlayerMaxHp(payload.pcMaxHP);
+    this.playerMaxHp.set(playerMaxHp);
+    this.playerStartingHp = this.gameJsonParserService.resolvePlayerCurrentHp(payload.pcCurrentHP, playerMaxHp);
+
+    this.loadDungonJsonState(payload.dungonid, payload.dungenJson);
+    this.setPcInventoryInitialized(payload.dungonid, false);
+    this.seedPcTreshersIntoInventory(payload.dungonid, payload.pcTreshers);
+    this.pcTresherItemsById.set(this.gameJsonParserService.parsePcTresherItemMap(payload.pcTresherItems));
+    this.pcTresherPotionsById.set(this.gameJsonParserService.parsePcTresherPotionMap(payload.pcTresherPotions));
+    this.pcTresherSpellsById.set(this.gameJsonParserService.parsePcTresherSpellMap(payload.pcTresherSpells));
+    this.pcTresherCursesById.set(new Map());
+
+    this.dungonCoverImageUrl.set(null);
+    this.isPreloadingAssets.set(false);
+    this.setInitialPreviewContext(payload.dungonid);
+    this.initializeCombatState(payload.dungonid);
+    this.loadMonsterImages(payload.dungonid);
+    this.loadObstacleImages(payload.dungonid);
+    this.loadLootImages(payload.dungonid);
+  }
+
+  private getCreatorTestPcProfile(userKey: string, dungonId: number, profileId: string): CreatorTestPcProfilePayload | null {
+    const storageKey = `${CREATOR_TEST_PC_KEY_PREFIX}:${userKey}:${dungonId}`;
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return null;
+      const profile = parsed.find((entry) => entry && typeof entry === 'object' && (entry as Record<string, unknown>)['id'] === profileId);
+      return profile ? (profile as CreatorTestPcProfilePayload) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private buildTestPcTreshers(profile: CreatorTestPcProfilePayload): unknown[] {
+    const itemIds = profile.items.map((entry) => entry.id);
+    const spellIds = profile.spells.map((entry) => entry.id);
+    const potionIds = profile.potions.map((entry) => entry.id);
+    return [
+      {
+        id: 999001,
+        type: 'OtherTresher',
+        name: 'Test Gear',
+        description: 'Creator test gear',
+        gold: 0,
+        silver: 0,
+        copper: 0,
+        zinc: 0,
+        item1Id: itemIds[0] ?? null,
+        item2Id: itemIds[1] ?? null,
+        item3Id: itemIds[2] ?? null,
+        item4Id: itemIds[3] ?? null,
+        spell1Id: spellIds[0] ?? null,
+        spell2Id: spellIds[1] ?? null,
+        spell3Id: spellIds[2] ?? null,
+        spell4Id: spellIds[3] ?? null,
+        potion1Id: potionIds[0] ?? null,
+        potion2Id: potionIds[1] ?? null,
+        potion3Id: potionIds[2] ?? null,
+        curse1Id: null,
+        curse2Id: null,
+        imageId: null,
+        soundId: null,
+        spReward: 0,
+      },
+    ];
+  }
+
+  private buildTestPcItems(profile: CreatorTestPcProfilePayload): unknown[] {
+    return profile.items.map((entry) => ({ ...entry }));
+  }
+
+  private buildTestPcPotions(profile: CreatorTestPcProfilePayload): unknown[] {
+    return profile.potions.map((entry) => ({ ...entry }));
+  }
+
+  private buildTestPcSpells(profile: CreatorTestPcProfilePayload): unknown[] {
+    return profile.spells.map((entry) => ({ ...entry }));
+  }
+
   private preloadGameAssets(game: GameSessionPayload): Promise<void> {
     // Populate sound path map synchronously from bundled server data
     this.gameSoundService.seedBundledSoundPaths(game.soundPaths);
@@ -5897,10 +6140,15 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private resolveSpellData(dungonId: number, spellId: number): PcTresherSpellData | null {
+    const normalizedSpellId = Number.isFinite(spellId) ? Math.floor(spellId) : null;
+    if (normalizedSpellId === null) {
+      return null;
+    }
+
     return (
-      this.pcTresherSpellsById().get(spellId) ??
-      (this.floorSpellListByDungon()[dungonId] ?? []).find((s) => s.id === spellId) ??
-      this.spellCatalogById().get(spellId) ??
+      this.pcTresherSpellsById().get(normalizedSpellId) ??
+      (this.floorSpellListByDungon()[dungonId] ?? []).find((s) => s.id === normalizedSpellId || Number(s.id) === normalizedSpellId) ??
+      this.spellCatalogById().get(normalizedSpellId) ??
       null
     );
   }
@@ -6699,8 +6947,10 @@ const targetKind = this.getSpellTargetKind(spell);
     // Draw portal markers (purple) for start/end points
     const portalsForMap = this.portalPlacementsByDungon()[preview.dungonId] ?? [];
     for (const portal of portalsForMap) {
-      const symbol = portal.look === 'starDown' ? '▼' : portal.look === 'magicDoor' ? '⊡' : '▲';
-      const drawPortalDot = (row: number | null, col: number | null): void => {
+      const symbolFor = (look: PortalLook) => (look === 'starDown' ? '▼' : look === 'magicDoor' ? '⊡' : '▲');
+      // The far end of a two-way star portal shows the opposite look (starUp <-> starDown).
+      const endLook: PortalLook = portal.look === 'starUp' ? 'starDown' : portal.look === 'starDown' ? 'starUp' : portal.look;
+      const drawPortalDot = (row: number | null, col: number | null, symbol: string): void => {
         if (row === null || col === null) return;
         if (!visibleSquareKeys.has(this.getSquareKey(row, col))) return;
         const pRow = row - preview.startRow;
@@ -6714,8 +6964,8 @@ const targetKind = this.getSpellTargetKind(spell);
         context.textBaseline = 'middle';
         context.fillText(symbol, cx, cy);
       };
-      drawPortalDot(portal.startRow, portal.startColumn);
-      drawPortalDot(portal.endRow, portal.endColumn);
+      drawPortalDot(portal.startRow, portal.startColumn, symbolFor(portal.look));
+      drawPortalDot(portal.endRow, portal.endColumn, symbolFor(endLook));
     }
 
     const centerPreviewRow = preview.centerRow - preview.startRow;
@@ -11153,6 +11403,12 @@ const targetKind = this.getSpellTargetKind(spell);
     const transitionType = this.pendingExitTransitionType();
     if (transitionType === null) return;
     this.pendingExitTransitionType.set(null);
+
+    if (this.isCreatorTestMode()) {
+      this.returnToCreatorFromTest();
+      return;
+    }
+
     this.triggerDungonWin(transitionType);
   }
 
@@ -11863,6 +12119,28 @@ const targetKind = this.getSpellTargetKind(spell);
   goHome(): void {
     const dest = this.account.getKey() ? '/dashboard' : '/';
     void this.router.navigate([dest]);
+  }
+
+  private isCreatorTestMode(): boolean {
+    return this.route.snapshot.queryParamMap?.get('testMode') === 'creator';
+  }
+
+  private getCreatorTestDungonIdFromQuery(): number | null {
+    const raw = this.route.snapshot.queryParamMap?.get('dungonId') ?? '';
+    const value = Number(raw);
+    return Number.isInteger(value) && value > 0 ? value : null;
+  }
+
+  private returnToCreatorFromTest(): void {
+    const dungonId = this.getCreatorTestDungonIdFromQuery();
+    if (!dungonId) {
+      this.goHome();
+      return;
+    }
+
+    void this.router.navigate(['/create'], {
+      queryParams: { dungonId },
+    });
   }
 
   canSearch(): boolean {
@@ -13245,7 +13523,27 @@ const targetKind = this.getSpellTargetKind(spell);
   }
 
   private monsterHasRangedAttackInRange(template: Monster, dist: number): boolean {
-    return template.attacks.some((a) => (a.range ?? 1) > 1 && (a.range ?? 1) >= dist);
+    return template.attacks.some((a) => a.spellId == null && (a.range ?? 1) > 1 && (a.range ?? 1) >= dist);
+  }
+
+  /** Max range among the monster's non-spell (weapon/natural) attacks with range > 1, or 0 if it has none. */
+  private getMonsterRangedWeaponMaxRange(template: Monster): number {
+    let maxRange = 0;
+    for (const attack of template.attacks) {
+      if (attack.spellId != null) continue;
+      const range = attack.range ?? 1;
+      if (range > 1) {
+        maxRange = Math.max(maxRange, range);
+      }
+    }
+    return maxRange;
+  }
+
+  /** True when every non-spell attack the monster has requires range > 1 (a "pure" ranged attacker, e.g. archer). */
+  private monsterHasOnlyRangedWeaponAttacks(template: Monster): boolean {
+    const physicalAttacks = template.attacks.filter((a) => a.spellId == null);
+    if (physicalAttacks.length === 0) return false;
+    return physicalAttacks.every((a) => (a.range ?? 1) > 1);
   }
 
   private activateTresherGuards(dungonId: number, row: number, column: number): void {
@@ -13290,6 +13588,11 @@ const targetKind = this.getSpellTargetKind(spell);
       monster.remainingAE = template ? Math.max(0, this.getEffectiveMonsterStamina(monster, template) + this.getEffectiveMonsterNumberOfAttacks(monster, template)) : 0;
       monster.attacksUsedThisTurn = 0;
       monster.hasCastSpellThisTurn = false;
+      console.log(
+        `[MonsterAI] ── START TURN: ${template?.name ?? '?'} (id:${monster.monsterId}) ` +
+        `AE:${monster.remainingAE} hp:${monster.currentHp} mp:${monster.currentMagic} ` +
+        `pos:(${monster.row},${monster.column}) attacks:${template?.attacks?.map(a => a.spellId != null ? `spell:${a.spellId}` : a.type).join('|') ?? '?'}`
+      );
     }
     this.monsterInstances.update((arr) => [...arr]);
 
@@ -13354,9 +13657,24 @@ const targetKind = this.getSpellTargetKind(spell);
       const canSeePlayer = this.hasLineOfSight(dungonId, monster.row, monster.column, playerRow, playerCol);
       const shouldFlee = monster.currentHp <= template.runAt && template.runAt > 0;
       const isPassive = (template.npcOnlyAttackWhenAttacked || monster.noAttackUnlessAttacked) && !monster.npcIsHostile;
+      const rangedWeaponMaxRange = this.getMonsterRangedWeaponMaxRange(template);
+      const shouldKiteToRangedDistance =
+        rangedWeaponMaxRange > 1 &&
+        this.monsterHasOnlyRangedWeaponAttacks(template) &&
+        distToPlayer < rangedWeaponMaxRange &&
+        !monster.isStationary;
+
+      console.log(
+        `[MonsterAI] ${template.name} (id:${monster.monsterId}) | AE:${monster.remainingAE} | ` +
+        `pos:(${monster.row},${monster.column}) -> player:(${playerRow},${playerCol}) | dist:${distToPlayer} | ` +
+        `adjacent:${isAdjacent} canRanged:${canRangedAttack} canDetect:${canDetectPlayer} canSee:${canSeePlayer} | ` +
+        `hp:${monster.currentHp} mp:${monster.currentMagic} attacks:${monster.attacksUsedThisTurn}/${maxAttacks} castThisTurn:${monster.hasCastSpellThisTurn} | ` +
+        `shouldFlee:${shouldFlee} isPassive:${isPassive} shouldKite:${shouldKiteToRangedDistance}(maxRange:${rangedWeaponMaxRange})`
+      );
 
       // Call for reinforcements before acting (first time only, costs full turn)
       if (template.callsReinforcements && !monster.hasCalledReinforcements && canDetectPlayer) {
+        console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → CALL REINFORCEMENTS`);
         monster.hasCalledReinforcements = true;
         monster.remainingAE = 0;
         const spawnedCount = this.spawnConfiguredReinforcements(monster, template, instances, monstersById, dungonId);
@@ -13370,29 +13688,64 @@ const targetKind = this.getSpellTargetKind(spell);
       }
 
       if (shouldFlee) {
+        console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → FLEE (hp ${monster.currentHp} <= runAt ${template.runAt})`);
         this.monsterTryFlee(monster, dungonId, playerRow, playerCol);
       } else if (isPassive) {
+        console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → PASSIVE — do nothing`);
         monster.remainingAE = 0;
       } else if (monster.attacksUsedThisTurn < maxAttacks && !monster.hasCastSpellThisTurn) {
         const spellAttack = this.selectMonsterSpellAttack(monster, template, dungonId, playerRow, playerCol);
         if (spellAttack !== null) {
-          this.monsterCastSpellOnPlayer(monster, template, spellAttack, dungonId, playerRow, playerCol);
+          const inferredSpellMaxRange = this.getSpellEffectSlots(spellAttack.spell)
+            .filter((slot) => slot.targetType === 'pc' || slot.targetType === 'monster')
+            .reduce((max, slot) => Math.max(max, slot.range), 0);
+          const selectedSpellMaxRange = Math.max(inferredSpellMaxRange, Math.max(1, spellAttack.attack.range ?? 1));
+          const spellIsRanged = selectedSpellMaxRange > 1;
+          const preferMeleePressure = !spellIsRanged && this.shouldMonsterPreferMeleePressure(template, isAdjacent);
+          console.log(
+            `[MonsterAI] ${template.name} AE:${monster.remainingAE} → spell candidate: "${spellAttack.spell.name}" ` +
+            `(id:${spellAttack.spell.id} range:${selectedSpellMaxRange} dist:${distToPlayer} spellIsRanged:${spellIsRanged} preferMelee:${preferMeleePressure})`
+          );
+          if (preferMeleePressure && isAdjacent) {
+            console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → MELEE ATTACK (prefer melee pressure, adjacent)`);
+            this.monsterAttackPlayer(monster, template, dungonId, playerRow, playerCol);
+          } else if (preferMeleePressure && canDetectPlayer && canSeePlayer && !monster.isStationary) {
+            console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → MOVE TOWARD (prefer melee pressure, closing distance)`);
+            this.monsterMoveToward(monster, dungonId, playerRow, playerCol);
+          } else {
+            console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → CAST SPELL "${spellAttack.spell.name}"`);
+            this.monsterCastSpellOnPlayer(monster, template, spellAttack, dungonId, playerRow, playerCol);
+          }
+        } else if (shouldKiteToRangedDistance) {
+          console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → KITE (retreat toward ranged weapon max range ${rangedWeaponMaxRange}, dist:${distToPlayer})`);
+          this.monsterKiteToRangedDistance(monster, template, dungonId, playerRow, playerCol);
         } else if (isAdjacent || canRangedAttack) {
+          console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → ATTACK (no spell available, ${isAdjacent ? 'adjacent melee' : 'ranged'})`);
           this.monsterAttackPlayer(monster, template, dungonId, playerRow, playerCol);
         } else if (canDetectPlayer && canSeePlayer && !monster.isStationary) {
+          console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → MOVE TOWARD (no spell in range, can detect+see)`);
           this.monsterMoveToward(monster, dungonId, playerRow, playerCol);
         } else if (monster.roam && !monster.isStationary) {
+          console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → ROAM (no target)`);
           this.monsterMoveRandom(monster, dungonId);
         } else {
+          console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → IDLE (nothing to do)`);
           monster.remainingAE = 0;
         }
+      } else if (shouldKiteToRangedDistance && monster.attacksUsedThisTurn < maxAttacks) {
+        console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → KITE (extra attack slot, retreat toward max range ${rangedWeaponMaxRange}, dist:${distToPlayer})`);
+        this.monsterKiteToRangedDistance(monster, template, dungonId, playerRow, playerCol);
       } else if ((isAdjacent || canRangedAttack) && monster.attacksUsedThisTurn < maxAttacks) {
+        console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → ATTACK (extra attack slot, ${isAdjacent ? 'adjacent' : 'ranged'})`);
         this.monsterAttackPlayer(monster, template, dungonId, playerRow, playerCol);
       } else if (!isAdjacent && canDetectPlayer && canSeePlayer && !monster.isStationary) {
+        console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → MOVE TOWARD (after attacks used)`);
         this.monsterMoveToward(monster, dungonId, playerRow, playerCol);
       } else if (monster.roam && !monster.isStationary) {
+        console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → ROAM (after attacks used)`);
         this.monsterMoveRandom(monster, dungonId);
       } else {
+        console.log(`[MonsterAI] ${template.name} AE:${monster.remainingAE} → END TURN (no actions left)`);
         monster.remainingAE = 0;
       }
 
@@ -13408,6 +13761,28 @@ const targetKind = this.getSpellTargetKind(spell);
     setTimeout(() => this.processMonsterRound(dungonId), 300);
   }
 
+  private shouldMonsterPreferMeleePressure(template: Monster, isAdjacent: boolean): boolean {
+    const hasRangeOneMeleeAttack = template.attacks.some((attack) => {
+      const attackType = (attack.type ?? '').trim().toLowerCase();
+      const isMeleeType = attackType === 'bite' || attackType === 'claw' || attackType === 'weapon';
+      const isSpellLinked = attack.spellId != null;
+      const attackRange = Math.max(1, attack.range ?? 1);
+      return isMeleeType && !isSpellLinked && attackRange <= 1;
+    });
+
+    if (!hasRangeOneMeleeAttack) {
+      return false;
+    }
+
+    // At point-blank monsters often choose to strike, while still frequently casting.
+    if (isAdjacent) {
+      return Math.random() < 0.6;
+    }
+
+    // At spell range they sometimes close distance to threaten range-1 attacks.
+    return Math.random() < 0.35;
+  }
+
   private selectMonsterSpellAttack(
     monster: GameMonsterInstance,
     template: Monster,
@@ -13416,6 +13791,7 @@ const targetKind = this.getSpellTargetKind(spell);
     playerCol: number
   ): { attack: MonsterAttack; spell: PcTresherSpellData } | null {
     if (monster.remainingAE < 1 || monster.currentMagic <= 0) {
+      console.log(`[MonsterAI] ${template.name} selectSpell → SKIP (AE:${monster.remainingAE} mp:${monster.currentMagic})`);
       return null;
     }
 
@@ -13426,24 +13802,35 @@ const targetKind = this.getSpellTargetKind(spell);
         }
         const spell = this.resolveSpellData(dungonId, attack.spellId);
         if (!spell) {
+          console.log(`[MonsterAI] ${template.name} selectSpell → spell id:${attack.spellId} NOT FOUND in catalog`);
           return null;
         }
         const spellCost = Math.max(1, spell.magicCost ?? 1);
         if (monster.currentMagic < spellCost) {
+          console.log(`[MonsterAI] ${template.name} selectSpell → "${spell.name}" SKIP: not enough mp (${monster.currentMagic} < cost ${spellCost})`);
           return null;
         }
         const monsterRange = Math.max(Math.abs(monster.row - playerRow), Math.abs(monster.column - playerCol));
-        const maxSpellRange = this.getSpellMaxMonsterRange(spell);
+        const inferredSpellMaxRange = this.getSpellEffectSlots(spell)
+          .filter((slot) => slot.targetType === 'pc' || slot.targetType === 'monster')
+          .reduce((max, slot) => Math.max(max, slot.range), 0);
+        const maxSpellRange = Math.max(inferredSpellMaxRange, Math.max(1, attack.range ?? 1));
+        console.log(
+          `[MonsterAI] ${template.name} selectSpell → "${spell.name}" id:${spell.id} ` +
+          `dist:${monsterRange} maxRange:${maxSpellRange} (inferredSlotRange:${inferredSpellMaxRange} attackRange:${attack.range ?? 'null'}) ` +
+          `cost:${spellCost} mp:${monster.currentMagic} diceFormula:${spell.effectDiceCount ?? 0}d${spell.effectDiceSides ?? 0}`
+        );
         if (maxSpellRange <= 0 || monsterRange > maxSpellRange) {
+          console.log(`[MonsterAI] ${template.name} selectSpell → "${spell.name}" SKIP: out of range (${monsterRange} > ${maxSpellRange})`);
           return null;
         }
-        if (this.getSpellTargetKind(spell) === 'trap') {
-          return null;
-        }
-        if (this.getSpellTargetKind(spell) === 'trap') {
+        const targetKind = this.getSpellTargetKind(spell);
+        if (targetKind === 'trap' || targetKind === 'self') {
+          console.log(`[MonsterAI] ${template.name} selectSpell → "${spell.name}" SKIP: wrong target kind (${targetKind})`);
           return null;
         }
         if (!this.hasLineOfSight(dungonId, monster.row, monster.column, playerRow, playerCol)) {
+          console.log(`[MonsterAI] ${template.name} selectSpell → "${spell.name}" SKIP: no line of sight`);
           return null;
         }
         return { attack, spell };
@@ -13484,17 +13871,40 @@ const targetKind = this.getSpellTargetKind(spell);
     monster.hasCastSpellThisTurn = true;
     monster.currentMagic = Math.max(0, monster.currentMagic - spellCost);
 
+    // Monsters use the same spell audio path resolution as player casts.
+    this.playSpellSound(spell);
+
     const coverPenalty = this.getAttackCoverPenalty(dungonId, monster.row, monster.column, playerRow, playerCol);
-    const hitRoll = this.rollD12((attack.plusToHit ?? 0) + coverPenalty);
+    const castPlus = Math.max(0, Math.trunc(template.castPlus ?? 0));
+    const castDamageBonus = Math.floor(castPlus / 2);
+    const spellHitBonus = (attack.plusToHit ?? 0) + coverPenalty + castPlus;
+    const hitRoll = this.rollD12(spellHitBonus);
     const dc = spell.successTestValue + this.getPlayerMagicResistance();
+    const rawFlashKind = this.getMonsterImpactKind(spell.name, spell.effectOn, spell.effectType ?? '');
+    const flashKind = rawFlashKind === 'rangedTarget' ? 'blood' : rawFlashKind;
     if (hitRoll < dc) {
-      this.addCombatLog(`${template.name} casts ${spell.name}, but you resist. (${hitRoll} vs DC ${dc})`);
+      // Even on resist, show the incoming spell visual across FPV.
+      this.triggerSpellHitFlash(spell.name, spell.effectOn, spell.effectType ?? '', spell.effectColor);
+      this.addCombatLog(
+        `${template.name} casts ${spell.name} — rolled ${hitRoll} (1d12${this.formatSignedModifier(spellHitBonus)}) vs DC ${dc}. ` +
+        `Cast+ ${castPlus} (Dmg +${castDamageBonus}). You resist.`
+      );
+      // Do not close distance after spending AE to cast.
+      monster.remainingAE = 0;
       return;
     }
 
-    const slots = this.getSpellEffectSlots(spell).filter((slot) => slot.targetType === 'monster');
+    // For spell impacts, use the spell-specific full-screen flash instead of generic red damage flash.
+    this.triggerSpellHitFlash(spell.name, spell.effectOn, spell.effectType ?? '', spell.effectColor);
+
+    const slots = this.getSpellEffectSlots(spell).filter(
+      (slot) => slot.targetType === 'monster' || slot.targetType === 'pc'
+    );
     if (slots.length === 0) {
-      this.addCombatLog(`${template.name} casts ${spell.name}, but nothing happens.`);
+      this.addCombatLog(
+        `${template.name} casts ${spell.name} — rolled ${hitRoll} (1d12${this.formatSignedModifier(spellHitBonus)}) vs DC ${dc}. ` +
+        `Cast+ ${castPlus} (Dmg +${castDamageBonus}), but nothing happens.`
+      );
       return;
     }
 
@@ -13503,7 +13913,33 @@ const targetKind = this.getSpellTargetKind(spell);
       if (distance > slot.range) {
         continue;
       }
-      const rolledAmount = this.rollSpellEffectDelta(slot.effectAmount);
+      const baseEffect = slot.effectAmount;
+      const signedDamageBonus = baseEffect >= 0 ? castDamageBonus : -castDamageBonus;
+      const adjustedEffectBase = baseEffect + signedDamageBonus;
+      const diceCount = Math.max(0, Math.trunc(slot.effectDiceCount ?? 0));
+      const diceSides = Math.max(0, Math.trunc(slot.effectDiceSides ?? 0));
+      const usesDiceFormula = diceCount > 0 && diceSides > 0;
+      let rolledAmount: number;
+      let formulaText: string;
+
+      if (usesDiceFormula) {
+        let diceTotal = 0;
+        for (let i = 0; i < diceCount; i += 1) {
+          diceTotal += this.randomInt(1, diceSides);
+        }
+        const signedDiceTotal = baseEffect >= 0 ? diceTotal : -diceTotal;
+        rolledAmount = signedDiceTotal + signedDamageBonus;
+        formulaText = `${diceCount}d${diceSides}${signedDamageBonus !== 0 ? this.formatSignedModifier(signedDamageBonus) : ''}`;
+      } else {
+        rolledAmount = this.rollSpellEffectDelta(adjustedEffectBase);
+        formulaText = `1d12+|${adjustedEffectBase}|`;
+      }
+
+      this.addCombatLog(
+        `${template.name} casts ${spell.name} pre-effect ${slot.effectOn}: base ${baseEffect}` +
+        `${signedDamageBonus !== 0 ? ` + Cast+ ${signedDamageBonus >= 0 ? '+' : ''}${signedDamageBonus}` : ''}` +
+        `${usesDiceFormula ? '' : ` => ${adjustedEffectBase}`}, formula ${formulaText}, rolled ${rolledAmount}.`
+      );
       const detrimentalAmount = rolledAmount >= 0 ? -rolledAmount : rolledAmount;
       if (slot.lastFor === 0) {
         this.applyPermanentPlayerSpellEffect(slot.effectOn, detrimentalAmount);
@@ -13532,8 +13968,12 @@ const targetKind = this.getSpellTargetKind(spell);
       }
     }
 
-    this.addCombatLog(`${template.name} casts ${spell.name} on you.`);
-    this.triggerSpellHitFlash(spell.name, spell.effectOn, spell.effectType ?? '');
+    this.addCombatLog(
+      `${template.name} casts ${spell.name} on you — rolled ${hitRoll} (1d12${this.formatSignedModifier(spellHitBonus)}) vs DC ${dc}. ` +
+      `Cast+ ${castPlus} (Dmg +${castDamageBonus}).`
+    );
+    // Do not close distance after spending AE to cast.
+    monster.remainingAE = 0;
   }
 
   private monsterAttackPlayer(
@@ -13553,20 +13993,27 @@ const targetKind = this.getSpellTargetKind(spell);
       return;
     }
 
+    // Pick only non-spell attacks here. Spell-linked attacks are handled by monsterCastSpellOnPlayer.
+    const physicalAttacks = template.attacks.filter((a) => a.spellId == null);
+    if (physicalAttacks.length === 0) {
+      monster.remainingAE = 0;
+      return;
+    }
+
     // Pick attack randomly from those in range (each attack independent when multi-attack)
     const distToPlayer = this.chebyshevDistance(monster.row, monster.column, playerRow, playerCol);
     const adjacentToPlayer = distToPlayer <= 1;
     let eligibleAttacks: MonsterAttack[];
     if (adjacentToPlayer) {
       // When adjacent prefer melee (range 1); fall back to all if monster is ranged-only
-      const meleePool = template.attacks.filter((a) => (a.range ?? 1) === 1);
-      eligibleAttacks = meleePool.length > 0 ? meleePool : template.attacks;
+      const meleePool = physicalAttacks.filter((a) => (a.range ?? 1) === 1);
+      eligibleAttacks = meleePool.length > 0 ? meleePool : physicalAttacks;
     } else {
       // At range, only use attacks that reach the player
-      const rangedPool = template.attacks.filter((a) => (a.range ?? 1) >= distToPlayer);
-      eligibleAttacks = rangedPool.length > 0 ? rangedPool : template.attacks;
+      const rangedPool = physicalAttacks.filter((a) => (a.range ?? 1) >= distToPlayer);
+      eligibleAttacks = rangedPool.length > 0 ? rangedPool : physicalAttacks;
     }
-    const attack = eligibleAttacks[Math.floor(Math.random() * eligibleAttacks.length)] ?? template.attacks[0];
+    const attack = eligibleAttacks[Math.floor(Math.random() * eligibleAttacks.length)] ?? physicalAttacks[0];
     const monsterStrength = this.getEffectiveMonsterStrength(monster, template);
     const plusToHit = (attack?.plusToHit ?? 0) + monsterStrength;
     const maxDamage = Math.max(1, (attack?.damage ?? 1) + monsterStrength);
@@ -13660,6 +14107,22 @@ const targetKind = this.getSpellTargetKind(spell);
     playerRow: number,
     playerCol: number
   ): void {
+    if (!this.moveMonsterAwayFromPlayer(monster, dungonId, playerRow, playerCol)) {
+      monster.remainingAE = 0;
+    }
+  }
+
+  /**
+   * Moves the monster one step in the direction that most increases its distance from the
+   * player (respecting movement/AE rules). Returns true if a step was taken, false if no
+   * valid retreat direction exists (e.g. monster is cornered).
+   */
+  private moveMonsterAwayFromPlayer(
+    monster: GameMonsterInstance,
+    dungonId: number,
+    playerRow: number,
+    playerCol: number
+  ): boolean {
     const directions = this.getShuffledDirections();
     let bestDir: { rowOffset: number; columnOffset: number } | null = null;
     let bestDist = this.chebyshevDistance(monster.row, monster.column, playerRow, playerCol);
@@ -13678,14 +14141,39 @@ const targetKind = this.getSpellTargetKind(spell);
       }
     }
 
-    if (bestDir) {
-      const isDiag = bestDir.rowOffset !== 0 && bestDir.columnOffset !== 0;
-      this.consumeMonsterAE(monster, isDiag ? 2 : 1, dungonId);
-      if (!monster.isDead) {
-        monster.row += bestDir.rowOffset;
-        monster.column += bestDir.columnOffset;
-        this.playStepSound(0.1);
-      }
+    if (!bestDir) {
+      return false;
+    }
+
+    const isDiag = bestDir.rowOffset !== 0 && bestDir.columnOffset !== 0;
+    this.consumeMonsterAE(monster, isDiag ? 2 : 1, dungonId);
+    if (!monster.isDead) {
+      monster.row += bestDir.rowOffset;
+      monster.column += bestDir.columnOffset;
+      this.playStepSound(0.1);
+    }
+    return true;
+  }
+
+  /**
+   * A "pure" ranged attacker (e.g. archer) retreats toward its weapon's max range before
+   * firing, rather than shooting from melee range. If it can't retreat any further (cornered),
+   * it fires from its current position instead of idling.
+   */
+  private monsterKiteToRangedDistance(
+    monster: GameMonsterInstance,
+    template: Monster,
+    dungonId: number,
+    playerRow: number,
+    playerCol: number
+  ): void {
+    if (this.moveMonsterAwayFromPlayer(monster, dungonId, playerRow, playerCol)) {
+      return;
+    }
+
+    const distToPlayer = this.chebyshevDistance(monster.row, monster.column, playerRow, playerCol);
+    if (this.monsterHasRangedAttackInRange(template, distToPlayer)) {
+      this.monsterAttackPlayer(monster, template, dungonId, playerRow, playerCol);
     } else {
       monster.remainingAE = 0;
     }

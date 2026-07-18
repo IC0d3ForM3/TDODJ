@@ -37,7 +37,7 @@ import {
   TresherPlacement,
 } from '../../interfaces/game';
 
-type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind' | 'rangedTarget';
+type MonsterImpactKind = 'blood' | 'fire' | 'ice' | 'lightning' | 'arcane' | 'mind' | 'splah' | 'rangedTarget';
 type MonsterImpactProjectile = 'arrow' | 'knife';
 type MonsterImpactState = { kind: MonsterImpactKind; color?: string | null; projectile?: MonsterImpactProjectile | null; startedAt: number; expiresAt: number };
 
@@ -92,6 +92,7 @@ export class DungeonFirstPersonComponent implements OnDestroy {
   private readonly stairsDownImageCache = new Map<string, HTMLImageElement>();
   private readonly stairsDownSquareAssignment = new Map<string, number>();
   private readonly shopImageCache = new Map<string, HTMLImageElement>();
+  private readonly starPortalImageCache = new Map<'starUp' | 'starDown', HTMLImageElement>();
   private readonly portalPulseTick = signal(0);
   private portalPulseTimer: ReturnType<typeof setInterval> | null = null;
   private genericTresherImage: HTMLImageElement | null = null;
@@ -133,6 +134,7 @@ export class DungeonFirstPersonComponent implements OnDestroy {
     this.loadDoorImages();
     this.loadStairsUpImages();
     this.loadStairsDownImages();
+    this.loadStarPortalImages();
   }
 
   ngOnDestroy(): void {
@@ -256,6 +258,20 @@ export class DungeonFirstPersonComponent implements OnDestroy {
       }
       if (portal.isTwoWay !== false && portal.endRow !== null && portal.endColumn !== null) {
         magicPortalGlowBySquare.set(this.getSquareKey(portal.endRow, portal.endColumn), 'twoWay');
+      }
+    }
+
+    const starPortalLookBySquare = new Map<string, 'starUp' | 'starDown'>();
+    for (const portal of this.portalPlacements()) {
+      if (portal.look !== 'starUp' && portal.look !== 'starDown') continue;
+      if (portal.startRow !== null && portal.startColumn !== null) {
+        starPortalLookBySquare.set(this.getSquareKey(portal.startRow, portal.startColumn), portal.look);
+      }
+      // The far end of a two-way star portal shows the opposite look (starUp <-> starDown),
+      // since travelling back through it goes the other direction.
+      if (portal.isTwoWay !== false && portal.endRow !== null && portal.endColumn !== null) {
+        const oppositeLook = portal.look === 'starUp' ? 'starDown' : 'starUp';
+        starPortalLookBySquare.set(this.getSquareKey(portal.endRow, portal.endColumn), oppositeLook);
       }
     }
 
@@ -673,6 +689,11 @@ export class DungeonFirstPersonComponent implements OnDestroy {
           depth,
           magicPortalMode
         );
+      }
+
+      const starPortalLook = starPortalLookBySquare.get(squareKey);
+      if (starPortalLook) {
+        this.drawFirstPersonFloorStarPortal(context, nearFrame, farFrame, starPortalLook);
       }
 
       const typeMatches = (needle: string) => [...trapSquaresByType.entries()].some(([type, keys]) => type.includes(needle) && keys.has(squareKey));
@@ -2794,6 +2815,21 @@ export class DungeonFirstPersonComponent implements OnDestroy {
         context.lineWidth = 1;
         context.strokeRect(sx, sy, slabW, sh);
       }
+      if (obs && obs.containsItemId !== null && !obs.itemTaken) {
+        if (heightPct >= 1) {
+          const markerSize = Math.min(slabW, sh) * 0.22;
+          context.fillStyle = 'rgba(0, 0, 0, 0.35)';
+          context.fillRect(sx + slabW / 2 - markerSize / 2, sy + sh / 2 - markerSize / 2, markerSize, markerSize);
+        } else {
+          const seamY = heightAnchor === 'ceiling' ? sy + sh * 0.8 : sy + sh * 0.2;
+          context.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+          context.lineWidth = Math.max(1, sh * 0.025);
+          context.beginPath();
+          context.moveTo(sx, seamY);
+          context.lineTo(sx + slabW, seamY);
+          context.stroke();
+        }
+      }
       if (fogAlpha > 0) {
         context.globalAlpha = fogAlpha;
         context.fillStyle = '#000';
@@ -3011,6 +3047,28 @@ export class DungeonFirstPersonComponent implements OnDestroy {
         context.strokeStyle = 'rgba(0,0,0,0.3)';
         context.lineWidth = 1;
         context.strokeRect(sx, sy, sw, sh);
+      }
+
+      // Openable hint: only obstacles that still hold something inside show a marker.
+      // Full floor-to-ceiling obstacles get a darker square in the middle; otherwise a
+      // seam line is drawn near the anchored edge (top for floor-anchored, bottom for
+      // ceiling-anchored) to suggest a lid.
+      if (obs && obs.containsItemId !== null && !obs.itemTaken) {
+        if (heightPct >= 1) {
+          const markerSize = Math.min(sw, sh) * 0.22;
+          const markerX = sx + sw / 2 - markerSize / 2;
+          const markerY = sy + sh / 2 - markerSize / 2;
+          context.fillStyle = 'rgba(0, 0, 0, 0.35)';
+          context.fillRect(markerX, markerY, markerSize, markerSize);
+        } else {
+          const seamY = heightAnchor === 'ceiling' ? sy + sh * 0.8 : sy + sh * 0.2;
+          context.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+          context.lineWidth = Math.max(1, sh * 0.025);
+          context.beginPath();
+          context.moveTo(sx, seamY);
+          context.lineTo(sx + sw, seamY);
+          context.stroke();
+        }
       }
 
       if (fogAlpha > 0) {
@@ -3834,6 +3892,37 @@ export class DungeonFirstPersonComponent implements OnDestroy {
       };
       img.src = `/images/${key}.jpg`;
     }
+  }
+
+  private loadStarPortalImages(): void {
+    for (const key of ['starUp', 'starDown'] as const) {
+      if (this.starPortalImageCache.has(key)) continue;
+      const img = new Image();
+      img.onload = () => {
+        this.starPortalImageCache.set(key, img);
+        this.drawCanvas();
+      };
+      img.src = key === 'starUp' ? '/images/starup1.png' : '/images/stardown1.png';
+    }
+  }
+
+  private drawFirstPersonFloorStarPortal(
+    context: CanvasRenderingContext2D,
+    nearFrame: { left: number; right: number; top: number; bottom: number },
+    farFrame: { left: number; right: number; top: number; bottom: number },
+    look: 'starUp' | 'starDown'
+  ): void {
+    const img = this.starPortalImageCache.get(look) ?? null;
+    if (!img) return;
+    const midLeft = nearFrame.left * 0.65 + farFrame.left * 0.35;
+    const midRight = nearFrame.right * 0.65 + farFrame.right * 0.35;
+    const midTop = nearFrame.top * 0.65 + farFrame.top * 0.35;
+    const midBottom = nearFrame.bottom * 0.65 + farFrame.bottom * 0.35;
+    const drawW = Math.max(8, (midRight - midLeft) * 0.9);
+    const drawH = Math.max(8, (midBottom - midTop) * 0.92);
+    const drawX = (midLeft + midRight) / 2 - drawW / 2;
+    const drawY = midBottom - drawH;
+    context.drawImage(img, drawX, drawY, drawW, drawH);
   }
 
   private drawFirstPersonDoorFace(
