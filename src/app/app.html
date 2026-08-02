@@ -50,3 +50,7 @@
 <main>
   <router-outlet></router-outlet>
 </main>
+
+@if (!isLoggedIn() && !isGamePage() && !isSamplePlayPage()) {
+  <app-ad-banner />
+}

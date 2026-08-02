@@ -47,16 +47,40 @@
 				<p style="color: #ffb2b2; font-size: 0.9rem; margin: 0.5rem 0;">You don't have any of these items.</p>
 			}
 			<div class="sound-pref-actions">
-				<button type="button" class="sound-pref-btn sound-pref-btn-on" (click)="cancelTrapCrossingPrompt()">Cancel</button>
+				<button type="button" class="sound-pref-btn sound-pref-btn-on" (click)="cancelTrapCrossingPrompt()">Stay Here</button>
 				<button type="button" class="sound-pref-btn sound-pref-btn-off" (click)="declineTrapCrossingUseItem()">No, Trigger Trap</button>
 			</div>
 		</div>
 	}
 
+	@if (showSettingsModal()) {
+		<div class="sound-pref-overlay" (click)="closeSettingsModal()"></div>
+		<div class="sound-pref-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" (click)="$event.stopPropagation()">
+			<div class="sound-pref-header">
+				<p id="settings-modal-title" class="sound-pref-title">Sound Settings</p>
+				<button type="button" class="sound-pref-close" (click)="closeSettingsModal()" aria-label="Close">✕</button>
+			</div>
+			<div class="settings-toggle-row">
+				<span class="settings-toggle-label">🎵 Music</span>
+				<div class="settings-toggle-btns">
+					<button type="button" class="settings-toggle-btn" [class.active]="!musicMuted()" (click)="setMusicMuted(false)">On</button>
+					<button type="button" class="settings-toggle-btn" [class.active]="musicMuted()" (click)="setMusicMuted(true)">Off</button>
+				</div>
+			</div>
+			<div class="settings-toggle-row">
+				<span class="settings-toggle-label">🔊 Game Sounds</span>
+				<div class="settings-toggle-btns">
+					<button type="button" class="settings-toggle-btn" [class.active]="!soundMuted()" (click)="setSfxMuted(false)">On</button>
+					<button type="button" class="settings-toggle-btn" [class.active]="soundMuted()" (click)="setSfxMuted(true)">Off</button>
+				</div>
+			</div>
+		</div>
+	}
+
 	@if (showTavernModal()) {
-		<button type="button" class="sound-toggle-btn tavern-mute-overlay" (click)="toggleMute()"
-			[title]="soundMuted() ? 'Unmute sounds' : 'Mute sounds'" aria-label="Toggle sound">
-			{{ soundMuted() ? '🔇' : '🔊' }}
+		<button type="button" class="sound-toggle-btn tavern-mute-overlay" (click)="toggleMusicMuted()"
+			[title]="musicMuted() ? 'Unmute music' : 'Mute music'" aria-label="Toggle music">
+			{{ musicMuted() ? '🔇' : '🎵' }}
 		</button>
 		<app-tavern-modal
 			[pcId]="currentPcId_()"
@@ -127,6 +151,13 @@
 			</div>
 		}
 	</app-tavern-modal>
+	}
+
+	@if (showAdOverlay()) {
+		<app-ad-interstitial
+			[message]="adOverlayMessage()"
+			(continued)="continueAfterAd()"
+		/>
 	}
 
 	@if (showYeOldMagiceShopModal()) {
@@ -375,6 +406,31 @@
 		</div>
 	}
 
+	@if (monsterDialogueModal(); as qa) {
+		<div class="npc-dialog-overlay" (click)="dismissMonsterDialogueModal()">
+			<div class="npc-dialog-box" (click)="$event.stopPropagation()">
+				<button class="npc-dialog-close" (click)="dismissMonsterDialogueModal()" title="Dismiss">✕</button>
+				<p class="npc-dialog-name">{{ qa.template.name }}</p>
+
+				@if (qa.selectedResponse) {
+					<p class="npc-dialog-line npc-dialog-greeting">"{{ qa.selectedResponse }}"</p>
+				} @else {
+					<p class="npc-dialog-line">What would you like to ask?</p>
+				}
+
+				<div class="npc-dialog-actions" style="flex-direction: column; align-items: stretch;">
+					@for (entry of qa.instance.dialogueEntries; track entry.id) {
+						<button class="npc-dialog-btn" (click)="askMonsterDialogueQuestion(entry.id)">{{ entry.question || 'Ask...' }}</button>
+					}
+				</div>
+
+				<div class="npc-dialog-actions">
+					<button class="npc-dialog-btn npc-dialog-btn-close" (click)="dismissMonsterDialogueModal()">Close</button>
+				</div>
+			</div>
+		</div>
+	}
+
 	@if (itemNoteModal(); as noteModal) {
 		<div class="item-note-overlay" (click)="dismissItemNoteModal()">
 			<div class="item-note-modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Item note">
@@ -499,6 +555,16 @@
 												(click)="useBackpackOtherItem(item)"
 											>
 												Use ({{ item.uses }})
+											</button>
+										}
+										@if (isScrollUsable(item)) {
+											<button
+												type="button"
+												class="action-button action-button-strong"
+												[disabled]="turnPhase() !== 'player' || playerHp() <= 0 || playerAE() < 1"
+												(click)="useBackpackScrollItem(item)"
+											>
+												Read ({{ item.uses }})
 											</button>
 										}
 										@if (isItemEquipable(item.type, item.name)) {
@@ -778,9 +844,7 @@
 	<header class="game-header">
 		<div class="game-header-row">
 			<h2 class="game-title">{{ gameName() }}</h2>
-			<button type="button" class="sound-toggle-btn" (click)="toggleMute()" [title]="soundMuted() ? 'Unmute sounds' : 'Mute sounds'" aria-label="Toggle sound">
-				{{ soundMuted() ? '🔇' : '🔊' }}
-			</button>
+			<button type="button" class="sound-toggle-btn" (click)="openSettingsModal()" title="Sound Settings" aria-label="Sound Settings">⚙️</button>
 			<button type="button" class="report-bug-btn" (click)="openReportBug()" title="Report a bug">🐛 Report Bug</button>
 		</div>
 		@if (isSampleMode()) {
@@ -1092,7 +1156,13 @@
 								Attack (A)
 							</button>						<button type="button" class="action-button" [disabled]="!canPlayerDefend()" (click)="tryPlayerDefend()" [title]="'Defend — costs 1 AE, +2 AC vs next attack' + (playerDefendStacks() > 0 ? ' (' + playerDefendStacks() + ' active)' : '')">
 							Defend (D){{ playerDefendStacks() > 0 ? ' ×' + playerDefendStacks() : '' }}
-						</button>							<button type="button" class="action-button" (click)="endPlayerTurnEarly()">
+						</button>
+						@if (canAskMonsterDialogueQuestions()) {
+							<button type="button" class="action-button" (click)="openMonsterDialogueModal()" title="Ask a nearby creature a question">
+								Ask
+							</button>
+						}
+						<button type="button" class="action-button" (click)="endPlayerTurnEarly()">
 								End Turn (E)
 							</button>
 							<button type="button" class="action-button action-button-ade" [disabled]="!canAde()" (click)="tryAde()" title="Attack + Defend + End Turn (requires 2 AE)">
@@ -1105,6 +1175,17 @@
 						}
 						@if (canMageRest()) {
 							<button type="button" class="action-button action-button-mage-rest" (click)="mageRest()" title="Rest — recover 1 MP per current AE (up to max), then restore AE to max. Mage Dox checks: 1d20 per MP gained; on spell cast: 1d20 per MP spent. End Turn Early restores 1 MP per AE left.">
+								Rest ✨
+							</button>
+						}
+						@if (isMageClass()) {
+							<label class="action-button action-button-overcast" title="Overcast — spend double MP on your next damage spell for up to ×2 damage.">
+								<input type="checkbox" [checked]="mageOvercastEnabled()" (change)="mageOvercastEnabled.set(!mageOvercastEnabled())" />
+								Overcast
+							</label>
+						}
+						@if (canHealerRest()) {
+							<button type="button" class="action-button action-button-mage-rest" (click)="healerRest()" title="Rest — recover 1 HP per current AE (up to max), then restore AE to max.">
 								Rest ✨
 							</button>
 						}
@@ -1252,188 +1333,125 @@
 												Opened.
 											} @else if (obstacleInfo.obstacle.requiredKeyId !== null && obstacleInfo.obstacle.isUnlocked !== true) {
 												Locked.
-											} @else if (obstacleInfo.obstacle.isOpened) {
-												Opened.
+										} @else {
+											Closed.
+										}
+										@if (obstacleRequiresKeyLabel(obstacleInfo.obstacle); as keyLabel) {
+											Requires key: {{ keyLabel }}.
+											@if (obstacleInfo.obstacle.isUnlocked) {
+												Already unlocked.
+											} @else if (obstacleInfo.hasMatchingKey) {
+												You can unlock it now.
 											} @else {
-												Closed.
+												You need the right key.
 											}
-											@if (obstacleRequiresKeyLabel(obstacleInfo.obstacle); as keyLabel) {
-												Requires key: {{ keyLabel }}.
-												@if (obstacleInfo.obstacle.isUnlocked) {
-													Already unlocked.
-												} @else if (obstacleInfo.hasMatchingKey) {
-													You can unlock it now.
-												} @else {
-													You need the right key.
-												}
-											}
-										</p>
-												@if ((obstacleInfo.obstacle.note || '').trim()) {
-													<button type="button" class="pc-wall-note-read-btn" (click)="readObstacleText(obstacleInfo.obstacle.name || 'Text', obstacleInfo.obstacle.note)">Read Text</button>
-												}
-										<div class="door-actions">
-											@if (obstacleInfo.canUseKey) {
-												<button type="button" class="action-button action-button-key" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="unlockObstacle(obstacleInfo.obstacle.id)">
-													Use Key
-												</button>
-											}
-											@if (obstacleInfo.canPick) {
-												<button type="button" class="action-button" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="pickObstacleLock(obstacleInfo.obstacle.id)">
-													Pick Lock
-												</button>
-											}
-											@if (obstacleInfo.canOpen) {
-												<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="openObstacle(obstacleInfo.obstacle.id)">
-													{{ obstacleOpenButtonLabel(obstacleInfo.obstacle) }}
-												</button>
-											}
-											@if (obstacleInfo.canTakeItem) {
-												<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="takeItemFromObstacle(obstacleInfo.obstacle.id)">
-													Take Item
-												</button>
-											}
-										</div>
-									</li>
-								}
-							</ul>
-						}
+										}
+									</p>
+									@if ((obstacleInfo.obstacle.note || '').trim()) {
+										<button type="button" class="pc-wall-note-read-btn" (click)="readObstacleText(obstacleInfo.obstacle.name || 'Text', obstacleInfo.obstacle.note)">Read Text</button>
+									}
+									<div class="door-actions">
+										@if (obstacleInfo.canUseKey) {
+											<button type="button" class="action-button action-button-key" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="unlockObstacle(obstacleInfo.obstacle.id)">
+												Use Key
+											</button>
+										}
+										@if (obstacleInfo.canPick) {
+											<button type="button" class="action-button" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="pickObstacleLock(obstacleInfo.obstacle.id)">
+												Pick Lock
+											</button>
+										}
+										@if (obstacleInfo.canOpen) {
+											<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="openObstacle(obstacleInfo.obstacle.id)">
+												{{ obstacleOpenButtonLabel(obstacleInfo.obstacle) }}
+											</button>
+										}
+										@if (obstacleInfo.canTakeItem) {
+											<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="takeItemFromObstacle(obstacleInfo.obstacle.id)">
+												Take Item
+											</button>
+										}
+										@if (obstacleInfo.canClose) {
+											<button type="button" class="action-button" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="closeObstacle(obstacleInfo.obstacle.id)">
+												Close
+											</button>
+										}
+										@if (obstacleInfo.canSmash) {
+											<button type="button" class="action-button" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="smashObstacle(obstacleInfo.obstacle.id)">
+												Smash
+											</button>
+										}
+									</div>
+								</li>
+							}
+						</ul>
+					}
 
 					@if (otherNearbyItemsForPreview().length > 0) {
 						<ul class="discovery-list">
 							@for (item of otherNearbyItemsForPreview(); track item.kind + ':' + item.row + ':' + item.column + ':' + item.name) {
 							<li class="discovery-item" [class.discovery-item-wall-note]="item.kind === 'Text' && item.name === 'Wall Note'">
-									<span class="discovery-kind">{{ item.kind }}</span>
-									<p class="discovery-name">{{ item.name }}</p>
-									<p class="discovery-description">{{ item.description }}</p>
-									@if (item.kind === 'Obstacle' && obstacleActionInfoForNearbyItem(item); as obstacleInfo) {
-										<div class="door-actions">
-											@if (obstacleInfo.canUseKey) {
-												<button type="button" class="action-button action-button-key" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="unlockObstacle(obstacleInfo.obstacle.id)">
-													Use Key
-												</button>
-											}
-											@if (obstacleInfo.canPick) {
-												<button type="button" class="action-button" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="pickObstacleLock(obstacleInfo.obstacle.id)">
-													Pick Lock
-												</button>
-											}
-											@if (obstacleInfo.canOpen) {
-												<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="openObstacle(obstacleInfo.obstacle.id)">
-													Open Obstacle
-												</button>
-											}
-											@if (obstacleInfo.canTakeItem) {
-												<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="takeItemFromObstacle(obstacleInfo.obstacle.id)">
-													Take Item
-												</button>
-											}
-										</div>
-									}
-												@if (item.kind === 'Text') {
-													<button type="button" class="pc-wall-note-read-btn" (click)="readObstacleText(item.name, item.description)">Read Text</button>
-												}
+								<span class="discovery-kind">{{ item.kind }}</span>
+								<p class="discovery-name">{{ item.name }}</p>
+								<p class="discovery-description">{{ item.description }}</p>
+								@if (item.kind === 'Text') {
+									<button type="button" class="pc-wall-note-read-btn" (click)="readObstacleText(item.name, item.description)">Read Text</button>
+								}
 								@if (item.imageSrc) {
 									<img [src]="item.imageSrc" alt="discovery image" style="display:block;max-width:100%;max-height:140px;border:1px solid rgba(255,255,255,0.25);border-radius:4px;margin-top:0.35rem" />
 								}
-								</li>
-							}
-						</ul>
-					} @else if (nearbyDoorsForPreview().length === 0 && nearbyObstaclesForPreview().length === 0) {
-						<p class="discovery-empty">Nothing else nearby right now.</p>
-					}
+							</li>
+						}
+					</ul>
+				} @else if (nearbyDoorsForPreview().length === 0 && nearbyObstaclesForPreview().length === 0) {
+					<p class="discovery-empty">Nothing else nearby right now.</p>
+				}
 
-					@if (hasCurrentSquarePickupItems()) {
-						<div class="action-buttons">
+				@if (hasCurrentSquarePickupItems()) {
+					<div class="action-buttons">
 						<button type="button" class="action-button" [disabled]="!canSearch()" (click)="searchForTraps()">
 							Search
+						</button>
+						@if (foundTrap()) {
+							<button type="button" class="action-button action-button-strong" (click)="handlePickActionIcon()">
+								{{ foundTrapPrimaryActionLabel() }}
 							</button>
-							@if (foundTrap()) {
-								<button type="button" class="action-button action-button-strong" (click)="handlePickActionIcon()">
-									{{ foundTrapPrimaryActionLabel() }}
-								</button>
-							}
-						</div>
-					} @else {
-						<div class="action-buttons">
-							<button type="button" class="action-button" [disabled]="!canSearch()" (click)="searchForTraps()">
-								Search
+						}
+					</div>
+				} @else {
+					<div class="action-buttons">
+						<button type="button" class="action-button" [disabled]="!canSearch()" (click)="searchForTraps()">
+							Search
+						</button>
+						@if (foundTrap()) {
+							<button type="button" class="action-button action-button-strong" (click)="handlePickActionIcon()">
+								{{ foundTrapPrimaryActionLabel() }}
 							</button>
-							@if (foundTrap()) {
-								<button type="button" class="action-button action-button-strong" (click)="handlePickActionIcon()">
-									{{ foundTrapPrimaryActionLabel() }}
-								</button>
-							}
-						</div>
-					}
+						}
+					</div>
+				}
 
-					@if (currentSquareObstacles().length > 0) {
-						<div class="obstacle-actions">
-							@for (obs of currentSquareObstacles(); track obs.id) {
-								<div class="obstacle-action-row">
-									<span class="obstacle-action-name">{{ obs.name }}</span>
-											@if ((obs.note || '').trim()) {
-												<button type="button" class="pc-wall-note-read-btn" (click)="readObstacleText(obs.name || 'Text', obs.note)">Read Text</button>
-											}
-											@if (!obs.isDestroyed && !obs.isOpened && obstacleIsLocked(obs) && obstacleHasMatchingKey(obs)) {
-												<button type="button" class="action-button action-button-key" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="unlockObstacle(obs.id)">
-													Use Key
-												</button>
-											}
-											@if (!obs.isDestroyed && !obs.isOpened && obstacleIsLocked(obs)) {
-												<button type="button" class="action-button" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="pickObstacleLock(obs.id)">
-													Pick Lock
-												</button>
-											}
-											@if (!obs.isDestroyed && !obs.isOpened && !obstacleIsLocked(obs) && ((obs.itemPlacement ?? 'in') !== 'on' || obs.containsItemId === null || obs.itemTaken)) {
-										<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="openObstacle(obs.id)">
-											{{ obstacleOpenButtonLabel(obs) }}
-										</button>
-									}
-											@if (obs.containsItemId !== null && !obs.itemTaken && ((obs.itemPlacement ?? 'in') === 'on' || obs.isDestroyed || obs.isOpened)) {
-												<button type="button" class="action-button action-button-strong" [disabled]="turnPhase() !== 'player' || playerAE() < 1" (click)="takeItemFromObstacle(obs.id)">
-													Take Item
-												</button>
-											}
-									@if (!obs.isIndestructible && !(obs.isDestroyed)) {
-										<button type="button" class="action-button" (click)="smashObstacle(obs.id)">
-											Smash
-										</button>
-									}
-									@if (obstacleRequiresKeyLabel(obs); as keyLabel) {
-										<span class="details-message" style="font-size:0.8rem">
-											Requires key: {{ keyLabel }}.
-											@if (obstacleHasMatchingKey(obs)) {
-												You can unlock it now.
-											} @else {
-												You need the right key.
-											}
-										</span>
-									}
-								</div>
-							}
-						</div>
-					}
+				</div>
+
+				<div class="info-col inventory-col">
+					<h3 class="panel-title panel-title-light">Inventory</h3>
+					<div class="inventory-scroll">
+					<div class="inventory-coin-row" title="Coins in inventory">
+						<span class="currency-coin currency-gold">G:{{ totalInventoryCurrency().gold }}</span>
+						<span class="currency-coin currency-silver">S:{{ totalInventoryCurrency().silver }}</span>
+						<span class="currency-coin currency-copper">C:{{ totalInventoryCurrency().copper }}</span>
+						<span class="currency-coin currency-zinc">Z:{{ totalInventoryCurrency().zinc }}</span>
+					</div>
+					<div class="inventory-summary">
+						<p class="inventory-summary-line">
+							Hands Equipped: {{ inventoryHandsUsedForPreview() }} / {{ maxEquippableHands }}
+						</p>
+						<p class="inventory-summary-line">
+							Armor Equipped: {{ equippedArmorSummaryForPreview() }}
+						</p>
 					</div>
 
-					<div class="info-col inventory-col">
-						<h3 class="panel-title panel-title-light">Inventory</h3>
-						<div class="inventory-scroll">
-						<div class="inventory-coin-row" title="Coins in inventory">
-							<span class="currency-coin currency-gold">G:{{ totalInventoryCurrency().gold }}</span>
-							<span class="currency-coin currency-silver">S:{{ totalInventoryCurrency().silver }}</span>
-							<span class="currency-coin currency-copper">C:{{ totalInventoryCurrency().copper }}</span>
-							<span class="currency-coin currency-zinc">Z:{{ totalInventoryCurrency().zinc }}</span>
-						</div>
-						<div class="inventory-summary">
-							<p class="inventory-summary-line">
-								Hands Equipped: {{ inventoryHandsUsedForPreview() }} / {{ maxEquippableHands }}
-							</p>
-							<p class="inventory-summary-line">
-								Armor Equipped: {{ equippedArmorSummaryForPreview() }}
-							</p>
-						</div>
-
-					@if (hasInventoryItemsForPreview()) {
+				@if (hasInventoryItemsForPreview()) {
 						@if (inventoryKeysForPreview().length > 0) {
 							<p class="inventory-section-title">Keys</p>
 							<ul class="discovery-list">
@@ -1548,6 +1566,16 @@
 												(click)="useBackpackOtherItem(item)"
 											>
 												Use ({{ item.uses }})
+											</button>
+										}
+										@if (isScrollUsable(item)) {
+											<button
+												type="button"
+												class="action-button action-button-strong"
+												[disabled]="turnPhase() !== 'player' || playerHp() <= 0 || playerAE() < 1"
+												(click)="useBackpackScrollItem(item)"
+											>
+												Read ({{ item.uses }})
 											</button>
 										}
 										@if (isItemEquipable(item.type, item.name)) {

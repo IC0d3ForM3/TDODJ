@@ -23,7 +23,8 @@ const getPcsByUserGuid = async (userguid) => {
        stamina,
        COALESCE(sp_bank, 0) AS sp,
        COALESCE(sp_lifetime, 0) AS "spLifetime",
-       COALESCE(agility, 3) AS agility,
+       COALESCE(dexterity, 3) AS dexterity,
+       COALESCE(awareness, 5) AS awareness,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -67,7 +68,8 @@ const getAllPcsWithUsername = async () => {
        p.mp AS "magicPower", p.mind, p.stamina,
        COALESCE(p.sp_bank, 0) AS sp,
        COALESCE(p.sp_lifetime, 0) AS "spLifetime",
-       COALESCE(p.agility, 3) AS agility,
+       COALESCE(p.dexterity, 3) AS dexterity,
+       COALESCE(p.awareness, 5) AS awareness,
        p.level, p.strength,
        p.rangeofview AS "rangeOfView",
        p.primarytresherid AS "primaryTresherId",
@@ -114,7 +116,8 @@ const getPcByIdForUser = async (id, userguid) => {
        stamina,
        COALESCE(sp_bank, 0) AS sp,
        COALESCE(sp_lifetime, 0) AS "spLifetime",
-       COALESCE(agility, 3) AS agility,
+       COALESCE(dexterity, 3) AS dexterity,
+       COALESCE(awareness, 5) AS awareness,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -261,7 +264,8 @@ const insertPcForUser = async (userguid, payload) => {
        hand1itemid,
        hand2itemid,
        numberofattacks,
-       agility,
+       dexterity,
+       awareness,
        ismaingame,
        updatedat
      )
@@ -302,6 +306,7 @@ const insertPcForUser = async (userguid, payload) => {
        $34,
        $35,
        $36,
+       $37,
        NOW()
      )
      RETURNING
@@ -321,7 +326,8 @@ const insertPcForUser = async (userguid, payload) => {
        stamina,
        COALESCE(sp_bank, 0) AS sp,
        COALESCE(sp_lifetime, 0) AS "spLifetime",
-       COALESCE(agility, 3) AS agility,
+       COALESCE(dexterity, 3) AS dexterity,
+       COALESCE(awareness, 5) AS awareness,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -382,7 +388,8 @@ const insertPcForUser = async (userguid, payload) => {
         payload.hand1ItemId,
         payload.hand2ItemId,
         Math.max(1, Math.floor(payload.numberOfAttacks ?? 1)),
-        Math.max(0, Math.floor(payload.agility ?? 3)),
+        Math.max(0, Math.floor(payload.dexterity ?? 3)),
+        Math.max(0, Math.floor(payload.awareness ?? 5)),
         payload.ismaingame === true,
     ]);
     return rows[0];
@@ -424,7 +431,8 @@ const updatePcForUser = async (id, userguid, payload) => {
        hand1itemid = $33,
        hand2itemid = $34,
        numberofattacks = $35,
-       agility = $36,
+       dexterity = $36,
+       awareness = $37,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING
@@ -444,7 +452,8 @@ const updatePcForUser = async (id, userguid, payload) => {
        stamina,
        COALESCE(sp_bank, 0) AS sp,
        COALESCE(sp_lifetime, 0) AS "spLifetime",
-       COALESCE(agility, 3) AS agility,
+       COALESCE(dexterity, 3) AS dexterity,
+       COALESCE(awareness, 5) AS awareness,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -506,7 +515,8 @@ const updatePcForUser = async (id, userguid, payload) => {
         payload.hand1ItemId,
         payload.hand2ItemId,
         Math.max(1, Math.floor(payload.numberOfAttacks ?? 1)),
-        Math.max(0, Math.floor(payload.agility ?? 3)),
+        Math.max(0, Math.floor(payload.dexterity ?? 3)),
+        Math.max(0, Math.floor(payload.awareness ?? 5)),
     ]);
     return rows[0] ?? null;
 };
@@ -676,7 +686,8 @@ const STAT_COLUMN_MAP = {
     stamina: { column: 'stamina', cost: 1 },
     mind: { column: 'mind', cost: 1 },
     magicPower: { column: 'mp', cost: 1 },
-    agility: { column: 'agility', cost: 1 },
+    dexterity: { column: 'dexterity', cost: 1 },
+    awareness: { column: 'awareness', cost: 1 },
     numberOfAttacks: { column: 'numberofattacks', cost: 5 },
     numberOfDefends: { column: 'numberofdefends', cost: 5 },
 };

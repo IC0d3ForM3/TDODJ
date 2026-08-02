@@ -47,7 +47,7 @@
                   <ul class="mn-attack-list">
                     @for (attack of item.attacks; track $index) {
                       <li>
-                        {{ attack.type }} · {{ attack.description || 'Attack' }} · Dmg {{ attack.damage }} · +Hit {{ attack.plusToHit }}
+                        {{ attack.type }} · {{ attack.description || 'Attack' }} · Dmg {{ attack.damageFormula || attack.damage }} · +Hit {{ attack.plusToHit }}
                         @if (attackLinkedSummary(attack)) {
                           · {{ attackLinkedSummary(attack) }}
                         }
@@ -227,32 +227,36 @@
                     <span>Description</span>
                     <input type="text" formControlName="description" placeholder="Description" />
                   </label>
-                  <label class="mn-field">
-                    <span>Damage</span>
-                    <input type="number" formControlName="damage" min="0" />
-                  </label>
-                  <label class="mn-field">
-                    <span>+To Hit</span>
-                    <input type="number" formControlName="plusToHit" />
-                  </label>
-                  <label class="mn-field">
-                    <span>Weapon Item</span>
-                    <select formControlName="weaponItemId">
-                      <option [ngValue]="null">None</option>
-                      @for (item of normalizedItemOptions(); track item.id) {
-                        <option [ngValue]="item.id">{{ item.name }}</option>
-                      }
-                    </select>
-                  </label>
-                  <label class="mn-field">
-                    <span>Spell</span>
-                    <select formControlName="spellId">
-                      <option [ngValue]="null">None</option>
-                      @for (spell of normalizedSpellOptions(); track spell.id) {
-                        <option [ngValue]="spell.id">{{ spell.name }}</option>
-                      }
-                    </select>
-                  </label>
+                  @if (attackForm.controls.type.value !== 'Spell') {
+                    <label class="mn-field">
+                      <span>Damage Formula</span>
+                      <input type="text" formControlName="damageFormula" placeholder="2d4" />
+                    </label>
+                    <label class="mn-field">
+                      <span>+To Hit</span>
+                      <input type="number" formControlName="plusToHit" />
+                    </label>
+                    <label class="mn-field">
+                      <span>Weapon Item</span>
+                      <select formControlName="weaponItemId">
+                        <option [ngValue]="null">None</option>
+                        @for (item of normalizedItemOptions(); track item.id) {
+                          <option [ngValue]="item.id">{{ item.name }}</option>
+                        }
+                      </select>
+                    </label>
+                  }
+                  @if (attackForm.controls.type.value === 'Spell') {
+                    <label class="mn-field">
+                      <span>Spell</span>
+                      <select formControlName="spellId">
+                        <option [ngValue]="null">None</option>
+                        @for (spell of normalizedSpellOptions(); track spell.id) {
+                          <option [ngValue]="spell.id">{{ spell.name }}</option>
+                        }
+                      </select>
+                    </label>
+                  }
                   <label class="mn-field">
                     <span>Curse</span>
                     <select formControlName="curseId">
@@ -266,75 +270,6 @@
                 <button type="button" class="mn-remove-btn" (click)="removeAttack($index)" [disabled]="attackControls().length === 1">Remove</button>
               </div>
             }
-          </div>
-        </div>
-
-        <div class="mn-check-row">
-          <input type="checkbox" id="monsterCallsReinforcements" formControlName="callsReinforcements" />
-          <label for="monsterCallsReinforcements">Calls Reinforcements</label>
-          <small class="mn-hint">Uses first combat turn to call additional enemies into the fight.</small>
-        </div>
-
-        @if (userMonsterForm.controls.callsReinforcements.value) {
-          <div class="mn-form-grid">
-            <label class="mn-field">
-              <span>Reinforcement Count</span>
-              <input type="number" formControlName="reinforcementCount" min="1" max="12" />
-            </label>
-            <label class="mn-field mn-field-wide">
-              <span>Reinforcement Monster</span>
-              <select formControlName="reinforcementMonsterName">
-                <option [value]="''">Same monster type</option>
-                @for (name of reinforcementMonsterOptions(); track name) {
-                  <option [value]="name">{{ name }}</option>
-                }
-              </select>
-              <small class="mn-hint">Choose which monster name to summon. If left as same type, this monster summons copies of itself.</small>
-            </label>
-          </div>
-        }
-
-        <div class="mn-npc-section">
-          <h4 class="mn-npc-title">NPC / Interactive</h4>
-          <p class="mn-npc-desc">Configure this monster to act as an NPC that the player can talk to, trade with, or that has special combat conditions.</p>
-
-          <label class="mn-field mn-field-wide">
-            <span>Greeting (shown when player gets within 1 square)</span>
-            <textarea formControlName="npcGreeting" rows="2" placeholder="e.g. A hooded figure raises a hand. 'Halt, traveller...'"></textarea>
-          </label>
-
-          <label class="mn-field mn-field-wide">
-            <span>Info Line 1 (what the NPC can tell the player)</span>
-            <input type="text" formControlName="npcInfo1" placeholder="e.g. The dragon sleeps in the east chamber." />
-          </label>
-          <label class="mn-field mn-field-wide">
-            <span>Info Line 2</span>
-            <input type="text" formControlName="npcInfo2" placeholder="Optional second piece of info." />
-          </label>
-          <label class="mn-field mn-field-wide">
-            <span>Info Line 3</span>
-            <input type="text" formControlName="npcInfo3" placeholder="Optional third piece of info." />
-          </label>
-
-          <div class="mn-check-row">
-            <input type="checkbox" id="npcOnlyAttackWhenAttacked" formControlName="npcOnlyAttackWhenAttacked" />
-            <label for="npcOnlyAttackWhenAttacked">Only attacks when attacked</label>
-            <small class="mn-hint">This NPC will not initiate combat unless struck first.</small>
-          </div>
-          <div class="mn-check-row">
-            <input type="checkbox" id="npcGivesInfoAfterDamaged" formControlName="npcGivesInfoAfterDamaged" />
-            <label for="npcGivesInfoAfterDamaged">Gives info only after being attacked &amp; spared</label>
-            <small class="mn-hint">Player must attack this NPC, then choose to spare it to unlock information.</small>
-          </div>
-          <div class="mn-check-row">
-            <input type="checkbox" id="npcAttacksAfterInfo" formControlName="npcAttacksAfterInfo" />
-            <label for="npcAttacksAfterInfo">Attacks after giving info</label>
-            <small class="mn-hint">Once the NPC has shared its information, it turns hostile.</small>
-          </div>
-          <div class="mn-check-row">
-            <input type="checkbox" id="npcCanTrade" formControlName="npcCanTrade" />
-            <label for="npcCanTrade">Can trade / sell items</label>
-            <small class="mn-hint">Player can browse and buy treshers from this NPC's inventory.</small>
           </div>
         </div>
 

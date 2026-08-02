@@ -157,6 +157,20 @@
 						<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
 					}
 
+					@if (showScrollFields()) {
+						<label class="it-field it-field-wide"><span>Spell</span>
+							<select formControlName="scrollSpellId">
+								<option [ngValue]="null">-- Choose Spell --</option>
+								@for (spell of spellOptions(); track spell.id) {
+									<option [ngValue]="spell.id">{{ spell.name }}</option>
+								}
+							</select>
+						</label>
+						<label class="it-field"><span>Magic Cost (MP to read)</span><input type="number" formControlName="magicCost" min="1" /></label>
+						<label class="it-field"><span>Value</span><input type="number" formControlName="value" min="0" /></label>
+						<label class="it-field"><span>Weight</span><input type="number" formControlName="weight" min="0" /></label>
+					}
+
 					<label class="it-field"><span>Uses (blank = unlimited)</span><input type="number" formControlName="uses" min="1" placeholder="Unlimited" /></label>
 					<label class="it-field it-field-wide"><span>Curse</span>
 						<select formControlName="curseId"><option [ngValue]="null">No Curse</option>@for (curse of curseOptions(); track curse.id) { <option [ngValue]="curse.id">{{ curse.name }}</option> }</select>

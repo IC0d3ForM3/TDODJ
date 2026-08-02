@@ -1,0 +1,25 @@
+.ad-banner-bar {
+  width: 100%;
+  background: #0e0802;
+  border-top: 1px solid #2a1e06;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  min-height: 64px;
+}
+
+.ad-banner-placeholder {
+  color: #555;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.ad-banner-placeholder a {
+  color: #8b6914;
+  text-decoration: underline;
+}
+
+.ad-banner-placeholder a:hover {
+  color: #c8941e;
+}

@@ -578,6 +578,46 @@
 	font-size: 1.4rem;
 }
 
+/* ─── Settings Modal Toggles ─────────────────────────────────────────────── */
+.settings-toggle-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.75rem 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.settings-toggle-row:last-child {
+	border-bottom: none;
+}
+.settings-toggle-label {
+	font-size: 0.95rem;
+	color: #c9d6e6;
+	font-weight: 600;
+}
+.settings-toggle-btns {
+	display: flex;
+	gap: 0.4rem;
+}
+.settings-toggle-btn {
+	border-radius: 6px;
+	border: 1px solid rgba(158, 197, 248, 0.2);
+	background: rgba(57, 57, 78, 0.3);
+	color: #7a8799;
+	padding: 0.3rem 0.8rem;
+	font-size: 0.85rem;
+	font-weight: 700;
+	cursor: pointer;
+	transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.settings-toggle-btn.active {
+	background: linear-gradient(180deg, rgba(74, 127, 193, 0.42) 0%, rgba(45, 89, 148, 0.52) 100%);
+	border-color: rgba(158, 197, 248, 0.6);
+	color: #eff6ff;
+}
+.settings-toggle-btn:hover {
+	color: #e0e8f5;
+}
+
 .game-subtitle {
 	margin: 0.2rem 0 0;
 	color: #626262;

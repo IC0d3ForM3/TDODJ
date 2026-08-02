@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import {
   FloorTrapPlacement,
   ItemPlacement,
+  MonsterDialogueEntry,
   MonsterPlacement,
   ObstaclePlacement,
   PendingDoorPlacement,
@@ -73,6 +74,7 @@ export class CreatorPlacementService {
   readonly placeMonsterStationaryTriggerRow = signal<number | null>(null);
   readonly placeMonsterStationaryTriggerCol = signal<number | null>(null);
   readonly placeMonsterNoAttackUnlessAttacked = signal(false);
+  readonly placeMonsterDialogueEntries = signal<MonsterDialogueEntry[]>([]);
   readonly placeMonsterDropTresherIds = signal<number[]>([]);
   readonly placeMonsterDropKeyIds = signal<number[]>([]);
   readonly placeMonsterDropItemIds = signal<number[]>([]);

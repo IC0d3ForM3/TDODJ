@@ -5,6 +5,25 @@
   color: #edf2ff;
 }
 
+/* Music toggle */
+.sg-music-btn {
+  position: fixed;
+  top: 0.7rem;
+  right: 1rem;
+  z-index: 200;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.4rem;
+  padding: 0.1rem 0.3rem;
+  line-height: 1;
+  opacity: 0.75;
+  transition: opacity 0.15s;
+}
+.sg-music-btn:hover {
+  opacity: 1;
+}
+
 /* Hero */
 .sg-hero {
   background: linear-gradient(135deg, #1a2a50, #0e1827);

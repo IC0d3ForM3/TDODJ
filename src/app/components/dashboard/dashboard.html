@@ -1,4 +1,4 @@
-﻿<section class="dashboard-wrap dashboard-tabs-wrap" aria-label="Dashboard tabs">
+<section class="dashboard-wrap dashboard-tabs-wrap" aria-label="Dashboard tabs">
 	<nav class="dashboard-tabs-nav" aria-label="Dashboard sections">
 		@for (tab of dashboardTabs; track tab.id) {
 			<button
@@ -117,8 +117,9 @@
 								<select formControlName="type" (change)="onPcTypeChanged()">
 									@for (type of pcTypeOptions; track type) {
 										<option [value]="type">{{ type }}</option>
-									}
-								</select>
+									}								@for (type of pcTypeOptionsComingSoon; track type) {
+									<option [value]="type" disabled>{{ type }} (coming soon)</option>
+								}								</select>
 							</label>
 						</div>
 						<div class="pc-stat-row">
@@ -139,8 +140,12 @@
 								<input class="pc-stat-num" type="number" formControlName="mind" readonly />
 							</label>
 							<label class="tresher-field pc-stat-field">
-								<span>Agility</span>
-								<input class="pc-stat-num" type="number" formControlName="agility" readonly />
+								<span>Dexterity</span>
+								<input class="pc-stat-num" type="number" formControlName="dexterity" readonly />
+							</label>
+							<label class="tresher-field pc-stat-field">
+								<span>Awareness</span>
+								<input class="pc-stat-num" type="number" formControlName="awareness" readonly />
 							</label>
 							<label class="tresher-field pc-stat-field">
 								<span>Magic Power</span>
@@ -493,7 +498,7 @@
 												[alt]="item.name"
 											/>
 										}
-										<p class="tresher-description pc-item-desc">HP {{ item.currentHP }}/{{ item.maxHP }} | AC {{ item.ac }} | AE {{ item.actionEconomy }} | NOA {{ item.numberOfAttacks }} | SP {{ item.sp }} ({{ item.spLifetime }} lifetime) | MP {{ item.magicPower }} | Mind {{ item.mind }} | Stamina {{ item.stamina }} | Agility {{ item.agility }} | POV {{ item.rangeOfView }}</p>
+										<p class="tresher-description pc-item-desc">HP {{ item.currentHP }}/{{ item.maxHP }} | AC {{ item.ac }} | AE {{ item.actionEconomy }} | NOA {{ item.numberOfAttacks }} | SP {{ item.sp }} ({{ item.spLifetime }} lifetime) | MP {{ item.magicPower }} | Mind {{ item.mind }} | Stamina {{ item.stamina }} | Dexterity {{ item.dexterity }} | POV {{ item.rangeOfView }}</p>
 										<p class="tresher-description pc-item-desc">Treshers: {{ pcTresherSummaryForPc(item) }}</p>
 										<div class="pc-accordion-actions">
 											<button type="button" class="dashboard-action-button dashboard-action-button-small pc-edit-btn" (click)="editPc(item)">
@@ -559,6 +564,9 @@
 						@for (type of pcTypeOptions; track type) {
 							<option [value]="type">{{ type }}</option>
 						}
+						@for (type of pcTypeOptionsComingSoon; track type) {
+							<option [value]="type" disabled>{{ type }} (coming soon)</option>
+						}
 					</select>
 				</label>
 			</div>
@@ -582,8 +590,12 @@
 					<input class="pc-stat-num" type="number" formControlName="mind" readonly />
 				</label>
 				<label class="tresher-field pc-stat-field">
-					<span>Agility</span>
-					<input class="pc-stat-num" type="number" formControlName="agility" readonly />
+					<span>Dexterity</span>
+					<input class="pc-stat-num" type="number" formControlName="dexterity" readonly />
+				</label>
+				<label class="tresher-field pc-stat-field">
+					<span>Awareness</span>
+					<input class="pc-stat-num" type="number" formControlName="awareness" readonly />
 				</label>
 				<label class="tresher-field pc-stat-field">
 					<span>Magic Power</span>
@@ -598,6 +610,10 @@
 					<input class="pc-stat-num" type="number" formControlName="maxHP" readonly />
 				</label>
 				<label class="tresher-field pc-stat-field">
+					<span>AC Bonus</span>
+					<input class="pc-stat-num" type="number" formControlName="ac" readonly />
+				</label>
+				<label class="tresher-field pc-stat-field">
 					<span>Poison Resist</span>
 					<input class="pc-stat-num" type="number" formControlName="poisonResest" readonly />
 				</label>
@@ -609,10 +625,6 @@
 				<label class="tresher-field">
 					<span>Current HP</span>
 					<input class="pc-stat-num" type="number" min="0" formControlName="currentHP" />
-				</label>
-				<label class="tresher-field">
-					<span>AC</span>
-					<input class="pc-stat-num" type="number" min="0" formControlName="ac" />
 				</label>
 				<label class="tresher-field">
 					<span>Level</span>
@@ -901,4 +913,10 @@
 		</div>
 	}
 </section>
+}
+@if (pendingGameNavId() !== null) {
+  <app-ad-interstitial
+    message="While I get everything ready for your journey... take a look at a few of our fine offers!"
+    (continued)="onPreGameAdContinued()"
+  />
 }

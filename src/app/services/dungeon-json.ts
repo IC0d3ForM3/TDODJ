@@ -108,7 +108,12 @@ export class DungeonJsonService {
     return {
       name: typeof src['name'] === 'string' ? src['name'] : '',
       description: typeof src['description'] === 'string' ? src['description'] : '',
-      damage: typeof src['damage'] === 'number' ? Math.max(0, src['damage']) : 0,
+      damage:
+        typeof src['damage'] === 'string'
+          ? src['damage']
+          : typeof src['damage'] === 'number'
+            ? String(Math.max(0, src['damage']))
+            : '0',
       damageTo: damageTo as 'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS',
       curseId: typeof src['curseId'] === 'number' ? src['curseId'] : null,
       toDetect: typeof src['toDetect'] === 'number' ? Math.max(0, src['toDetect']) : 10,

@@ -41,7 +41,8 @@ export interface PcRecord {
   updatedAt: string;
   sp: number;
   spLifetime: number;
-  agility: number;
+  dexterity: number;
+  awareness: number;
   numberOfAttacks: number;
   numberOfDefends: number;
   username?: string;
@@ -82,7 +83,8 @@ export interface UpsertPcPayload {
   hand2ItemId: number | null;
   numberOfAttacks: number;
   numberOfDefends: number;
-  agility: number;
+  dexterity: number;
+  awareness: number;
   ismaingame?: boolean;
 }
 
@@ -105,7 +107,8 @@ export const getPcsByUserGuid = async (userguid: string): Promise<PcRecord[]> =>
        stamina,
        COALESCE(sp_bank, 0) AS sp,
        COALESCE(sp_lifetime, 0) AS "spLifetime",
-       COALESCE(agility, 3) AS agility,
+       COALESCE(dexterity, 3) AS dexterity,
+       COALESCE(awareness, 5) AS awareness,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -153,7 +156,8 @@ export const getAllPcsWithUsername = async (): Promise<PcRecord[]> => {
        p.mp AS "magicPower", p.mind, p.stamina,
        COALESCE(p.sp_bank, 0) AS sp,
        COALESCE(p.sp_lifetime, 0) AS "spLifetime",
-       COALESCE(p.agility, 3) AS agility,
+       COALESCE(p.dexterity, 3) AS dexterity,
+       COALESCE(p.awareness, 5) AS awareness,
        p.level, p.strength,
        p.rangeofview AS "rangeOfView",
        p.primarytresherid AS "primaryTresherId",
@@ -205,7 +209,8 @@ export const getPcByIdForUser = async (
        stamina,
        COALESCE(sp_bank, 0) AS sp,
        COALESCE(sp_lifetime, 0) AS "spLifetime",
-       COALESCE(agility, 3) AS agility,
+       COALESCE(dexterity, 3) AS dexterity,
+       COALESCE(awareness, 5) AS awareness,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -394,7 +399,8 @@ export const insertPcForUser = async (
        hand1itemid,
        hand2itemid,
        numberofattacks,
-       agility,
+       dexterity,
+       awareness,
        ismaingame,
        updatedat
      )
@@ -435,6 +441,7 @@ export const insertPcForUser = async (
        $34,
        $35,
        $36,
+       $37,
        NOW()
      )
      RETURNING
@@ -454,7 +461,8 @@ export const insertPcForUser = async (
        stamina,
        COALESCE(sp_bank, 0) AS sp,
        COALESCE(sp_lifetime, 0) AS "spLifetime",
-       COALESCE(agility, 3) AS agility,
+       COALESCE(dexterity, 3) AS dexterity,
+       COALESCE(awareness, 5) AS awareness,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -516,7 +524,8 @@ export const insertPcForUser = async (
       payload.hand1ItemId,
       payload.hand2ItemId,
       Math.max(1, Math.floor(payload.numberOfAttacks ?? 1)),
-      Math.max(0, Math.floor(payload.agility ?? 3)),
+      Math.max(0, Math.floor(payload.dexterity ?? 3)),
+      Math.max(0, Math.floor(payload.awareness ?? 5)),
       payload.ismaingame === true,
     ]
   );
@@ -565,7 +574,8 @@ export const updatePcForUser = async (
        hand1itemid = $33,
        hand2itemid = $34,
        numberofattacks = $35,
-       agility = $36,
+       dexterity = $36,
+       awareness = $37,
        updatedat = NOW()
      WHERE id = $1 AND userguid = $2
      RETURNING
@@ -585,7 +595,8 @@ export const updatePcForUser = async (
        stamina,
        COALESCE(sp_bank, 0) AS sp,
        COALESCE(sp_lifetime, 0) AS "spLifetime",
-       COALESCE(agility, 3) AS agility,
+       COALESCE(dexterity, 3) AS dexterity,
+       COALESCE(awareness, 5) AS awareness,
        level,
        strength,
        rangeofview AS "rangeOfView",
@@ -648,7 +659,8 @@ export const updatePcForUser = async (
       payload.hand1ItemId,
       payload.hand2ItemId,
       Math.max(1, Math.floor(payload.numberOfAttacks ?? 1)),
-      Math.max(0, Math.floor(payload.agility ?? 3)),
+      Math.max(0, Math.floor(payload.dexterity ?? 3)),
+      Math.max(0, Math.floor(payload.awareness ?? 5)),
     ]
   );
 
@@ -883,14 +895,15 @@ export const getPcByIdPublic = async (id: number): Promise<PcRecord | null> => {
   return rows[0] ?? null;
 };
 
-export type UpgradeStatName = 'strength' | 'stamina' | 'mind' | 'magicPower' | 'agility' | 'numberOfAttacks' | 'numberOfDefends';
+export type UpgradeStatName = 'strength' | 'stamina' | 'mind' | 'magicPower' | 'dexterity' | 'awareness' | 'numberOfAttacks' | 'numberOfDefends';
 
 const STAT_COLUMN_MAP: Record<UpgradeStatName, { column: string; cost: number }> = {
   strength:        { column: 'strength',        cost: 1 },
   stamina:         { column: 'stamina',          cost: 1 },
   mind:            { column: 'mind',             cost: 1 },
   magicPower:      { column: 'mp',               cost: 1 },
-  agility:         { column: 'agility',          cost: 1 },
+  dexterity:         { column: 'dexterity',          cost: 1 },
+  awareness:         { column: 'awareness',          cost: 1 },
   numberOfAttacks: { column: 'numberofattacks',  cost: 5 },
   numberOfDefends: { column: 'numberofdefends',  cost: 5 },
 };

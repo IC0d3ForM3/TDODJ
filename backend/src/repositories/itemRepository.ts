@@ -27,6 +27,8 @@ export interface ItemRecord {
   isPublic: boolean;
   isTwoHanded: boolean;
   uses: number | null;
+  scrollSpellId: number | null;
+  magicCost: number;
   createdAt: string;
   updatedAt: string;
   username?: string;
@@ -55,6 +57,8 @@ export interface UpsertItemPayload {
   isPublic: boolean;
   isTwoHanded: boolean;
   uses: number | null;
+  scrollSpellId: number | null;
+  magicCost: number;
 }
 
 const SELECT_ITEM_FIELDS = `
@@ -82,6 +86,8 @@ const SELECT_ITEM_FIELDS = `
   ispublic AS "isPublic",
   COALESCE(istwohanded, false) AS "isTwoHanded",
   uses,
+  scrollspellid AS "scrollSpellId",
+  COALESCE(magiccost, 1) AS "magicCost",
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -111,6 +117,8 @@ const SELECT_ITEM_FIELDS_LEGACY = `
   ispublic AS "isPublic",
   COALESCE(istwohanded, false) AS "isTwoHanded",
   uses,
+  NULL::int AS "scrollSpellId",
+  1 AS "magicCost",
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -235,8 +243,8 @@ export const insertItemForUser = async (
   const { rows } = await pool.query<ItemRecord>(
     `INSERT INTO items
        (userguid, name, description, type, range, value, weight, curseid,
-        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, note, minmindtoread, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded, uses)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, note, minmindtoread, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded, uses, scrollspellid, magiccost)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
      RETURNING ${SELECT_ITEM_FIELDS}`,
     [
       userguid,
@@ -262,6 +270,8 @@ export const insertItemForUser = async (
       payload.isPublic,
       payload.isTwoHanded,
       payload.uses,
+      payload.scrollSpellId,
+      payload.magicCost,
     ]
   );
   return rows[0];
@@ -296,8 +306,10 @@ export const updateItemForUser = async (
          ispublic = $20,
          istwohanded = $21,
          uses = $22,
+         scrollspellid = $23,
+         magiccost = $24,
          updatedat = NOW()
-       WHERE id = $23 AND userguid = $24
+       WHERE id = $25 AND userguid = $26
      RETURNING ${SELECT_ITEM_FIELDS}`,
     [
       payload.name,
@@ -322,6 +334,8 @@ export const updateItemForUser = async (
       payload.isPublic,
       payload.isTwoHanded,
       payload.uses,
+      payload.scrollSpellId,
+      payload.magicCost,
       id,
       userguid,
     ]

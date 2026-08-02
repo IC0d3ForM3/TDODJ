@@ -23,7 +23,7 @@ interface CurseOption { id: number; name: string; }
 type MonsterAttackFormGroup = FormGroup<{
   type: FormControl<string>;
   description: FormControl<string>;
-  damage: FormControl<number>;
+  damageFormula: FormControl<string>;
   plusToHit: FormControl<number>;
   weaponItemId: FormControl<number | null>;
   spellId: FormControl<number | null>;
@@ -147,18 +147,7 @@ export class Monsters implements OnInit {
     spReward: new FormControl<number>(0, { nonNullable: true }),
     attacks: new FormArray<MonsterAttackFormGroup>([this.createMonsterAttackForm()]),
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
-    callsReinforcements: new FormControl<boolean>(false, { nonNullable: true }),
-    reinforcementCount: new FormControl<number>(1, { nonNullable: true }),
-    reinforcementMonsterName: new FormControl<string>('', { nonNullable: true }),
     toHitPlusNeeded: new FormControl<number>(0, { nonNullable: true }),
-    npcGreeting: new FormControl<string>('', { nonNullable: true }),
-    npcInfo1: new FormControl<string>('', { nonNullable: true }),
-    npcInfo2: new FormControl<string>('', { nonNullable: true }),
-    npcInfo3: new FormControl<string>('', { nonNullable: true }),
-    npcOnlyAttackWhenAttacked: new FormControl<boolean>(false, { nonNullable: true }),
-    npcGivesInfoAfterDamaged: new FormControl<boolean>(false, { nonNullable: true }),
-    npcAttacksAfterInfo: new FormControl<boolean>(false, { nonNullable: true }),
-    npcCanTrade: new FormControl<boolean>(false, { nonNullable: true }),
     awareness: new FormControl<number>(5, { nonNullable: true }),
   });
 
@@ -308,7 +297,7 @@ export class Monsters implements OnInit {
       this.monsterAttacksArray.at(0).reset({
         type: 'Bite',
         description: '',
-        damage: 0,
+        damageFormula: '1d4',
         plusToHit: 0,
         weaponItemId: null,
         spellId: null,
@@ -335,18 +324,12 @@ export class Monsters implements OnInit {
     const attacks = normalizedAttackList.map((a) => ({
           type: a.type || 'Bite',
           description: a.description || '',
-          damage: this.normalizeNumber(a.damage, 0),
+          damageFormula: this.normalizeDamageFormula(a.damageFormula, a.damage),
           plusToHit: this.normalizeNumber(a.plusToHit, 0),
           weaponItemId: this.normalizeNullableNumber(a.weaponItemId),
-          spellId: this.normalizeNullableNumber(a.spellId),
+          spellId: (a.type || 'Bite') === 'Spell' ? this.normalizeNullableNumber(a.spellId) : null,
           curseId: this.normalizeNullableNumber(a.curseId),
         }));
-
-    const mappedSpellIds = attacks
-      .map((attack) => attack.spellId)
-      .filter((id): id is number => id !== null);
-    const availableSpellIds = new Set(this.normalizedSpellOptions().map((spell) => spell.id));
-    const missingSpellIds = mappedSpellIds.filter((id) => !availableSpellIds.has(id));
 
     this.replaceAttackForms(attacks);
 
@@ -373,18 +356,7 @@ export class Monsters implements OnInit {
     c.castPlus.setValue(this.normalizeNumber(item.castPlus, 0));
     c.spReward.setValue(this.normalizeNumber(item.spReward, 0));
     c.isPublic.setValue(item.isPublic);
-    c.callsReinforcements.setValue(item.callsReinforcements === true);
-    c.reinforcementCount.setValue(Math.max(1, this.normalizeNumber(item.reinforcementCount, 1)));
-    c.reinforcementMonsterName.setValue(item.reinforcementMonsterName ?? '');
     c.toHitPlusNeeded.setValue(this.normalizeNumber(item.toHitPlusNeeded, 0));
-    c.npcGreeting.setValue(item.npcGreeting ?? '');
-    c.npcInfo1.setValue(item.npcInfo1 ?? '');
-    c.npcInfo2.setValue(item.npcInfo2 ?? '');
-    c.npcInfo3.setValue(item.npcInfo3 ?? '');
-    c.npcOnlyAttackWhenAttacked.setValue(item.npcOnlyAttackWhenAttacked === true);
-    c.npcGivesInfoAfterDamaged.setValue(item.npcGivesInfoAfterDamaged === true);
-    c.npcAttacksAfterInfo.setValue(item.npcAttacksAfterInfo === true);
-    c.npcCanTrade.setValue(item.npcCanTrade === true);
     c.awareness.setValue(Math.max(1, item.awareness ?? 5));
   }
 
@@ -484,10 +456,14 @@ export class Monsters implements OnInit {
     const attacks: UserMonsterAttackEditorValue[] = attackValues.map((attack) => ({
       type: (attack.type || 'Bite').trim(),
       description: (attack.description || '').trim(),
-      damage: Math.max(0, this.normalizeNumber(attack.damage, 0)),
+      damageFormula: this.normalizeDamageFormula(attack.damageFormula),
+      damage: this.damageFormulaToLegacyNumber(attack.damageFormula),
       plusToHit: this.normalizeNumber(attack.plusToHit, 0),
       weaponItemId: this.normalizeNullableNumber(attack.weaponItemId),
-      spellId: this.normalizeNullableNumber(attack.spellId),
+      spellId:
+        (attack.type || 'Bite').trim() === 'Spell'
+          ? this.normalizeNullableNumber(attack.spellId)
+          : null,
       curseId: this.normalizeNullableNumber(attack.curseId),
     }));
 
@@ -514,31 +490,25 @@ export class Monsters implements OnInit {
       spReward: Math.max(0, this.normalizeNumber(c.spReward.value, 0)),
       attacks,
       isPublic: this.isAdminUser() ? c.isPublic.value === true : false,
-      callsReinforcements: c.callsReinforcements.value === true,
-      reinforcementCount:
-        c.callsReinforcements.value === true
-          ? Math.max(1, this.normalizeNumber(c.reinforcementCount.value, 1))
-          : 0,
-      reinforcementMonsterName:
-        c.callsReinforcements.value === true
-          ? c.reinforcementMonsterName.value.trim() || null
-          : null,
+      callsReinforcements: false,
+      reinforcementCount: 0,
+      reinforcementMonsterName: null,
       toHitPlusNeeded: Math.max(0, this.normalizeNumber(c.toHitPlusNeeded.value, 0)),
-      npcGreeting: c.npcGreeting.value.trim() || null,
-      npcInfo1: c.npcInfo1.value.trim() || null,
-      npcInfo2: c.npcInfo2.value.trim() || null,
-      npcInfo3: c.npcInfo3.value.trim() || null,
-      npcOnlyAttackWhenAttacked: c.npcOnlyAttackWhenAttacked.value === true,
-      npcGivesInfoAfterDamaged: c.npcGivesInfoAfterDamaged.value === true,
-      npcAttacksAfterInfo: c.npcAttacksAfterInfo.value === true,
-      npcCanTrade: c.npcCanTrade.value === true,
+      npcGreeting: null,
+      npcInfo1: null,
+      npcInfo2: null,
+      npcInfo3: null,
+      npcOnlyAttackWhenAttacked: false,
+      npcGivesInfoAfterDamaged: false,
+      npcAttacksAfterInfo: false,
+      npcCanTrade: false,
       awareness: Math.max(1, c.awareness.value ?? 5),
     };
   }
 
   private resetForm(): void {
     this.replaceAttackForms([
-      { type: 'Bite', description: '', damage: 0, plusToHit: 0, weaponItemId: null, spellId: null, curseId: null },
+      { type: 'Bite', description: '', damageFormula: '1d4', plusToHit: 0, weaponItemId: null, spellId: null, curseId: null },
     ]);
     this.replaceTresherForms([]);
     const c = this.userMonsterForm.controls;
@@ -557,18 +527,7 @@ export class Monsters implements OnInit {
     c.castPlus.setValue(0);
     c.spReward.setValue(0);
     c.isPublic.setValue(false);
-    c.callsReinforcements.setValue(false);
-    c.reinforcementCount.setValue(1);
-    c.reinforcementMonsterName.setValue('');
     c.toHitPlusNeeded.setValue(0);
-    c.npcGreeting.setValue('');
-    c.npcInfo1.setValue('');
-    c.npcInfo2.setValue('');
-    c.npcInfo3.setValue('');
-    c.npcOnlyAttackWhenAttacked.setValue(false);
-    c.npcGivesInfoAfterDamaged.setValue(false);
-    c.npcAttacksAfterInfo.setValue(false);
-    c.npcCanTrade.setValue(false);
     c.awareness.setValue(5);
   }
 
@@ -587,21 +546,21 @@ export class Monsters implements OnInit {
   }
 
   private replaceAttackForms(
-    attacks: UserMonsterAttackEditorValue[] | UserMonsterAttackListItem[]
+    attacks: Array<Partial<UserMonsterAttackEditorValue> | Partial<UserMonsterAttackListItem>>
   ): void {
     this.monsterAttacksArray.clear();
     const normalized = attacks.length
       ? attacks.map((a) => ({
           type: a.type || 'Bite',
           description: a.description || '',
-          damage: this.normalizeNumber(a.damage, 0),
+          damageFormula: this.normalizeDamageFormula((a as { damageFormula?: unknown }).damageFormula, a.damage),
           plusToHit: this.normalizeNumber(a.plusToHit, 0),
           weaponItemId: this.normalizeNullableNumber(a.weaponItemId),
-          spellId: this.normalizeNullableNumber(a.spellId),
+          spellId: (a.type || 'Bite') === 'Spell' ? this.normalizeNullableNumber(a.spellId) : null,
           curseId: this.normalizeNullableNumber(a.curseId),
         }))
       : [
-          { type: 'Bite', description: '', damage: 0, plusToHit: 0, weaponItemId: null, spellId: null, curseId: null },
+          { type: 'Bite', description: '', damageFormula: '1d4', plusToHit: 0, weaponItemId: null, spellId: null, curseId: null },
         ];
     for (const attack of normalized) {
       this.monsterAttacksArray.push(this.createMonsterAttackForm(attack));
@@ -647,14 +606,15 @@ export class Monsters implements OnInit {
     value?: Partial<UserMonsterAttackEditorValue>
   ): MonsterAttackFormGroup {
     const typeValue = value?.type || 'Bite';
-    const spellIdValue = this.normalizeNullableNumber(value?.spellId ?? null);
+    const spellIdValue = typeValue === 'Spell' ? this.normalizeNullableNumber(value?.spellId ?? null) : null;
 
     return new FormGroup({
       type: new FormControl<string>(typeValue, { nonNullable: true }),
       description: new FormControl<string>(value?.description || '', { nonNullable: true }),
-      damage: new FormControl<number>(this.normalizeNumber(value?.damage ?? null, 0), {
-        nonNullable: true,
-      }),
+      damageFormula: new FormControl<string>(
+        this.normalizeDamageFormula((value as { damageFormula?: unknown } | undefined)?.damageFormula, value?.damage),
+        { nonNullable: true }
+      ),
       plusToHit: new FormControl<number>(this.normalizeNumber(value?.plusToHit ?? null, 0), {
         nonNullable: true,
       }),
@@ -666,6 +626,45 @@ export class Monsters implements OnInit {
         this.normalizeNullableNumber(value?.curseId ?? null)
       ),
     });
+  }
+
+  private normalizeDamageFormula(value: unknown, fallbackDamage?: unknown): string {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      const match = /^(\d+)d(\d+)(?:[+\-]\d+)?$/i.exec(trimmed);
+      if (match) {
+        const count = Number.parseInt(match[1], 10);
+        const sides = Number.parseInt(match[2], 10);
+        if (count >= 1 && sides >= 1) {
+          return trimmed.toLowerCase();
+        }
+      }
+      if (/^\d+$/.test(trimmed)) {
+        return `1d${trimmed}`;
+      }
+    }
+
+    const fallbackNumber = this.normalizeNumber(fallbackDamage, 0);
+    return fallbackNumber > 0 ? `1d${fallbackNumber}` : '1d4';
+  }
+
+  private damageFormulaToLegacyNumber(value: unknown): number {
+    const formula = this.normalizeDamageFormula(value);
+    const match = /^(\d+)d(\d+)(?:([+\-])(\d+))?$/i.exec(formula);
+    if (!match) {
+      return 0;
+    }
+    const count = Number.parseInt(match[1], 10);
+    const sides = Number.parseInt(match[2], 10);
+    if (!Number.isFinite(count) || !Number.isFinite(sides) || count <= 0 || sides <= 0) {
+      return 0;
+    }
+    const maxRoll = count * sides;
+    if (match[3] && match[4]) {
+      const modifier = Number.parseInt(match[4], 10);
+      return match[3] === '+' ? maxRoll + modifier : Math.max(0, maxRoll - modifier);
+    }
+    return maxRoll;
   }
 
   private createMonsterTresherControl(value: number | null = null): MonsterTresherControl {
@@ -701,16 +700,4 @@ export class Monsters implements OnInit {
     );
   }
 
-  reinforcementMonsterOptions(): string[] {
-    const names = this.items()
-      .map((monster) => (monster.name || '').trim())
-      .filter((name) => name.length > 0);
-
-    const current = this.userMonsterForm.controls.reinforcementMonsterName.value.trim();
-    if (current.length > 0) {
-      names.push(current);
-    }
-
-    return Array.from(new Set(names));
-  }
 }

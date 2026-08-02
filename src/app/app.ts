@@ -1,13 +1,14 @@
 import { Component, inject, signal } from '@angular/core';
 
-import { ActivatedRoute, Router, RouterLinkActive, RouterLinkWithHref, RouterOutlet } from '@angular/router';
+import { ActivatedRoute, Router, RouterLinkActive, RouterLinkWithHref, RouterLink, RouterOutlet } from '@angular/router';
 import { Account } from './services/account';
 import { NgIf } from '@angular/common';
 import { CreatorLayout } from './services/creator-layout';
+import { AdBannerComponent } from './components/ad-banner/ad-banner';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLinkWithHref, RouterLinkActive, NgIf],
+  imports: [RouterOutlet, RouterLinkWithHref, RouterLinkActive, RouterLink, NgIf, AdBannerComponent],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })

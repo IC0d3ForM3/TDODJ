@@ -59,6 +59,15 @@ export class GameInteractionService {
   readonly npcDialog = signal<{ instance: GameMonsterInstance; template: Monster; creativeGreeting?: string } | null>(null);
   readonly npcTradesPurchased = signal<number[]>([]);
 
+  // Monster dialogue tree (Q&A) modal - a per-placement list of question
+  // prompts the PC can ask, with randomized responses. Separate feature from
+  // the npcDialog greeting/trade popup above.
+  readonly monsterDialogueModal = signal<{
+    instance: GameMonsterInstance;
+    template: Monster;
+    selectedResponse: string | null;
+  } | null>(null);
+
   // Stash (items available to pick up at the dungeon exit)
   readonly stashItems = signal<StashItem[]>([]);
 

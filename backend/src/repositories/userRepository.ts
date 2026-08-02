@@ -66,6 +66,7 @@ export interface LoginUserRecord {
     isadmin: boolean;
     ismasteradmin: boolean;
     iscreator: boolean;
+    issubscribed: boolean;
 }
 
 export const insertUser = async (user: NewUser): Promise<boolean> => {
@@ -102,7 +103,12 @@ export const updateUserFlags = async (
 
 export const getActiveUserByCredentials = async (username: string, password: string): Promise<LoginUserRecord | null> => {
     const { rows } = await pool.query<LoginUserRecord & { password: string }>(
-        'SELECT username, key, isadmin, ismasteradmin, iscreator, password FROM users WHERE username = $1 AND isactive = true',
+        `SELECT u.username, u.key, u.isadmin, u.ismasteradmin, u.iscreator, u.password,
+         EXISTS(
+           SELECT 1 FROM subscribed_users su WHERE su.user_id = u.id AND su.is_paid = true
+         ) AS issubscribed
+         FROM users u
+         WHERE u.username = $1 AND u.isactive = true`,
         [username]
     );
     const user = rows[0];

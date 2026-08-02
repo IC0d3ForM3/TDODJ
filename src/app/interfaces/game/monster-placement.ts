@@ -1,4 +1,5 @@
 import { BasePlacement } from './base-placement';
+import { MonsterDialogueEntry } from './monster-dialogue-entry';
 
 export interface MonsterPlacement extends BasePlacement {
   monsterId: number;
@@ -24,4 +25,5 @@ export interface MonsterPlacement extends BasePlacement {
   stationaryTriggerRow?: number | null;
   stationaryTriggerCol?: number | null;
   noAttackUnlessAttacked?: boolean;
+  dialogueEntries?: MonsterDialogueEntry[];
 }

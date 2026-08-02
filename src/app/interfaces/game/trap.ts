@@ -19,7 +19,10 @@ export interface TrapCrossingRequirement {
 export interface Trap {
   name: string;
   description: string;
-  damage: number;
+  /** Dice notation (e.g. "2d6", "1d4+2") rolled at trigger time. Plain
+   * integer strings (e.g. "5") are also accepted for backward compatibility
+   * with dungeons saved before this field became dice notation. */
+  damage: string;
   damageTo: 'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS';
   curseId: number | null;
   toDetect: number;

@@ -1,0 +1,22 @@
+@if (adService.showAds()) {
+  <div class="ad-banner-bar" role="complementary" aria-label="Advertisement">
+    <!--
+      ═══════════════════════════════════════════════════════════
+      ADSENSE PUBLISHER: ca-pub-8747092902350073  (loader is in index.html)
+      When Google provides a banner slot ID, replace the .ad-banner-placeholder
+      div below with the <ins> push tag, e.g.:
+
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-8747092902350073"
+           data-ad-slot="XXXXXXXXXX"
+           data-ad-format="horizontal"
+           data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+      ═══════════════════════════════════════════════════════════
+    -->
+    <div class="ad-banner-placeholder">
+      [ Advertisement — <a routerLink="/subscribe">Subscribe</a> to remove ads ]
+    </div>
+  </div>
+}

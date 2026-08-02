@@ -12,6 +12,7 @@ export * from './tresher';
 export * from './tresher-placement';
 export * from './monster';
 export * from './monster-placement';
+export * from './monster-dialogue-entry';
 export * from './first-person-block';
 export * from './adjacent-connection-info';
 export * from './first-person-step';

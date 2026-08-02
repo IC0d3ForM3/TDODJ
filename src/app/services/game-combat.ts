@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { MonsterDialogueEntry } from '../interfaces/game';
 
 export type TurnPhase = 'player' | 'monsters' | 'gameover';
 
@@ -41,6 +42,10 @@ export interface GameMonsterInstance {
   stationaryTriggerCol: number | null;
   noAttackUnlessAttacked: boolean;
   hasCalledReinforcements: boolean;
+  // Dialogue tree (Q&A) - static per-placement question/response data, plus
+  // a runtime flag set once a "preventsAttackUnlessAttacked" question is asked.
+  dialogueEntries: MonsterDialogueEntry[];
+  dialoguePreventsAttack: boolean;
   // NPC state
   hasGreeted: boolean;
   hasSharedInfo: boolean;
@@ -84,6 +89,10 @@ export class GameCombatService {
   readonly playerStrength = signal<number>(0);
   readonly playerMagicPower = signal<number>(0);
   readonly playerMp = signal<number>(0);
+  readonly playerDexterity = signal<number>(0);
+  readonly playerAwareness = signal<number>(0);
+  readonly playerRoundsSinceLastAction = signal<number>(0);
+  readonly playerWasHitThisRound = signal<boolean>(false);
 
   // Monster state
   readonly monsterInstances = signal<GameMonsterInstance[]>([]);

@@ -56,6 +56,7 @@ import {
   GridPreviewContext,
   Monster,
   MonsterAttack,
+  MonsterDialogueEntry,
   MonsterPlacement,
   OpenBlockOption,
   OpenBlockOptionKey,
@@ -431,6 +432,7 @@ export class Creator implements OnInit {
   get placeMonsterStationaryTriggerCol() { return this.placementService.placeMonsterStationaryTriggerCol; }
   get isSelectingStationaryTriggerSquare() { return this.placementService.isSelectingStationaryTriggerSquare; }
   get placeMonsterNoAttackUnlessAttacked() { return this.placementService.placeMonsterNoAttackUnlessAttacked; }
+  get placeMonsterDialogueEntries() { return this.placementService.placeMonsterDialogueEntries; }
   get editingMonsterPlacementPos() { return this.placementService.editingMonsterPlacementPos; }
   get isCopyMonsterMode() { return this.placementService.isCopyMonsterMode; }
   get copyMonsterSource() { return this.placementService.copyMonsterSource; }
@@ -849,7 +851,7 @@ export class Creator implements OnInit {
     hasTrap: new FormControl<boolean>(false, { nonNullable: true }),
     trapName: new FormControl<string>('', { nonNullable: true }),
     trapDescription: new FormControl<string>('', { nonNullable: true }),
-    trapDamage: new FormControl<number>(0, { nonNullable: true }),
+    trapDamage: new FormControl<string>('0', { nonNullable: true }),
     trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS'>('HP', { nonNullable: true }),
     trapType: new FormControl<TrapType>('Dart', { nonNullable: true }),
     trapHiddenUntilFoundOrTriggered: new FormControl<boolean>(true, { nonNullable: true }),
@@ -904,7 +906,7 @@ export class Creator implements OnInit {
     hasTrap: new FormControl<boolean>(false, { nonNullable: true }),
     trapName: new FormControl<string>('', { nonNullable: true }),
     trapDescription: new FormControl<string>('', { nonNullable: true }),
-    trapDamage: new FormControl<number>(0, { nonNullable: true }),
+    trapDamage: new FormControl<string>('0', { nonNullable: true }),
     trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS'>('HP', { nonNullable: true }),
     trapCurseId: new FormControl<number | null>(null),
     trapToDetect: new FormControl<number>(10, { nonNullable: true }),
@@ -953,7 +955,7 @@ export class Creator implements OnInit {
     trapType: new FormControl<TrapType>('Pit', { nonNullable: true }),
     trapName: new FormControl<string>('', { nonNullable: true }),
     trapDescription: new FormControl<string>('', { nonNullable: true }),
-    trapDamage: new FormControl<number>(0, { nonNullable: true }),
+    trapDamage: new FormControl<string>('0', { nonNullable: true }),
     trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS'>('HP', { nonNullable: true }),
     isHiddenUntilFoundOrTriggered: new FormControl<boolean>(true, { nonNullable: true }),
     trapCurseId: new FormControl<number | null>(null),
@@ -978,7 +980,7 @@ export class Creator implements OnInit {
     hasTrap: new FormControl<boolean>(false, { nonNullable: true }),
     trapName: new FormControl<string>('', { nonNullable: true }),
     trapDescription: new FormControl<string>('', { nonNullable: true }),
-    trapDamage: new FormControl<number>(0, { nonNullable: true }),
+    trapDamage: new FormControl<string>('0', { nonNullable: true }),
     trapDamageTo: new FormControl<'HP' | 'Stamina' | 'Mind' | 'AE' | 'ROS'>('HP', { nonNullable: true }),
     trapType: new FormControl<TrapType>('Dart', { nonNullable: true }),
     trapHiddenUntilFoundOrTriggered: new FormControl<boolean>(true, { nonNullable: true }),
@@ -1158,6 +1160,7 @@ export class Creator implements OnInit {
     this.placeMonsterStationaryTriggerCol.set(null);
     this.isSelectingStationaryTriggerSquare.set(false);
     this.placeMonsterNoAttackUnlessAttacked.set(false);
+    this.placeMonsterDialogueEntries.set([]);
     this.editingMonsterPlacementPos.set(null);
     this.isCopyMonsterMode.set(false);
     this.copyMonsterSource.set(null);
@@ -1212,7 +1215,7 @@ export class Creator implements OnInit {
       hasTrap: false,
       trapName: '',
       trapDescription: '',
-      trapDamage: 0,
+      trapDamage: '0',
       trapDamageTo: 'HP',
       trapCurseId: null,
       trapToDetect: 10,
@@ -1347,7 +1350,7 @@ export class Creator implements OnInit {
           trapType: this.doorForm.controls.trapType.value,
           name: this.doorForm.controls.trapName.value.trim(),
           description: this.doorForm.controls.trapDescription.value.trim(),
-          damage: Math.max(0, this.doorForm.controls.trapDamage.value),
+          damage: this.doorForm.controls.trapDamage.value.trim() || '0',
           damageTo: this.doorForm.controls.trapDamageTo.value,
           isHiddenUntilFoundOrTriggered: this.doorForm.controls.trapHiddenUntilFoundOrTriggered.value,
           sourceObjectType: 'door',
@@ -1491,7 +1494,7 @@ export class Creator implements OnInit {
       hasTrap: door.trap !== null,
       trapName: door.trap?.name ?? '',
       trapDescription: door.trap?.description ?? '',
-      trapDamage: door.trap?.damage ?? 0,
+      trapDamage: door.trap?.damage ?? '0',
       trapDamageTo: door.trap?.damageTo ?? 'HP',
       trapType: door.trap?.trapType === 'Gas Cloud' ? 'Gas Cloud' : 'Dart',
       trapHiddenUntilFoundOrTriggered: door.trap?.isHiddenUntilFoundOrTriggered ?? true,
@@ -1651,7 +1654,7 @@ export class Creator implements OnInit {
       trapType: 'Pit',
       trapName: '',
       trapDescription: '',
-      trapDamage: 0,
+      trapDamage: '0',
       trapDamageTo: 'HP',
       isHiddenUntilFoundOrTriggered: true,
       trapCurseId: null,
@@ -1677,7 +1680,7 @@ export class Creator implements OnInit {
       trapType: trap.trap.trapType ?? 'Pit',
       trapName: trap.trap.name,
       trapDescription: trap.trap.description,
-      trapDamage: trap.trap.damage,
+      trapDamage: trap.trap.damage ?? '0',
       trapDamageTo: trap.trap.damageTo,
       isHiddenUntilFoundOrTriggered: trap.trap.isHiddenUntilFoundOrTriggered ?? true,
       trapCurseId: trap.trap.curseId,
@@ -1715,7 +1718,7 @@ export class Creator implements OnInit {
       trapType,
       name: controls.trapName.value.trim(),
       description: controls.trapDescription.value.trim(),
-      damage: Math.max(0, controls.trapDamage.value),
+      damage: controls.trapDamage.value.trim() || '0',
       damageTo: controls.trapDamageTo.value,
       isHiddenUntilFoundOrTriggered: isAlwaysHidden ? true : controls.isHiddenUntilFoundOrTriggered.value,
       crossingRequirements,
@@ -1878,7 +1881,7 @@ export class Creator implements OnInit {
         hasTrap: false,
         trapName: '',
         trapDescription: '',
-        trapDamage: 0,
+        trapDamage: '0',
         trapDamageTo: 'HP',
         trapType: 'Dart',
         trapHiddenUntilFoundOrTriggered: true,
@@ -1913,7 +1916,7 @@ export class Creator implements OnInit {
       hasTrap: false,
       trapName: '',
       trapDescription: '',
-      trapDamage: 0,
+      trapDamage: '0',
       trapDamageTo: 'HP',
       trapType: 'Dart',
       trapHiddenUntilFoundOrTriggered: true,
@@ -1958,7 +1961,7 @@ export class Creator implements OnInit {
           trapType: controls.trapType.value,
           name: controls.trapName.value.trim(),
           description: controls.trapDescription.value.trim(),
-          damage: Math.max(0, controls.trapDamage.value),
+          damage: controls.trapDamage.value.trim() || '0',
           damageTo: controls.trapDamageTo.value,
           isHiddenUntilFoundOrTriggered: controls.trapHiddenUntilFoundOrTriggered.value,
           sourceObjectType: 'obstacle',
@@ -2121,7 +2124,7 @@ export class Creator implements OnInit {
         hasTrap: obstacle.trap !== null,
         trapName: obstacle.trap?.name ?? '',
         trapDescription: obstacle.trap?.description ?? '',
-        trapDamage: obstacle.trap?.damage ?? 0,
+        trapDamage: obstacle.trap?.damage ?? '0',
         trapDamageTo: obstacle.trap?.damageTo ?? 'HP',
         trapType: obstacle.trap?.trapType === 'Gas Cloud' ? 'Gas Cloud' : 'Dart',
         trapHiddenUntilFoundOrTriggered: obstacle.trap?.isHiddenUntilFoundOrTriggered ?? true,
@@ -2172,7 +2175,7 @@ export class Creator implements OnInit {
       hasTrap: obstacle.trap !== null,
       trapName: obstacle.trap?.name ?? '',
       trapDescription: obstacle.trap?.description ?? '',
-      trapDamage: obstacle.trap?.damage ?? 0,
+      trapDamage: obstacle.trap?.damage ?? '0',
       trapDamageTo: obstacle.trap?.damageTo ?? 'HP',
       trapType: obstacle.trap?.trapType === 'Gas Cloud' ? 'Gas Cloud' : 'Dart',
       trapHiddenUntilFoundOrTriggered: obstacle.trap?.isHiddenUntilFoundOrTriggered ?? true,
@@ -2213,7 +2216,7 @@ export class Creator implements OnInit {
       ? {
           name: controls.trapName.value.trim(),
           description: controls.trapDescription.value.trim(),
-          damage: Math.max(0, controls.trapDamage.value),
+          damage: controls.trapDamage.value.trim() || '0',
           damageTo: controls.trapDamageTo.value,
           curseId: controls.trapCurseId.value ?? null,
           toDetect: Math.max(0, controls.trapToDetect.value),
@@ -2990,6 +2993,7 @@ export class Creator implements OnInit {
     this.placeMonsterStationaryTriggerCol.set(placement.stationaryTriggerCol ?? null);
     this.isSelectingStationaryTriggerSquare.set(false);
     this.placeMonsterNoAttackUnlessAttacked.set(placement.noAttackUnlessAttacked ?? false);
+    this.placeMonsterDialogueEntries.set(placement.dialogueEntries ? placement.dialogueEntries.map((e) => ({ ...e })) : []);
     this.isKaysDialogVisible.set(false);
     this.isTresherDialogVisible.set(false);
     this.isMonsterDialogVisible.set(false);
@@ -4821,6 +4825,7 @@ export class Creator implements OnInit {
     this.placeMonsterStationaryTriggerCol.set(null);
     this.isSelectingStationaryTriggerSquare.set(false);
     this.placeMonsterNoAttackUnlessAttacked.set(false);
+    this.placeMonsterDialogueEntries.set([]);
     this.editingMonsterPlacementPos.set(null);
   }
 
@@ -4851,6 +4856,7 @@ export class Creator implements OnInit {
     this.placeMonsterStationaryTriggerCol.set(placement.stationaryTriggerCol ?? null);
     this.isSelectingStationaryTriggerSquare.set(false);
     this.placeMonsterNoAttackUnlessAttacked.set(placement.noAttackUnlessAttacked ?? false);
+    this.placeMonsterDialogueEntries.set(placement.dialogueEntries ? placement.dialogueEntries.map((e) => ({ ...e })) : []);
     this.isKaysDialogVisible.set(false);
     this.isTresherDialogVisible.set(false);
     this.isMonsterDialogVisible.set(false);
@@ -4887,6 +4893,7 @@ export class Creator implements OnInit {
               stationaryTriggerRow: this.placeMonsterIsStationary() && this.placeMonsterStationaryTriggerRow() !== null ? this.placeMonsterStationaryTriggerRow() : undefined,
               stationaryTriggerCol: this.placeMonsterIsStationary() && this.placeMonsterStationaryTriggerCol() !== null ? this.placeMonsterStationaryTriggerCol() : undefined,
               noAttackUnlessAttacked: this.placeMonsterNoAttackUnlessAttacked() || undefined,
+              dialogueEntries: this.placeMonsterDialogueEntries().length > 0 ? this.placeMonsterDialogueEntries().map((e) => ({ ...e })) : undefined,
             }
           : mp
       ),
@@ -5101,6 +5108,7 @@ export class Creator implements OnInit {
             stationaryTriggerRow: this.placeMonsterIsStationary() && this.placeMonsterStationaryTriggerRow() !== null ? this.placeMonsterStationaryTriggerRow() : undefined,
             stationaryTriggerCol: this.placeMonsterIsStationary() && this.placeMonsterStationaryTriggerCol() !== null ? this.placeMonsterStationaryTriggerCol() : undefined,
             noAttackUnlessAttacked: this.placeMonsterNoAttackUnlessAttacked() || undefined,
+            dialogueEntries: this.placeMonsterDialogueEntries().length > 0 ? this.placeMonsterDialogueEntries().map((e) => ({ ...e })) : undefined,
           },
         ],
       };
@@ -5632,6 +5640,50 @@ export class Creator implements OnInit {
     );
   }
 
+  // ── Monster placement dialogue tree (Q&A) ─────────────────────────────────
+  addMonsterDialogueEntry(): void {
+    this.placeMonsterDialogueEntries.update((entries) => {
+      const nextId = entries.reduce((max, e) => Math.max(max, e.id), 0) + 1;
+      return [
+        ...entries,
+        { id: nextId, question: '', responses: [''], triggersAttack: false, preventsAttackUnlessAttacked: false },
+      ];
+    });
+  }
+
+  removeMonsterDialogueEntry(idx: number): void {
+    this.placeMonsterDialogueEntries.update((entries) => entries.filter((_, i) => i !== idx));
+  }
+
+  setMonsterDialogueQuestion(idx: number, value: string): void {
+    this.placeMonsterDialogueEntries.update((entries) =>
+      entries.map((e, i) => i === idx ? { ...e, question: value } : e)
+    );
+  }
+
+  monsterDialogueResponsesText(entry: MonsterDialogueEntry): string {
+    return entry.responses.join('\n');
+  }
+
+  setMonsterDialogueResponses(idx: number, value: string): void {
+    const responses = value.split('\n').map((r) => r.trim()).filter((r) => r.length > 0);
+    this.placeMonsterDialogueEntries.update((entries) =>
+      entries.map((e, i) => i === idx ? { ...e, responses } : e)
+    );
+  }
+
+  setMonsterDialogueTriggersAttack(idx: number, checked: boolean): void {
+    this.placeMonsterDialogueEntries.update((entries) =>
+      entries.map((e, i) => i === idx ? { ...e, triggersAttack: checked } : e)
+    );
+  }
+
+  setMonsterDialoguePreventsAttack(idx: number, checked: boolean): void {
+    this.placeMonsterDialogueEntries.update((entries) =>
+      entries.map((e, i) => i === idx ? { ...e, preventsAttackUnlessAttacked: checked } : e)
+    );
+  }
+
   private loadMonsterDialogOptions(): void {
     const userKey = this.account.getKey();
     if (!userKey) return;
@@ -5691,7 +5743,7 @@ export class Creator implements OnInit {
       ? {
           name: controls.trapName.value.trim(),
           description: controls.trapDescription.value.trim(),
-          damage: Math.max(0, controls.trapDamage.value),
+          damage: controls.trapDamage.value.trim() || '0',
           damageTo: controls.trapDamageTo.value,
           curseId: controls.trapCurseId.value ?? null,
           toDetect: Math.max(0, controls.trapToDetect.value),
@@ -5757,7 +5809,7 @@ export class Creator implements OnInit {
       hasTrap: false,
       trapName: '',
       trapDescription: '',
-      trapDamage: 0,
+      trapDamage: '0',
       trapDamageTo: 'HP',
       trapCurseId: null,
       trapToDetect: 10,
@@ -6688,6 +6740,9 @@ export class Creator implements OnInit {
       return;
     }
 
+    // Ensure placed monsters linked to library entries keep latest library stats on save.
+    this.refreshDungonMonstersFromLibrary(dungonId);
+
     const payload = this.getDungonJsonPayload(dungonId);
     this.dungonJsonSaveError.set(null);
     this.isSavingDungonJson.set(true);
@@ -6724,6 +6779,96 @@ export class Creator implements OnInit {
           this.dungonJsonSaveError.set('Failed to save dungeon json.');
         },
       });
+  }
+
+  private refreshDungonMonstersFromLibrary(dungonId: number): void {
+    const currentMonsters = this.monsterListByDungon()[dungonId] ?? [];
+    if (currentMonsters.length === 0) {
+      return;
+    }
+
+    const libraryById = new Map<number, MonsterLibraryItem>(
+      this.monsterLibrary().map((monster) => [monster.id, monster] as const)
+    );
+
+    let didChange = false;
+    const refreshedMonsters = currentMonsters.map((monster) => {
+      const monsterDbId =
+        typeof monster.monsterDbId === 'number' && Number.isFinite(monster.monsterDbId)
+          ? monster.monsterDbId
+          : null;
+
+      if (monsterDbId === null) {
+        return monster;
+      }
+
+      const libraryMonster = libraryById.get(monsterDbId);
+      if (!libraryMonster) {
+        return monster;
+      }
+
+      const refreshed: Monster = {
+        ...monster,
+        imageId: this.normalizeNullableNumber(this.toFiniteNumber(libraryMonster.imageId)),
+        soundId: this.normalizeNullableNumber(this.toFiniteNumber(libraryMonster.soundId)),
+        tresherIds: this.normalizeIdList(libraryMonster.tresherIds),
+        keyIds: this.normalizeIdList(libraryMonster.keyIds),
+        name: libraryMonster.name,
+        type: libraryMonster.type,
+        description: libraryMonster.description,
+        hp: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.hp), 1)),
+        movementEconomy: Math.max(
+          0,
+          this.normalizeNumber(this.toFiniteNumber(libraryMonster.movementEconomy), 0)
+        ),
+        ac: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.ac), 10)),
+        runAt: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.runAt), 0)),
+        numberOfAttacks: Math.max(
+          1,
+          this.normalizeNumber(this.toFiniteNumber(libraryMonster.numberOfAttacks), 1)
+        ),
+        attacks: this.normalizeMonsterAttacks(libraryMonster.attacks),
+        magic: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.magic), 0)),
+        magicResistance: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.magicResistance), 0)),
+        castPlus: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.castPlus), 0)),
+        spReward: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.spReward), 0)),
+        callsReinforcements: libraryMonster.callsReinforcements === true,
+        reinforcementCount: Math.max(
+          0,
+          this.normalizeNumber(this.toFiniteNumber(libraryMonster.reinforcementCount), 0)
+        ),
+        reinforcementMonsterName:
+          typeof libraryMonster.reinforcementMonsterName === 'string' &&
+          libraryMonster.reinforcementMonsterName.trim()
+            ? libraryMonster.reinforcementMonsterName.trim()
+            : null,
+        toHitPlusNeeded: Math.max(0, this.normalizeNumber(this.toFiniteNumber(libraryMonster.toHitPlusNeeded), 0)),
+        npcGreeting: libraryMonster.npcGreeting ?? null,
+        npcInfo1: libraryMonster.npcInfo1 ?? null,
+        npcInfo2: libraryMonster.npcInfo2 ?? null,
+        npcInfo3: libraryMonster.npcInfo3 ?? null,
+        npcOnlyAttackWhenAttacked: libraryMonster.npcOnlyAttackWhenAttacked === true,
+        npcGivesInfoAfterDamaged: libraryMonster.npcGivesInfoAfterDamaged === true,
+        npcAttacksAfterInfo: libraryMonster.npcAttacksAfterInfo === true,
+        npcCanTrade: libraryMonster.npcCanTrade === true,
+        awareness: libraryMonster.awareness ?? 5,
+      };
+
+      if (!this.isSameMonsterDefinition(monster, refreshed)) {
+        didChange = true;
+      }
+
+      return refreshed;
+    });
+
+    if (!didChange) {
+      return;
+    }
+
+    this.monsterListByDungon.update((allMonsters) => ({
+      ...allMonsters,
+      [dungonId]: refreshedMonsters,
+    }));
   }
 
   openGenerateDungonDialog(): void {
@@ -8160,7 +8305,7 @@ export class Creator implements OnInit {
       hasTrap: false,
       trapName: '',
       trapDescription: '',
-      trapDamage: 0,
+      trapDamage: '0',
       trapDamageTo: 'HP',
       trapType: 'Dart',
       trapHiddenUntilFoundOrTriggered: true,
@@ -8408,6 +8553,10 @@ export class Creator implements OnInit {
         isTwoHanded: i.isTwoHanded,
         effectToPc: i.effectToPc ?? null,
         effectToPcValue: i.effectToPcValue ?? 0,
+        uses: i.uses ?? null,
+        minMindToRead: i.minMindToRead ?? 0,
+        scrollSpellId: i.scrollSpellId ?? null,
+        magicCost: i.magicCost ?? 1,
       }));
     const floorPotionList = allLibPotions
       .filter((p) => placedPotionIds.has(p.id))
@@ -9072,6 +9221,39 @@ export class Creator implements OnInit {
         ? Math.floor((source as Record<string, unknown>)['stationaryTriggerCol'] as number)
         : undefined,
       noAttackUnlessAttacked: (source as Record<string, unknown>)['noAttackUnlessAttacked'] === true || undefined,
+      dialogueEntries: this.normalizeMonsterDialogueEntries((source as Record<string, unknown>)['dialogueEntries']),
+    };
+  }
+
+  private normalizeMonsterDialogueEntries(value: unknown): MonsterDialogueEntry[] | undefined {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+    const entries = value
+      .map((item, index) => this.parseMonsterDialogueEntryItem(item, index))
+      .filter((item): item is MonsterDialogueEntry => item !== null);
+    return entries.length > 0 ? entries : undefined;
+  }
+
+  private parseMonsterDialogueEntryItem(item: unknown, fallbackIndex: number): MonsterDialogueEntry | null {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+    const source = item as Record<string, unknown>;
+    const question = typeof source['question'] === 'string' ? source['question'] : '';
+    const responses = Array.isArray(source['responses'])
+      ? (source['responses'] as unknown[]).filter((r): r is string => typeof r === 'string' && r.trim().length > 0)
+      : [];
+    if (!question.trim() && responses.length === 0) {
+      return null;
+    }
+    const id = this.toFiniteNumber(source['id']);
+    return {
+      id: id !== null ? Math.max(0, Math.floor(id)) : fallbackIndex + 1,
+      question,
+      responses,
+      triggersAttack: source['triggersAttack'] === true || undefined,
+      preventsAttackUnlessAttacked: source['preventsAttackUnlessAttacked'] === true || undefined,
     };
   }
 
@@ -12842,13 +13024,36 @@ export class Creator implements OnInit {
 
     const obstacles = this.obstaclePlacementsByDungon()[dungonId] ?? [];
     const hasObstacle = obstacles.some(
-      (obs) => obs.row === toRow && obs.column === toColumn && !obs.isDestroyed
+      (obs) => obs.row === toRow && obs.column === toColumn && this.isObstacleBlockingMovement(obs)
     );
     if (hasObstacle) {
       return { type: 'wall', door: null };
     }
 
     return { type: 'none', door: null };
+  }
+
+  /**
+   * Determines whether an obstacle placement blocks movement into its
+   * square. Destroyed obstacles never block. Short floor-anchored obstacles
+   * (<=20% height) can be stepped over, and low ceiling-anchored obstacles
+   * (<=40% height) can be walked under - both are treated as non-blocking
+   * terrain rather than a full wall. Mirrors game.ts's identically-named
+   * method for the Creator's grid preview "cheater" walkthrough tool.
+   */
+  private isObstacleBlockingMovement(obs: ObstaclePlacement): boolean {
+    if (obs.isDestroyed) {
+      return false;
+    }
+    const heightAnchor = obs.heightAnchor ?? 'floor';
+    const heightPercent = obs.heightPercent ?? 100;
+    if (heightAnchor === 'floor' && heightPercent <= 20) {
+      return false;
+    }
+    if (heightAnchor === 'ceiling' && heightPercent <= 40) {
+      return false;
+    }
+    return true;
   }
 
   private getFacingDirectionFromKey(key: string): FacingDirection | null {

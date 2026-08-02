@@ -50,7 +50,12 @@ const updateUserFlags = async (id, flags) => {
 };
 exports.updateUserFlags = updateUserFlags;
 const getActiveUserByCredentials = async (username, password) => {
-    const { rows } = await db_1.default.query('SELECT username, key, isadmin, ismasteradmin, iscreator, password FROM users WHERE username = $1 AND isactive = true', [username]);
+    const { rows } = await db_1.default.query(`SELECT u.username, u.key, u.isadmin, u.ismasteradmin, u.iscreator, u.password,
+         EXISTS(
+           SELECT 1 FROM subscribed_users su WHERE su.user_id = u.id AND su.is_paid = true
+         ) AS issubscribed
+         FROM users u
+         WHERE u.username = $1 AND u.isactive = true`, [username]);
     const user = rows[0];
     if (!user)
         return null;

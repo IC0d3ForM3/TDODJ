@@ -64,6 +64,7 @@ interface MonsterAttackWriteInput {
   type?: unknown;
   description?: unknown;
   discription?: unknown;
+  damageFormula?: unknown;
   damage?: unknown;
   plusToHit?: unknown;
   plushToHit?: unknown;
@@ -282,24 +283,26 @@ const normalizeMonsterAttacks = (value: unknown): MonsterAttackRecord[] => {
     return [];
   }
 
-  return value
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return null;
-      }
+  const normalized: MonsterAttackRecord[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
 
-      const source = item as MonsterAttackWriteInput;
-      return {
-        type: normalizeText(source.type, 'Weapon'),
-        description: normalizeText(source.description ?? source.discription, ''),
-        damage: Math.max(0, normalizeNumber(source.damage, 0)),
-        plusToHit: normalizeNumber(source.plusToHit ?? source.plushToHit, 0),
-        weaponItemId: normalizeNullableNumber(source.weaponItemId),
-        spellId: normalizeNullableNumber(source.spellId),
-        curseId: normalizeNullableNumber(source.curseId),
-      };
-    })
-    .filter((item): item is MonsterAttackRecord => item !== null);
+    const source = item as MonsterAttackWriteInput;
+    normalized.push({
+      type: normalizeText(source.type, 'Weapon'),
+      description: normalizeText(source.description ?? source.discription, ''),
+      damageFormula: normalizeDamageFormula(source.damageFormula),
+      damage: Math.max(0, normalizeNumber(source.damage, 0)),
+      plusToHit: normalizeNumber(source.plusToHit ?? source.plushToHit, 0),
+      weaponItemId: normalizeNullableNumber(source.weaponItemId),
+      spellId: normalizeNullableNumber(source.spellId),
+      curseId: normalizeNullableNumber(source.curseId),
+    });
+  }
+
+  return normalized;
 };
 
 const normalizeText = (value: unknown, fallback: string): string => {
@@ -371,4 +374,13 @@ const normalizeNullableText = (value: unknown): string | null => {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed || null;
+};
+
+const DICE_NOTATION_RE = /^\d+d\d+(?:[+\-÷/]\d+)?$/i;
+
+const normalizeDamageFormula = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return null;
+  return DICE_NOTATION_RE.test(trimmed) ? trimmed : null;
 };

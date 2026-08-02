@@ -18,22 +18,26 @@
     <h3>Creating a PC</h3>
     <p>
       Head to the <strong>Dashboard → PC tab</strong> and click <strong>Create New PC</strong>.
-      Pick a name, a species, and a class. Stats are rolled automatically using a d12 — you can
-      reroll by changing your species or type.
+      Pick a name, a species, and a class. All stats are rolled automatically from dice formulas
+      based on your species and class — there is no manual stat entry.
     </p>
 
     <p class="htp-subsection-title">Species</p>
     <table class="htp-table">
       <thead>
-        <tr><th>Species</th><th>Range of View</th><th>Action Economy</th><th>Strength</th><th>Flavour</th></tr>
+        <tr><th>Species</th><th>Range of View</th><th>Action Economy</th><th>Strength</th><th>Dexterity</th><th>Awareness</th><th>Mind</th></tr>
       </thead>
       <tbody>
-        <tr><td>Human</td><td>5</td><td>5</td><td>d12÷2 + 1</td><td>Balanced, moderate magic</td></tr>
-        <tr><td>Elph</td><td>7</td><td>5</td><td>d12÷2</td><td>Far sight, nimble, magic-leaning</td></tr>
-        <tr><td>DwarPh</td><td>7</td><td>4</td><td>d12÷2 + 4</td><td>Tough, powerful, low magic</td></tr>
-        <tr><td>Shorties</td><td>5</td><td>4</td><td>d12÷4 + 2</td><td>Balanced, decent magic</td></tr>
+        <tr><td>Human</td><td>5</td><td>5</td><td>6+2d6</td><td>3d6</td><td>2d4</td><td>1d10+5</td></tr>
+        <tr><td>Elph</td><td>7</td><td>5</td><td>4+2d6</td><td>3d6+2</td><td>3d4+3</td><td>1d12+6</td></tr>
+        <tr><td>DwarPh</td><td>7</td><td>4</td><td>8+2d6</td><td>2d6−2</td><td>3d4</td><td>1d8+4</td></tr>
+        <tr><td>Shorties</td><td>6</td><td>4</td><td>2d6</td><td>6+2d6</td><td>2d4+4</td><td>1d10+5</td></tr>
       </tbody>
     </table>
+    <p>
+      Each species also rolls a hidden <strong>Magic</strong> stat that feeds directly into your
+      class's Magic Power formula below (Human/Shorties 2d6, Elph 6+2d6, DwarPh 1d12).
+    </p>
 
     <p class="htp-subsection-title">Class</p>
     <table class="htp-table">
@@ -41,10 +45,11 @@
         <tr><th>Class</th><th>Max HP</th><th>AC Bonus</th><th>Magic Power</th><th>Role</th></tr>
       </thead>
       <tbody>
-        <tr><td>Fighter</td><td>d12 + 4</td><td>2 + Str÷2 (max 5) + 1d6÷2</td><td>0</td><td>Front-line brawler, −2 to spell learning, −1 to spell cast rolls</td></tr>
-        <tr><td>Thieph</td><td>d12 + 2</td><td>1</td><td>2</td><td>Stealth, picking locks, −1 to spell learning</td></tr>
-        <tr><td>Mage</td><td>d12÷2 + 2</td><td>1</td><td>8 +</td><td>Spell power, fragile</td></tr>
-        <tr><td>Healer</td><td>d12÷2 + 2</td><td>1</td><td>6 +</td><td>Support, recovery</td></tr>
+        <tr><td>Fighter</td><td>2d8 + Str÷2</td><td>1d6÷2</td><td>0 (no casting)</td><td>Front-line brawler — see Class Passives below</td></tr>
+        <tr><td>Thieph</td><td>d12 + 2</td><td>2d6 + Dex÷2</td><td>1d4 + Magic</td><td>Stealth, sneak attacks, lock-picking</td></tr>
+        <tr><td>Mage</td><td>2d4 + 2</td><td>0</td><td>2d8 + Magic + Mind</td><td>Spell power, fragile</td></tr>
+        <tr><td>Healer</td><td>3d4 + 3</td><td>2d4÷2</td><td>1d8 + Magic + Mind</td><td>Support, recovery</td></tr>
+        <tr><td>Ranger</td><td>2d6 + Str÷2</td><td>1d6÷2 + Dex÷4</td><td>= Magic (flat)</td><td>Ranged combat, favored monster types</td></tr>
       </tbody>
     </table>
 
@@ -57,8 +62,22 @@
       <li><strong>Stamina</strong> — Adds to your attack roll.</li>
       <li><strong>Mind</strong> — Used for trap detection, lock picking, finding hidden doors, and casting spells. Also determines your Magic Resistance (Mind ÷ 2, rounded down).</li>
       <li><strong>Magic Power (MP)</strong> — How many magic points you have available to fuel spells. Casting a spell costs 1 AE and also spends that spell's Magic Cost from your MP pool.</li>
-      <li><strong>Agility</strong> — Improves ranged to-hit rolls and enhances Thieph sneak attacks.</li>
+      <li><strong>Dexterity</strong> — Improves ranged to-hit rolls, powers Fighter/Ranger bonuses, and enhances Thieph sneak attacks.</li>
+      <li><strong>Awareness</strong> — Your perception stat. Determines how easily monsters notice you while sneaking, and boosts Thieph trap-finding.</li>
       <li><strong>Range of View</strong> — How far you can see in the first-person view.</li>
+    </ul>
+  </section>
+
+  <!-- ── Class Passives ─────────────────────────────────────────── -->
+  <section class="how-to-play-section">
+    <h3>Class Passives</h3>
+    <p>Beyond the base stat formulas, every class has passive combat bonuses that apply automatically:</p>
+    <ul>
+      <li><strong>Fighter</strong> — Always gains +Dexterity÷2 to hit and +Strength÷4 damage on every attack. <em>Toughening:</em> go 3 full rounds without attacking or being hit and gain +1 max HP.</li>
+      <li><strong>Thieph</strong> — <em>Sneak attack:</em> striking while unseen deals ×2 damage. Gains +Dexterity÷2 to disarm traps and pick locks, and +Awareness÷2 to search for traps.</li>
+      <li><strong>Mage</strong> — Resting with no monsters nearby restores 1d4 Magic Power per AE spent resting (small risk of summoning a monster each time). Can overspend MP on damage spells for up to double damage.</li>
+      <li><strong>Healer</strong> — Resting with no monsters nearby restores 1 HP per AE spent. Healing spells/potions/scrolls that restore a stat add Magic÷2 to the result (capped at max).</li>
+      <li><strong>Ranger</strong> — Gains +Dexterity÷2 to hit and +Strength÷2 damage with ranged weapons (no bonus at melee range). No range penalty when firing at 1 square. Can Sneak against Beast-type monsters like a Thieph.</li>
     </ul>
   </section>
 
@@ -95,6 +114,12 @@
       You can also use the on-screen direction pad beneath the mini-map. Tap the outer buttons to
       face a direction (including diagonals) and <strong>F</strong> in the centre to step forward.
       Moving diagonally costs <strong>2 AE</strong> instead of 1.
+    </p>
+    <p>
+      Some obstacles can be walked over or under instead of blocking your path: a short
+      floor-standing obstacle (20% height or less) can be stepped over, and a low-hanging
+      ceiling obstacle (40% height or less) can be walked under. Taller obstacles block movement
+      like a wall unless destroyed or opened.
     </p>
   </section>
 
@@ -224,6 +249,18 @@
       <li>Some monsters <strong>flee</strong> when they drop below a certain HP threshold.</li>
       <li>Monsters with the <strong>roam</strong> flag wander the dungeon even when you are far away.</li>
       <li>Some monsters <strong>call reinforcements</strong> — when they spot you, nearby allies join the fight.</li>
+      <li>
+        Some monsters can be spoken to with an <strong>Ask</strong> button during combat — pick a
+        question and the monster gives a randomized reply. Some answers reveal information, some
+        provoke the monster into attacking, and some calm it down so it won't attack unless you
+        attack first.
+      </li>
+      <li>
+        A monster's <strong>type</strong> (Undead, Construct, Ooze, Dragon, etc.) can carry hidden
+        combat traits — extra to-hit or AC, HP regeneration each round, immunity to mind-affecting
+        magic, or resistance to non-magical weapons. Watch the combat log for hints like
+        <em>"resists non-magical damage"</em> or <em>"immune to mind-affecting magic"</em>.
+      </li>
       <li>Killing a monster can drop treshers and keys — and earns you <strong>SP</strong>.</li>
     </ul>
   </section>
@@ -246,7 +283,7 @@
       <li>Stamina — improves attack rolls and AC when defending</li>
       <li>Mind — better spell accuracy, trap detection, and magic resistance</li>
       <li>Magic Power — more MP for spellcasting</li>
-      <li>Agility — improves ranged to-hit and Thieph sneak attacks</li>
+      <li>Dexterity — improves ranged to-hit and Thieph sneak attacks</li>
       <li>Number of Attacks (NOA) — attack more times per turn</li>
       <li>Number of Defends (NOD) — defend more times per turn</li>
     </ul>
@@ -310,6 +347,7 @@
       <li>Magic gems — equip to boost Magic Power</li>
       <li>Potions — drink healing potions (1 AE) to recover HP; lasting potions tick over turns</li>
       <li>Spells — cast from Inventory tab (see Magic below)</li>
+      <li>Scrolls — a one-time (or limited-use) spell you can read straight from your inventory without needing to learn it first (see Magic below)</li>
     </ul>
     <p>
       Some treshers are trapped. Always search before grabbing a pile of loot in a suspicious spot.
@@ -317,7 +355,8 @@
     <p class="htp-subsection-title">Traps</p>
     <p>
       Traps are hidden hazards on the floor, inside treshers, on doors, or behind hidden passages.
-      When triggered they can cause:
+      Trap damage is rolled as dice (e.g. 2d6) at the moment the trap triggers, so the same trap
+      can hit harder or lighter each time. When triggered they can cause:
     </p>
     <ul>
       <li><strong>HP damage</strong> — the most common trap effect</li>
@@ -351,6 +390,13 @@
       <li>On a success the spell applies its effect (e.g. HP damage, stat reduction).</li>
       <li>On a failure the spell fizzles — AE is still spent.</li>
       <li><strong>Class penalties:</strong> Fighters take −1 on spell cast rolls. Thiephs have no casting penalty.</li>
+    </ul>
+    <p class="htp-subsection-title">Reading a Scroll</p>
+    <ul>
+      <li>Scrolls appear in your <strong>Inventory</strong> tab with a <strong>Read (1 AE)</strong> button — no Learn step needed.</li>
+      <li>Reading costs <strong>1 AE</strong> plus the scroll's Magic Cost from your MP pool, the same as casting a learned spell.</li>
+      <li>Some scrolls require a minimum Mind stat to decipher.</li>
+      <li>Most scrolls have limited <strong>uses</strong> — once exhausted, the scroll disappears from your inventory.</li>
     </ul>
     <p class="htp-subsection-title">Magic Resistance</p>
     <ul>

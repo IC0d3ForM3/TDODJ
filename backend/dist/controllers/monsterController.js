@@ -208,23 +208,24 @@ const normalizeMonsterAttacks = (value) => {
     if (!Array.isArray(value)) {
         return [];
     }
-    return value
-        .map((item) => {
+    const normalized = [];
+    for (const item of value) {
         if (!item || typeof item !== 'object') {
-            return null;
+            continue;
         }
         const source = item;
-        return {
+        normalized.push({
             type: normalizeText(source.type, 'Weapon'),
             description: normalizeText(source.description ?? source.discription, ''),
+            damageFormula: normalizeDamageFormula(source.damageFormula),
             damage: Math.max(0, normalizeNumber(source.damage, 0)),
             plusToHit: normalizeNumber(source.plusToHit ?? source.plushToHit, 0),
             weaponItemId: normalizeNullableNumber(source.weaponItemId),
             spellId: normalizeNullableNumber(source.spellId),
             curseId: normalizeNullableNumber(source.curseId),
-        };
-    })
-        .filter((item) => item !== null);
+        });
+    }
+    return normalized;
 };
 const normalizeText = (value, fallback) => {
     if (typeof value !== 'string') {
@@ -275,4 +276,13 @@ const normalizeNullableText = (value) => {
         return null;
     const trimmed = value.trim();
     return trimmed || null;
+};
+const DICE_NOTATION_RE = /^\d+d\d+(?:[+\-÷/]\d+)?$/i;
+const normalizeDamageFormula = (value) => {
+    if (typeof value !== 'string')
+        return null;
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed)
+        return null;
+    return DICE_NOTATION_RE.test(trimmed) ? trimmed : null;
 };

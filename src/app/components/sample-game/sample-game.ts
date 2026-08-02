@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { RouterLinkWithHref } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { API_BASE_URL } from '../../api-config';
+import { GameSoundService } from '../../services/game-sound';
 
 interface SampleDungon {
   id: number;
@@ -167,9 +168,18 @@ const DEFAULT_PC_GUIDE: PcGuide = {
   styleUrl: './sample-game.css',
   imports: [RouterLinkWithHref],
 })
-export class SampleGame implements OnInit {
+export class SampleGame implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly gameSoundService = inject(GameSoundService);
+
+  readonly musicMuted = signal<boolean>((() => {
+    const stored = localStorage.getItem('musicMuted');
+    if (stored === 'true') return true;
+    if (stored === 'false') return false;
+    // Default: music on for the sample-game page (browser autoplay may still block it)
+    return false;
+  })());
 
   readonly dungon = signal<SampleDungon | null>(null);
   readonly sampleDungons = signal<SampleDungon[]>([]);
@@ -266,6 +276,8 @@ export class SampleGame implements OnInit {
         this.pickerIndex.set(0);
         this.selectedPc.set(null);
         this.isLoading.set(false);
+        // Try to start music now that data has arrived (user likely interacted to get here)
+        this.tryStartMusic();
       },
       error: () => {
         this.hasError.set(true);
@@ -274,10 +286,38 @@ export class SampleGame implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    this.gameSoundService.stopTavernMusic();
+  }
+
+  tryStartMusic(): void {
+    this.gameSoundService.startTavernMusic({
+      muted: this.musicMuted(),
+      resolveClientAssetUrl: (assetPath: string) => {
+        const trimmed = assetPath.trim();
+        if (!trimmed) return '';
+        if (/^https?:\/\//i.test(trimmed)) return encodeURI(trimmed);
+        return encodeURI(trimmed.startsWith('/') ? trimmed : `/${trimmed}`);
+      },
+    });
+  }
+
+  toggleMusic(): void {
+    const muted = !this.musicMuted();
+    this.musicMuted.set(muted);
+    localStorage.setItem('musicMuted', muted ? 'true' : 'false');
+    if (muted) {
+      this.gameSoundService.stopTavernMusic();
+    } else {
+      this.tryStartMusic();
+    }
+  }
+
   selectPc(pc: SamplePc): void {
     this.selectedPc.set(pc);
     this.tavernDungeonPickerIndex.set(0);
     this.showTavernDungeonPicker.set(true);
+    this.tryStartMusic();
   }
 
   selectDungon(dungon: SampleDungon): void {

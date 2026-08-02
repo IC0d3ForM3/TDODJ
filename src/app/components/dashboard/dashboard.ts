@@ -9,6 +9,9 @@ import { Account } from '../../services/account';
 import { API_BASE_URL } from '../../api-config';
 import { TresherService, UserTresherListItem } from '../../services/tresher';
 import { UploadPopup, UploadedMediaItem } from '../upload-popup/upload-popup';
+import { rollDie, rollDice } from '../../utils/dice';
+import { AdService } from '../../services/ad.service';
+import { AdInterstitialComponent } from '../ad-interstitial/ad-interstitial';
 
 interface UserImageListItem {
   id: number;
@@ -73,7 +76,8 @@ interface UserPcListItem {
   sp: number;
   spLifetime: number;
   numberOfAttacks: number;
-  agility: number;
+  dexterity: number;
+  awareness: number;
   ismaingame: boolean;
 }
 
@@ -119,7 +123,8 @@ interface UserPcWritePayload {
   hand1ItemId: number | null;
   hand2ItemId: number | null;
   numberOfAttacks: number;
-  agility: number;
+  dexterity: number;
+  awareness: number;
 }
 
 type PcTresherControl = FormControl<number | null>;
@@ -137,7 +142,7 @@ interface DashboardTabItem {
 
 @Component({
   selector: 'app-dashboard',
-  imports: [ReactiveFormsModule, DatePipe, UploadPopup],
+  imports: [ReactiveFormsModule, DatePipe, UploadPopup, AdInterstitialComponent],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -147,6 +152,10 @@ export class Dashboard implements OnInit {
   private readonly account = inject(Account);
   private readonly router = inject(Router);
   private readonly tresherService = inject(TresherService);
+  private readonly adService = inject(AdService);
+
+  /** Holds the game ID waiting for the pre-game ad to complete before navigation. */
+  readonly pendingGameNavId = signal<number | null>(null);
 
   readonly isLoadingPublishedGames = signal(false);
   readonly publishedGamesError = signal<string | null>(null);
@@ -232,7 +241,8 @@ export class Dashboard implements OnInit {
   readonly noaUpgradeMessage = signal<string | null>(null);
 
   readonly pcSpeciesOptions: PcSpeciesOption[] = ['Human', 'Elph', 'DwarPh', 'Shorties'];
-  readonly pcTypeOptions: PcTypeOption[] = ['Fighter', 'Ranger', 'Mage', 'Thieph', 'Healer'];
+  readonly pcTypeOptions: PcTypeOption[] = ['Fighter', 'Mage'];
+  readonly pcTypeOptionsComingSoon: PcTypeOption[] = ['Ranger', 'Thieph', 'Healer'];
 
   readonly userFriendForm = new FormGroup({
     email: new FormControl<string>('', { nonNullable: true }),
@@ -276,7 +286,8 @@ export class Dashboard implements OnInit {
     hand1ItemId: new FormControl<number | null>(null),
     hand2ItemId: new FormControl<number | null>(null),
     numberOfAttacks: new FormControl<number>(1, { nonNullable: true }),
-    agility: new FormControl<number>(3, { nonNullable: true }),
+    dexterity: new FormControl<number>(3, { nonNullable: true }),
+    awareness: new FormControl<number>(5, { nonNullable: true }),
   });
 
   ngOnInit(): void {
@@ -469,7 +480,11 @@ export class Dashboard implements OnInit {
           this.pendingStartGame.set(null);
           this.selectedStartPcId.set(null);
           this.loadActiveGames();
-          void this.router.navigate(['/game', gameId]);
+          if (this.adService.showAds()) {
+            this.pendingGameNavId.set(gameId);
+          } else {
+            void this.router.navigate(['/game', gameId]);
+          }
         },
         error: () => {
           this.startGameMessage.set('Failed to start game.');
@@ -479,6 +494,14 @@ export class Dashboard implements OnInit {
 
   isLoggedIn(): boolean {
     return this.account.isLoggedIn();
+  }
+
+  onPreGameAdContinued(): void {
+    const gameId = this.pendingGameNavId();
+    this.pendingGameNavId.set(null);
+    if (gameId !== null) {
+      void this.router.navigate(['/game', gameId]);
+    }
   }
 
   isAdminUser(): boolean {
@@ -811,7 +834,8 @@ export class Dashboard implements OnInit {
     controls.hand1ItemId.setValue(this.normalizeNullableNumber(source.hand1ItemId));
     controls.hand2ItemId.setValue(this.normalizeNullableNumber(source.hand2ItemId));
     controls.numberOfAttacks.setValue(Math.max(1, this.normalizeNumber(source.numberOfAttacks, 1)));
-    controls.agility.setValue(Math.max(0, this.normalizeNumber((source as UserPcListItem & Record<string, unknown>)['agility'] as number ?? source.agility ?? 3, 3)));
+    controls.dexterity.setValue(Math.max(0, this.normalizeNumber((source as UserPcListItem & Record<string, unknown>)['dexterity'] as number ?? source.dexterity ?? 3, 3)));
+    controls.awareness.setValue(Math.max(0, this.normalizeNumber((source as UserPcListItem & Record<string, unknown>)['awareness'] as number ?? source.awareness ?? 5, 5)));
     this.pcStatsRolled.set(true);
   }
 
@@ -1195,7 +1219,8 @@ export class Dashboard implements OnInit {
       hand1ItemId: this.normalizeNullableNumber(controls.hand1ItemId.value),
       hand2ItemId: this.normalizeNullableNumber(controls.hand2ItemId.value),
       numberOfAttacks: Math.max(1, this.normalizeNumber(controls.numberOfAttacks.value, 1)),
-      agility: Math.max(0, this.normalizeNumber(controls.agility.value, 3)),
+      dexterity: Math.max(0, this.normalizeNumber(controls.dexterity.value, 3)),
+      awareness: Math.max(0, this.normalizeNumber(controls.awareness.value, 5)),
     };
   }
 
@@ -1237,7 +1262,8 @@ export class Dashboard implements OnInit {
     controls.hand1ItemId.setValue(null);
     controls.hand2ItemId.setValue(null);
     controls.numberOfAttacks.setValue(1);
-    controls.agility.setValue(3);
+    controls.dexterity.setValue(3);
+    controls.awareness.setValue(5);
   }
 
   private replacePcTresherForms(tresherIds: number[]): void {
@@ -1317,11 +1343,13 @@ export class Dashboard implements OnInit {
   }
 
   private rangeOfViewBySpecies(species: PcSpeciesOption): number {
-    return species === 'Elph' || species === 'DwarPh' ? 7 : 5;
+    if (species === 'Human') return 5;
+    if (species === 'Shorties') return 6;
+    return 7; // Elph, DwarPh
   }
 
   private rollDn(sides: number): number {
-    return Math.floor(Math.random() * sides) + 1;
+    return rollDie(sides);
   }
 
   private generatePcStats(): void {
@@ -1330,67 +1358,106 @@ export class Dashboard implements OnInit {
     const type = this.normalizePcType(this.userPcForm.controls.type.value);
     const controls = this.userPcForm.controls;
 
-    // AE: Human/Elph=5, DwarPh/Shorties=4
-    controls.actionEconomy.setValue(species === 'Human' || species === 'Elph' ? 5 : 4);
-
-    // Strength by species (from species table)
+    // Species base stats (Dark Dungeons of Danny Joe species table:
+    // ROV, AE, Strength, Dexterity, Magic, Awareness, Mind)
+    let actionEconomy: number;
     let strength: number;
-    if (species === 'Human')        strength = Math.floor(this.rollDn(12) / 2) + 1;
-    else if (species === 'Elph')   strength = Math.floor(this.rollDn(12) / 2);
-    else if (species === 'DwarPh') strength = Math.floor(this.rollDn(12) / 2) + 4;
-    else                           strength = Math.floor(this.rollDn(12) / 4) + 2; // Shorties
-    controls.strength.setValue(strength);
+    let dexterity: number;
+    let magic: number;
+    let awareness: number;
+    let mind: number;
+    let rangeOfView: number;
 
-    // Stamina: species base + type bonus
-    // Base: Human=1d4, Elph=1d3, DwarPh=1d6, Shorties=1d3
+    if (species === 'Human') {
+      rangeOfView = 5;
+      actionEconomy = 5;
+      strength = 6 + rollDice(2, 6);
+      dexterity = rollDice(3, 6);
+      magic = rollDice(2, 6);
+      awareness = rollDice(2, 4);
+      mind = this.rollDn(10) + 5;
+    } else if (species === 'Elph') {
+      rangeOfView = 7;
+      actionEconomy = 5;
+      strength = 4 + rollDice(2, 6);
+      dexterity = rollDice(3, 6) + 2;
+      magic = 6 + rollDice(2, 6);
+      awareness = rollDice(3, 4) + 3;
+      mind = this.rollDn(12) + 6;
+    } else if (species === 'DwarPh') {
+      rangeOfView = 7;
+      actionEconomy = 4;
+      strength = 8 + rollDice(2, 6);
+      dexterity = Math.max(0, rollDice(2, 6) - 2);
+      magic = this.rollDn(12);
+      awareness = rollDice(3, 4);
+      mind = this.rollDn(8) + 4;
+    } else {
+      // Shorties
+      rangeOfView = 6;
+      actionEconomy = 4;
+      strength = rollDice(2, 6);
+      dexterity = 6 + rollDice(2, 6);
+      magic = rollDice(2, 6) + 2;
+      awareness = rollDice(2, 4) + 4;
+      mind = this.rollDn(10) + 5;
+    }
+
+    // Class modifiers (Max HP, AC Bonus, Magic Points/PM)
+    let maxHP: number;
+    let acBonus: number;
+    let magicPoints: number;
+
+    if (type === 'Fighter') {
+      maxHP = rollDice(2, 8) + Math.floor(strength / 2);
+      acBonus = Math.floor(this.rollDn(6) / 2);
+      magicPoints = 0; // Fighters can't cast; can still use scrolls/potions
+    } else if (type === 'Thieph') {
+      maxHP = this.rollDn(12) + 2;
+      acBonus = rollDice(2, 6) + Math.floor(dexterity / 2);
+      magicPoints = this.rollDn(4) + magic;
+    } else if (type === 'Mage') {
+      maxHP = rollDice(2, 4) + 2;
+      acBonus = 0;
+      magicPoints = rollDice(2, 8) + magic + mind;
+    } else if (type === 'Healer') {
+      maxHP = rollDice(3, 4) + 3;
+      acBonus = Math.floor(rollDice(2, 4) / 2);
+      magicPoints = this.rollDn(8) + magic + mind;
+    } else {
+      // Ranger
+      maxHP = rollDice(2, 6) + Math.floor(strength / 2);
+      acBonus = Math.floor(this.rollDn(6) / 2) + Math.floor(dexterity / 4);
+      magicPoints = magic;
+    }
+
+    controls.actionEconomy.setValue(actionEconomy);
+    controls.strength.setValue(strength);
+    controls.dexterity.setValue(dexterity);
+    controls.awareness.setValue(awareness);
+    controls.mind.setValue(mind);
+    controls.magicPower.setValue(magicPoints);
+    controls.rangeOfView.setValue(rangeOfView);
+    controls.maxHP.setValue(maxHP);
+    controls.currentHP.setValue(maxHP);
+    controls.ac.setValue(acBonus);
+
+    // Stamina and Poison Resist are not part of the new species/class tables;
+    // they keep their pre-rework formulas until the design specifies otherwise.
     const staminaBase = species === 'Human' ? this.rollDn(4)
       : species === 'Elph'   ? this.rollDn(3)
       : species === 'DwarPh' ? this.rollDn(6)
       : this.rollDn(3); // Shorties
-    // Type bonus: Fighter=+1d6, Thieph=+1d2, Mage=+1d3, Healer=+1d4
     const staminaBonus = type === 'Fighter' ? this.rollDn(6)
       : type === 'Thieph'  ? this.rollDn(2)
       : type === 'Mage'    ? this.rollDn(3)
-      : this.rollDn(4); // Healer
+      : this.rollDn(4); // Healer, Ranger
     const stamina = staminaBase + staminaBonus;
     controls.stamina.setValue(stamina);
 
-    // Mind: 1d6 + (Elph +1d4) + (Mage +1d4, Healer +1d3, Thieph +1d2)
-    let mind = this.rollDn(6);
-    if (species === 'Elph')       mind += this.rollDn(4);
-    if (type === 'Mage')          mind += this.rollDn(4);
-    else if (type === 'Healer')   mind += this.rollDn(3);
-    else if (type === 'Thieph')   mind += this.rollDn(2);
-    controls.mind.setValue(mind);
-
-    // Magic Power: Mind + (Elph +1d4) + (Mage +1d6, Healer +1d4)
-    let magicPower = mind;
-    if (species === 'Elph')     magicPower += this.rollDn(4);
-    if (type === 'Mage')        magicPower += this.rollDn(6);
-    else if (type === 'Healer') magicPower += this.rollDn(4);
-    controls.magicPower.setValue(magicPower);
-
-    // Range of View (species-based)
-    controls.rangeOfView.setValue(this.rangeOfViewBySpecies(species));
-
-    // Max HP: stamina + (DwarPh +2) + (Fighter +2) + 1d4
-    let maxHP = stamina;
-    if (species === 'DwarPh') maxHP += 2;
-    if (type === 'Fighter')   maxHP += 2;
-    maxHP += this.rollDn(4);
-    controls.maxHP.setValue(maxHP);
-    controls.currentHP.setValue(maxHP);
-
-    // Poison Resist: floor(stamina/2) + (Elph or DwarPh +1d4)
     let poisonResist = Math.floor(stamina / 2);
     if (species === 'Elph' || species === 'DwarPh') poisonResist += this.rollDn(4);
     controls.poisonResest.setValue(poisonResist);
-
-    // AC: Fighter = 2 + min(floor(Strength/2), 5) + floor(1d6/2); others = 1
-    const ac = type === 'Fighter'
-      ? 2 + Math.min(Math.floor(strength / 2), 5) + Math.floor(this.rollDn(6) / 2)
-      : 1;
-    controls.ac.setValue(ac);
   }
 
   private normalizePcSpecies(value: string): PcSpeciesOption {
@@ -1527,7 +1594,8 @@ export class Dashboard implements OnInit {
         (source['necklaceItemId'] ?? source['necklaceitemid'] ?? item.necklaceItemId) as number | string | null
       ),
       spLifetime: Math.max(0, this.normalizeNumber((source['spLifetime'] as number | null | undefined) ?? item.spLifetime ?? 0, 0)),
-      agility: Math.max(0, this.normalizeNumber((source['agility'] as number | null | undefined) ?? item.agility ?? 3, 3)),
+      dexterity: Math.max(0, this.normalizeNumber((source['dexterity'] as number | null | undefined) ?? item.dexterity ?? 3, 3)),
+      awareness: Math.max(0, this.normalizeNumber((source['awareness'] as number | null | undefined) ?? item.awareness ?? 5, 5)),
     };
   }
 

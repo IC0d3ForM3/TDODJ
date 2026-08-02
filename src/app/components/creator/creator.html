@@ -1246,7 +1246,7 @@
 }
 
 @if (isCreatorTabActive('items')) {
-<app-items [imageOptions]="libItemImageOptions()" [soundOptions]="libItemSoundOptions()" [curseOptions]="libCurses()" />
+<app-items [imageOptions]="libItemImageOptions()" [soundOptions]="libItemSoundOptions()" [curseOptions]="libCurses()" [spellOptions]="libSpells()" />
 }
 
 @if (isCreatorTabActive('curses')) {
@@ -1578,8 +1578,8 @@
 					<input id="door-trap-name" class="form-input" type="text" formControlName="trapName" />
 					<label class="form-label" for="door-trap-description">Trap Description</label>
 					<textarea id="door-trap-description" class="form-textarea" rows="2" formControlName="trapDescription"></textarea>
-					<label class="form-label" for="door-trap-damage">Trap Damage</label>
-					<input id="door-trap-damage" class="form-input" type="number" min="0" formControlName="trapDamage" />
+					<label class="form-label" for="door-trap-damage">Trap Damage (dice, e.g. 2d6)</label>
+					<input id="door-trap-damage" class="form-input" type="text" placeholder="e.g. 2d6+1" formControlName="trapDamage" />
 					<label class="form-label" for="door-trap-damage-to">Damage To</label>
 					<select id="door-trap-damage-to" class="form-input" formControlName="trapDamageTo">
 						<option value="HP">HP</option>
@@ -1743,8 +1743,8 @@
 					<input id="tresher-trap-name" class="form-input" type="text" formControlName="trapName" />
 					<label class="form-label" for="tresher-trap-description">Trap Description</label>
 					<textarea id="tresher-trap-description" class="form-textarea" rows="2" formControlName="trapDescription"></textarea>
-					<label class="form-label" for="tresher-trap-damage">Trap Damage</label>
-					<input id="tresher-trap-damage" class="form-input" type="number" min="0" formControlName="trapDamage" />
+					<label class="form-label" for="tresher-trap-damage">Trap Damage (dice, e.g. 2d6)</label>
+					<input id="tresher-trap-damage" class="form-input" type="text" placeholder="e.g. 2d6+1" formControlName="trapDamage" />
 					<label class="form-label" for="tresher-trap-damage-to">Damage To</label>
 					<select id="tresher-trap-damage-to" class="form-input" formControlName="trapDamageTo">
 						<option value="HP">HP</option>
@@ -2543,6 +2543,49 @@
 					Won't attack unless attacked first
 				</label>
 
+				<p class="form-label" style="margin-top: 0.6rem">Dialogue Questions</p>
+				@for (entry of placeMonsterDialogueEntries(); track entry.id; let i = $index) {
+					<div class="monster-attack-row">
+						<div class="monster-attack-header">
+							<span>Question {{ i + 1 }}</span>
+							<button type="button" class="cancel-button monster-attack-remove" (click)="removeMonsterDialogueEntry(i)">Remove</button>
+						</div>
+						<label class="form-label" style="font-size: 0.8rem">Question</label>
+						<input
+							class="form-input"
+							type="text"
+							placeholder="e.g. Where is the treasure?"
+							[value]="entry.question"
+							(input)="setMonsterDialogueQuestion(i, $any($event.target).value)"
+						/>
+						<label class="form-label" style="font-size: 0.8rem; margin-top: 0.25rem">Responses (one per line, picked at random)</label>
+						<textarea
+							class="form-input"
+							rows="3"
+							placeholder="I'm not telling you...&#10;Get away from me!"
+							[value]="monsterDialogueResponsesText(entry)"
+							(input)="setMonsterDialogueResponses(i, $any($event.target).value)"
+						></textarea>
+						<label class="door-locked-toggle" style="margin-top: 0.3rem">
+							<input
+								type="checkbox"
+								[checked]="entry.triggersAttack ?? false"
+								(change)="setMonsterDialogueTriggersAttack(i, $any($event.target).checked)"
+							/>
+							Asking this triggers an attack
+						</label>
+						<label class="door-locked-toggle">
+							<input
+								type="checkbox"
+								[checked]="entry.preventsAttackUnlessAttacked ?? false"
+								(change)="setMonsterDialoguePreventsAttack(i, $any($event.target).checked)"
+							/>
+							Asking this makes monster passive unless attacked
+						</label>
+					</div>
+				}
+				<button type="button" class="cancel-button" style="margin-top: 0.3rem; width: 100%" (click)="addMonsterDialogueEntry()">+ Add Question</button>
+
 				@if (selectedDungonTreshers().length > 0) {
 					<p class="details-message" style="margin: 0 0 0.3rem">Drop Treshers</p>
 					<div style="display:flex; gap:0.4rem; align-items:center; margin-bottom:0.35rem;">
@@ -2978,8 +3021,8 @@
 				<label class="form-label" for="floor-trap-description">Trap Description</label>
 				<textarea id="floor-trap-description" class="form-textarea" rows="2" formControlName="trapDescription"></textarea>
 
-				<label class="form-label" for="floor-trap-damage">Trap Damage</label>
-				<input id="floor-trap-damage" class="form-input" type="number" min="0" formControlName="trapDamage" />
+				<label class="form-label" for="floor-trap-damage">Trap Damage (dice, e.g. 2d6)</label>
+				<input id="floor-trap-damage" class="form-input" type="text" placeholder="e.g. 2d6+1" formControlName="trapDamage" />
 
 				<label class="form-label" for="floor-trap-damage-to">Damage To</label>
 				<select id="floor-trap-damage-to" class="form-input" formControlName="trapDamageTo">
@@ -3294,8 +3337,8 @@
 					<label class="form-label" for="obstacle-trap-description">Trap Description</label>
 					<textarea id="obstacle-trap-description" class="form-textarea" rows="2" formControlName="trapDescription"></textarea>
 
-					<label class="form-label" for="obstacle-trap-damage">Trap Damage</label>
-					<input id="obstacle-trap-damage" class="form-input" type="number" min="0" formControlName="trapDamage" />
+					<label class="form-label" for="obstacle-trap-damage">Trap Damage (dice, e.g. 2d6)</label>
+					<input id="obstacle-trap-damage" class="form-input" type="text" placeholder="e.g. 2d6+1" formControlName="trapDamage" />
 
 					<label class="form-label" for="obstacle-trap-damage-to">Damage To</label>
 					<select id="obstacle-trap-damage-to" class="form-input" formControlName="trapDamageTo">

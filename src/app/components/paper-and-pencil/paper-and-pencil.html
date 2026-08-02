@@ -67,23 +67,24 @@
     <p>Each player fills out a character sheet. Follow these steps:</p>
     <ol>
       <li>Choose a <strong>Name</strong></li>
-      <li>Choose a <strong>Species</strong> — this sets your Range of Sight and Action Economy</li>
-      <li>Choose a <strong>Class</strong> — this sets your HP, AC bonus, and Magic Power</li>
-      <li>Roll <strong>Strength</strong> using the formula for your species</li>
-      <li>Roll or assign <strong>Stamina</strong> (1d6), <strong>Mind</strong> (1d6)</li>
+      <li>Choose a <strong>Species</strong> — this sets your Range of Sight, Action Economy, and dice formulas below</li>
+      <li>Choose a <strong>Class</strong> — this sets your HP, AC bonus, and Magic Power formulas</li>
+      <li>Roll <strong>Strength</strong>, <strong>Dexterity</strong>, <strong>Awareness</strong>, and <strong>Mind</strong> using your species' formulas</li>
+      <li>Roll a hidden <strong>Magic</strong> stat (species formula) — feed it straight into your class's Magic Power formula, then discard it</li>
+      <li>Roll <strong>Stamina</strong> (species base die + class bonus die — see Starting Stats below)</li>
       <li>Calculate <strong>Max HP</strong> and <strong>starting AC</strong> using your class</li>
     </ol>
 
     <p class="pnp-subsection-title">Species</p>
     <table class="pnp-table">
       <thead>
-        <tr><th>Species</th><th>Range of Sight</th><th>AE / Turn</th><th>Strength Formula</th></tr>
+        <tr><th>Species</th><th>Range of Sight</th><th>AE / Turn</th><th>Strength</th><th>Dexterity</th><th>Magic</th><th>Awareness</th><th>Mind</th></tr>
       </thead>
       <tbody>
-        <tr><td>Human</td><td>5</td><td>5</td><td>d12 ÷ 2 + 1</td></tr>
-        <tr><td>Elph</td><td>7</td><td>5</td><td>d12 ÷ 2</td></tr>
-        <tr><td>DwarPh</td><td>7</td><td>4</td><td>d12 ÷ 2 + 4</td></tr>
-        <tr><td>Shorties</td><td>5</td><td>4</td><td>d12 ÷ 4 + 2</td></tr>
+        <tr><td>Human</td><td>5</td><td>5</td><td>6+2d6</td><td>3d6</td><td>2d6</td><td>2d4</td><td>1d10+5</td></tr>
+        <tr><td>Elph</td><td>7</td><td>5</td><td>4+2d6</td><td>3d6+2</td><td>6+2d6</td><td>3d4+3</td><td>1d12+6</td></tr>
+        <tr><td>DwarPh</td><td>7</td><td>4</td><td>8+2d6</td><td>2d6−2</td><td>1d12</td><td>3d4</td><td>1d8+4</td></tr>
+        <tr><td>Shorties</td><td>6</td><td>4</td><td>2d6</td><td>6+2d6</td><td>2d6+2</td><td>2d4+4</td><td>1d10+5</td></tr>
       </tbody>
     </table>
 
@@ -93,10 +94,11 @@
         <tr><th>Class</th><th>Max HP</th><th>AC Bonus</th><th>Magic Power</th><th>Special</th></tr>
       </thead>
       <tbody>
-        <tr><td>Fighter</td><td>d12 + 4</td><td>2 + Str÷2 (max 5) + 1d6÷2</td><td>0</td><td>Boost Attack ability; −2 to spell learning, −1 to spell cast rolls</td></tr>
-        <tr><td>Thieph</td><td>d12 + 2</td><td>1</td><td>2</td><td>Search twice per turn; −1 to spell learning</td></tr>
-        <tr><td>Mage</td><td>d12 ÷ 2 + 2</td><td>1</td><td>8+</td><td>Powerful spells</td></tr>
-        <tr><td>Healer</td><td>d12 ÷ 2 + 2</td><td>1</td><td>6+</td><td>Recovery focus</td></tr>
+        <tr><td>Fighter</td><td>2d8 + Str÷2</td><td>1d6÷2</td><td>0</td><td>Boost Attack ability; always +Dex÷2 to hit, +Str÷4 dmg; Toughening (+1 max HP per 3 rounds w/o attacking or being hit); −2 to spell learning, −1 to spell cast rolls</td></tr>
+        <tr><td>Thieph</td><td>d12 + 2</td><td>2d6 + Dex÷2</td><td>1d4 + Magic</td><td>Search twice per turn; sneak attack ×2 dmg; +Dex÷2 disarm/pick lock, +Awareness÷2 search; −1 to spell learning</td></tr>
+        <tr><td>Mage</td><td>2d4 + 2</td><td>0</td><td>2d8 + Magic + Mind</td><td>Powerful spells; rest for 1d4 MP per AE (risk of monster); can overcast for up to 2× damage</td></tr>
+        <tr><td>Healer</td><td>3d4 + 3</td><td>2d4÷2</td><td>1d8 + Magic + Mind</td><td>Recovery focus; rest for +1 HP per AE; healing effects add Magic÷2 to the result (capped at max)</td></tr>
+        <tr><td>Ranger</td><td>2d6 + Str÷2</td><td>1d6÷2 + Dex÷4</td><td>= Magic (flat, no dice)</td><td>+Dex÷2 to hit / +Str÷2 dmg with ranged weapons only; no range penalty at 1 square; can Sneak on Beast-type monsters</td></tr>
       </tbody>
     </table>
 
@@ -104,12 +106,13 @@
     <ul>
       <li><strong>Max HP</strong> — roll based on class (above); write it down</li>
       <li><strong>Current HP</strong> — starts equal to Max HP</li>
-      <li><strong>AC</strong> — your starting AC. Fighter: 2 + Str÷2 (max +5) + 1d6÷2; all other classes: 1. Armor treshers and armor items add on top in-game.</li>
+      <li><strong>AC</strong> — your starting AC, rolled from the class formula above. Armor treshers and armor items add on top in-game.</li>
       <li><strong>AE</strong> — 5 (Human/Elph) or 4 (DwarPh/Shorties)</li>
-      <li><strong>Stamina</strong> — roll 1d6; adds to attack rolls</li>
-      <li><strong>Mind</strong> — roll 1d6; used for spells, traps, lock-picking, and magic resistance (Mind ÷ 2, rounded down)</li>
-      <li><strong>Agility</strong> — roll 1d6; improves ranged to-hit rolls and Thieph sneak attacks</li>
-      <li><strong>Magic Power (MP)</strong> — from class; used to fuel spells</li>
+      <li><strong>Stamina</strong> — species base die (Human 1d4, Elph 1d3, DwarPh 1d6, Shorties 1d3) + class bonus die (Fighter 1d6, Thieph 1d2, Mage 1d3, Healer/Ranger 1d4); adds to attack rolls</li>
+      <li><strong>Mind</strong> — roll from the species table; used for spells, traps, lock-picking, and magic resistance (Mind ÷ 2, rounded down)</li>
+      <li><strong>Dexterity</strong> — roll from the species table; improves ranged to-hit rolls, Fighter/Ranger bonuses, and Thieph sneak attacks</li>
+      <li><strong>Awareness</strong> — roll from the species table; affects how easily monsters notice a sneaking PC, and boosts Thieph trap-finding</li>
+      <li><strong>Magic Power (MP)</strong> — from class formula (fed by the hidden Magic roll); used to fuel spells</li>
       <li><strong>NOA</strong> — Number of Attacks per turn; starts at 1</li>
       <li><strong>NOD</strong> — Number of Defends per turn; starts at 1</li>
       <li><strong>SP</strong> — Skill Points; starts at 0; awarded for kills and dungeon completion</li>
@@ -154,6 +157,16 @@
       <li>You cannot pass through walls or closed doors</li>
       <li>You can enter a square occupied by a monster only to push through (DK discretion)</li>
       <li>On the map, track your facing direction — you can only attack the monster you are facing (or within weapon range)</li>
+    </ul>
+    <p class="pnp-subsection-title">Obstacles</p>
+    <p>
+      Obstacles placed on the map have a height rating. When adjudicating whether a PC can
+      cross one, use these thresholds:
+    </p>
+    <ul>
+      <li>A <strong>floor-anchored</strong> obstacle (rubble, low furniture, etc.) at <strong>≤20%</strong> of a square's height can be stepped over freely</li>
+      <li>A <strong>ceiling-anchored</strong> obstacle (low beam, hanging debris, etc.) at <strong>≤40%</strong> of a square's height can be walked under freely</li>
+      <li>Anything taller blocks movement through that square entirely, unless the party finds another way around, over, or through it</li>
     </ul>
   </section>
 
@@ -250,19 +263,19 @@
   <!-- ── Traps ──────────────────────────────────────────────────── -->
   <section class="pnp-section">
     <h3>Traps</h3>
-    <p>Traps are hidden until a Search roll reveals them.</p>
+    <p>Traps are hidden until a Search roll reveals them. Roll trap damage as dice (e.g. 2d6) at the moment the trap triggers, rather than a flat number — the same trap can hit harder or lighter each time.</p>
     <ul>
       <li><strong>Detect:</strong> d12 + Mind ≥ trap's Detect DC</li>
       <li><strong>Disarm:</strong> d12 + Mind ≥ trap's Disarm DC (once detected)</li>
       <li>A failed lock-pick on a trapped door <em>triggers</em> the trap</li>
     </ul>
-    <p>Trap effects (DK sets amount):</p>
+    <p>Trap effects (DK sets the dice formula, e.g. 1d4 or 2d6):</p>
     <ul>
-      <li>HP damage — reduce current HP by the trap value</li>
-      <li>Stamina drain — lower Stamina by the trap value</li>
-      <li>Mind drain — lower Mind by the trap value</li>
-      <li>AE drain — lose that many AE from remaining actions this turn</li>
-      <li>Range of Sight reduction — narrow how far you can see</li>
+      <li>HP damage — roll the trap's dice and reduce current HP by the result</li>
+      <li>Stamina drain — roll the trap's dice and lower Stamina by the result</li>
+      <li>Mind drain — roll the trap's dice and lower Mind by the result</li>
+      <li>AE drain — roll the trap's dice and lose that many AE from remaining actions this turn</li>
+      <li>Range of Sight reduction — roll the trap's dice and narrow how far you can see</li>
     </ul>
   </section>
 
@@ -278,6 +291,7 @@
       <li><strong>Magic Gems:</strong> add gem's value to your Magic Power when equipped</li>
       <li><strong>Potions:</strong> note healing amount; drink for 1 AE (your turn only)</li>
       <li><strong>Spells:</strong> note the spell's TN, Magic Cost, range, and damage</li>
+      <li><strong>Scrolls:</strong> a one-time (or limited-use) spell read straight from your inventory — no Learn roll needed. Note its Magic Cost, uses remaining, and any minimum Mind requirement.</li>
     </ul>
     <p>
       A tresher with a <strong>✕</strong> mark is trapped — Search before taking it.
@@ -333,6 +347,53 @@
       For a smoother run, keep early rooms light, put stronger monsters deeper in the dungeon, and
       save the nastier combinations for areas close to the exit or major treasure.
     </p>
+    <p class="pnp-subsection-title">Talking to Monsters (Ask)</p>
+    <p>
+      Some monsters can be asked a question instead of attacked. If the DK has written a few lines
+      of dialogue for the monster, a PC may "Ask" once per encounter. The DK either reads a fixed
+      response or rolls to pick from a short table of possible replies. Note on the monster's card
+      whether asking:
+    </p>
+    <ul>
+      <li>Is always safe — the monster answers and combat starts normally afterward if the PCs attack</li>
+      <li>Provokes an immediate attack — asking counts as the PCs' turn and the monster gets to act</li>
+      <li>Can defuse the fight — a good response (or right answer/item shown) makes the monster leave or stand down</li>
+    </ul>
+    <p class="pnp-subsection-title">Monster Type Traits</p>
+    <p>
+      Every monster has a type that grants small, consistent combat traits on top of its own card.
+      Use this table as a DK quick-reference when adjudicating a monster's to-hit, AC, regeneration,
+      and resistances:
+    </p>
+    <table class="pnp-table">
+      <thead>
+        <tr><th>Type</th><th>To-Hit</th><th>AC</th><th>Regen/Round</th><th>Mind-Immune</th><th>Resists Non-Magic</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Aberration</td><td>+1</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Beast</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Celestial</td><td>+1</td><td>+2</td><td>1</td><td>Yes</td><td>—</td></tr>
+        <tr><td>Construct</td><td>—</td><td>+2</td><td>—</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Dragon</td><td>+2</td><td>+2</td><td>1</td><td>—</td><td>—</td></tr>
+        <tr><td>Elemental</td><td>+1</td><td>+1</td><td>1</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Fey</td><td>—</td><td>+1</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Fiend</td><td>+1</td><td>+1</td><td>1</td><td>Yes</td><td>—</td></tr>
+        <tr><td>Giant</td><td>+1</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Humanoid</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Monstrosity</td><td>+1</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Ooze</td><td>—</td><td>−1</td><td>1</td><td>Yes</td><td>—</td></tr>
+        <tr><td>Plant</td><td>—</td><td>—</td><td>1</td><td>Yes</td><td>—</td></tr>
+        <tr><td>Specter</td><td>+1</td><td>+2</td><td>—</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Swarm of Tiny Beasts</td><td>—</td><td>+2</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Undead</td><td>—</td><td>+1</td><td>—</td><td>Yes</td><td>—</td></tr>
+        <tr><td>Other</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <p>
+      "Resists Non-Magic" halves (minimum 1) damage from weapons and thrown treshers that carry no
+      magical bonus. "Mind-Immune" means the monster automatically shrugs off spells that target the
+      Mind stat (charm, fear, sleep, and similar effects).
+    </p>
   </section>
 
   <!-- ── SP and Advancement ─────────────────────────────────────── -->
@@ -352,7 +413,7 @@
         <tr><td>Stamina</td><td>+1 to attack rolls and +1 AC when defending</td></tr>
         <tr><td>Mind</td><td>+1 to spell rolls, trap detection, lock-picking; +0.5 magic resistance</td></tr>
         <tr><td>Magic Power</td><td>+1 MP for spells</td></tr>
-        <tr><td>Agility</td><td>+1 to ranged to-hit rolls; +1 to Thieph sneak attacks</td></tr>
+        <tr><td>Dexterity</td><td>+1 to ranged to-hit rolls; +1 to Thieph sneak attacks</td></tr>
         <tr><td>NOA</td><td>Attack one extra time per turn</td></tr>
         <tr><td>NOD</td><td>Defend one extra time per turn (+2 AC per stack)</td></tr>
       </tbody>
@@ -376,7 +437,8 @@
         <div class="pnp-field"><span class="pnp-field-label">Strength</span><span class="pnp-field-line"></span></div>
         <div class="pnp-field"><span class="pnp-field-label">Stamina</span><span class="pnp-field-line"></span></div>
         <div class="pnp-field"><span class="pnp-field-label">Mind</span><span class="pnp-field-line"></span></div>
-        <div class="pnp-field"><span class="pnp-field-label">Agility</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">Dexterity</span><span class="pnp-field-line"></span></div>
+        <div class="pnp-field"><span class="pnp-field-label">Awareness</span><span class="pnp-field-line"></span></div>
         <div class="pnp-field"><span class="pnp-field-label">Magic Resistance</span><span class="pnp-field-line"></span><span class="pnp-field-max">(Mind ÷ 2)</span></div>
         <div class="pnp-field"><span class="pnp-field-label">NOA</span><span class="pnp-field-line"></span></div>
         <div class="pnp-field"><span class="pnp-field-label">NOD</span><span class="pnp-field-line"></span></div>

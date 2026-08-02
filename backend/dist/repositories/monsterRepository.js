@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateMonsterForUser = exports.insertMonsterForUser = exports.getAllMonstersWithUsername = exports.getMonsterLibraryByUserGuid = exports.getMonstersByUserGuid = exports.isAdminUserByGuid = void 0;
+exports.updateMonsterForUser = exports.insertMonsterForUser = exports.getAllMonstersWithUsername = exports.getMonsterLibraryByUserGuid = exports.getMonstersByIds = exports.getMonstersByUserGuid = exports.isAdminUserByGuid = void 0;
 const db_1 = __importDefault(require("../db"));
 const isAdminUserByGuid = async (userguid) => {
     const { rows } = await db_1.default.query('SELECT isadmin FROM users WHERE key = $1', [userguid]);
@@ -72,6 +72,15 @@ const getMonstersByUserGuid = async (userguid) => {
     return rows;
 };
 exports.getMonstersByUserGuid = getMonstersByUserGuid;
+const getMonstersByIds = async (ids) => {
+    if (ids.length === 0)
+        return [];
+    const { rows } = await db_1.default.query(`SELECT ${SELECT_MONSTER_FIELDS}
+     FROM monsters
+     WHERE id = ANY($1::int[])`, [ids]);
+    return rows;
+};
+exports.getMonstersByIds = getMonstersByIds;
 const getMonsterLibraryByUserGuid = async (userguid) => {
     const { rows } = await db_1.default.query(`SELECT
        m.id, m.userguid::text AS userguid,

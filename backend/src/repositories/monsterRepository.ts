@@ -3,6 +3,7 @@ import pool from '../db';
 export interface MonsterAttackRecord {
   type: string;
   description: string;
+  damageFormula?: string | null;
   plusToHit: number;
   damage: number;
   weaponItemId: number | null;

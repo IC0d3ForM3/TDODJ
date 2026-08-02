@@ -64,6 +64,8 @@ export type PcTresherItemData = {
   weaponEffectColor?: string;
   isTwoHanded: boolean;
   uses?: number | null;
+  scrollSpellId?: number | null;
+  magicCost?: number;
 };
 
 /** Item as stored in floor/collected item signals — effectValue is always a number. */
@@ -87,6 +89,8 @@ export type FloorItemData = {
   weaponEffectColor?: string;
   isTwoHanded: boolean;
   uses?: number | null;
+  scrollSpellId?: number | null;
+  magicCost?: number;
 };
 
 type PcTresherPotionData = {

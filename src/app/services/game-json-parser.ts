@@ -10,6 +10,7 @@ import {
   ItemPlacement,
   Monster,
   MonsterAttack,
+  MonsterDialogueEntry,
   MonsterPlacement,
   normalizeSquareTextWallSide,
   ObstaclePlacement,
@@ -64,10 +65,13 @@ export interface ParsedFloorItemRecord {
   effectOn: string | null;
   effectToPc?: string | null;
   effectToPcValue?: number;
+  minMindToRead?: number;
   weaponEffectType?: string;
   weaponEffectColor?: string;
   isTwoHanded: boolean;
   uses?: number | null;
+  scrollSpellId?: number | null;
+  magicCost?: number;
 }
 
 export interface ParsedFloorPotionRecord {
@@ -710,6 +714,9 @@ export class GameJsonParserService {
       weaponEffectColor: typeof item['weaponEffectColor'] === 'string' ? item['weaponEffectColor'] : '#cc0000',
       isTwoHanded: item['isTwoHanded'] === true || item['istwohanded'] === true,
       uses: typeof item['uses'] === 'number' ? item['uses'] : null,
+      minMindToRead: typeof item['minMindToRead'] === 'number' ? item['minMindToRead'] : (typeof item['minmindtoread'] === 'number' ? item['minmindtoread'] : 0),
+      scrollSpellId: typeof item['scrollSpellId'] === 'number' ? item['scrollSpellId'] : (typeof item['scrollspellid'] === 'number' ? item['scrollspellid'] : null),
+      magicCost: typeof item['magicCost'] === 'number' ? item['magicCost'] : (typeof item['magiccost'] === 'number' ? item['magiccost'] : 1),
     };
   }
 
@@ -927,8 +934,44 @@ export class GameJsonParserService {
     if ((source as Record<string, unknown>)['noAttackUnlessAttacked'] === true) {
       result.noAttackUnlessAttacked = true;
     }
+    const dialogueEntries = this.normalizeMonsterDialogueEntries((source as Record<string, unknown>)['dialogueEntries']);
+    if (dialogueEntries) {
+      result.dialogueEntries = dialogueEntries;
+    }
 
     return result;
+  }
+
+  private normalizeMonsterDialogueEntries(value: unknown): MonsterDialogueEntry[] | undefined {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+    const entries = value
+      .map((item, index) => this.parseMonsterDialogueEntryItem(item, index))
+      .filter((item): item is MonsterDialogueEntry => item !== null);
+    return entries.length > 0 ? entries : undefined;
+  }
+
+  private parseMonsterDialogueEntryItem(item: unknown, fallbackIndex: number): MonsterDialogueEntry | null {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+    const source = item as Record<string, unknown>;
+    const question = typeof source['question'] === 'string' ? source['question'] : '';
+    const responses = Array.isArray(source['responses'])
+      ? (source['responses'] as unknown[]).filter((r): r is string => typeof r === 'string' && r.trim().length > 0)
+      : [];
+    if (!question.trim() && responses.length === 0) {
+      return null;
+    }
+    const id = this.toFiniteNumber(source['id']);
+    return {
+      id: id !== null ? Math.max(0, Math.floor(id)) : fallbackIndex + 1,
+      question,
+      responses,
+      triggersAttack: source['triggersAttack'] === true || undefined,
+      preventsAttackUnlessAttacked: source['preventsAttackUnlessAttacked'] === true || undefined,
+    };
   }
 
   private normalizeMonsterAttacks(value: unknown): MonsterAttack[] {
@@ -936,25 +979,33 @@ export class GameJsonParserService {
       return [];
     }
 
-    return value
-      .map((item) => {
-        if (!item || typeof item !== 'object') {
-          return null;
-        }
+    const normalized: MonsterAttack[] = [];
+    for (const item of value) {
+      if (!item || typeof item !== 'object') {
+        continue;
+      }
 
-        const source = item as Partial<MonsterAttack> & { plus_to_hit?: unknown };
-        return {
-          type: typeof source.type === 'string' ? source.type : 'Weapon',
-          description: typeof source.description === 'string' ? source.description : '',
-          damage: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.damage), 0)),
-          plusToHit: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.plusToHit ?? source.plus_to_hit), 0)),
-          range: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source.range), 1)),
-          weaponItemId: typeof source.weaponItemId === 'number' ? source.weaponItemId : null,
-          spellId: typeof source.spellId === 'number' ? source.spellId : null,
-          curseId: typeof source.curseId === 'number' ? source.curseId : null,
-        };
-      })
-      .filter((item): item is MonsterAttack => item !== null);
+      const source = item as Partial<MonsterAttack> & { plus_to_hit?: unknown };
+      const numericDamage = Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.damage), 0));
+      const damageFormula =
+        typeof source.damageFormula === 'string' && source.damageFormula.trim().length > 0
+          ? source.damageFormula.trim()
+          : `1d${Math.max(1, numericDamage)}`;
+
+      normalized.push({
+        type: typeof source.type === 'string' ? source.type : 'Weapon',
+        description: typeof source.description === 'string' ? source.description : '',
+        damageFormula,
+        damage: numericDamage,
+        plusToHit: Math.max(0, this.normalizeNumber(this.toFiniteNumber(source.plusToHit ?? source.plus_to_hit), 0)),
+        range: Math.max(1, this.normalizeNumber(this.toFiniteNumber(source.range), 1)),
+        weaponItemId: typeof source.weaponItemId === 'number' ? source.weaponItemId : null,
+        spellId: typeof source.spellId === 'number' ? source.spellId : null,
+        curseId: typeof source.curseId === 'number' ? source.curseId : null,
+      });
+    }
+
+    return normalized;
   }
 
   private parseExitItem(item: unknown): DungonExit | null {

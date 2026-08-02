@@ -44,6 +44,7 @@ export class Items implements OnInit {
   readonly groupedImageOptions = computed(() => this.groupMediaOptions(this.allImageOptions()));
   readonly groupedSoundOptions = computed(() => this.groupMediaOptions(this.allSoundOptions()));
   readonly curseOptions = input<CurseOption[]>([]);
+  readonly spellOptions = input<{ id: number; name: string; magicCost?: number }[]>([]);
 
   readonly itemTypeOptions: Array<{ value: ItemType; label: string }> = [
     { value: 'weapon', label: 'Weapon' },
@@ -52,6 +53,7 @@ export class Items implements OnInit {
     { value: 'ring', label: 'Ring (4 Equipped)' },
     { value: 'necklace', label: 'Necklace (1 Equipped)' },
     { value: 'gem', label: 'Gem' },
+    { value: 'scroll', label: 'Scroll' },
     { value: 'other', label: 'Other' },
   ];
   readonly armorSlotOptions = [
@@ -154,6 +156,8 @@ export class Items implements OnInit {
     isPublic: new FormControl<boolean>(false, { nonNullable: true }),
     isTwoHanded: new FormControl<boolean>(false, { nonNullable: true }),
     uses: new FormControl<number | null>(null),
+    scrollSpellId: new FormControl<number | null>(null),
+    magicCost: new FormControl<number>(1, { nonNullable: true }),
   });
 
   effectValueLabel(): string {
@@ -192,6 +196,10 @@ export class Items implements OnInit {
     return this.userItemForm.controls.type.value === 'other';
   }
 
+  showScrollFields(): boolean {
+    return this.userItemForm.controls.type.value === 'scroll';
+  }
+
   itemTypeLabel(type: string | null | undefined): string {
     if (!type) return 'Other';
     if (type === 'neckless' || type === 'amulet') return 'Necklace (1 Equipped)';
@@ -207,6 +215,9 @@ export class Items implements OnInit {
     }
     if (type !== 'weapon') {
       this.userItemForm.controls.isTwoHanded.setValue(false);
+    }
+    if (type === 'scroll' && this.userItemForm.controls.uses.value === null) {
+      this.userItemForm.controls.uses.setValue(1);
     }
   }
 
@@ -319,6 +330,8 @@ export class Items implements OnInit {
       isPublic: item.isPublic,
       isTwoHanded: item.isTwoHanded,
       uses: this.normalizeNullableNumber(item.uses),
+      scrollSpellId: this.normalizeNullableNumber(item.scrollSpellId),
+      magicCost: Math.max(1, this.normalizeNumber(item.magicCost, 1)),
     });
   }
 
@@ -444,6 +457,8 @@ export class Items implements OnInit {
       isPublic: this.isAdminUser() ? c.isPublic.value === true : false,
       isTwoHanded: type === 'weapon' ? c.isTwoHanded.value === true : false,
       uses: this.normalizeNullableNumber(c.uses.value),
+      scrollSpellId: type === 'scroll' ? this.normalizeNullableNumber(c.scrollSpellId.value) : null,
+      magicCost: type === 'scroll' ? Math.max(1, this.normalizeNumber(c.magicCost.value, 1)) : 1,
     };
   }
 
@@ -471,6 +486,8 @@ export class Items implements OnInit {
       isPublic: false,
       isTwoHanded: false,
       uses: null,
+      scrollSpellId: null,
+      magicCost: 1,
     });
   }
 
@@ -496,6 +513,7 @@ export class Items implements OnInit {
       normalized === 'ring' ||
       normalized === 'necklace' ||
       normalized === 'gem' ||
+      normalized === 'scroll' ||
       normalized === 'other'
     ) {
       return normalized;

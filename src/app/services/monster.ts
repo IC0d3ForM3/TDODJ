@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../api-config';
 export interface UserMonsterAttackListItem {
   type: string;
   description: string;
+  damageFormula?: string;
   damage: number;
   plusToHit: number;
   weaponItemId: number | null;
@@ -53,6 +54,7 @@ export interface UserMonsterListItem {
 export interface UserMonsterAttackEditorValue {
   type: string;
   description: string;
+  damageFormula?: string;
   damage: number;
   plusToHit: number;
   weaponItemId: number | null;
@@ -96,6 +98,7 @@ export interface UserMonsterWritePayload {
 type UnknownAttackShape = {
   type?: unknown;
   description?: unknown;
+  damageFormula?: unknown;
   damage?: unknown;
   plusToHit?: unknown;
   weaponItemId?: unknown;
@@ -153,6 +156,10 @@ export class MonsterService {
               attacks: this.normalizeAttackList(item.attacks).map((attack) => ({
                     type: typeof attack.type === 'string' && attack.type.trim() ? attack.type : 'Bite',
                     description: typeof attack.description === 'string' ? attack.description : '',
+                    damageFormula:
+                      typeof attack.damageFormula === 'string' && attack.damageFormula.trim().length > 0
+                        ? attack.damageFormula.trim()
+                        : `1d${Math.max(1, this.normalizeNumber(attack.damage, 1))}`,
                     damage: this.normalizeNumber(attack.damage, 0),
                     plusToHit: this.normalizeNumber(attack.plusToHit, 0),
                     weaponItemId: this.normalizeNullableNumber(attack.weaponItemId),

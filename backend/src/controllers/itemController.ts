@@ -6,7 +6,7 @@ import * as itemService from '../services/itemService';
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const ITEM_TYPES = new Set(['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'neckless', 'gem', 'other']);
+const ITEM_TYPES = new Set(['weapon', 'armor', 'pick', 'light', 'ring', 'necklace', 'neckless', 'gem', 'scroll', 'other']);
 const ARMOR_SLOTS = new Set(['none', 'hand', 'shield', 'head', 'body', 'left-arm', 'right-arm', 'left-leg', 'right-leg']);
 const EFFECT_ON_OPTIONS = new Set(['HP', 'AC', 'MP', 'Mind', 'Stamina', 'Strength', 'SP', 'AE', 'NOA', 'ROS', 'Door Trap', 'To Pick', 'Placed Trap']);
 const EFFECT_TO_PC_OPTIONS = new Set(['HP', 'AC', 'Magic', 'Mind', 'Stamina', 'Strength', 'AE', 'NOA', 'ROS','ToHit','Damage']);
@@ -53,6 +53,10 @@ interface ItemWriteInput {
   isTwoHanded?: unknown;
   istwohanded?: unknown;
   uses?: unknown;
+  scrollSpellId?: unknown;
+  scrollspellid?: unknown;
+  magicCost?: unknown;
+  magiccost?: unknown;
 }
 
 function normalizeText(value: unknown, fallback: string): string {
@@ -132,6 +136,7 @@ function buildItemPayload(input: ItemWriteInput, isAdmin: boolean): UpsertItemPa
   const normalizedType = ITEM_TYPES.has(type) ? type : 'other';
   const canonicalType = normalizedType === 'neckless' ? 'necklace' : normalizedType;
   const allowsPcEffect = canonicalType === 'weapon' || canonicalType === 'armor' || canonicalType === 'ring' || canonicalType === 'necklace' || canonicalType === 'other';
+  const isScroll = canonicalType === 'scroll';
 
   return {
     name: normalizeText(input.name, 'Unnamed Item'),
@@ -148,7 +153,7 @@ function buildItemPayload(input: ItemWriteInput, isAdmin: boolean): UpsertItemPa
     effectToPc: allowsPcEffect ? effectToPc : null,
     effectToPcValue: allowsPcEffect ? effectToPcValue : 0,
     note,
-    minMindToRead: note ? minMindToRead : 0,
+    minMindToRead: note || isScroll ? minMindToRead : 0,
     weaponEffectType: canonicalType === 'weapon' ? weaponEffectType : 'Blood',
     weaponEffectColor: canonicalType === 'weapon' ? weaponEffectColor : '#cc0000',
     imageId: normalizeNullableInt(input.imageId ?? input.imageid),
@@ -156,6 +161,8 @@ function buildItemPayload(input: ItemWriteInput, isAdmin: boolean): UpsertItemPa
     isPublic: isAdmin ? input.isPublic === true || input.ispublic === true : false,
     isTwoHanded: input.isTwoHanded === true || input.istwohanded === true,
     uses: normalizeNullableInt(input.uses),
+    scrollSpellId: isScroll ? normalizeNullableInt(input.scrollSpellId ?? input.scrollspellid) : null,
+    magicCost: isScroll ? Math.max(1, normalizeNumber(input.magicCost ?? input.magiccost, 1)) : 1,
   };
 }
 

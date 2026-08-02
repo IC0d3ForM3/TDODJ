@@ -90,7 +90,8 @@ interface PcWriteInput {
   numberOfAttacks?: unknown;
   numberofattacks?: unknown;
   numberOfDefends?: unknown;
-  agility?: unknown;
+  dexterity?: unknown;
+  awareness?: unknown;
   ismaingame?: unknown;
 }
 
@@ -408,7 +409,8 @@ const normalizePcPayload = (value: unknown): UpsertPcPayload | null => {
     hand2ItemId: normalizeNullableNumber(input.hand2ItemId ?? input.hand2itemid),
     numberOfAttacks: Math.max(1, normalizeNumber(input.numberOfAttacks ?? input.numberofattacks, 1)),
     numberOfDefends: Math.max(1, normalizeNumber(input.numberOfDefends, 1)),
-    agility: Math.max(0, normalizeNumber(input.agility, 3)),
+    dexterity: Math.max(0, normalizeNumber(input.dexterity, 3)),
+    awareness: Math.max(0, normalizeNumber(input.awareness, 5)),
     ismaingame: input.ismaingame === true,
   };
 };
@@ -509,11 +511,15 @@ const normalizePcType = (value: unknown): PcType | null => {
 
 const rangeOfViewBySpecies = (species: PcSpecies): number => {
   if (species === 'Elph') {
-    return 6;
+    return 7;
   }
 
   if (species === 'DwarPh') {
     return 7;
+  }
+
+  if (species === 'Shorties') {
+    return 6;
   }
 
   return 5;
@@ -674,7 +680,7 @@ export const upgradeStatController = async (req: Request, res: Response) => {
   if (typeof userkey !== 'string' || !UUID_REGEX.test(userkey.trim())) {
     return res.status(400).json({ result: -1, error: 'Valid userkey is required' });
   }
-  const allowed = ['strength', 'stamina', 'mind', 'magicPower', 'agility'] as const;
+  const allowed = ['strength', 'stamina', 'mind', 'magicPower', 'dexterity', 'awareness'] as const;
   type AllowedStat = typeof allowed[number];
   if (typeof stat !== 'string' || !(allowed as readonly string[]).includes(stat)) {
     return res.status(400).json({ result: -1, error: 'Valid stat name is required' });

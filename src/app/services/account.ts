@@ -12,6 +12,7 @@ interface RawLoginResponse {
   ismasteradmin?: boolean;
   isAdmin?: boolean;
   isCreator?: boolean;
+  issubscribed?: boolean;
 }
 
 export interface LoginResponse {
@@ -20,6 +21,7 @@ export interface LoginResponse {
   isAdmin: boolean;
   isCreator: boolean;
   isMasterAdmin: boolean;
+  isSubscribed: boolean;
 }
 
 @Injectable({
@@ -31,6 +33,7 @@ export class Account {
   private _isCreator = signal<boolean>(false);
   private _isMasterAdmin = signal<boolean>(false);
   private _username = signal<string | null>(null);
+  private _isPaidSubscriber = signal<boolean>(false);
 
   constructor(private http: HttpClient) {}
 
@@ -46,27 +49,31 @@ export class Account {
         isAdmin: res.isadmin ?? res.isAdmin ?? false,
         isCreator: res.iscreator ?? res.isCreator ?? false,
         isMasterAdmin: res.ismasteradmin ?? false,
+        isSubscribed: res.issubscribed ?? false,
       }))
     );
   }
 
-  setKey(key: string | null, isAdmin: boolean = false, isCreator: boolean = false, username: string | null = null, isMasterAdmin: boolean = false) {
+  setKey(key: string | null, isAdmin: boolean = false, isCreator: boolean = false, username: string | null = null, isMasterAdmin: boolean = false, isPaidSubscriber: boolean = false) {
     this._userKey.set(key);
     this._isAdmin.set(isAdmin);
     this._isCreator.set(isCreator);
     this._isMasterAdmin.set(isMasterAdmin);
     this._username.set(username);
+    this._isPaidSubscriber.set(isPaidSubscriber);
     if (key) {
       localStorage.setItem('userKey', key);
       localStorage.setItem('isAdmin', isAdmin ? 'true' : 'false');
       localStorage.setItem('isCreator', isCreator ? 'true' : 'false');
       localStorage.setItem('isMasterAdmin', isMasterAdmin ? 'true' : 'false');
+      localStorage.setItem('isPaidSubscriber', isPaidSubscriber ? 'true' : 'false');
       if (username) localStorage.setItem('username', username);
     } else {
       localStorage.removeItem('userKey');
       localStorage.removeItem('isAdmin');
       localStorage.removeItem('isCreator');
       localStorage.removeItem('isMasterAdmin');
+      localStorage.removeItem('isPaidSubscriber');
       localStorage.removeItem('username');
     }
   }
@@ -95,16 +102,22 @@ export class Account {
     return this._isMasterAdmin();
   }
 
+  isPaidSubscriber(): boolean {
+    return this._isPaidSubscriber();
+  }
+
   restoreKey() {
     const key = localStorage.getItem('userKey');
     const isAdmin = localStorage.getItem('isAdmin') === 'true';
     const isCreator = localStorage.getItem('isCreator') === 'true';
     const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
+    const isPaidSubscriber = localStorage.getItem('isPaidSubscriber') === 'true';
     const username = localStorage.getItem('username');
     this._userKey.set(key);
     this._isAdmin.set(isAdmin);
     this._isCreator.set(isCreator);
     this._isMasterAdmin.set(isMasterAdmin);
+    this._isPaidSubscriber.set(isPaidSubscriber);
     this._username.set(username);
   }
   logout() {

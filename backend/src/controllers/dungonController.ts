@@ -150,6 +150,38 @@ function collectMonsterSpellIdsFromDungeonJson(dungenJson: unknown): Set<number>
   return ids;
 }
 
+// Scrolls (item type 'scroll') reference a spell by ID the same way monster attacks do.
+// Scan every place item records can appear in the dungeon JSON (tresher-nested item slots
+// are resolved separately via itemService) so scrolls placed directly on the floor still
+// resolve their spell effect for every player.
+function collectScrollSpellIdsFromDungeonJson(dungenJson: unknown): Set<number> {
+  const ids = new Set<number>();
+  const root = asRecord(dungenJson);
+
+  const readArray = (...keys: string[]): unknown[] => {
+    for (const key of keys) {
+      const value = root[key];
+      if (Array.isArray(value)) {
+        return value;
+      }
+    }
+    return [];
+  };
+
+  const itemList = readArray('floorItemList', 'itemList', 'items');
+  for (const rawItem of itemList) {
+    const item = asRecord(rawItem);
+    const type = typeof item['type'] === 'string' ? item['type'].toLowerCase() : '';
+    if (type !== 'scroll') continue;
+    const scrollSpellId = item['scrollSpellId'] ?? item['scrollspellid'];
+    if (typeof scrollSpellId === 'number' && Number.isInteger(scrollSpellId) && scrollSpellId > 0) {
+      ids.add(scrollSpellId);
+    }
+  }
+
+  return ids;
+}
+
 function mapSpellRecordForSession(s: SpellRecord): Record<string, unknown> {
   return {
     id: s.id,
@@ -628,7 +660,8 @@ export const getGameById = async (req: Request, res: Response) => {
     let pcMaxHP: number | null = null;
     let pcSp: number | null = null;
     let pcSpLifetime: number | null = null;
-    let pcAgility: number = 3;
+    let pcDexterity: number = 3;
+    let pcAwareness: number = 5;
     let pcMind: number = 0;
     let pcStamina: number = 0;
     let pcAc: number = 10;
@@ -648,7 +681,8 @@ export const getGameById = async (req: Request, res: Response) => {
         pcMaxHP = pc.maxHP;
         pcSp = pc.sp;
         pcSpLifetime = pc.spLifetime ?? null;
-        pcAgility = pc.agility ?? 3;
+        pcDexterity = pc.dexterity ?? 3;
+        pcAwareness = pc.awareness ?? 5;
         pcMind = pc.mind;
         pcStamina = pc.stamina ?? 0;
         pcAc = pc.ac ?? 10;
@@ -719,21 +753,25 @@ export const getGameById = async (req: Request, res: Response) => {
           ));
           if (allItemIds.length > 0) {
             const items = await itemService.fetchItemsByIds(allItemIds);
-            pcTresherItems = items.map((it) => ({
-              id: it.id,
-              name: it.name,
-              description: it.description,
-              type: it.type,
-              soundId: it.soundId ?? null,
-              effectValue: it.effectValue,
-              damage: it.damage ?? 0,
-              range: Math.max(1, parseInt(String(it.range), 10) || 1),
-              armorSlot: it.armorSlot ?? null,
-              effectOn: it.effectOn ?? null,
-              effectToPc: it.effectToPc ?? null,
-              effectToPcValue: it.effectToPcValue ?? 0,
-              uses: it.uses ?? null,
-            }));
+          pcTresherItems = items.map((it) => ({
+            id: it.id,
+            name: it.name,
+            description: it.description,
+            type: it.type,
+            imageId: it.imageId,
+            soundId: it.soundId ?? null,
+            effectValue: it.effectValue,
+            damage: it.damage ?? 0,
+            range: Math.max(1, parseInt(String(it.range), 10) || 1),
+            armorSlot: it.armorSlot ?? null,
+            effectOn: it.effectOn ?? null,
+            effectToPc: it.effectToPc ?? null,
+            effectToPcValue: it.effectToPcValue ?? 0,
+            uses: it.uses ?? null,
+            minMindToRead: it.minMindToRead ?? 0,
+            scrollSpellId: it.scrollSpellId ?? null,
+            magicCost: it.magicCost ?? 1,
+          }));
           }
 
           const allPotionIds = Array.from(new Set(
@@ -853,8 +891,23 @@ export const getGameById = async (req: Request, res: Response) => {
             effectOn: it.effectOn ?? null,
             effectToPc: it.effectToPc ?? null,
             effectToPcValue: it.effectToPcValue ?? 0,
+            uses: it.uses ?? null,
+            minMindToRead: it.minMindToRead ?? 0,
+            scrollSpellId: it.scrollSpellId ?? null,
+            magicCost: it.magicCost ?? 1,
           })),
         ];
+      }
+      const existingSpellIdsAfterItems = new Set(pcTresherSpells.map((s) => (s as { id: number }).id));
+      const scrollSpellIds = Array.from(new Set([
+        ...collectScrollSpellIdsFromDungeonJson(dungonJsonObj),
+        ...pcTresherItems
+          .map((it) => (it as { scrollSpellId?: number | null }).scrollSpellId)
+          .filter((id): id is number => typeof id === 'number' && id > 0),
+      ])).filter((spellId) => !existingSpellIdsAfterItems.has(spellId));
+      if (scrollSpellIds.length > 0) {
+        const scrollSpells = await spellService.fetchSpellsByIdsForGame(scrollSpellIds);
+        pcTresherSpells = [...pcTresherSpells, ...scrollSpells.map(mapSpellRecordForSession)];
       }
     } catch {
       // non-fatal — proceed without dungeon tresher items
@@ -945,7 +998,7 @@ export const getGameById = async (req: Request, res: Response) => {
       pcTresherCurses = [];
     }
 
-    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcTresherCurses, pcCurrentHP, pcMaxHP, pcSp, pcSpLifetime, pcAgility, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, pcImagePath, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false, monsterImages, obstacleImages, lootImages, soundPaths, dungonCoverImagePath });
+    return res.json({ ...game, pcTreshers, pcTresherItems, pcTresherPotions, pcTresherSpells, pcTresherCurses, pcCurrentHP, pcMaxHP, pcSp, pcSpLifetime, pcDexterity, pcAwareness, pcMind, pcStamina, pcAc, pcStrength, pcMagicPower, pcNumberOfAttacks, pcNumberOfDefends, pcType, pcSpecies, pcName, pcImagePath, currentPcId, dungonSpReward, isMainGame: dungonStatus?.ismaingame ?? false, resettablePerPc: dungonStatus?.resettable_per_pc ?? false, monsterImages, obstacleImages, lootImages, soundPaths, dungonCoverImagePath });
   } catch (error) {
     console.error('Error fetching game by id:', error);
     return res.status(500).json({ error: 'Failed to fetch game' });
@@ -1246,6 +1299,9 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
             effectToPc: it.effectToPc ?? null,
             effectToPcValue: it.effectToPcValue ?? 0,
             uses: it.uses ?? null,
+            minMindToRead: it.minMindToRead ?? 0,
+            scrollSpellId: it.scrollSpellId ?? null,
+            magicCost: it.magicCost ?? 1,
           }));
         }
 
@@ -1426,8 +1482,23 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
             effectOn: it.effectOn ?? null,
             effectToPc: it.effectToPc ?? null,
             effectToPcValue: it.effectToPcValue ?? 0,
+            uses: it.uses ?? null,
+            minMindToRead: it.minMindToRead ?? 0,
+            scrollSpellId: it.scrollSpellId ?? null,
+            magicCost: it.magicCost ?? 1,
           })),
         ];
+      }
+      const existingSpellIdsAfterItems = new Set(pcTresherSpells.map((s) => (s as { id: number }).id));
+      const scrollSpellIds = Array.from(new Set([
+        ...collectScrollSpellIdsFromDungeonJson(dungonJsonObj),
+        ...pcTresherItems
+          .map((it) => (it as { scrollSpellId?: number | null }).scrollSpellId)
+          .filter((id): id is number => typeof id === 'number' && id > 0),
+      ])).filter((spellId) => !existingSpellIdsAfterItems.has(spellId));
+      if (scrollSpellIds.length > 0) {
+        const scrollSpells = await spellService.fetchSpellsByIdsForGame(scrollSpellIds);
+        pcTresherSpells = [...pcTresherSpells, ...scrollSpells.map(mapSpellRecordForSession)];
       }
     } catch {
       // non-fatal — proceed without dungeon tresher items
@@ -1557,7 +1628,8 @@ export const getSampleGameSession = async (req: Request, res: Response) => {
       pcMaxHP: pc.maxHP,
       pcSp: 0,
       pcSpLifetime: 0,
-      pcAgility: pc.agility ?? 3,
+      pcDexterity: pc.dexterity ?? 3,
+      pcAwareness: pc.awareness ?? 5,
       pcMind: pc.mind,
       pcStamina: pc.stamina,
       pcAc: pc.ac ?? 10,

@@ -31,6 +31,8 @@ const SELECT_ITEM_FIELDS = `
   ispublic AS "isPublic",
   COALESCE(istwohanded, false) AS "isTwoHanded",
   uses,
+  scrollspellid AS "scrollSpellId",
+  COALESCE(magiccost, 1) AS "magicCost",
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -59,6 +61,8 @@ const SELECT_ITEM_FIELDS_LEGACY = `
   ispublic AS "isPublic",
   COALESCE(istwohanded, false) AS "isTwoHanded",
   uses,
+  NULL::int AS "scrollSpellId",
+  1 AS "magicCost",
   createdat::text AS "createdAt",
   updatedat::text AS "updatedAt"
 `;
@@ -160,8 +164,8 @@ exports.getAllItemsWithUsername = getAllItemsWithUsername;
 const insertItemForUser = async (userguid, payload) => {
     const { rows } = await db_1.default.query(`INSERT INTO items
        (userguid, name, description, type, range, value, weight, curseid,
-        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, note, minmindtoread, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded, uses)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+        effectvalue, damage, armorslot, effecton, effecttopc, effecttopcvalue, note, minmindtoread, weaponeffecttype, weaponeffectcolor, imageid, soundid, ispublic, istwohanded, uses, scrollspellid, magiccost)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
      RETURNING ${SELECT_ITEM_FIELDS}`, [
         userguid,
         payload.name,
@@ -186,6 +190,8 @@ const insertItemForUser = async (userguid, payload) => {
         payload.isPublic,
         payload.isTwoHanded,
         payload.uses,
+        payload.scrollSpellId,
+        payload.magicCost,
     ]);
     return rows[0];
 };
@@ -214,8 +220,10 @@ const updateItemForUser = async (id, userguid, payload) => {
          ispublic = $20,
          istwohanded = $21,
          uses = $22,
+         scrollspellid = $23,
+         magiccost = $24,
          updatedat = NOW()
-       WHERE id = $23 AND userguid = $24
+       WHERE id = $25 AND userguid = $26
      RETURNING ${SELECT_ITEM_FIELDS}`, [
         payload.name,
         payload.description,
@@ -239,6 +247,8 @@ const updateItemForUser = async (id, userguid, payload) => {
         payload.isPublic,
         payload.isTwoHanded,
         payload.uses,
+        payload.scrollSpellId,
+        payload.magicCost,
         id,
         userguid,
     ]);

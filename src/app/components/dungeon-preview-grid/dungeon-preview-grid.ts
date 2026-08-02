@@ -253,6 +253,72 @@ export class DungeonPreviewGridComponent {
       this.drawTresherCoinMarker(context, centerX, centerY, 3.5);
     }
 
+    // Draw obstacle markers (image thumbnail or shape/color fallback marker)
+    const obstacleImages = this.obstacleImagesBySquare();
+    for (const obs of this.obstaclePlacements()) {
+      if (obs.isDestroyed) continue;
+      const obsSquareKey = this.getSquareKey(obs.row, obs.column);
+      if (!visibleSquareKeys.has(obsSquareKey)) continue;
+      const previewRow = obs.row - preview.startRow;
+      const previewColumn = obs.column - preview.startColumn;
+      if (previewRow >= 0 && previewColumn >= 0 && previewRow < this.dimension && previewColumn < this.dimension) {
+        const centerX = previewColumn * this.cellSize + this.cellSize / 2;
+        const centerY = previewRow * this.cellSize + this.cellSize / 2;
+        const obsImg = obstacleImages.get(obsSquareKey) ?? null;
+        if (obsImg && obsImg.naturalWidth > 0) {
+          const imgSize = this.cellSize - 2;
+          context.drawImage(obsImg, previewColumn * this.cellSize + 1, previewRow * this.cellSize + 1, imgSize, imgSize);
+        } else {
+          const radius = this.cellSize * 0.32;
+          const markerColor = (obs.color ?? '').trim() || '#a0856a';
+          context.fillStyle = markerColor;
+          context.strokeStyle = '#5c4532';
+          context.lineWidth = 1.5;
+          if ((obs.shape ?? 'circle') === 'square') {
+            const size = radius * 2;
+            const left = centerX - radius;
+            const top = centerY - radius;
+            context.fillRect(left, top, size, size);
+            context.strokeRect(left, top, size, size);
+          } else {
+            context.beginPath();
+            context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            context.fill();
+            context.stroke();
+          }
+        }
+
+        if (obs.requiredKeyId !== null && obs.requiredKeyId !== undefined) {
+          const keyholeRadius = Math.max(2, this.cellSize * 0.11);
+          const keyholeCenterY = centerY - this.cellSize * 0.08;
+          const shaftWidth = Math.max(2, this.cellSize * 0.12);
+          const shaftHeight = Math.max(3, this.cellSize * 0.16);
+
+          context.fillStyle = 'rgba(255,255,255,0.78)';
+          context.beginPath();
+          context.arc(centerX, keyholeCenterY, keyholeRadius, 0, Math.PI * 2);
+          context.fill();
+          context.fillRect(
+            centerX - shaftWidth / 2,
+            keyholeCenterY + keyholeRadius * 0.35,
+            shaftWidth,
+            shaftHeight
+          );
+
+          context.fillStyle = '#1f1f1f';
+          context.beginPath();
+          context.arc(centerX, keyholeCenterY, keyholeRadius * 0.52, 0, Math.PI * 2);
+          context.fill();
+          context.fillRect(
+            centerX - shaftWidth * 0.25,
+            keyholeCenterY + keyholeRadius * 0.45,
+            shaftWidth * 0.5,
+            shaftHeight * 0.85
+          );
+        }
+      }
+    }
+
     if (this.combatRange() > 0) {
       const range = this.combatRange();
       const pRow = preview.centerRow;
@@ -403,72 +469,6 @@ export class DungeonPreviewGridComponent {
         context.textAlign = 'center';
         context.textBaseline = 'middle';
         context.fillText('T', centerX, centerY);
-      }
-    }
-
-    // Draw obstacle markers (image thumbnail or shape/color fallback marker)
-    const obstacleImages = this.obstacleImagesBySquare();
-    for (const obs of this.obstaclePlacements()) {
-      if (obs.isDestroyed) continue;
-      const obsSquareKey = this.getSquareKey(obs.row, obs.column);
-      if (!visibleSquareKeys.has(obsSquareKey)) continue;
-      const previewRow = obs.row - preview.startRow;
-      const previewColumn = obs.column - preview.startColumn;
-      if (previewRow >= 0 && previewColumn >= 0 && previewRow < this.dimension && previewColumn < this.dimension) {
-        const centerX = previewColumn * this.cellSize + this.cellSize / 2;
-        const centerY = previewRow * this.cellSize + this.cellSize / 2;
-        const obsImg = obstacleImages.get(obsSquareKey) ?? null;
-        if (obsImg && obsImg.naturalWidth > 0) {
-          const imgSize = this.cellSize - 2;
-          context.drawImage(obsImg, previewColumn * this.cellSize + 1, previewRow * this.cellSize + 1, imgSize, imgSize);
-        } else {
-          const radius = this.cellSize * 0.32;
-          const markerColor = (obs.color ?? '').trim() || '#a0856a';
-          context.fillStyle = markerColor;
-          context.strokeStyle = '#5c4532';
-          context.lineWidth = 1.5;
-          if ((obs.shape ?? 'circle') === 'square') {
-            const size = radius * 2;
-            const left = centerX - radius;
-            const top = centerY - radius;
-            context.fillRect(left, top, size, size);
-            context.strokeRect(left, top, size, size);
-          } else {
-            context.beginPath();
-            context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-            context.fill();
-            context.stroke();
-          }
-        }
-
-        if (obs.requiredKeyId !== null && obs.requiredKeyId !== undefined) {
-          const keyholeRadius = Math.max(2, this.cellSize * 0.11);
-          const keyholeCenterY = centerY - this.cellSize * 0.08;
-          const shaftWidth = Math.max(2, this.cellSize * 0.12);
-          const shaftHeight = Math.max(3, this.cellSize * 0.16);
-
-          context.fillStyle = 'rgba(255,255,255,0.78)';
-          context.beginPath();
-          context.arc(centerX, keyholeCenterY, keyholeRadius, 0, Math.PI * 2);
-          context.fill();
-          context.fillRect(
-            centerX - shaftWidth / 2,
-            keyholeCenterY + keyholeRadius * 0.35,
-            shaftWidth,
-            shaftHeight
-          );
-
-          context.fillStyle = '#1f1f1f';
-          context.beginPath();
-          context.arc(centerX, keyholeCenterY, keyholeRadius * 0.52, 0, Math.PI * 2);
-          context.fill();
-          context.fillRect(
-            centerX - shaftWidth * 0.25,
-            keyholeCenterY + keyholeRadius * 0.45,
-            shaftWidth * 0.5,
-            shaftHeight * 0.85
-          );
-        }
       }
     }
 

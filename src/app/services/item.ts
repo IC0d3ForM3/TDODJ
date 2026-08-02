@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { finalize, Observable } from 'rxjs';
 import { API_BASE_URL } from '../api-config';
 
-export type ItemType = 'weapon' | 'armor' | 'pick' | 'light' | 'ring' | 'necklace' | 'neckless' | 'gem' | 'other';
+export type ItemType = 'weapon' | 'armor' | 'pick' | 'light' | 'ring' | 'necklace' | 'neckless' | 'gem' | 'scroll' | 'other';
 
 export interface UserItemListItem {
   id: number;
@@ -30,6 +30,8 @@ export interface UserItemListItem {
   isPublic: boolean;
   isTwoHanded: boolean;
   uses: number | null;
+  scrollSpellId: number | null;
+  magicCost: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,6 +59,8 @@ export interface UserItemWritePayload {
   isPublic: boolean;
   isTwoHanded: boolean;
   uses: number | null;
+  scrollSpellId: number | null;
+  magicCost: number;
 }
 
 export interface ItemResponse {
